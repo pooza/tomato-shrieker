@@ -9,14 +9,14 @@ module TomatoToot
         feed = TomatoToot::Feed.new(feed, config)
         feed.bodies(options).each do |body|
           mastodon.create_status(body)
-          loggerr.info({message: 'tooted', body: body}.to_json)
+          logger.info({message: 'tooted', body: body}.to_json)
         end
         feed.touch
       end
-      loggerr.info({message: 'executed', options: options}.to_json)
+      logger.info({message: 'executed', options: options}.to_json)
     rescue => e
       puts "#{e.class} #{e.message}"
-      loggerr.error({class: e.class, message: e.message}.to_json)
+      logger.error({class: e.class, message: e.message}.to_json)
       exit 1
     end
 
