@@ -7,13 +7,16 @@ module TomatoToot
     def execute (options)
       config['local']['feeds'].each do |feed|
         feed = TomatoToot::Feed.new(feed, config)
-        feed.bodies(options).each do |item|
-          mastodon.create_status(item)
+        feed.bodies(options).each do |body|
+          mastodon.create_status(body)
+          loggerr.info({message: 'tooted', body: body}.to_json)
         end
         feed.touch
       end
+      loggerr.info({message: 'executed', options: options}.to_json)
     rescue => e
       puts "#{e.class} #{e.message}"
+      loggerr.error({class: e.class, message: e.message}.to_json)
       exit 1
     end
 
@@ -26,6 +29,13 @@ module TomatoToot
         end
       end
       return @config
+    end
+
+    def logger
+      unless @logger
+        @logger = Syslog::Logger.new(config['application']['name'])
+      end
+      return @logger
     end
 
     def mastodon

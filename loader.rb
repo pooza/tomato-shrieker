@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-#
+
 path = File.expand_path(__FILE__)
 while File.symlink?(path)
   path = File.expand_path(File.readlink(path))
