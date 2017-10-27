@@ -29,14 +29,13 @@ module TomatoToot
 
     def items
       return enum_for(__method__) unless block_given?
-      shortener = TomatoToot::URLShortener.new(@config)
       @feed.items.reverse.each do |item|
         entry = {
           date: item.pubDate + (tz_offset * 3600),
           feed: @name,
           title: item.title,
           body: item.description,
-          url: shortener.shorten(item.link),
+          url: item.link,
         }
         yield entry
       end
@@ -45,9 +44,15 @@ module TomatoToot
     def bodies (options = {})
       return enum_for(__method__, options) unless block_given?
       items.each do |item|
-        if (options['all'] || (timestamp < item[:date]))
-          yield ["[#{item[:feed]}]", item[:body], item[:url]].join(' ')
+        next if (options['tag'] && !item[:body].match("##{options['tag']}"))
+        next if (!options['all'] && (item[:date] <= timestamp))
+        body = ["[#{item[:feed]}]", item[:body]]
+        if (options['shorten'])
+          body.push(shortener.shorten(item[:url]))
+        else
+          body.push(item[:url])
         end
+        yield body.join(' ')
       end
     end
 
@@ -58,6 +63,13 @@ module TomatoToot
 
     def tz_offset
       return (@config['local']['tz_offset'].to_i || 0)
+    end
+
+    def shortener
+      unless @shortener
+        @shortener = TomatoToot::URLShortener.new(@config)
+      end
+      return @shortener
     end
   end
 end
