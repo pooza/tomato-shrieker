@@ -1,5 +1,6 @@
 require 'yaml'
 require 'mastodon'
+require 'syslog/logger'
 require 'tomato-toot/feed'
 
 module TomatoToot
