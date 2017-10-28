@@ -8,9 +8,11 @@ module TomatoToot
     def execute (options)
       config['local']['feeds'].each do |feed|
         feed = TomatoToot::Feed.new(feed, config)
-        feed.bodies(options).each do |body|
-          mastodon.create_status(body)
-          logger.info({message: 'tooted', body: body}.to_json)
+        if feed.touched?
+          feed.bodies(options).each do |body|
+            mastodon.create_status(body)
+            logger.info({message: 'tooted', body: body}.to_json)
+          end
         end
         feed.touch
       end
@@ -40,10 +42,13 @@ module TomatoToot
     end
 
     def mastodon
-      return ::Mastodon::REST::Client.new({
-        base_url: config['local']['services']['mastodon']['url'],
-        bearer_token: config['local']['services']['mastodon']['access_token'],
-      })
+      unless @mastodon
+        @mastodon = Mastodon::REST::Client.new({
+          base_url: config['local']['services']['mastodon']['url'],
+          bearer_token: config['local']['services']['mastodon']['access_token'],
+        })
+      end
+      return @mastodon
     end
   end
 end

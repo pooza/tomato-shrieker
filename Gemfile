@@ -1,6 +1,7 @@
 source 'https://rubygems.org'
 gem 'bundler'
-gem "mastodon-api"
+gem 'activesupport'
+gem 'mastodon-api'
 gem 'httparty'
+gem 'addressable'
 gem 'syslog-logger'
-

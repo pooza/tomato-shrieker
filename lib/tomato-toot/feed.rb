@@ -12,14 +12,17 @@ module TomatoToot
       @feed = RSS::Parser.parse(values['url'])
     end
 
+    def touched?
+      return File.exist?(timestamp_path)
+    end
+
     def touch
-      if (newest = @feed.items.first)
-        File.write(timestamp_path, {date: newest.pubDate + (tz_offset * 3600)}.to_json)
-      end
+      File.write(timestamp_path, items.last[:date].strftime('%F %T')) if items.present?
     end
 
     def timestamp
-      return Time.parse(File.read(timestamp_path)) if File.exist?(timestamp_path)
+      return Time.parse(File.read(timestamp_path))
+    rescue
       return Time.parse('1970/10/01')
     end
 
@@ -31,7 +34,7 @@ module TomatoToot
       return enum_for(__method__) unless block_given?
       @feed.items.reverse.each do |item|
         entry = {
-          date: item.pubDate + (tz_offset * 3600),
+          date: item.pubDate,
           feed: @name,
           title: item.title,
           body: item.description,
@@ -59,10 +62,6 @@ module TomatoToot
     private
     def timestamp_path
       return File.join(ROOT_DIR, 'tmp/timestamps', "#{Digest::SHA1.hexdigest(@url)}.json")
-    end
-
-    def tz_offset
-      return (@config['local']['tz_offset'].to_i || 0)
     end
 
     def shortener
