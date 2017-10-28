@@ -15,7 +15,7 @@ require 'optparse'
 require 'tomato-toot/application'
 
 begin
-  options = ARGV.getopts('', 'all', 'shorten', 'tag:')
+  options = ARGV.getopts('', 'all', 'shorten', 'tag:', 'mode:')
 rescue OptionParser::InvalidOption => e
   puts "#{e.class} #{e.message}"
   exit 1
