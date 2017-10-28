@@ -19,8 +19,7 @@ module TomatoToot
 
     def touch
       if items.present?
-        time = items.to_a.last[:date] + (@tz || 0) * 3600
-        File.write(timestamp_path, time.strftime('%F %T'))
+        File.write(timestamp_path, items.to_a.last[:date].strftime('%F %z %T'))
       end
     end
 
