@@ -5,18 +5,18 @@ require 'tomato-toot/feed'
 
 module TomatoToot
   class Application
-    def execute (options)
+    def execute
       config['local']['feeds'].each do |feed|
         feed = TomatoToot::Feed.new(feed, config)
         if feed.touched?
-          feed.fetch(options).each do |body|
+          feed.fetch do |body|
             mastodon.create_status(body)
-            logger.info({message: 'tooted', body: body}.to_json)
+            logger.info({message: 'toot', body: body}.to_json)
           end
         end
         feed.touch
       end
-      logger.info({message: 'executed', options: options}.to_json)
+      logger.info({message: 'complete', options: options}.to_json)
     rescue => e
       puts "#{e.class} #{e.message}"
       logger.error({class: e.class, message: e.message}.to_json)

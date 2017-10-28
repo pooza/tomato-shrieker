@@ -5,11 +5,15 @@ require 'tomato-toot/url_shortener'
 
 module TomatoToot
   class Feed
-    def initialize (values, config = {})
+    def initialize (params, config = {})
       @config = config
-      @name = values['name']
-      @url = values['url']
-      @feed = RSS::Parser.parse(values['url'])
+      @params = params
+      @params['mode'] ||= 'body'
+      @feed = RSS::Parser.parse(self.url)
+    end
+
+    def [] (key)
+      return @params[key]
     end
 
     def touched?
@@ -29,16 +33,12 @@ module TomatoToot
       return Time.parse('1970/10/01')
     end
 
-    def title
-      return @feed.channel.title
-    end
-
     def items
       return enum_for(__method__) unless block_given?
       @feed.items.reverse.each do |item|
         entry = {
           date: item.pubDate,
-          feed: @name,
+          feed: self.name,
           title: item.title,
           body: item.description,
           url: item.link,
@@ -48,13 +48,12 @@ module TomatoToot
     end
 
     def fetch (options = {})
-      options['mode'] ||= 'body'
       return enum_for(__method__, options) unless block_given?
       items.each do |item|
-        next if (options['tag'] && !item[:body].match("##{options['tag']}"))
-        next if (!options['all'] && (item[:date] <= timestamp))
+        next if (@params['tag'] && !item[:body].match("#{@params['tag']}"))
+        next if (item[:date] <= timestamp))
         body = ["[#{item[:feed]}]"]
-        case options['mode']
+        case self.mode
         when 'body'
           body.push(item[:body])
         when 'title'
@@ -62,7 +61,7 @@ module TomatoToot
         else
           body.push('')
         end
-        if (options['shorten'])
+        if self.shorten
           body.push(shortener.shorten(item[:url]))
         else
           body.push(item[:url])
