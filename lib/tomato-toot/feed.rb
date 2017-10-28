@@ -53,7 +53,7 @@ module TomatoToot
       items.each do |item|
         next if (options['tag'] && !item[:body].match("##{options['tag']}"))
         next if (!options['all'] && (item[:date] <= timestamp))
-        body = ["[#{item[:feed]}]"]]
+        body = ["[#{item[:feed]}]"]
         case options['mode']
         when 'body'
           body.push(item[:body])
