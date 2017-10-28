@@ -73,7 +73,7 @@ module TomatoToot
 
     private
     def timestamp_path
-      return File.join(ROOT_DIR, 'tmp/timestamps', "#{Digest::SHA1.hexdigest(@url)}.json")
+      return File.join(ROOT_DIR, 'tmp/timestamps', Digest::SHA1.hexdigest(@url))
     end
 
     def shortener
