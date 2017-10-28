@@ -49,8 +49,8 @@ module TomatoToot
 
     def fetch (options = {})
       return enum_for(__method__, options) unless block_given?
-      items.each do |item|
-        next if (@params['tag'] && !item[:body].match("#{@params['tag']}"))
+      items do |item|
+        next if (@params['tag'] && !item[:body].match(@params['tag']))
         next if (item[:date] <= timestamp)
         body = ["[#{item[:feed]}]"]
         case self['mode']
