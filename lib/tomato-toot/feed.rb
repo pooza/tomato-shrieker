@@ -9,7 +9,6 @@ module TomatoToot
       @config = config
       @name = values['name']
       @url = values['url']
-      @zone = values['zone']
       @feed = RSS::Parser.parse(values['url'])
     end
 
@@ -48,12 +47,21 @@ module TomatoToot
       end
     end
 
-    def bodies (options = {})
+    def fetch (options = {})
+      options['mode'] ||= 'body'
       return enum_for(__method__, options) unless block_given?
       items.each do |item|
         next if (options['tag'] && !item[:body].match("##{options['tag']}"))
         next if (!options['all'] && (item[:date] <= timestamp))
-        body = ["[#{item[:feed]}]", item[:body]]
+        body = ["[#{item[:feed]}]"]]
+        case options['mode']
+        when 'body'
+          body.push(item[:body])
+        when 'title'
+          body.push(item[:title])
+        else
+          body.push('')
+        end
         if (options['shorten'])
           body.push(shortener.shorten(item[:url]))
         else

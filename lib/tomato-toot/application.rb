@@ -9,7 +9,7 @@ module TomatoToot
       config['local']['feeds'].each do |feed|
         feed = TomatoToot::Feed.new(feed, config)
         if feed.touched?
-          feed.bodies(options).each do |body|
+          feed.fetch(options).each do |body|
             mastodon.create_status(body)
             logger.info({message: 'tooted', body: body}.to_json)
           end
