@@ -9,7 +9,7 @@ module TomatoToot
       @config = config
       @params = params
       @params['mode'] ||= 'body'
-      @feed = RSS::Parser.parse(self.url)
+      @feed = RSS::Parser.parse(self['url'])
     end
 
     def [] (key)
@@ -38,7 +38,7 @@ module TomatoToot
       @feed.items.reverse.each do |item|
         entry = {
           date: item.pubDate,
-          feed: self.name,
+          feed: self['name'],
           title: item.title,
           body: item.description,
           url: item.link,
@@ -53,7 +53,7 @@ module TomatoToot
         next if (@params['tag'] && !item[:body].match("#{@params['tag']}"))
         next if (item[:date] <= timestamp)
         body = ["[#{item[:feed]}]"]
-        case self.mode
+        case self['mode']
         when 'body'
           body.push(item[:body])
         when 'title'
@@ -61,7 +61,7 @@ module TomatoToot
         else
           body.push('')
         end
-        if self.shorten
+        if self['shorten']
           body.push(shortener.shorten(item[:url]))
         else
           body.push(item[:url])
@@ -72,7 +72,7 @@ module TomatoToot
 
     private
     def timestamp_path
-      return File.join(ROOT_DIR, 'tmp/timestamps', Digest::SHA1.hexdigest(self.url))
+      return File.join(ROOT_DIR, 'tmp/timestamps', Digest::SHA1.hexdigest(self['url']))
     end
 
     def shortener
