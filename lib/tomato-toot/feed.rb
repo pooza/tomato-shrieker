@@ -19,8 +19,7 @@ module TomatoToot
 
     def touch
       if items.present?
-        time = items.to_a.last[:date]
-        time.zone = @zone
+        time = items.to_a.last[:date].getlocal
         File.write(timestamp_path, time.strftime('%F %z %T'))
       end
     end
