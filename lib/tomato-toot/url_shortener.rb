@@ -1,5 +1,6 @@
 require 'json'
 require 'uri'
+require 'addressable/uri'
 require 'httparty'
 
 module TomatoToot
@@ -17,8 +18,8 @@ module TomatoToot
 
     private
     def service_url
-      url = URI.parse(@config['application']['services']['url_shortener']['url'])
-      url.query = "key=#{api_key}"
+      url = Addressable::URI.parse(@config['application']['services']['url_shortener']['url'])
+      url.query_values['key'] = api_key
       return url.to_s
     end
 
