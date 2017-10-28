@@ -9,7 +9,7 @@ module TomatoToot
       @config = config
       @name = values['name']
       @url = values['url']
-      @tz = values['tz']
+      @zone = values['zone']
       @feed = RSS::Parser.parse(values['url'])
     end
 
@@ -19,7 +19,9 @@ module TomatoToot
 
     def touch
       if items.present?
-        File.write(timestamp_path, items.to_a.last[:date].strftime('%F %z %T'))
+        time = items.to_a.last[:date]
+        time.zone = @zone
+        File.write(timestamp_path, time.strftime('%F %z %T'))
       end
     end
 
