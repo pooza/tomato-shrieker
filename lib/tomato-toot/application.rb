@@ -16,7 +16,7 @@ module TomatoToot
         end
         feed.touch
       end
-      logger.info({message: 'complete', options: options}.to_json)
+      logger.info({message: 'complete'}.to_json)
     rescue => e
       puts "#{e.class} #{e.message}"
       logger.error({class: e.class, message: e.message}.to_json)
