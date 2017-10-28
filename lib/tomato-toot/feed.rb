@@ -9,6 +9,7 @@ module TomatoToot
       @config = config
       @name = values['name']
       @url = values['url']
+      @tz = values['tz']
       @feed = RSS::Parser.parse(values['url'])
     end
 
@@ -17,7 +18,10 @@ module TomatoToot
     end
 
     def touch
-      File.write(timestamp_path, items.last[:date].strftime('%F %T')) if items.present?
+      if items.present?
+        time = items.to_a.last[:date] + (@tz || 0) * 3600
+        File.write(timestamp_path, time.strftime('%F %T'))
+      end
     end
 
     def timestamp
