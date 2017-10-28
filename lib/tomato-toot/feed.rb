@@ -51,7 +51,7 @@ module TomatoToot
       return enum_for(__method__, options) unless block_given?
       items.each do |item|
         next if (@params['tag'] && !item[:body].match("#{@params['tag']}"))
-        next if (item[:date] <= timestamp))
+        next if (item[:date] <= timestamp)
         body = ["[#{item[:feed]}]"]
         case self.mode
         when 'body'
@@ -72,7 +72,7 @@ module TomatoToot
 
     private
     def timestamp_path
-      return File.join(ROOT_DIR, 'tmp/timestamps', Digest::SHA1.hexdigest(@url))
+      return File.join(ROOT_DIR, 'tmp/timestamps', Digest::SHA1.hexdigest(self.url))
     end
 
     def shortener
