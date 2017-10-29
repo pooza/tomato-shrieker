@@ -52,8 +52,8 @@ module TomatoToot
       items do |item|
         next if (item[:date] <= timestamp)
         body = ["[#{item[:prefix]}]"]
-        text = self['mode'].to_sym
-        next if (@params['tag'] && !text.match(@params['tag']))
+        text = item[self['mode'].to_sym]
+        next if (self['tag'] && !text.match("\##{self['tag']}"))
         body.push(text)
         url = item[:url]
         url = shortener.shorten(url) if self['shorten']
@@ -64,7 +64,14 @@ module TomatoToot
 
     private
     def timestamp_path
-      return File.join(ROOT_DIR, 'tmp/timestamps', Digest::SHA1.hexdigest(self['url']))
+      return File.join(
+        ROOT_DIR,
+        'tmp/timestamps',
+        Digest::SHA1.hexdigest([
+          self['url'],
+          self['mastodon']['url'],
+        ].join(' ')),
+      )
     end
 
     def shortener
