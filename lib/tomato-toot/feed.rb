@@ -53,14 +53,8 @@ module TomatoToot
         next if (@params['tag'] && !item[:body].match("##{@params['tag']}"))
         next if (item[:date] <= timestamp)
         body = ["[#{item[:prefix]}]"]
-        case self['mode']
-        when 'body'
-          body.push(item[:body])
-        when 'title'
-          body.push(item[:title])
-        else
-          body.push('')
-        end
+        text = self['mode'].to_sym
+        body.push(text) if (!@params['tag'] || text.match(@params['tag']))
         if self['shorten']
           body.push(shortener.shorten(item[:url]))
         else
