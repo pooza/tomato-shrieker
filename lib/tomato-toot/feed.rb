@@ -38,7 +38,7 @@ module TomatoToot
       @feed.items.reverse.each do |item|
         entry = {
           date: item.pubDate,
-          feed: self['name'],
+          prefix: self['prefix'],
           title: item.title,
           body: item.description,
           url: item.link,
@@ -50,9 +50,9 @@ module TomatoToot
     def fetch (options = {})
       return enum_for(__method__, options) unless block_given?
       items do |item|
-        next if (@params['tag'] && !item[:body].match(@params['tag']))
+        next if (@params['tag'] && !item[:body].match("##{@params['tag']}"))
         next if (item[:date] <= timestamp)
-        body = ["[#{item[:feed]}]"]
+        body = ["[#{item[:prefix]}]"]
         case self['mode']
         when 'body'
           body.push(item[:body])

@@ -1,3 +1,5 @@
+require 'active_support'
+require 'active_support/core_ext'
 require 'yaml'
 require 'mastodon'
 require 'syslog/logger'
@@ -6,9 +8,13 @@ require 'tomato-toot/feed'
 module TomatoToot
   class Application
     def execute
-      config['local']['feeds'].each do |feed|
-        feed = TomatoToot::Feed.new(feed, config)
+      config['local']['entries'].each do |entry|
+        feed = TomatoToot::Feed.new(entry, config)
         if feed.touched?
+          mastodon = Mastodon::REST::Client.new({
+            base_url: entry['mastodon']['url'],
+            bearer_token: entry['mastodon']['access_token'],
+          })
           feed.fetch do |body|
             mastodon.create_status(body)
             logger.info({message: 'toot', body: body}.to_json)
@@ -39,16 +45,6 @@ module TomatoToot
         @logger = Syslog::Logger.new(config['application']['name'])
       end
       return @logger
-    end
-
-    def mastodon
-      unless @mastodon
-        @mastodon = Mastodon::REST::Client.new({
-          base_url: config['local']['services']['mastodon']['url'],
-          bearer_token: config['local']['services']['mastodon']['access_token'],
-        })
-      end
-      return @mastodon
     end
   end
 end
