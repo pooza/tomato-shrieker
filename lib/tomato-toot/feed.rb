@@ -50,16 +50,14 @@ module TomatoToot
     def fetch (options = {})
       return enum_for(__method__, options) unless block_given?
       items do |item|
-        next if (@params['tag'] && !item[:body].match("##{@params['tag']}"))
         next if (item[:date] <= timestamp)
         body = ["[#{item[:prefix]}]"]
         text = self['mode'].to_sym
-        body.push(text) if (!@params['tag'] || text.match(@params['tag']))
-        if self['shorten']
-          body.push(shortener.shorten(item[:url]))
-        else
-          body.push(item[:url])
-        end
+        next if (@params['tag'] && !text.match(@params['tag']))
+        body.push(text)
+        url = item[:url]
+        url = shortener.shorten(url) if self['shorten']
+        body.push(url)
         yield body.join(' ')
       end
     end
