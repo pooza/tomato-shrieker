@@ -1,5 +1,6 @@
 require 'active_support'
 require 'active_support/core_ext'
+require 'json'
 require 'yaml'
 require 'mastodon'
 require 'syslog/logger'
@@ -13,7 +14,7 @@ module TomatoToot
         if feed.touched?
           mastodon = Mastodon::REST::Client.new({
             base_url: entry['mastodon']['url'],
-            bearer_token: entry['mastodon']['access_token'],
+            bearer_token: entry['mastodon']['token'],
           })
           feed.fetch do |body|
             mastodon.create_status(body)

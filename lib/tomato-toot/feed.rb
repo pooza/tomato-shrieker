@@ -6,14 +6,10 @@ require 'tomato-toot/url_shortener'
 module TomatoToot
   class Feed
     def initialize (params, config = {})
-      @config = config
       @params = params
-      @params['mode'] ||= 'body'
-      @feed = RSS::Parser.parse(self['url'])
-    end
-
-    def [] (key)
-      return @params[key]
+      @config = config
+      @params['source']['mode'] ||= 'title'
+      @feed = RSS::Parser.parse(@params['source']['url'])
     end
 
     def touched?
@@ -38,7 +34,6 @@ module TomatoToot
       @feed.items.reverse.each do |item|
         entry = {
           date: item.pubDate,
-          prefix: self['prefix'],
           title: item.title,
           body: item.description,
           url: item.link,
@@ -51,12 +46,13 @@ module TomatoToot
       return enum_for(__method__, options) unless block_given?
       items do |item|
         next if (item[:date] <= timestamp)
-        body = ["[#{item[:prefix]}]"]
-        text = item[self['mode'].to_sym]
-        next if (self['tag'] && !text.match("\##{self['tag']}"))
+        body = []
+        body.push("[#{@params['prefix']}]") if @params['prefix']
+        text = item[@params['source']['mode'].to_sym]
+        next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
         body.push(text)
         url = item[:url]
-        url = shortener.shorten(url) if self['shorten']
+        url = shortener.shorten(url) if @params['source']['shorten']
         body.push(url)
         yield body.join(' ')
       end
@@ -67,10 +63,7 @@ module TomatoToot
       return File.join(
         ROOT_DIR,
         'tmp/timestamps',
-        Digest::SHA1.hexdigest([
-          self['url'],
-          self['mastodon']['url'],
-        ].join(' ')),
+        Digest::SHA1.hexdigest(@params.to_json),
       )
     end
 
