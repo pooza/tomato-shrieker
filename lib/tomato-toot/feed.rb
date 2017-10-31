@@ -29,19 +29,6 @@ module TomatoToot
       return Time.parse('1970/10/01')
     end
 
-    def items
-      return enum_for(__method__) unless block_given?
-      @feed.items.reverse.each do |item|
-        entry = {
-          date: item.pubDate,
-          title: item.title,
-          body: item.description,
-          url: item.link,
-        }
-        yield entry
-      end
-    end
-
     def fetch (options = {})
       return enum_for(__method__, options) unless block_given?
       items do |item|
@@ -59,6 +46,19 @@ module TomatoToot
     end
 
     private
+    def items
+      return enum_for(__method__) unless block_given?
+      @feed.items.sort_by{|item| item.pubDate.to_f}.each do |item|
+        entry = {
+          date: item.pubDate,
+          title: item.title,
+          body: item.description,
+          url: item.link,
+        }
+        yield entry
+      end
+    end
+
     def timestamp_path
       return File.join(
         ROOT_DIR,
