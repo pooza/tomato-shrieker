@@ -9,7 +9,7 @@ require 'tomato-toot/feed'
 module TomatoToot
   class Application
     def execute
-      logger.info({message: 'start', application: config['application']['info']}.to_json)
+      logger.info({message: 'start', version: config['application']['version']}.to_json)
       config['local']['entries'].each do |entry|
         feed = TomatoToot::Feed.new(entry, config)
         if feed.touched?
@@ -25,11 +25,11 @@ module TomatoToot
         end
         feed.touch
       end
-      logger.info({message: 'complete', application: config['application']['info']}.to_json)
+      logger.info({message: 'complete', version: config['application']['version']}.to_json)
     rescue => e
       puts "#{e.class} #{e.message}"
       logger.error({class: e.class, message: e.message}.to_json)
-      logger.info({message: 'failed', application: config['application']['info']}.to_json)
+      logger.info({message: 'failed', version: config['application']['version']}.to_json)
       exit 1
     end
 
