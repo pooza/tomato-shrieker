@@ -1,10 +1,11 @@
 require 'rss'
-require 'json'
 require 'digest/sha1'
 require 'tomato-toot/url_shortener'
 
 module TomatoToot
   class Feed
+    attr_accessor :params
+
     def initialize (params, config = {})
       @params = params
       @config = config
@@ -63,7 +64,7 @@ module TomatoToot
       return File.join(
         ROOT_DIR,
         'tmp/timestamps',
-        Digest::SHA1.hexdigest(@params.to_json),
+        Digest::SHA1.hexdigest(@params.to_s),
       )
     end
 
