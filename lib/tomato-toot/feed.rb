@@ -1,4 +1,5 @@
 require 'feedjira'
+require 'addressable/uri'
 require 'digest/sha1'
 require 'tomato-toot/url_shortener'
 
@@ -58,10 +59,19 @@ module TomatoToot
           date: item.published,
           title: item.title,
           body: item.summary,
-          url: item.url,
+          url: create_url(item.url).to_s,
         }
         yield entry
       end
+    end
+
+    def create_url (url)
+      @url = Addressable::URI.parse(url)
+      unless @url.host
+        @url = Addressable::URI.parse(@feed.url)
+        @url.path = url
+      end
+      return @url
     end
 
     def timestamp_path
@@ -74,7 +84,7 @@ module TomatoToot
 
     def shortener
       unless @shortener
-        @shortener = TomatoToot::URLShortener.new(@config)
+        @shortener = URLShortener.new(@config)
       end
       return @shortener
     end

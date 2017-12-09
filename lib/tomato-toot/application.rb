@@ -11,7 +11,7 @@ module TomatoToot
     def execute
       logger.info({message: 'start', version: config['application']['version']}.to_json)
       config['local']['entries'].each do |entry|
-        feed = TomatoToot::Feed.new(entry, config)
+        feed = Feed.new(entry, config)
         if feed.touched?
           mastodon = Mastodon::REST::Client.new({
             base_url: entry['mastodon']['url'],
