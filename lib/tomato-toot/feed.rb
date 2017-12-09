@@ -1,4 +1,4 @@
-require 'rss'
+require 'feedjira'
 require 'digest/sha1'
 require 'tomato-toot/url_shortener'
 
@@ -10,7 +10,7 @@ module TomatoToot
       @params = params
       @config = config
       @params['source']['mode'] ||= 'title'
-      @feed = RSS::Parser.parse(@params['source']['url'])
+      @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
     end
 
     def touched?
@@ -49,12 +49,12 @@ module TomatoToot
     private
     def items
       return enum_for(__method__) unless block_given?
-      @feed.items.sort_by{|item| item.pubDate.to_f}.each do |item|
+      @feed.entries.each.sort_by{|item| item.published.to_f}.each do |item|
         entry = {
-          date: item.pubDate,
+          date: item.published,
           title: item.title,
-          body: item.description,
-          url: item.link,
+          body: item.summary,
+          url: item.url,
         }
         yield entry
       end
