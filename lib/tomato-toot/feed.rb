@@ -13,6 +13,10 @@ module TomatoToot
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
     end
 
+    def prefix
+      return (@params['prefix'] || @feed.title)
+    end
+
     def touched?
       return File.exist?(timestamp_path)
     end
@@ -35,7 +39,7 @@ module TomatoToot
       items do |item|
         next if (item[:date] <= timestamp)
         body = []
-        body.push("[#{@params['prefix']}]") if @params['prefix']
+        body.push("[#{prefix}]")
         text = item[@params['source']['mode'].to_sym]
         next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
         body.push(text)
