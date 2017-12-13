@@ -1,11 +1,12 @@
 require 'json'
 require 'addressable/uri'
 require 'httparty'
+require 'tomato-toot/config'
 
 module TomatoToot
   class URLShortener
-    def initialize (config = {})
-      @config = config
+    def initialize
+      @config = Config.new
     end
 
     def shorten (url)

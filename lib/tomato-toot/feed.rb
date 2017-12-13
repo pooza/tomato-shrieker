@@ -7,9 +7,8 @@ module TomatoToot
   class Feed
     attr_accessor :params
 
-    def initialize (params, config = {})
+    def initialize (params)
       @params = params
-      @config = config
       @params['source']['mode'] ||= 'title'
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
     end
@@ -45,7 +44,7 @@ module TomatoToot
         next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
         body.push(text)
         url = item[:url]
-        url = shortener.shorten(url) if @params['source']['shorten']
+        url = URLShortener.new.shorten(url) if @params['source']['shorten']
         body.push(url)
         yield body.join(' ')
       end
@@ -65,13 +64,13 @@ module TomatoToot
       end
     end
 
-    def create_url (url)
-      @url = Addressable::URI.parse(url)
-      unless @url.host
-        @url = Addressable::URI.parse(@feed.url)
-        @url.path = url
+    def create_url (src)
+      dest = Addressable::URI.parse(src)
+      unless dest.host
+        dest = Addressable::URI.parse(@feed.url)
+        dest.path = src
       end
-      return @url
+      return dest
     end
 
     def timestamp_path
@@ -80,13 +79,6 @@ module TomatoToot
         'tmp/timestamps',
         Digest::SHA1.hexdigest(@params.to_s),
       )
-    end
-
-    def shortener
-      unless @shortener
-        @shortener = URLShortener.new(@config)
-      end
-      return @shortener
     end
   end
 end
