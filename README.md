@@ -92,7 +92,7 @@ tomato-tootというプログラム名で、syslogに出力している。
 :programname, isequal, "tomato-toot" -/var/log/tomato-toot.log
 ```
 
-## ■操作
+### 操作
 
 loader.rbを実行する。root権限不要。  
 通常はcronで5分毎等で起動すればよいと思う。
