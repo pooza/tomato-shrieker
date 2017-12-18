@@ -11,7 +11,7 @@ module TomatoToot
 
     def shorten (url)
       return HTTParty.post(service_url, {
-        body: {longUrl: url}.to_json,
+        body: {longUrl: url.to_s}.to_json,
         headers: {'Content-Type' => 'application/json'},
       })['id']
     end
@@ -20,13 +20,9 @@ module TomatoToot
     def service_url
       url = Addressable::URI.parse(@config['application']['services']['url_shortener']['url'])
       query = url.query_values || {}
-      query['key'] = api_key
+      query['key'] = @config['local']['services']['url_shortener']['api_key']
       url.query_values = query
-      return url.to_s
-    end
-
-    def api_key
-      return @config['local']['services']['url_shortener']['api_key']
+      return url
     end
   end
 end
