@@ -1,7 +1,6 @@
 require 'active_support'
 require 'active_support/core_ext'
 require 'json'
-require 'mastodon'
 require 'syslog/logger'
 require 'tomato-toot/feed'
 require 'tomato-toot/config'
@@ -18,13 +17,9 @@ module TomatoToot
       @config['local']['entries'].each do |entry|
         feed = Feed.new(entry)
         if feed.touched?
-          mastodon = Mastodon::REST::Client.new({
-            base_url: entry['mastodon']['url'],
-            bearer_token: entry['mastodon']['token'],
-          })
           @logger.info(feed.params.to_json)
           feed.fetch do |body|
-            mastodon.create_status(body)
+            feed.mastodon.create_status(body)
             @logger.info({toot: body}.to_json)
           end
         end

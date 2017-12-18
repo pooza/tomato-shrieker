@@ -1,16 +1,22 @@
 require 'feedjira'
 require 'addressable/uri'
 require 'digest/sha1'
+require 'mastodon'
 require 'tomato-toot/url_shortener'
 
 module TomatoToot
   class Feed
     attr_accessor :params
+    attr_accessor :mastodon
 
     def initialize (params)
       @params = params
       @params['source']['mode'] ||= 'title'
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
+      @mastodon = Mastodon::REST::Client.new({
+        base_url: params['mastodon']['url'],
+        bearer_token: params['mastodon']['token'],
+      })
     end
 
     def prefix
@@ -34,7 +40,7 @@ module TomatoToot
       return Time.parse('1970/10/01')
     end
 
-    def fetch (options = {})
+    def fetch
       return enum_for(__method__, options) unless block_given?
       items do |item|
         next if (item[:date] <= timestamp)
