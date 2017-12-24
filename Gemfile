@@ -1,5 +1,4 @@
 source 'https://rubygems.org'
-gem 'bundler'
 gem 'activesupport'
 gem 'mastodon-api'
 gem 'httparty'
