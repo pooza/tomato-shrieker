@@ -41,7 +41,7 @@ module TomatoToot
     end
 
     def fetch
-      return enum_for(__method__, options) unless block_given?
+      return enum_for(__method__) unless block_given?
       items do |item|
         next if (item[:date] <= timestamp)
         body = []
