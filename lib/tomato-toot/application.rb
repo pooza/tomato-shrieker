@@ -16,12 +16,16 @@ module TomatoToot
       @logger.info({message: 'start', version: @config['application']['version']}.to_json)
       @config['local']['entries'].each do |entry|
         feed = Feed.new(entry)
+        @logger.info(feed.params.to_json)
         if feed.touched?
-          @logger.info(feed.params.to_json)
           feed.fetch do |body|
             feed.mastodon.create_status(body)
             @logger.info({toot: body}.to_json)
           end
+        else
+          body = feed.fetch.first
+          feed.mastodon.create_status(body)
+          @logger.info({toot: body}.to_json)
         end
         feed.touch
       end
