@@ -23,7 +23,7 @@ module TomatoToot
             @logger.info({toot: body}.to_json)
           end
         else
-          body = feed.fetch.first
+          body = feed.fetch.to_a.last
           feed.mastodon.create_status(body)
           @logger.info({toot: body}.to_json)
         end
