@@ -60,12 +60,6 @@ entries:
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
-  - source:
-      url: https://github.com/pooza/onionbot/releases.atom
-      mode: title
-    mastodon:
-      url: https://mstdn.b-shock.org
-      token: hogehoge
 slack:
   hook:
     url: https://hooks.slack.com/services/*********/*********/************************

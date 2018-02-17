@@ -70,11 +70,14 @@ module TomatoToot
       end
     end
 
-    def create_url (src)
-      dest = Addressable::URI.parse(src)
-      unless dest.host
-        dest = Addressable::URI.parse(@feed.url)
-        dest.path = src
+    def create_url (href)
+      url = Addressable::URI.parse(href)
+      unless url.scheme
+        local_url = url
+        url = Addressable::URI.parse(@feed.url)
+        url.path = local_url.path
+        url.query = local_url.query
+        url.fragment = local_url.fragment
       end
       return dest
     end
