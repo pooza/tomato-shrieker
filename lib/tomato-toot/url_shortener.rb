@@ -18,9 +18,9 @@ module TomatoToot
 
     private
     def service_url
-      url = Addressable::URI.parse(@config['application']['services']['url_shortener']['url'])
+      url = Addressable::URI.parse(@config['application']['url_shortener']['url'])
       query = url.query_values || {}
-      query['key'] = @config['local']['services']['url_shortener']['api_key']
+      query['key'] = @config['local']['url_shortener']['api_key']
       url.query_values = query
       return url
     end
