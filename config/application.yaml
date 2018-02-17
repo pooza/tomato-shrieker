@@ -1,5 +1,5 @@
 name: tomato-toot
-version: 1.0.2
+version: 1.0.3
 services:
   url_shortener:
     url: https://www.googleapis.com/urlshortener/v1/url
