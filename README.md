@@ -66,6 +66,9 @@ entries:
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
+slack:
+  hook:
+    url: https://hooks.slack.com/services/*********/*********/************************
 ```
 
 上記設定は、実際に使ってるもの。（但し、トークンとかは当然伏せてる）
@@ -85,6 +88,8 @@ entries:
 - mastodon内のtokenは、Mastodonの設定画面「開発」で作成する。  
   作成後に表示される __アクセストークン__ をコピペ。ほかの情報は要らない。  
   また、アクセス権は __write__ 以外は不要。
+- SlackのWebフックを指定可能。実行中の例外が、Slackに告知されるようになる。（省略可）  
+  また、DiscordのSlack互換Webフックでの動作も確認済み。
 
 ### syslog設定
 
