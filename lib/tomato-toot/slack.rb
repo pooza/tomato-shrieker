@@ -3,7 +3,7 @@ require 'httparty'
 require 'json'
 require 'tomato-toot/config'
 
-module OnionBot
+module TomatoToot
   class Slack
     def initialize
       @config = Config.new['local']['slack']

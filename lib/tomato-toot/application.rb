@@ -34,7 +34,7 @@ module TomatoToot
         rescue => e
           message = entry.clone
           message['error'] = e.message
-          @slack.say(e.message) if @slack
+          @slack.say(message) if @slack
           @logger.error({class: e.class, message: e.message}.to_json)
         end
       end
