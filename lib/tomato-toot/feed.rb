@@ -37,7 +37,7 @@ module TomatoToot
     def timestamp
       return Time.parse(File.read(timestamp_path))
     rescue
-      return Time.parse('1970/10/01')
+      return Time.parse('1970/01/01')
     end
 
     def fetch
