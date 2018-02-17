@@ -79,7 +79,7 @@ module TomatoToot
         url.query = local_url.query
         url.fragment = local_url.fragment
       end
-      return dest
+      return url
     end
 
     def timestamp_path
