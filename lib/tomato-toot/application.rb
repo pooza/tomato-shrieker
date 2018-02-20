@@ -9,7 +9,7 @@ require 'tomato-toot/config'
 module TomatoToot
   class Application
     def initialize
-      @config = Config.new
+      @config = Config.instance
       @logger = Syslog::Logger.new(@config['application']['name'])
       @slack = Slack.new if @config['local']['slack']
     end

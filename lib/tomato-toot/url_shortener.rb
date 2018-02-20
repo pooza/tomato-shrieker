@@ -6,7 +6,7 @@ require 'tomato-toot/config'
 module TomatoToot
   class URLShortener
     def initialize
-      @config = Config.new
+      @config = Config.instance
     end
 
     def shorten (url)

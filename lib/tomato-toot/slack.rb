@@ -6,7 +6,7 @@ require 'tomato-toot/config'
 module TomatoToot
   class Slack
     def initialize
-      @config = Config.new['local']['slack']
+      @config = Config.instance['local']['slack']
       @url = Addressable::URI.parse(@config['hook']['url'])
     end
 
