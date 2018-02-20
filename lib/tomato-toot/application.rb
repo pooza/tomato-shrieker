@@ -22,7 +22,7 @@ module TomatoToot
           if feed.touched?
             feed.fetch do |body|
               feed.mastodon.create_status(body)
-              Applicatiion.logger.info({toot: body}.to_json)
+              Application.logger.info({toot: body}.to_json)
             end
           else
             body = feed.fetch.to_a.last
