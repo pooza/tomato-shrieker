@@ -2,6 +2,7 @@ require 'feedjira'
 require 'addressable/uri'
 require 'digest/sha1'
 require 'mastodon'
+require 'tomato-toot/application'
 require 'tomato-toot/url_shortener'
 
 module TomatoToot
@@ -12,7 +13,12 @@ module TomatoToot
     def initialize (params)
       @params = params
       @params['source']['mode'] ||= 'title'
+
+      Feedjira.configure do |config|
+        config.user_agent = "#{Application.full_name} #{Application.url}"
+      end
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
+
       @mastodon = Mastodon::REST::Client.new({
         base_url: params['mastodon']['url'],
         bearer_token: params['mastodon']['token'],
