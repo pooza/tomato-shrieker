@@ -2,7 +2,7 @@ require 'feedjira'
 require 'addressable/uri'
 require 'digest/sha1'
 require 'mastodon'
-require 'tomato-toot/application'
+require 'tomato-toot/package'
 require 'tomato-toot/url_shortener'
 
 module TomatoToot
@@ -15,7 +15,7 @@ module TomatoToot
       @params['source']['mode'] ||= 'title'
 
       Feedjira.configure do |config|
-        config.user_agent = "#{Application.full_name} #{Application.url}"
+        config.user_agent = "#{Package.full_name} #{Package.url}"
       end
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
