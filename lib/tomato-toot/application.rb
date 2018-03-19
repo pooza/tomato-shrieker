@@ -36,7 +36,7 @@ module TomatoToot
           message = entry.clone
           message['error'] = e.message
           @slack.say(message) if @slack
-          @logger.error({class: e.class, message: e.message})
+          @logger.error(message)
         end
       end
       @logger.info({message: 'complete', version: Package.version})
