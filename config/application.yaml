@@ -1,6 +1,6 @@
 package:
   name: tomato-toot
-  version: 1.1.4
+  version: 1.1.5
   url: https://github.com/pooza/tomato-toot
 url_shortener:
   url: https://www.googleapis.com/urlshortener/v1/url

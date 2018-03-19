@@ -102,3 +102,18 @@ loader.rbを実行する。root権限不要。
   不完全なものになってる。これを補う為、エントリーURLが不完全な場合は、
   フィード自体が持ってるサイトのURLから必要な情報を補完し、完全なURLの生成を
   試みる。
+
+## ■設定ファイルの検索順
+
+local.yamlは、上記設置例ではconfigファイル内に置いているが、実際には以下の順に検索している。
+
+- /usr/local/etc/tomato-toot/local.yaml
+- /etc/tomato-toot/local.yaml
+- 設置先/config/tomato-toot/local.yaml
+
+同様に、local.yamlというファイルは、実際には以下の順に検索している。
+
+- local.yaml
+- local.yml
+
+設置先ディレクトリもファイル名も、そのファイルが発見できた時点で、以降の検索をやめる。
