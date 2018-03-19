@@ -49,7 +49,7 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      items do |item|
+      items.each do |item|
         next if (item[:date] <= timestamp)
         body = []
         body.push("[#{prefix}]")
