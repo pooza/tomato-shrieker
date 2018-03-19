@@ -19,6 +19,7 @@ module TomatoToot
       @config['local']['entries'].each do |entry|
         begin
           feed = Feed.new(entry)
+          raise 'empty' unless feed.present?
           @logger.info(feed.params)
           if feed.touched?
             feed.fetch do |body|

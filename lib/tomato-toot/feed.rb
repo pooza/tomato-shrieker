@@ -33,11 +33,12 @@ module TomatoToot
       return File.exist?(timestamp_path)
     end
 
+    def present?
+      return items.present?
+    end
+
     def touch
-      if items.to_a.present?
-        time = items.to_a.last[:date].getlocal
-        File.write(timestamp_path, time.strftime('%F %z %T'))
-      end
+      File.write(timestamp_path, updated_at.strftime('%F %z %T')) if present?
     end
 
     def timestamp
@@ -64,15 +65,25 @@ module TomatoToot
 
     private
     def items
-      return enum_for(__method__) unless block_given?
-      @feed.entries.each.sort_by{|item| item.published.to_f}.each do |item|
-        entry = {
-          date: item.published,
-          title: item.title,
-          body: item.summary,
-          url: create_url(item.url).to_s,
-        }
-        yield entry
+      unless @items
+        @items = []
+        @feed.entries.each.sort_by{|item| item.published.to_f}.each do |item|
+          @items.push({
+            date: item.published,
+            title: item.title,
+            body: item.summary,
+            url: create_url(item.url).to_s,
+          })
+        end
+      end
+      return @items
+    end
+
+    def updated_at
+      if present?
+        return items.last[:date].getlocal
+      else
+        return nil
       end
     end
 
