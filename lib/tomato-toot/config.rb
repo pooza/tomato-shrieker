@@ -1,5 +1,6 @@
 require 'yaml'
 require 'singleton'
+require 'tomato-toot/package'
 
 module TomatoToot
   class Config < Hash
@@ -20,8 +21,8 @@ module TomatoToot
 
     def dirs
       return [
-        File.join('/usr/local/etc', File.basename(ROOT_DIR)),
-        File.join('/etc', File.basename(ROOT_DIR)),
+        File.join('/usr/local/etc', Package.name),
+        File.join('/etc', Package.name),
         File.join(ROOT_DIR, 'config'),
       ]
     end

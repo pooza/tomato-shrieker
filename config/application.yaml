@@ -1,5 +1,4 @@
 package:
-  name: tomato-toot
   version: 1.1.7
   url: https://github.com/pooza/tomato-toot
 url_shortener:
