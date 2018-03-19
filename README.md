@@ -109,7 +109,7 @@ local.yamlは、上記設置例ではconfigディレクトリ内に置いてい�
 
 - /usr/local/etc/tomato-toot/local.yaml
 - /etc/tomato-toot/local.yaml
-- 設置先/config/tomato-toot/local.yaml
+- 設置先/config/local.yaml
 
 同様に、local.yamlというファイルは、実際には以下の順に検索している。
 
