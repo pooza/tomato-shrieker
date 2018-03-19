@@ -105,15 +105,14 @@ loader.rbを実行する。root権限不要。
 
 ## ■設定ファイルの検索順
 
-local.yamlは、上記設置例ではconfigディレクトリ内に置いているが、実際には以下の順に検索している。
+local.yamlは、上記設置例ではconfigディレクトリ内に置いているが、
+実際には以下の順に検索している。（ROOT_DIRは設置先）
 
 - /usr/local/etc/tomato-toot/local.yaml
+- /usr/local/etc/tomato-toot/local.yml
 - /etc/tomato-toot/local.yaml
-- 設置先/config/local.yaml
+- /etc/tomato-toot/local.yml
+- __ROOT_DIR__/config/local.yaml
+- __ROOT_DIR__/config/local.yml
 
-同様に、local.yamlというファイルは、実際には以下の順に検索している。
-
-- local.yaml
-- local.yml
-
-設置先ディレクトリもファイル名も、そのファイルが発見できた時点で、以降の検索をやめる。
+ファイルが発見できた時点で、以降の検索をやめる。
