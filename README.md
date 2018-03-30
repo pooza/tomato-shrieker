@@ -32,36 +32,30 @@ vi config/local.yaml
 
 ```
 entries:
-  - prefix: foursquare
-    source:
-      url: https://feeds.foursquare.com/history/hoge.rss
-      mode: body
-    mastodon:
-      url: https://mstdn.b-shock.org
-      token: hogehoge
-  - prefix: foursquare
-    source:
-      url: https://feeds.foursquare.com/history/hoge.rss
-      tag: precure
-      mode: body
-    mastodon:
-      url: https://precure.ml
-      token: hogehoge
   - source:
       url: https://blog.b-shock.org/atom.xml
       mode: title
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
-  - source:
-      url: https://github.com/pooza/radish-feed/releases.atom
-      mode: title
+  - prefix: foursquare #プリフィックスを変更
+    source:
+      url: https://feeds.foursquare.com/history/hoge.rss
+      mode: body #タイトルではなく、本文を出力
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
+  - prefix: foursquare #プリフィックスを変更
+    source:
+      url: https://feeds.foursquare.com/history/hoge.rss
+      tag: precure #ハッシュタグprecureがあるものだけ
+      mode: body #タイトルではなく、本文を出力
+    mastodon:
+      url: https://precure.ml
+      token: hogehoge
   - source:
       url: https://github.com/pooza/radish-feed/releases.atom
-      prefix: null
+    bot_account: yes #BOTアカウント（プリフィックスを省略）
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
@@ -79,7 +73,7 @@ slack:
   ものだけをprecure.mlへトゥートする設定にしている。
 - source内prefixは、文字通り、トゥートされるテキストのプリフィックスを指定。
   省略した場合は、フィード自体が持ってるタイトルがプリフィックスとして使用される。
-  また、 `null` を指定すると、プリフィックスの出力を行わない。
+- `bot_account: yes` を指定すると、プリフィックスの出力を行わない。
 - mastodon内のtokenは、Mastodonの設定画面「開発」で作成する。  
   作成後に表示される __アクセストークン__ をコピペ。ほかの情報は要らない。  
   また、アクセス権は __write__ 以外は不要。
