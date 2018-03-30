@@ -59,6 +59,12 @@ entries:
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
+  - source:
+      url: https://github.com/pooza/radish-feed/releases.atom
+      prefix: null
+    mastodon:
+      url: https://mstdn.b-shock.org
+      token: hogehoge
 slack:
   hook:
     url: https://hooks.slack.com/services/*********/*********/************************
@@ -73,6 +79,7 @@ slack:
   ものだけをprecure.mlへトゥートする設定にしている。
 - source内prefixは、文字通り、トゥートされるテキストのプリフィックスを指定。
   省略した場合は、フィード自体が持ってるタイトルがプリフィックスとして使用される。
+  また、 `null` を指定すると、プリフィックスの出力を行わない。
 - mastodon内のtokenは、Mastodonの設定画面「開発」で作成する。  
   作成後に表示される __アクセストークン__ をコピペ。ほかの情報は要らない。  
   また、アクセス権は __write__ 以外は不要。
