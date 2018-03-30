@@ -52,7 +52,7 @@ module TomatoToot
       items.each do |item|
         next if (item[:date] <= timestamp)
         body = []
-        body.push("[#{prefix}]")
+        body.push("[#{prefix}]") unless @params['prefix'].nil?
         text = item[@params['source']['mode'].to_sym]
         next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
         body.push(text)
