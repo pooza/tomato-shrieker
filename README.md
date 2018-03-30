@@ -55,7 +55,7 @@ entries:
       token: hogehoge
   - source:
       url: https://github.com/pooza/radish-feed/releases.atom
-    bot_account: yes #BOTアカウント（プリフィックスを省略）
+    bot_account: true #BOTアカウント（プリフィックスを省略）
     mastodon:
       url: https://mstdn.b-shock.org
       token: hogehoge
@@ -73,7 +73,7 @@ slack:
   ものだけをprecure.mlへトゥートする設定にしている。
 - source内prefixは、文字通り、トゥートされるテキストのプリフィックスを指定。
   省略した場合は、フィード自体が持ってるタイトルがプリフィックスとして使用される。
-- `bot_account: yes` を指定すると、プリフィックスの出力を行わない。
+- `bot_account: true` を指定すると、プリフィックスの出力を行わない。
 - mastodon内のtokenは、Mastodonの設定画面「開発」で作成する。  
   作成後に表示される __アクセストークン__ をコピペ。ほかの情報は要らない。  
   また、アクセス権は __write__ 以外は不要。
