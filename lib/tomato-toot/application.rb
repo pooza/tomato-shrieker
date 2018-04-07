@@ -1,3 +1,4 @@
+require 'optparse'
 require 'active_support'
 require 'active_support/core_ext'
 require 'tomato-toot/package'
@@ -12,6 +13,10 @@ module TomatoToot
       @config = Config.instance
       @logger = Logger.new(Package.name)
       @slack = Slack.new if @config['local']['slack']
+      @options = ARGV.getopts('', 'silence')
+    rescue => e
+      puts "#{e.class} #{e.message}"
+      exit 1
     end
 
     def execute
@@ -23,13 +28,13 @@ module TomatoToot
           @logger.info(feed.params)
           if feed.touched?
             feed.fetch do |body|
-              feed.mastodon.create_status(body)
-              @logger.info({toot: body})
+              feed.mastodon.create_status(body) unless @options['silence']
+              @logger.info({toot: body, options: @options})
             end
           else
             body = feed.fetch.to_a.last
-            feed.mastodon.create_status(body)
-            @logger.info({toot: body})
+            feed.mastodon.create_status(body) unless @options['silence']
+            @logger.info({toot: body, options: @options})
           end
           feed.touch
         rescue => e
