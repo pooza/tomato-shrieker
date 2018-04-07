@@ -2,8 +2,9 @@ require 'feedjira'
 require 'addressable/uri'
 require 'digest/sha1'
 require 'mastodon'
+require 'tomato-toot/config'
 require 'tomato-toot/package'
-require 'tomato-toot/url_shortener'
+require 'tomato-toot/bitly'
 
 module TomatoToot
   class Feed
@@ -23,6 +24,7 @@ module TomatoToot
         base_url: params['mastodon']['url'],
         bearer_token: params['mastodon']['token'],
       })
+      @bitly = Bitly.new if Config.instance['local']['bitly']
     end
 
     def prefix
@@ -57,7 +59,7 @@ module TomatoToot
         next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
         body.push(text)
         url = item[:url]
-        url = URLShortener.new.shorten(url) if @params['source']['shorten']
+        url = Bitly.new.shorten(url) if @params['shorten']
         body.push(url)
         yield body.join(' ')
       end
