@@ -90,7 +90,7 @@ bitly:
 ### syslog設定
 
 tomato-tootというプログラム名で、syslogに出力している。  
-必要に応じて、適宜設定。以下、rsyslogでの設定例。
+以下、rsyslogでの設定例。
 
 ```
 :programname, isequal, "tomato-toot" -/var/log/tomato-toot.log
@@ -123,8 +123,7 @@ loader.rbを実行する。root権限不要。
 ## ■設定ファイルの検索順
 
 local.yamlは、上記設置例ではconfigディレクトリ内に置いているが、
-実際には以下の順に検索している。（ROOT_DIRは設置先）  
-ファイルが発見できた時点で、以降の検索をやめる。
+実際には以下の順に検索している。（ROOT_DIRは設置先）
 
 - /usr/local/etc/tomato-toot/local.yaml
 - /usr/local/etc/tomato-toot/local.yml
