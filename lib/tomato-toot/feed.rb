@@ -116,7 +116,7 @@ module TomatoToot
       return File.join(
         ROOT_DIR,
         'tmp/tooted',
-        Digest::SHA1.hexdigest(entry.to_s),
+        Digest::SHA1.hexdigest([@params, entry].to_json),
       )
     end
 
