@@ -1,6 +1,7 @@
 require 'feedjira'
 require 'addressable/uri'
 require 'digest/sha1'
+require 'json'
 require 'mastodon'
 require 'tomato-toot/config'
 require 'tomato-toot/package'
@@ -9,7 +10,6 @@ require 'tomato-toot/bitly'
 module TomatoToot
   class Feed
     attr_accessor :params
-    attr_accessor :mastodon
 
     def initialize (params)
       @params = params
@@ -43,6 +43,11 @@ module TomatoToot
       File.write(timestamp_path, updated_at.strftime('%F %z %T')) if present?
     end
 
+    def toot (entry)
+      File.write(create_toot_path(entry), entry.to_json)
+      @mastodon.create_status(entry[:body])
+    end
+
     def timestamp
       return Time.parse(File.read(timestamp_path))
     rescue
@@ -52,7 +57,7 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       items.each do |item|
-        next if (item[:date] <= timestamp)
+        next if (item[:date] < timestamp)
         body = []
         body.push("[#{prefix}]") unless @params['bot_account']
         text = item[@params['source']['mode'].to_sym]
@@ -61,7 +66,9 @@ module TomatoToot
         url = item[:url]
         url = Bitly.new.shorten(url) if @params['shorten']
         body.push(url)
-        yield body.join(' ')
+        values = {date: item[:date], body: body.join(' ')}
+        next if tooted?(values)
+        yield values
       end
     end
 
@@ -79,6 +86,10 @@ module TomatoToot
         end
       end
       return @items
+    end
+
+    def tooted? (entry)
+      return File.exist?(create_toot_path(entry))
     end
 
     def updated_at
@@ -99,6 +110,14 @@ module TomatoToot
         url.fragment = local_url.fragment
       end
       return url
+    end
+
+    def create_toot_path (entry)
+      return File.join(
+        ROOT_DIR,
+        'tmp/tooted',
+        Digest::SHA1.hexdigest(entry.to_s),
+      )
     end
 
     def timestamp_path

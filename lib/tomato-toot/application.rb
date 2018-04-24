@@ -27,14 +27,14 @@ module TomatoToot
           raise 'empty' unless feed.present?
           @logger.info(feed.params)
           if feed.touched?
-            feed.fetch do |body|
-              feed.mastodon.create_status(body) unless @options['silence']
-              @logger.info({toot: body, options: @options})
+            feed.fetch do |entry|
+              feed.toot(entry) unless @options['silence']
+              @logger.info({toot: entry[:body], options: @options})
             end
           else
-            body = feed.fetch.to_a.last
-            feed.mastodon.create_status(body) unless @options['silence']
-            @logger.info({toot: body, options: @options})
+            entry = feed.fetch.to_a.last
+            feed.toot(entry) unless @options['silence']
+            @logger.info({toot: entry[:body], options: @options})
           end
           feed.touch
         rescue => e
