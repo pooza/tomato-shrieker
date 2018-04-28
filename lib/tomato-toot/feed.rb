@@ -20,6 +20,7 @@ module TomatoToot
       Feedjira.configure do |config|
         config.user_agent = "#{Package.full_name} #{Package.url}"
       end
+      Feedjira.logger.level = ::Logger::FATAL
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
       @mastodon = Mastodon::REST::Client.new({
