@@ -96,6 +96,19 @@ tomato-tootというプログラム名で、syslogに出力している。
 :programname, isequal, "tomato-toot" -/var/log/tomato-toot.log
 ```
 
+## ■更新適用の手順
+
+新バージョンの更新は、以下の手順で行う。（ROOT_DIRは設置先）
+
+```
+cd ROOT_DIR
+git fetch
+git checkout バージョン名
+bundle install
+bundle exec rake clean
+bundle exec rake touch
+```
+
 ## ■操作
 
 loader.rbを実行する。root権限不要。  
