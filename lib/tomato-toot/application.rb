@@ -11,7 +11,7 @@ module TomatoToot
   class Application
     def initialize
       @config = Config.instance
-      @logger = Logger.new(Package.name)
+      @logger = Logger.new
       @slack = Slack.new if @config['local']['slack']
       @options = ARGV.getopts('', 'silence')
     rescue => e
@@ -28,15 +28,11 @@ module TomatoToot
           @logger.info(feed.params)
           if feed.touched?
             feed.fetch do |entry|
-              feed.toot(entry) unless @options['silence']
-              @logger.info({toot: entry[:body], options: @options})
+              feed.toot(entry, @options)
             end
-          else
-            entry = feed.fetch.to_a.last
-            feed.toot(entry) unless @options['silence']
-            @logger.info({toot: entry[:body], options: @options})
+          elsif feed.present?
+            feed.toot(feed.fetch.to_a.first, @options)
           end
-          feed.touch
         rescue => e
           message = entry.clone
           message['error'] = e.message

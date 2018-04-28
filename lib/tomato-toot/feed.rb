@@ -6,6 +6,7 @@ require 'mastodon'
 require 'tomato-toot/config'
 require 'tomato-toot/package'
 require 'tomato-toot/bitly'
+require 'tomato-toot/logger'
 
 module TomatoToot
   class Feed
@@ -14,6 +15,7 @@ module TomatoToot
     def initialize (params)
       @params = params
       @params['source']['mode'] ||= 'title'
+      @logger = Logger.new
 
       Feedjira.configure do |config|
         config.user_agent = "#{Package.full_name} #{Package.url}"
@@ -32,32 +34,38 @@ module TomatoToot
     end
 
     def touched?
-      return File.exist?(timestamp_path)
+      return File.exist?(status_path) || File.exist?(timestamp_path)
     end
 
     def present?
       return items.present?
     end
 
-    def touch
-      File.write(timestamp_path, updated_at.strftime('%F %z %T')) if present?
-    end
-
-    def toot (entry)
-      File.write(create_toot_path(entry), entry.to_json)
-      @mastodon.create_status(entry[:body])
+    def toot (entry, options)
+      unless options[:silence]
+        @mastodon.create_status(entry[:body])
+        @logger.info({entry: entry, options: options})
+      end
+      touch(entry)
+      clean(entry)
     end
 
     def timestamp
-      return Time.parse(File.read(timestamp_path))
-    rescue
+      if File.exist?(status_path)
+        return Time.parse(
+          JSON.parse(File.read(status_path))['date']
+        )
+      else
+        return Time.parse(File.read(timestamp_path))
+      end
+    rescue => e
       return Time.parse('1970/01/01')
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
       items.each do |item|
-        next if (item[:date] < timestamp)
+        return if (item[:date] < timestamp)
         body = []
         body.push("[#{prefix}]") unless @params['bot_account']
         text = item[@params['source']['mode'].to_sym]
@@ -67,7 +75,7 @@ module TomatoToot
         url = Bitly.new.shorten(url) if @params['shorten']
         body.push(url)
         values = {date: item[:date], body: body.join(' ')}
-        next if tooted?(values)
+        return if tooted?(values)
         yield values
       end
     end
@@ -84,11 +92,39 @@ module TomatoToot
             url: create_url(item.url).to_s,
           })
         end
+        @items.reverse!
       end
       return @items
     end
 
+    def touch (entry)
+      if File.exist?(path = status_path)
+        status = JSON.parse(File.read(path))
+        if (Time.parse(status['date']) == entry[:date])
+          status['bodies'] ||= []
+        else
+          status['date'] = entry[:date]
+          status['bodies'] = []
+        end
+        status['bodies'].push(entry[:body])
+      else
+        status = {date:entry[:date], bodies:[entry[:body]]}
+      end
+      File.write(path, JSON.pretty_generate(status))
+    end
+
+    def clean (entry)
+      File.unlink(timestamp_path) if File.exist?(timestamp_path)
+      path = create_toot_path(entry)
+      File.unlink(path) if File.exist?(path)
+    end
+
     def tooted? (entry)
+      if File.exist?(status_path)
+        saved = JSON.parse(File.read(status_path))
+        saved['bodies'] ||= []
+        return (entry[:date] == saved['date']) && saved['bodies'].include?(entry[:body])
+      end
       return File.exist?(create_toot_path(entry))
     end
 
@@ -125,6 +161,14 @@ module TomatoToot
         ROOT_DIR,
         'tmp/timestamps',
         Digest::SHA1.hexdigest(@params.to_s),
+      )
+    end
+
+    def status_path
+      return File.join(
+        ROOT_DIR,
+        'tmp/timestamps',
+        "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )
     end
   end
