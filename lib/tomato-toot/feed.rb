@@ -108,7 +108,7 @@ module TomatoToot
         end
         status['bodies'].push(entry[:body])
       else
-        status = {date:entry[:date], bodies:[entry[:body]]}
+        status = {date: entry[:date], bodies: [entry[:body]]}
       end
       File.write(path, JSON.pretty_generate(status))
     end
