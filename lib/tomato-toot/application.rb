@@ -1,7 +1,6 @@
 require 'optparse'
 require 'active_support'
 require 'active_support/core_ext'
-require 'tomato-toot/package'
 require 'tomato-toot/feed'
 require 'tomato-toot/slack'
 require 'tomato-toot/config'
@@ -20,7 +19,7 @@ module TomatoToot
     end
 
     def execute
-      @logger.info({message: 'start', version: Package.version})
+      @logger.info({message: 'start'})
       @config['local']['entries'].each do |entry|
         begin
           feed = Feed.new(entry)
@@ -40,7 +39,7 @@ module TomatoToot
           @logger.error(message)
         end
       end
-      @logger.info({message: 'complete', version: Package.version})
+      @logger.info({message: 'complete'})
     end
   end
 end
