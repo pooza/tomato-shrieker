@@ -1,10 +1,11 @@
 require 'json'
 require 'syslog/logger'
+require 'tomato-toot/package'
 
 module TomatoToot
   class Logger
-    def initialize (name)
-      @logger = Syslog::Logger.new(name)
+    def initialize
+      @logger = Syslog::Logger.new(Package.name)
     end
 
     def info (message)
