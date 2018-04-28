@@ -34,7 +34,7 @@ module TomatoToot
     end
 
     def touched?
-      return File.exist?(status_path) || File.exist?(timestamp_path)
+      return File.exist?(status_path)
     end
 
     def present?
@@ -42,22 +42,15 @@ module TomatoToot
     end
 
     def toot (entry, options)
-      unless options[:silence]
+      unless options['silence']
         @mastodon.create_status(entry[:body])
         @logger.info({entry: entry, options: options})
       end
       touch(entry)
-      clean(entry)
     end
 
     def timestamp
-      if File.exist?(status_path)
-        return Time.parse(
-          JSON.parse(File.read(status_path))['date']
-        )
-      else
-        return Time.parse(File.read(timestamp_path))
-      end
+      return Time.parse(JSON.parse(File.read(status_path))['date'])
     rescue => e
       return Time.parse('1970/01/01')
     end
@@ -113,27 +106,13 @@ module TomatoToot
       File.write(path, JSON.pretty_generate(status))
     end
 
-    def clean (entry)
-      File.unlink(timestamp_path) if File.exist?(timestamp_path)
-      path = create_toot_path(entry)
-      File.unlink(path) if File.exist?(path)
-    end
-
     def tooted? (entry)
       if File.exist?(status_path)
         saved = JSON.parse(File.read(status_path))
         saved['bodies'] ||= []
         return (entry[:date] == saved['date']) && saved['bodies'].include?(entry[:body])
       end
-      return File.exist?(create_toot_path(entry))
-    end
-
-    def updated_at
-      if present?
-        return items.last[:date].getlocal
-      else
-        return nil
-      end
+      return false
     end
 
     def create_url (href)
@@ -146,22 +125,6 @@ module TomatoToot
         url.fragment = local_url.fragment
       end
       return url
-    end
-
-    def create_toot_path (entry)
-      return File.join(
-        ROOT_DIR,
-        'tmp/tooted',
-        Digest::SHA1.hexdigest([@params, entry].to_json),
-      )
-    end
-
-    def timestamp_path
-      return File.join(
-        ROOT_DIR,
-        'tmp/timestamps',
-        Digest::SHA1.hexdigest(@params.to_s),
-      )
     end
 
     def status_path
