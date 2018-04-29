@@ -6,14 +6,12 @@ require 'mastodon'
 require 'tomato-toot/config'
 require 'tomato-toot/package'
 require 'tomato-toot/bitly'
-require 'tomato-toot/logger'
 
 module TomatoToot
   class Feed
     def initialize (params)
       @params = params
       @params['source']['mode'] ||= 'title'
-      @logger = Logger.new
 
       Feedjira.configure do |config|
         config.user_agent = "#{Package.full_name} #{Package.url}"
@@ -36,12 +34,25 @@ module TomatoToot
       return items.present?
     end
 
-    def toot (entry, options)
-      unless options['silence']
-        @mastodon.create_status(entry[:body])
-        @logger.info({entry: entry, options: options})
-      end
+    def toot (entry)
+      @mastodon.create_status(entry[:body])
       touch(entry)
+    end
+
+    def touch (entry)
+      if touched?
+        status = JSON.parse(File.read(status_path))
+        if (Time.parse(status['date']) == entry[:date])
+          status['bodies'] ||= []
+        else
+          status['date'] = entry[:date]
+          status['bodies'] = []
+        end
+        status['bodies'].push(entry[:body])
+      else
+        status = {date: entry[:date], bodies: [entry[:body]]}
+      end
+      File.write(status_path, JSON.pretty_generate(status))
     end
 
     def fetch
@@ -77,22 +88,6 @@ module TomatoToot
         @items.reverse!
       end
       return @items
-    end
-
-    def touch (entry)
-      if touched?
-        status = JSON.parse(File.read(status_path))
-        if (Time.parse(status['date']) == entry[:date])
-          status['bodies'] ||= []
-        else
-          status['date'] = entry[:date]
-          status['bodies'] = []
-        end
-        status['bodies'].push(entry[:body])
-      else
-        status = {date: entry[:date], bodies: [entry[:body]]}
-      end
-      File.write(status_path, JSON.pretty_generate(status))
     end
 
     def prefix
