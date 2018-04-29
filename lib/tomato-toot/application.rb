@@ -25,12 +25,19 @@ module TomatoToot
           feed = Feed.new(entry)
           raise 'empty' unless feed.present?
           @logger.info(entry)
-          if (feed.touched? || @options['silence'])
+          if @options['silence']
             feed.fetch do |entry|
-              feed.toot(entry, @options)
+              feed.touch(entry)
+            end
+          elsif feed.touched?
+            feed.fetch do |entry|
+              feed.toot(entry)
+              @logger.info({entry: entry})
             end
           elsif feed.present?
-            feed.toot(feed.fetch.to_a.first, @options)
+            entry = feed.fetch.to_a.first
+            feed.toot(entry)
+            @logger.info({entry: entry})
           end
         rescue => e
           message = entry.clone
