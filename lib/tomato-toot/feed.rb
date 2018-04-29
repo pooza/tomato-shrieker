@@ -47,7 +47,7 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       items.each do |item|
-        return if (item[:date] < timestamp)
+        next if (item[:date] < timestamp)
         body = []
         body.push("[#{prefix}]") unless @params['bot_account']
         text = item[@params['source']['mode'].to_sym]
@@ -107,9 +107,9 @@ module TomatoToot
 
     def tooted? (entry)
       if touched?
-        saved = JSON.parse(File.read(status_path))
-        saved['bodies'] ||= []
-        return (entry[:date] == saved['date']) && saved['bodies'].include?(entry[:body])
+        status = JSON.parse(File.read(status_path))
+        status['bodies'] ||= []
+        return (entry[:date] == status['date']) && status['bodies'].include?(entry[:body])
       end
       return false
     end
