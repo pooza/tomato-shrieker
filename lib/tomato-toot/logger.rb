@@ -9,23 +9,26 @@ module TomatoToot
     end
 
     def info (message)
-      message['package'] = {name: Package.name, version: Package.version}
-      @logger.info(message.to_json)
+      @logger.info(jsonize(message))
     end
 
     def warning (message)
-      message['package'] = {name: Package.name, version: Package.version}
-      @logger.warn(message.to_json)
+      @logger.warn(jsonize(message))
     end
 
     def error (message)
-      message['package'] = {name: Package.name, version: Package.version}
-      @logger.error(message.to_json)
+      @logger.error(jsonize(message))
     end
 
     def fatal (message)
+      @logger.fatal(jsonize(message))
+    end
+
+    private
+    def jsonize (message)
+      message = message.clone
       message['package'] = {name: Package.name, version: Package.version}
-      @logger.fatal(message.to_json)
+      return message.to_json
     end
   end
 end

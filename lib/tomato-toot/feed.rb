@@ -10,7 +10,7 @@ require 'tomato-toot/bitly'
 module TomatoToot
   class Feed
     def initialize (params)
-      @params = params
+      @params = params.clone
       @params['source']['mode'] ||= 'title'
 
       Feedjira.configure do |config|
