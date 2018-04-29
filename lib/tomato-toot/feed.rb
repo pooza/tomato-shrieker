@@ -10,8 +10,6 @@ require 'tomato-toot/logger'
 
 module TomatoToot
   class Feed
-    attr_accessor :params
-
     def initialize (params)
       @params = params
       @params['source']['mode'] ||= 'title'
@@ -30,10 +28,6 @@ module TomatoToot
       @bitly = Bitly.new if Config.instance['local']['bitly']
     end
 
-    def prefix
-      return (@params['prefix'] || @feed.title)
-    end
-
     def touched?
       return File.exist?(status_path)
     end
@@ -50,12 +44,6 @@ module TomatoToot
       touch(entry)
     end
 
-    def timestamp
-      return Time.parse(JSON.parse(File.read(status_path))['date'])
-    rescue => e
-      return Time.parse('1970/01/01')
-    end
-
     def fetch
       return enum_for(__method__) unless block_given?
       items.each do |item|
@@ -69,7 +57,7 @@ module TomatoToot
         url = Bitly.new.shorten(url) if @params['shorten']
         body.push(url)
         values = {date: item[:date], body: body.join(' ')}
-        return if tooted?(values)
+        next if tooted?(values)
         yield values
       end
     end
@@ -92,8 +80,8 @@ module TomatoToot
     end
 
     def touch (entry)
-      if File.exist?(path = status_path)
-        status = JSON.parse(File.read(path))
+      if touched?
+        status = JSON.parse(File.read(status_path))
         if (Time.parse(status['date']) == entry[:date])
           status['bodies'] ||= []
         else
@@ -104,11 +92,21 @@ module TomatoToot
       else
         status = {date: entry[:date], bodies: [entry[:body]]}
       end
-      File.write(path, JSON.pretty_generate(status))
+      File.write(status_path, JSON.pretty_generate(status))
+    end
+
+    def prefix
+      return (@params['prefix'] || @feed.title)
+    end
+
+    def timestamp
+      return Time.parse(JSON.parse(File.read(status_path))['date'])
+    rescue => e
+      return Time.parse('1970/01/01')
     end
 
     def tooted? (entry)
-      if File.exist?(status_path)
+      if touched?
         saved = JSON.parse(File.read(status_path))
         saved['bodies'] ||= []
         return (entry[:date] == saved['date']) && saved['bodies'].include?(entry[:body])

@@ -98,10 +98,10 @@ tomato-tootというプログラム名で、syslogに出力している。
 
 ## ■更新適用の手順
 
-新バージョンの更新は、以下の手順で行う。（ROOT_DIRは設置先）
+新バージョンの適用は、以下の手順で行う。
 
 ```
-cd ROOT_DIR
+cd 設置先
 git fetch
 git checkout バージョン名
 bundle install
