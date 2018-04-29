@@ -24,8 +24,8 @@ module TomatoToot
         begin
           feed = Feed.new(entry)
           raise 'empty' unless feed.present?
-          @logger.info(feed.params)
-          if feed.touched?
+          @logger.info(entry)
+          if (feed.touched? || @options['silence'])
             feed.fetch do |entry|
               feed.toot(entry, @options)
             end
