@@ -47,7 +47,7 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       items.each do |item|
-        next if (item[:date] < timestamp)
+        return if (item[:date] < timestamp)
         body = []
         body.push("[#{prefix}]") unless @params['bot_account']
         text = item[@params['source']['mode'].to_sym]
