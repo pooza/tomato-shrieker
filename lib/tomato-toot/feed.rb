@@ -65,7 +65,7 @@ module TomatoToot
         next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
         body.push(text)
         url = item[:url]
-        url = Bitly.new.shorten(url) if @params['shorten']
+        url = @bitly.shorten(url) if (@bitly && @params['shorten'])
         body.push(url)
         values = {date: item[:date], body: body.join(' ')}
         next if tooted?(values)
@@ -96,7 +96,7 @@ module TomatoToot
 
     def timestamp
       return Time.parse(JSON.parse(File.read(status_path))['date'])
-    rescue => e
+    rescue
       return Time.parse('1970/01/01')
     end
 
@@ -104,7 +104,11 @@ module TomatoToot
       if touched?
         status = JSON.parse(File.read(status_path))
         status['bodies'] ||= []
-        return (entry[:date] == status['date']) && status['bodies'].include?(entry[:body])
+        return (
+          entry[:date] == status['date']
+        ) && (
+          status['bodies'].include?(entry[:body])
+        )
       end
       return false
     end
