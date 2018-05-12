@@ -101,16 +101,11 @@ module TomatoToot
     end
 
     def tooted? (entry)
-      if touched?
-        status = JSON.parse(File.read(status_path))
-        status['bodies'] ||= []
-        return (
-          entry[:date] == status['date']
-        ) && (
-          status['bodies'].include?(entry[:body])
-        )
-      end
-      return false
+      return false unless touched?
+      status = JSON.parse(File.read(status_path))
+      return false if (entry[:date] != status['date'])
+      status['bodies'] ||= []
+      return status['bodies'].include?(entry[:body])
     end
 
     def create_url (href)
