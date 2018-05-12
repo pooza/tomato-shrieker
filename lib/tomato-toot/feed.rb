@@ -9,7 +9,7 @@ require 'tomato-toot/bitly'
 
 module TomatoToot
   class Feed
-    def initialize (params)
+    def initialize(params)
       @params = params.clone
       @params['source']['mode'] ||= 'title'
 
@@ -34,15 +34,15 @@ module TomatoToot
       return items.present?
     end
 
-    def toot (entry)
+    def toot(entry)
       @mastodon.create_status(entry[:body])
       touch(entry)
     end
 
-    def touch (entry)
+    def touch(entry)
       if touched?
         status = JSON.parse(File.read(status_path))
-        if (Time.parse(status['date']) == entry[:date])
+        if Time.parse(status['date']) == entry[:date]
           status['bodies'] ||= []
         else
           status['date'] = entry[:date]
@@ -58,14 +58,14 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       items.each do |item|
-        return if (item[:date] < timestamp)
+        break if item[:date] < timestamp
         body = []
         body.push("[#{prefix}]") unless @params['bot_account']
         text = item[@params['source']['mode'].to_sym]
-        next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
+        next if @params['source']['tag'] && !text.match("\##{@params['source']['tag']}")
         body.push(text)
         url = item[:url]
-        url = @bitly.shorten(url) if (@bitly && @params['shorten'])
+        url = @bitly.shorten(url) if @bitly && @params['shorten']
         body.push(url)
         values = {date: item[:date], body: body.join(' ')}
         next if tooted?(values)
@@ -74,10 +74,11 @@ module TomatoToot
     end
 
     private
+
     def items
       unless @items
         @items = []
-        @feed.entries.each.sort_by{|item| item.published.to_f}.each do |item|
+        @feed.entries.each.sort_by{ |item| item.published.to_f}.each do |item|
           @items.push({
             date: item.published,
             title: item.title,
@@ -100,20 +101,18 @@ module TomatoToot
       return Time.parse('1970/01/01')
     end
 
-    def tooted? (entry)
+    def tooted?(entry)
       if touched?
         status = JSON.parse(File.read(status_path))
         status['bodies'] ||= []
         return (
           entry[:date] == status['date']
-        ) && (
-          status['bodies'].include?(entry[:body])
-        )
+        ) && status['bodies'].include?(entry[:body])
       end
       return false
     end
 
-    def create_url (href)
+    def create_url(href)
       url = Addressable::URI.parse(href)
       unless url.scheme
         local_url = url
@@ -129,7 +128,7 @@ module TomatoToot
       return File.join(
         ROOT_DIR,
         'tmp/timestamps',
-        "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
+        "#{Digest::SHA1.hexdigest(@params.to_s)}.json"
       )
     end
   end
