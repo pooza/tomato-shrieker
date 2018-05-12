@@ -22,23 +22,8 @@ module TomatoToot
       @logger.info({message: 'start'})
       @config['local']['entries'].each do |entry|
         begin
-          feed = Feed.new(entry)
-          raise 'empty' unless feed.present?
+          Feed.new(entry).execute(@options)
           @logger.info(entry)
-          if @options['silence']
-            feed.fetch do |entry|
-              feed.touch(entry)
-            end
-          elsif feed.touched?
-            feed.fetch do |entry|
-              feed.toot(entry)
-              @logger.info({entry: entry})
-            end
-          elsif feed.present?
-            entry = feed.fetch.to_a.first
-            feed.toot(entry)
-            @logger.info({entry: entry})
-          end
         rescue => e
           message = entry.clone
           message['error'] = e.message
