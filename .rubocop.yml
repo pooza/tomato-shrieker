@@ -11,13 +11,16 @@ Layout/SpaceInsideBlockBraces:
   EnforcedStyle: no_space
 
 Layout/SpaceInsideHashLiteralBraces:
-  Enabled: false
+  EnforcedStyle: no_space
 
 Metrics/AbcSize:
   Max: 30
 
 Metrics/MethodLength:
   Max: 20
+
+Metrics/ClassLength:
+  Max: 200
 
 Naming/FileName:
   Exclude:
@@ -38,6 +41,9 @@ Style/RescueStandardError:
 Style/SymbolArray:
   EnforcedStyle: brackets
 
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
+
 Style/TrailingCommaInArrayLiteral:
   EnforcedStyleForMultiline: comma
 
@@ -51,3 +57,30 @@ Metrics/LineLength:
   Max: 100
   Exclude:
     - test/*
+
+Style/AsciiComments:
+  Enabled: false
+
+Style/FormatString:
+  EnforcedStyle: percent
+
+Style/ConditionalAssignment:
+  Enabled: false
+
+Lint/AssignmentInCondition:
+  Enabled: false
+
+Style/YodaCondition:
+  Enabled: false
+
+Style/RescueModifier:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/PerceivedComplexity:
+  Max: 10

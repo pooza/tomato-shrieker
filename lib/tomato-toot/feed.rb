@@ -104,7 +104,7 @@ module TomatoToot
       return File.join(
         ROOT_DIR,
         'tmp/timestamps',
-        "#{Digest::SHA1.hexdigest(@params.to_s)}.json"
+        "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )
     end
   end
