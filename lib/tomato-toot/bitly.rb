@@ -12,7 +12,7 @@ module TomatoToot
       @service = ::Bitly.client
     end
 
-    def shorten (url)
+    def shorten(url)
       return @service.shorten(url).short_url
     end
   end
