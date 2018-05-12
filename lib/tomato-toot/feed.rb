@@ -1,15 +1,19 @@
 require 'feedjira'
-require 'addressable/uri'
 require 'digest/sha1'
-require 'json'
 require 'mastodon'
+require 'json'
 require 'tomato-toot/config'
 require 'tomato-toot/package'
 require 'tomato-toot/bitly'
+require 'tomato-toot/feed_entry'
 
 module TomatoToot
   class Feed
-    def initialize (params)
+    attr_reader :bitly
+    attr_reader :mastodon
+
+    def initialize(params)
+      @config = Config.instance
       @params = params.clone
       @params['source']['mode'] ||= 'title'
 
@@ -19,75 +23,71 @@ module TomatoToot
       Feedjira.logger.level = ::Logger::FATAL
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
+      @bitly = Bitly.new if @config['local']['bitly'] && @params['shorten']
       @mastodon = Mastodon::REST::Client.new({
-        base_url: params['mastodon']['url'],
-        bearer_token: params['mastodon']['token'],
+        base_url: @params['mastodon']['url'],
+        bearer_token: @params['mastodon']['token'],
       })
-      @bitly = Bitly.new if Config.instance['local']['bitly']
+    end
+
+    def execute(options)
+      raise 'empty' unless present?
+      if options['silence']
+        fetch.map(&:touch)
+      elsif touched?
+        fetch.map(&:toot)
+      elsif present?
+        fetch.to_a.first.toot
+      end
+    end
+
+    def fetch
+      return enum_for(__method__) unless block_given?
+      @feed.entries.each.sort_by{ |item| item.published.to_f}.reverse.each do |item|
+        entry = FeedEntry.new(self, item)
+        break if entry.outdated?
+        next if tag && !entry.tag?
+        next if entry.tooted?
+        yield entry
+      end
+    end
+
+    def status
+      unless @status
+        @status = {}
+        @status = JSON.parse(File.read(status_path), {symbolize_names: true}) if touched?
+        @status[:bodies] ||= []
+      end
+      return @status
+    end
+
+    def status=(values)
+      @status = nil
+      File.write(status_path, JSON.pretty_generate(values))
     end
 
     def touched?
       return File.exist?(status_path)
     end
 
+    def bot_account?
+      return @params['bot_account']
+    end
+
     def present?
-      return items.present?
+      return @feed.entries.present?
     end
 
-    def toot (entry)
-      @mastodon.create_status(entry[:body])
-      touch(entry)
+    def url
+      return @params['source']['url']
     end
 
-    def touch (entry)
-      if touched?
-        status = JSON.parse(File.read(status_path))
-        if (Time.parse(status['date']) == entry[:date])
-          status['bodies'] ||= []
-        else
-          status['date'] = entry[:date]
-          status['bodies'] = []
-        end
-        status['bodies'].push(entry[:body])
-      else
-        status = {date: entry[:date], bodies: [entry[:body]]}
-      end
-      File.write(status_path, JSON.pretty_generate(status))
+    def mode
+      return @params['source']['mode']
     end
 
-    def fetch
-      return enum_for(__method__) unless block_given?
-      items.each do |item|
-        return if (item[:date] < timestamp)
-        body = []
-        body.push("[#{prefix}]") unless @params['bot_account']
-        text = item[@params['source']['mode'].to_sym]
-        next if (@params['source']['tag'] && !text.match("\##{@params['source']['tag']}"))
-        body.push(text)
-        url = item[:url]
-        url = @bitly.shorten(url) if (@bitly && @params['shorten'])
-        body.push(url)
-        values = {date: item[:date], body: body.join(' ')}
-        next if tooted?(values)
-        yield values
-      end
-    end
-
-    private
-    def items
-      unless @items
-        @items = []
-        @feed.entries.each.sort_by{|item| item.published.to_f}.each do |item|
-          @items.push({
-            date: item.published,
-            title: item.title,
-            body: item.summary,
-            url: create_url(item.url).to_s,
-          })
-        end
-        @items.reverse!
-      end
-      return @items
+    def tag
+      return @params['source']['tag']
     end
 
     def prefix
@@ -95,41 +95,16 @@ module TomatoToot
     end
 
     def timestamp
-      return Time.parse(JSON.parse(File.read(status_path))['date'])
+      return Time.parse(status[:date])
     rescue
       return Time.parse('1970/01/01')
-    end
-
-    def tooted? (entry)
-      if touched?
-        status = JSON.parse(File.read(status_path))
-        status['bodies'] ||= []
-        return (
-          entry[:date] == status['date']
-        ) && (
-          status['bodies'].include?(entry[:body])
-        )
-      end
-      return false
-    end
-
-    def create_url (href)
-      url = Addressable::URI.parse(href)
-      unless url.scheme
-        local_url = url
-        url = Addressable::URI.parse(@feed.url)
-        url.path = local_url.path
-        url.query = local_url.query
-        url.fragment = local_url.fragment
-      end
-      return url
     end
 
     def status_path
       return File.join(
         ROOT_DIR,
         'tmp/timestamps',
-        "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
+        "#{Digest::SHA1.hexdigest(@params.to_s)}.json"
       )
     end
   end

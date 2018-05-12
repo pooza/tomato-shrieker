@@ -8,24 +8,25 @@ module TomatoToot
       @logger = Syslog::Logger.new(Package.name)
     end
 
-    def info (message)
+    def info(message)
       @logger.info(jsonize(message))
     end
 
-    def warning (message)
+    def warning(message)
       @logger.warn(jsonize(message))
     end
 
-    def error (message)
+    def error(message)
       @logger.error(jsonize(message))
     end
 
-    def fatal (message)
+    def fatal(message)
       @logger.fatal(jsonize(message))
     end
 
     private
-    def jsonize (message)
+
+    def jsonize(message)
       message = message.clone
       message['package'] = {name: Package.name, version: Package.version}
       return message.to_json
