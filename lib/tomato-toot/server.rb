@@ -47,6 +47,13 @@ module TomatoToot
       return @renderer.to_s
     end
 
+    post '/webhook/toot' do
+      params = ::JSON.parse(request.body.read.to_s)
+      @message[:request][:params] = params
+      @renderer.message = @message
+      return @renderer.to_s
+    end
+
     not_found do
       @renderer = JSON.new
       @renderer.status = 404
