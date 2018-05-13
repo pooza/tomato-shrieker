@@ -15,7 +15,13 @@ module TomatoToot
     def initialize(params)
       @config = Config.instance
       @params = params.clone
-      @params['source']['mode'] ||= 'title'
+
+      case @params['source']['mode']
+      when 'body', 'summary'
+        @params['source']['mode'] = 'summary'
+      else
+        @params['source']['mode'] = 'title'
+      end
 
       Feedjira.configure do |config|
         config.user_agent = "#{Package.full_name} #{Package.url}"
@@ -104,7 +110,7 @@ module TomatoToot
       return File.join(
         ROOT_DIR,
         'tmp/timestamps',
-        "#{Digest::SHA1.hexdigest(@params.to_s)}.json"
+        "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )
     end
   end

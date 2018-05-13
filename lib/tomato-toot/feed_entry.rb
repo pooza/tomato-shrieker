@@ -38,6 +38,7 @@ module TomatoToot
       values[:bodies] = [] if @feed.timestamp != @date
       values[:date] = @date
       values[:bodies].push(@body)
+      values[:bodies].uniq!
       @feed.status = values
     end
 
@@ -46,13 +47,7 @@ module TomatoToot
     def create_body(item)
       body = []
       body.push("[#{@feed.prefix}]") unless @feed.bot_account?
-
-      case @feed.mode
-      when 'title'
-        body.push(item.title)
-      when 'body'
-        body.push(item.summary)
-      end
+      body.push(item.send(@feed.mode))
 
       url = create_url(item.url)
       url = @feed.bitly.shorten(url) if @feed.bitly

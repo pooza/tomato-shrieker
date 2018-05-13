@@ -67,10 +67,10 @@ bitly:
   token: hogehoge
 ```
 
-- source内のmodeは、titleかbody。（titleの場合は省略可）  
-  フィードの種類によって適切な設定は異なる。例えば、foursquareではbody（本文）を
-  トゥートしないと情報量が全然足りないけど、通常のブログではtitle（タイトル）じゃないと
-  文字数が収まらない。
+- source内のmodeは、titleかsummary。互換性のためbody指定はsummary扱い。
+  それ以外の場合は、未指定の場合も含めtitle扱い。  
+  フィードの種類によって適切な設定は異なる。通常のブログではtitle、
+  foursquare等ではsummaryが適切。
 - source内のtagは、ハッシュタグ先頭の # を除いたものを指定。（必要ない場合は省略可）  
   上記の例ではfoursquareチェックインのうち、本文中に #precure ハッシュタグがある
   ものだけをprecure.mlへトゥートする設定にしている。
