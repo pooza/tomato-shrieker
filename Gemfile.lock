@@ -96,7 +96,6 @@ DEPENDENCIES
   feedjira
   httparty
   mastodon-api
-  rack
   rake
   sinatra
   syslog-logger
