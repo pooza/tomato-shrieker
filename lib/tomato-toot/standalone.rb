@@ -7,7 +7,7 @@ require 'tomato-toot/config'
 require 'tomato-toot/logger'
 
 module TomatoToot
-  class Application
+  class Standalone
     def initialize
       @config = Config.instance
       @logger = Logger.new
@@ -19,19 +19,20 @@ module TomatoToot
     end
 
     def execute
-      @logger.info({message: 'start'})
+      @logger.info({script: File.basename(__FILE__), message: 'start'})
       @config['local']['entries'].each do |entry|
         begin
           Feed.new(entry).execute(@options)
           @logger.info(entry)
         rescue => e
           message = entry.clone
+          message['script'] = File.basename(__FILE__)
           message['error'] = e.message
           @slack.say(message) if @slack
           @logger.error(message)
         end
       end
-      @logger.info({message: 'complete'})
+      @logger.info({script: File.basename(__FILE__), message: 'complete'})
     end
   end
 end
