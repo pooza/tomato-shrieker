@@ -19,20 +19,19 @@ module TomatoToot
     end
 
     def execute
-      @logger.info({script: File.basename(__FILE__), message: 'start'})
+      @logger.info({mode: 'standalone', message: 'start'})
       @config['local']['entries'].each do |entry|
+        message = {mode: 'standalone', entry: entry}
         begin
           Feed.new(entry).execute(@options)
-          @logger.info(entry)
+          @logger.info(message)
         rescue => e
-          message = entry.clone
-          message['script'] = File.basename(__FILE__)
-          message['error'] = e.message
+          message[:error] = e.message
           @slack.say(message) if @slack
           @logger.error(message)
         end
       end
-      @logger.info({script: File.basename(__FILE__), message: 'complete'})
+      @logger.info({mode: 'standalone', message: 'complete'})
     end
   end
 end

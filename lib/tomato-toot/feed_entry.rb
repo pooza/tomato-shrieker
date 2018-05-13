@@ -30,7 +30,7 @@ module TomatoToot
     def toot
       @feed.mastodon.create_status(@body)
       touch
-      @logger.info({entry: {date: @date, body: @body}})
+      @logger.info({mode: 'standalone', entry: {date: @date, body: @body}})
     end
 
     def touch
