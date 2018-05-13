@@ -10,7 +10,7 @@ require 'bundler/setup'
 end
 
 [:start, :stop, :restart].each do |action|
-  desc "#{action} thin"
+  desc "#{action} server"
   task action => ["server:#{action}"]
 end
 
