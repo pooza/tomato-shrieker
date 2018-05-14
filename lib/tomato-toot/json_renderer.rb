@@ -2,7 +2,7 @@ require 'json'
 require 'tomato-toot/renderer'
 
 module TomatoToot
-  class JSON < Renderer
+  class JSONRenderer < Renderer
     attr_accessor :message
 
     def to_s

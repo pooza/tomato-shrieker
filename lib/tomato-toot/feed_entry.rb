@@ -54,7 +54,7 @@ module TomatoToot
 
     def create_url(href)
       url = Addressable::URI.parse(href)
-      unless url.scheme
+      unless url.absolute?
         local_url = url
         url = Addressable::URI.parse(@feed.url)
         url.path = local_url.path

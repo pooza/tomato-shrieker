@@ -5,7 +5,7 @@ require 'tomato-toot/config'
 require 'tomato-toot/webhook'
 require 'tomato-toot/package'
 require 'tomato-toot/logger'
-require 'tomato-toot/json'
+require 'tomato-toot/json_renderer'
 require 'tomato-toot/slack'
 
 module TomatoToot
@@ -16,7 +16,7 @@ module TomatoToot
       @slack = Slack.new if @config['local']['slack']
       @logger = Logger.new
       @logger.info({
-        mode: 'server',
+        mode: 'webhook',
         message: 'starting...',
         server: {port: @config['thin']['port']},
       })
@@ -24,11 +24,11 @@ module TomatoToot
 
     before do
       @message = {
-        mode: 'server',
+        mode: 'webhook',
         request: {path: request.path, params: params},
         response: {},
       }
-      @renderer = JSON.new
+      @renderer = JSONRenderer.new
     end
 
     after do
@@ -48,13 +48,13 @@ module TomatoToot
       return @renderer.to_s
     end
 
-    post '/webhook/:digest' do
+    post '/webhook/v1.0/toot/:digest' do
       unless webhook = Webhook.search(params[:digest])
         @renderer.status = 404
         return @renderer.to_s
       end
 
-      json = ::JSON.parse(request.body.read.to_s)
+      json = JSON.parse(request.body.read.to_s)
       unless json['text']
         @renderer.status = 400
         @message[:response][:message] = 'empty message'
@@ -70,7 +70,7 @@ module TomatoToot
     end
 
     not_found do
-      @renderer = JSON.new
+      @renderer = JSONRenderer.new
       @renderer.status = 404
       @message[:response][:message] = "Resource #{@message[:request][:path]} not found."
       @renderer.message = @message
@@ -78,7 +78,7 @@ module TomatoToot
     end
 
     error do
-      @renderer = JSON.new
+      @renderer = JSONRenderer.new
       @renderer.status = 500
       @message[:response][:message] = env['sinatra.error'].message
       @renderer.message = @message

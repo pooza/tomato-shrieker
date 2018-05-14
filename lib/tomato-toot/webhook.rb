@@ -33,8 +33,9 @@ module TomatoToot
         url = Addressable::URI.new
         url.host = Socket.gethostname
         url.port = @config['thin']['port']
+        url.scheme = 'http'
       end
-      url.path = "/webhook/#{digest}"
+      url.path = "/webhook/v1.0/toot/#{digest}"
       return url.to_s
     end
 
@@ -47,7 +48,7 @@ module TomatoToot
 
     def toot(body)
       @mastodon.create_status(body)
-      @logger.info({mode: 'server', entry: {body: body}})
+      @logger.info({mode: 'webhook', entry: {body: body}})
     end
 
     def self.search(digest)
