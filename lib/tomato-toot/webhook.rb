@@ -2,6 +2,7 @@ require 'addressable/uri'
 require 'digest/sha1'
 require 'mastodon'
 require 'json'
+require 'socket'
 require 'tomato-toot/config'
 require 'tomato-toot/logger'
 
@@ -18,9 +19,9 @@ module TomatoToot
     end
 
     def digest
-      return Digest::SHA1.hexdigest(
-        @params.to_s,
-      )
+      values = @params.clone
+      values['salt'] = (@config['local']['salt'] || @config['local'])
+      return Digest::SHA1.hexdigest(@values.to_s)
     end
 
     def mastodon_url
@@ -28,7 +29,11 @@ module TomatoToot
     end
 
     def hook_url
-      url = Addressable::URI.parse(@config['local']['root_url'])
+      unless url = Addressable::URI.parse(@config['local']['root_url'])
+        url = Addressable::URI.new
+        url.host = Socket.gethostname
+        url.port = @config['thin']['port']
+      end
       url.path = "/webhook/#{digest}"
       return url.to_s
     end
