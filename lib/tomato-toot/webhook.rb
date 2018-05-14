@@ -28,6 +28,10 @@ module TomatoToot
       return @params['mastodon']['url']
     end
 
+    def token
+      return @params['mastodon']['token']
+    end
+
     def hook_url
       unless url = Addressable::URI.parse(@config['local']['root_url'])
         url = Addressable::URI.new
@@ -42,13 +46,13 @@ module TomatoToot
     def to_json
       return ::JSON.pretty_generate({
         mastodon: mastodon_url,
+        token: token,
         hook: hook_url,
       })
     end
 
     def toot(body)
       @mastodon.create_status(body)
-      @logger.info({mode: 'webhook', entry: {body: body}})
     end
 
     def self.search(digest)
@@ -60,8 +64,7 @@ module TomatoToot
 
     def self.all
       return enum_for(__method__) unless block_given?
-      @config = Config.instance
-      @config['local']['entries'].each do |entry|
+      Config.instance['local']['entries'].each do |entry|
         next unless entry['webhook']
         yield Webhook.new(entry)
       end
