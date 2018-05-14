@@ -2,6 +2,7 @@ require 'sinatra'
 require 'active_support'
 require 'active_support/core_ext'
 require 'tomato-toot/config'
+require 'tomato-toot/webhook'
 require 'tomato-toot/package'
 require 'tomato-toot/logger'
 require 'tomato-toot/json'
@@ -47,9 +48,23 @@ module TomatoToot
       return @renderer.to_s
     end
 
-    post '/webhook/toot' do
-      params = ::JSON.parse(request.body.read.to_s)
-      @message[:request][:params] = params
+    post '/webhook/:digest' do
+      unless webhook = Webhook.search(params[:digest])
+        @renderer.status = 404
+        return @renderer.to_s
+      end
+
+      json = ::JSON.parse(request.body.read.to_s)
+      unless json['text']
+        @renderer.status = 400
+        @message[:response][:message] = 'empty message'
+        @renderer.message = @message
+        return @renderer.to_s
+      end
+
+      webhook.toot(json['text'])
+      @message[:request][:params] = json
+      @message[:response][:text] = json['text']
       @renderer.message = @message
       return @renderer.to_s
     end
