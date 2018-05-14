@@ -19,9 +19,14 @@ task :test do
 end
 
 namespace :standalone do
+  desc 'run standalone'
+  task :run do
+    sh './standalone.rb'
+  end
+
   desc 'update timestamps'
   task :touch do
-    sh './loader.rb --silence'
+    sh './standalone.rb --silence'
   end
 
   desc 'clear timestamps'
