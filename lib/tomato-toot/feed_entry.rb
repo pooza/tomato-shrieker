@@ -48,10 +48,7 @@ module TomatoToot
       body = []
       body.push("[#{@feed.prefix}]") unless @feed.bot_account?
       body.push(item.send(@feed.mode))
-
-      url = create_url(item.url)
-      url = @feed.bitly.shorten(url) if @feed.bitly
-      body.push(url)
+      body.push(create_url(item.url))
       return body.join(' ')
     end
 
@@ -64,7 +61,9 @@ module TomatoToot
         url.query = local_url.query
         url.fragment = local_url.fragment
       end
-      return url.to_s
+      url = url.to_s
+      url = @feed.bitly.shorten(url) if @feed.shorten?
+      return url
     end
   end
 end
