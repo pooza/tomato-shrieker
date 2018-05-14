@@ -4,11 +4,10 @@ ENV['BUNDLE_GEMFILE'] ||= File.join(ROOT_DIR, 'Gemfile')
 
 require 'bundler/setup'
 
-desc 'clear timestamps (obsosleted: 1.x compatible)'
-task clean: ['standalone:clean']
-
-desc 'update timestamps (obsosleted: 1.x compatible)'
-task touch: ['standalone:touch']
+[:run, :touch, :clean].each do |action|
+  desc "alias of standalone:#{action}"
+  task action => ["standalone:#{action}"]
+end
 
 desc 'test'
 task :test do

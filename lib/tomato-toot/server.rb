@@ -29,7 +29,10 @@ module TomatoToot
         response: {},
       }
       @renderer = JSONRenderer.new
-      @json = JSON.parse(request.body.read.to_s)
+      if request.request_method == 'POST'
+        @json = JSON.parse(request.body.read.to_s)
+        @message[:request][:params] = @json
+      end
     end
 
     after do
@@ -64,7 +67,6 @@ module TomatoToot
       end
 
       webhook.toot(@json['text'])
-      @message[:request][:params] = @json
       @message[:response][:text] = @json['text']
       @renderer.message = @message
       return @renderer.to_s
