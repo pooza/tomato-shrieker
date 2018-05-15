@@ -43,9 +43,8 @@ slack:
 
 webhookのURLを決定する際に、ソルトとして使用される。省略可能だが非推奨。  
 省略した場合はlocal.yaml全体がソルトとして使われ、local.yamlを少しでも
-書き換えたら、その度にwebhookのURLが変更されるモードになる。
-
-__ソルトは、パスワード同様の厳重な管理を！__
+書き換えたら、その度にwebhookのURLが変更されるモードになる。  
+ソルトは、パスワード同様の厳重な管理を！
 
 ### /entries/*/webhook
 
@@ -81,7 +80,7 @@ nginxにリバースプロキシを設定する。以下、nginx.confでの設�
 ### bundle exec rake server:hooks
 
 全てのwebhookのURLを表示する。local.yamlの `/root_url` や `/salt` が影響。  
-__URLを知られてしまったら、誰でもトゥートが行える。パスワード同様の厳重な管理を！__
+URLを知られてしまったら、誰でもトゥートが行える。パスワード同様の厳重な管理を！
 
 ### bundle exec rake server:start
 
@@ -100,9 +99,8 @@ __URLを知られてしまったら、誰でもトゥートが行える。パス
 ### POST /webhook/v1.0/toot/フックID
 
 application/json形式でPOSTすると、対象インスタンスにトゥートを行う。  
-jsonの形式は、SlackやDiscordと互換性あり。（Slackを優先）
-
-__フックのURLは、事前に `bundle exec rake server:hooks` にて確認しておくこと。__
+jsonの形式は、SlackやDiscordと互換性あり。（Slackを優先）  
+フックのURLは、事前に `bundle exec rake server:hooks` にて確認しておくこと。
 
 以下、実行例。
 
