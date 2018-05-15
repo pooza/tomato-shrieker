@@ -36,12 +36,12 @@ tomato-tootというプログラム名で、syslogに出力している。
 
 ### スタンドアロンモードの設定
 
-[スタンドアロンモードの設定](doc/standalone.md)を行い、local.yamlの編集以降の
+[スタンドアロンモード](doc/standalone.md)の設定を行い、local.yamlの編集以降の
 手順に対応。
 
 ### サーバモードの設定
 
-[サーバスタンドアロンモードの設定](doc/server.md)を行い、local.yamlの編集以降の
+[サーバスタンドアロンモード](doc/server.md)の設定を行い、local.yamlの編集以降の
 手順に対応。
 
 ## ■更新適用の手順
