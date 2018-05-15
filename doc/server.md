@@ -1,6 +1,7 @@
-# サーバモード
+# tomato-toot サーバモード
 
-Slack/Discord互換のwebhookを提供。
+Slack/Discord互換のwebhookを提供。  
+2.0にて新設されたモード。
 
 ## ■利用までの流れ
 
@@ -116,7 +117,7 @@ curl -H 'Content-Type: application/json' -X POST -d '{"text":"敵が増えてき
 curlがインストールされているなら、設置先サーバ上で以下実行。
 
 ```
-curl http://localhost:3009/about -i
+curl -i http://localhost:3009/about
 ```
 
 以下、レスポンス例。
