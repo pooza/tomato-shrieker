@@ -7,7 +7,7 @@ require 'tomato-toot/config'
 require 'tomato-toot/logger'
 
 module TomatoToot
-  class Application
+  class Standalone
     def initialize
       @config = Config.instance
       @logger = Logger.new
@@ -19,19 +19,21 @@ module TomatoToot
     end
 
     def execute
-      @logger.info({message: 'start'})
+      @logger.info({mode: 'standalone', message: 'start'})
       @config['local']['entries'].each do |entry|
+        message = {mode: 'standalone', entry: entry}
+        next unless entry['source']
+        next if entry['webhook']
         begin
           Feed.new(entry).execute(@options)
-          @logger.info(entry)
+          @logger.info(message)
         rescue => e
-          message = entry.clone
-          message['error'] = e.message
+          message[:error] = e.message
           @slack.say(message) if @slack
           @logger.error(message)
         end
       end
-      @logger.info({message: 'complete'})
+      @logger.info({mode: 'standalone', message: 'complete'})
     end
   end
 end

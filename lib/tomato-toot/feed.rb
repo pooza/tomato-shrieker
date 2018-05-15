@@ -29,7 +29,7 @@ module TomatoToot
       Feedjira.logger.level = ::Logger::FATAL
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
-      @bitly = Bitly.new if @config['local']['bitly'] && @params['shorten']
+      @bitly = Bitly.new if shorten?
       @mastodon = Mastodon::REST::Client.new({
         base_url: @params['mastodon']['url'],
         bearer_token: @params['mastodon']['token'],
@@ -78,6 +78,10 @@ module TomatoToot
 
     def bot_account?
       return @params['bot_account']
+    end
+
+    def shorten?
+      return @config['local']['bitly'] && @params['shorten']
     end
 
     def present?

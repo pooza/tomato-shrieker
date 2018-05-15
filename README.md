@@ -1,10 +1,13 @@
 # tomato-toot
 
-RSS/Atomフィードの新着エントリーをトゥートする。
+Mastodonむけ、トゥート支援ツール。
+
+- RSS/Atomフィードの新着エントリーをトゥートする。
+- Slack/Discord互換のwebhookを提供。
 
 ## ■設置の手順
 
-- 常時起動のUNIX系サーバでさえあれば、どこでも設置可。
+常時起動のUNIX系サーバであれば、どこでも設置可。
 
 ### リポジトリをクローン
 
@@ -22,71 +25,6 @@ cd tomato-toot
 bundle install
 ```
 
-### local.yamlを編集
-
-```
-vi config/local.yaml
-```
-
-以下、設定例。
-
-```
-entries:
-  - source:
-      url: https://blog.b-shock.org/atom.xml
-      mode: title
-    mastodon:
-      url: https://mstdn.b-shock.org
-      token: hogehoge
-  - prefix: foursquare #プリフィックスを変更
-    source:
-      url: https://feeds.foursquare.com/history/hoge.rss
-      mode: body #タイトルではなく、本文を出力
-    mastodon:
-      url: https://mstdn.b-shock.org
-      token: hogehoge
-  - prefix: foursquare #プリフィックスを変更
-    source:
-      url: https://feeds.foursquare.com/history/hoge.rss
-      tag: precure #ハッシュタグprecureがあるものだけ
-      mode: body #タイトルではなく、本文を出力
-    mastodon:
-      url: https://precure.ml
-      token: hogehoge
-  - source:
-      url: https://github.com/pooza/radish-feed/releases.atom
-    bot_account: true #BOTアカウント（プリフィックスを省略）
-    mastodon:
-      url: https://mstdn.b-shock.org
-      token: hogehoge
-    shorten: true #URLを短縮
-slack:
-  hook:
-    url: https://hooks.slack.com/services/*********/*********/************************
-bitly:
-  token: hogehoge
-```
-
-- source内のmodeは、titleかsummary。互換性のためbody指定はsummary扱い。
-  それ以外の場合は、未指定の場合も含めtitle扱い。  
-  フィードの種類によって適切な設定は異なる。通常のブログではtitle、
-  foursquare等ではsummaryが適切。
-- source内のtagは、ハッシュタグ先頭の # を除いたものを指定。（必要ない場合は省略可）  
-  上記の例ではfoursquareチェックインのうち、本文中に #precure ハッシュタグがある
-  ものだけをprecure.mlへトゥートする設定にしている。
-- source内prefixは、文字通り、トゥートされるテキストのプリフィックスを指定。
-  省略した場合は、フィード自体が持ってるタイトルがプリフィックスとして使用される。
-- `bot_account: true` を指定すると、プリフィックスの出力を行わない。
-- `shorten: true` を指定すると、URLがbit.lyで短縮される。  
-  別途、アクセストークンの設定が必要。
-- mastodon内のtokenは、Mastodonの設定画面「開発」で作成する。  
-  作成後に表示される __アクセストークン__ をコピペ。ほかの情報は要らない。  
-  また、アクセス権は __write__ 以外は不要。
-- SlackのWebフックを指定すれば、実行中の例外がSlackに通知されるようになる。（省略可）  
-  また、DiscordのSlack互換Webフックでの動作も確認済み。
-- 短縮URLを使用する場合は、bit.lyのアクセストークンを設定する。  
-  使用しない場合は省略可。
-
 ### syslog設定
 
 tomato-tootというプログラム名で、syslogに出力している。  
@@ -95,6 +33,16 @@ tomato-tootというプログラム名で、syslogに出力している。
 ```
 :programname, isequal, "tomato-toot" -/var/log/tomato-toot.log
 ```
+
+### スタンドアロンモードの設定
+
+[スタンドアロンモード](doc/standalone.md)の設定を行い、local.yamlの編集以降の
+手順に対応。
+
+### サーバモードの設定
+
+[サーバスタンドアロンモード](doc/server.md)の設定を行い、local.yamlの編集以降の
+手順に対応。
 
 ## ■更新適用の手順
 
@@ -109,33 +57,9 @@ bundle exec rake clean
 bundle exec rake touch
 ```
 
-## ■操作
-
-loader.rbを実行する。root権限不要。  
-通常はcronで5分毎等で起動すればよいと思う。
-
-### コマンドラインオプション
-
-- `--silence` トゥートを抑止、時刻の更新のみを行う。（後述）
-
-## ■ふるまい
-
-- 初回起動時に、その時点での最新エントリーの時刻を一時ファイルに記録し、
-  そのエントリーをトゥート。次回以降は、その時刻より新しいエントリーが
-  トゥートの対象になる。
-- フィード設定を少しでも書き換えたら、新しいフィードを登録したとみなす。  
-  新規登録時同様、次回の実行では最新エントリーの時刻を記録とトゥートを行い、
-  その次以降から実際の処理をはじめる。
-- 起動時に `--silence` オプションが指定されている場合は、トゥートを行わない。  
-  この場合、最新エントリー時刻の記録のみを行う。
-- 例えばGitHubでは、エントリーURLがスキーム（https）とホスト名を含まず、
-  不完全なものになってる。これを補う為、エントリーURLが不完全な場合は、
-  フィード自体が持ってるサイトのURLから必要な情報を補完し、完全なURLの生成を
-  試みる。
-
 ## ■設定ファイルの検索順
 
-local.yamlは、上記設置例ではconfigディレクトリ内に置いているが、
+local.yamlは、設置例ではconfigディレクトリ内に置いているが、
 実際には以下の順に検索している。（ROOT_DIRは設置先）
 
 - /usr/local/etc/tomato-toot/local.yaml

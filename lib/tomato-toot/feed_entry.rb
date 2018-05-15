@@ -30,7 +30,7 @@ module TomatoToot
     def toot
       @feed.mastodon.create_status(@body)
       touch
-      @logger.info({entry: {date: @date, body: @body}})
+      @logger.info({mode: 'standalone', entry: {date: @date, body: @body}})
     end
 
     def touch
@@ -48,23 +48,22 @@ module TomatoToot
       body = []
       body.push("[#{@feed.prefix}]") unless @feed.bot_account?
       body.push(item.send(@feed.mode))
-
-      url = create_url(item.url)
-      url = @feed.bitly.shorten(url) if @feed.bitly
-      body.push(url)
+      body.push(create_url(item.url))
       return body.join(' ')
     end
 
     def create_url(href)
       url = Addressable::URI.parse(href)
-      unless url.scheme
+      unless url.absolute?
         local_url = url
         url = Addressable::URI.parse(@feed.url)
         url.path = local_url.path
         url.query = local_url.query
         url.fragment = local_url.fragment
       end
-      return url.to_s
+      url = url.to_s
+      url = @feed.bitly.shorten(url) if @feed.shorten?
+      return url
     end
   end
 end
