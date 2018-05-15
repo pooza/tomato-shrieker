@@ -113,7 +113,7 @@ standalone.rbを実行する。root権限不要。
 
 1.xとの互換性の為に、standalone.rbへのシンボリックリンクをloader.rbという名前で
 配置しているが、廃止予定。  
-loader.rbへのシンボリックリンクを作成していた場合は、standalone.rbへ
+従来loader.rbへのシンボリックリンクを作成していた場合は、standalone.rbへ
 リンクし直さないと誤動作すると思われる。
 
 ### コマンドラインオプション
