@@ -2,9 +2,14 @@
 
 RSS/Atomフィードの新着エントリーをトゥートする。
 
-## ■config/local.yaml設定例
+## 利用までの流れ
 
-このファイルは640か600のパーミッションを推奨。
+1. local.yamlを設定。
+1. standalone.rbを実行。通常はcron等で。
+
+## ■設定例
+
+local.yamlは640か600のパーミッションを推奨。
 
 ```
 entries:

@@ -1,6 +1,6 @@
 # サーバモード
 
-Slack互換のwebhookを提供。
+Slack/Discord互換のwebhookを提供。
 
 ## 利用までの流れ
 
@@ -9,9 +9,9 @@ Slack互換のwebhookを提供。
 1. `bundle exec rake server:start` を実行。
 1. あなたのアプリから、 /webhook/v1.0/toot/xxx へPOST。
 
-## ■config/local.yaml設定例
+## ■設定例
 
-このファイルは640か600のパーミッションを推奨。
+local.yamlは640か600のパーミッションを推奨。
 
 ```
 root_url: https://mstdn.example.com/
@@ -41,9 +41,9 @@ slack:
 
 ### /salt
 
-webhookのURLを決定する際に、ソルトとして使用される。  
-省略可能だが非推奨。省略した場合はlocal.yaml全体がソルトとして使われ、
-local.yamlを少しでも書き換えたら、その度にwebhookのURLが変更されるモードになる。
+webhookのURLを決定する際に、ソルトとして使用される。省略可能だが非推奨。  
+省略した場合はlocal.yaml全体がソルトとして使われ、local.yamlを少しでも
+書き換えたら、その度にwebhookのURLが変更されるモードになる。
 
 ### /entries/*/webhook
 
