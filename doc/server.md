@@ -11,7 +11,7 @@ Slack/Discord互換のwebhookを提供。
 
 ## ■設定例
 
-local.yamlは640か600のパーミッションを推奨。
+local.yamlは、640か600のパーミッションを推奨。
 
 ```
 root_url: https://mstdn.example.com/
