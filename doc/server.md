@@ -45,6 +45,8 @@ webhookのURLを決定する際に、ソルトとして使用される。省略�
 省略した場合はlocal.yaml全体がソルトとして使われ、local.yamlを少しでも
 書き換えたら、その度にwebhookのURLが変更されるモードになる。
 
+__ソルトは、パスワード同様の厳重な管理を！__
+
 ### /entries/*/webhook
 
 サーバモードのためのエントリーである場合は、必ず `true` 。
@@ -78,7 +80,8 @@ nginxにリバースプロキシを設定する。以下、nginx.confでの設�
 
 ### bundle exec rake server:hooks
 
-全てのwebhookのURLを表示する。local.yamlの `/root_url` や `/salt` が影響。
+全てのwebhookのURLを表示する。local.yamlの `/root_url` や `/salt` が影響。  
+__URLを知られてしまったら、誰でもトゥートが行える。パスワード同様の厳重な管理を！__
 
 ### bundle exec rake server:start
 
@@ -111,7 +114,7 @@ curl -H 'Content-Type: application/json' -X POST -d '{"text":"敵が増えてき
 
 プログラム名とバージョン情報だけを含んだ簡単なJSON文書を出力するので、
 必要に応じて監視などに使って頂くとよいと思う。  
-（上記設定例ではリバースプロキシを設定していない為、一般ユーザーには公開されない）
+＿上記設定例ではリバースプロキシを設定していない為、一般ユーザーには公開されない）
 
 curlがインストールされているなら、設置先サーバ上で以下実行。
 
