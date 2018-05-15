@@ -6,8 +6,8 @@ Slack/Discord互換のwebhookを提供。
 
 1. local.yamlを設定。
 1. `bundle exec rake server:hooks` を実行し、webhookのURLを確認。
-1. `bundle exec rake server:start` を実行。
-1. あなたのアプリから、 /webhook/v1.0/toot/xxx へPOST。
+1. `bundle exec rake server:start` を実行し、デーモン起動。
+1. あなたのアプリから、 /webhook/v1.0/toot/xxx （確認したURL）へPOST。
 
 ## ■設定例
 
@@ -78,19 +78,19 @@ nginxにリバースプロキシを設定する。以下、nginx.confでの設�
 
 ### bundle exec rake server:hooks
 
-全てのwebhookのURLを表示する。 `/root_url` や `/salt` が影響。
+全てのwebhookのURLを表示する。local.yamlの `/root_url` や `/salt` が影響。
 
 ### bundle exec rake server:start
 
-起動
+デーモン（thin）起動
 
 ### bundle exec rake server:stop
 
-停止
+デーモン（thin）停止
 
 ### bundle exec rake server:restart
 
-再起動
+デーモン（thin）再起動
 
 ## ■API
 
@@ -98,6 +98,8 @@ nginxにリバースプロキシを設定する。以下、nginx.confでの設�
 
 application/json形式でPOSTすると、対象インスタンスにトゥートを行う。  
 jsonの形式は、SlackやDiscordと互換性あり。（Slackを優先）
+
+__フックのURLは、事前に `bundle exec rake server:hooks` にて確認しておくこと。__
 
 以下、実行例。
 
@@ -107,9 +109,9 @@ curl -H 'Content-Type: application/json' -X POST -d '{"text":"敵が増えてき
 
 ### GET /about
 
-上記設定例ではリバースプロキシを設定していない為、一般ユーザーには公開されないが、
-現状はプログラム名とバージョン情報だけを含んだ簡単なJSON文書を出力するので、
-必要に応じて監視などに使って頂くとよいと思う。
+プログラム名とバージョン情報だけを含んだ簡単なJSON文書を出力するので、
+必要に応じて監視などに使って頂くとよいと思う。  
+（上記設定例ではリバースプロキシを設定していない為、一般ユーザーには公開されない）
 
 curlがインストールされているなら、設置先サーバ上で以下実行。
 

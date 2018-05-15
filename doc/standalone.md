@@ -111,7 +111,7 @@ standalone.rbを実行する。root権限不要。
 
 ### シンボリックリンク
 
-1.xとの互換性の為にstandalone.rbへのシンボリックリンクをloader.rbという名前で
+1.xとの互換性の為に、standalone.rbへのシンボリックリンクをloader.rbという名前で
 配置しているが、廃止予定。  
 loader.rbへのシンボリックリンクを作成していた場合は、standalone.rbへ
 リンクし直さないと誤動作すると思われる。
@@ -129,14 +129,13 @@ loader.rbへのシンボリックリンクを作成していた場合は、stand
 
 ### bundle exec rake standalone:touch
 
-`standalone.rb --silence` を実行、タイムスタンプの更新を行う。
+`standalone.rb --silence` を実行、タイムスタンプの更新のみを行う。（後述）
 `bundle exec rake rouch` でも可。
 
 ### bundle exec rake standalone:clean
 
-tmp/timestamps/*.json を削除し、タイムスタンプ記録を一掃。  
-`bundle exec rake clean` でも可。
-
+tmp/timestamps/*.json を削除し、タイムスタンプ記録を一掃。
+`bundle exec rake clean` でも可。  
 直後に `bundle exec rake standalone:touch` の実行を推奨。
 
 ## ■ふるまい
