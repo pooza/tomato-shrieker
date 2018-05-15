@@ -3,7 +3,7 @@
 Mastodonむけ、トゥート支援ツール。
 
 - RSS/Atomフィードの新着エントリーをトゥートする。
-- Slack互換のwebhookを提供。
+- Slack/Discord互換のwebhookを提供。
 
 ## ■設置の手順
 
@@ -36,11 +36,11 @@ tomato-tootというプログラム名で、syslogに出力している。
 
 ### スタンドアロンモードの設定
 
-[スタンドアロンモードの設定](doc/standalone.md#設定)
+[スタンドアロンモードの設定](doc/standalone.md#config/local.yaml設定例)
 
 ### サーバモードの設定
 
-[サーバスタンドアロンモードの設定](doc/server.md#設定)
+[サーバスタンドアロンモードの設定](doc/server.md#config/local.yaml設定例)
 
 ## ■更新適用の手順
 

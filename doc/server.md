@@ -2,17 +2,28 @@
 
 Slack互換のwebhookを提供。
 
+## 利用までの流れ
+
+1. local.yamlを設定。
+1. `bundle exec rake server:hooks` を実行し、webhookのURLを確認。
+1. `bundle exec rake server:start` を実行。
+1. あなたのアプリから、 /webhook/v1.0/toot/xxx へPOST。
+
 ## ■config/local.yaml設定例
 
 このファイルは640か600のパーミッションを推奨。
 
 ```
 root_url: https://mstdn.example.com/
-salt: 武田信玄
+salt: 群れをなして襲い掛かってくるつかみ男たち
 entries:
   - webhook: true
     mastodon:
       url: https://mstdn.example.com
+      token: hogehoge
+  - webhook: true
+    mastodon:
+      url: https://another.mstdn.example.com
       token: hogehoge
 slack:
   hook:
