@@ -2,7 +2,7 @@
 
 Slack/Discord互換のwebhookを提供。
 
-## 利用までの流れ
+## ■利用までの流れ
 
 1. local.yamlを設定。
 1. `bundle exec rake server:hooks` を実行し、webhookのURLを確認。
