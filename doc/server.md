@@ -53,11 +53,11 @@ __ソルトは、パスワード同様の厳重な管理を！__
 
 ### /entries/*/mastodon/url
 
-MastodonインスタンスのルートURL。
+トゥート先MastodonインスタンスのルートURL。
 
 ### /entries/*/mastodon/token
 
-Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。ほかの情報は要らない。  
+Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。  
 また、アクセス権は __write__ 以外は不要。
 
 ### /slack/hook/url

@@ -59,35 +59,35 @@ HTMLファイルのlink要素を読んだりはしないので、フィードの
 
 ### /entries/*/source/mode
 
-title又はsummaryを指定。  
-過去のバージョンとの互換性のため、body指定はsummary扱い。  
-それ以外の場合は、未指定の場合も含めtitle扱い。  
-フィードの種類によって適切な設定は異なる。通常のブログではtitle、
-foursquare等ではsummaryが適切と思われる。
+`title` 又は `summary` を指定。  
+過去のバージョンとの互換性のため、 `body` 指定は `summary` 扱い。  
+それ以外の場合は、未指定の場合も含め `title` 扱い。  
+フィードの種類によって適切な設定は異なる。通常のブログでは `title`、
+foursquare等では `summary` が適切と思われる。
 
 ### /entries/*/source/tag
 
 ハッシュタグ先頭の `#` を除いたものを指定。（必要ない場合は省略可）  
-上記の例ではfoursquareチェックインのうち、本文中に `#precure`  
+上記の例ではfoursquareチェックインのうち、本文中に `#precure`
 ハッシュタグがあるものだけをprecure.mlへトゥートする設定にしている。
 
 ### /entries/*/source/prefix
 
-文字通り、トゥートされるテキストのプリフィックスを指定。
+文字通り、トゥートされるテキストのプリフィックスを指定。  
 省略した場合は、フィード自体が持ってるタイトルがプリフィックスとして使用される。
-
-### /entries/*/mastodon/url
-
-MastodonインスタンスのルートURL。
-
-### /entries/*/mastodon/token
-
-Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。ほかの情報は要らない。  
-また、アクセス権は __write__ 以外は不要。
 
 ### /entries/*/bot_account
 
 `true` を指定すると、プリフィックスの出力を行わない。
+
+### /entries/*/mastodon/url
+
+トゥート先MastodonインスタンスのルートURL。
+
+### /entries/*/mastodon/token
+
+Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。  
+また、アクセス権は __write__ 以外は不要。
 
 ### /entries/*/shorten
 
