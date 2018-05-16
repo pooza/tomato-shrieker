@@ -3,7 +3,7 @@ require 'tomato-toot/config'
 module TomatoToot
   module Package
     def self.name
-      return File.basename(ROOT_DIR)
+      return self.to_s.underscore.split('/').first
     end
 
     def self.version

@@ -3,6 +3,8 @@ $LOAD_PATH.push(File.join(ROOT_DIR, 'lib'))
 ENV['BUNDLE_GEMFILE'] ||= File.join(ROOT_DIR, 'Gemfile')
 
 require 'bundler/setup'
+require 'active_support'
+require 'active_support/core_ext'
 
 [:run, :touch, :clean].each do |action|
   desc "alias of standalone:#{action}"
