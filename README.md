@@ -36,11 +36,13 @@ tomato-tootというプログラム名で、syslogに出力している。
 
 ### スタンドアロンモードの設定
 
+Atom/RSSフィードをソースとしたトゥートを行うなら。  
 [スタンドアロンモード](doc/standalone.md)の設定を行い、local.yamlの編集以降の
 手順に対応。
 
 ### サーバモードの設定
 
+Slack/Discord互換webhookからトゥートを行うなら。  
 [サーバモード](doc/server.md)の設定を行い、local.yamlの編集以降の
 手順に対応。
 
@@ -59,8 +61,7 @@ bundle exec rake touch
 
 ## ■設定ファイルの検索順
 
-local.yamlは、設置例ではconfigディレクトリ内に置いているが、
-実際には以下の順に検索している。（ROOT_DIRは設置先）
+local.yamlは以下の順に検索しているので、どこにあってもよい。（ROOT_DIRは設置先）
 
 - /usr/local/etc/tomato-toot/local.yaml
 - /usr/local/etc/tomato-toot/local.yml

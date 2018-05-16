@@ -97,7 +97,7 @@ Mastodonの設定画面「開発」で作成できる __アクセストークン
 ### /slack/hook/url
 
 指定すれば、実行中の例外がSlackに通知されるようになる。（省略可）  
-DiscordのSlack互換Webフックでの動作も確認済み。
+DiscordのSlack互換webhookでの動作も確認済み。
 
 ### /bitly/token
 
