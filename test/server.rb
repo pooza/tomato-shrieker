@@ -15,7 +15,7 @@ module TomatoToot
       uri.path = '/about'
       response = uri.open
 
-      assert_equal(response.status.first, "200")
+      assert_equal(response.status.first, '200')
       assert_equal(response.meta['content-type'], 'application/json; charset=UTF-8')
     end
 
@@ -43,7 +43,7 @@ module TomatoToot
       uri = @root.clone
       uri.path = '/not_found'
       begin
-        response = uri.open
+        uri.open
       rescue OpenURI::HTTPError => e
         assert_equal(e.message, '404 Not Found')
       end
