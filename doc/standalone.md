@@ -130,7 +130,7 @@ standalone.rbを実行する。root権限不要。
 ### bundle exec rake standalone:touch
 
 `standalone.rb --silence` を実行、タイムスタンプの更新のみを行う。（後述）
-`bundle exec rake rouch` でも可。
+`bundle exec rake touch` でも可。
 
 ### bundle exec rake standalone:clean
 
