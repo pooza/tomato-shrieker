@@ -71,7 +71,7 @@ foursquare等では `summary` が適切と思われる。
 上記の例ではfoursquareチェックインのうち、本文中に `#precure`
 ハッシュタグがあるものだけをprecure.mlへトゥートする設定にしている。
 
-### /entries/*/source/prefix
+### /entries/*/prefix
 
 文字通り、トゥートされるテキストのプリフィックスを指定。  
 省略した場合は、フィード自体が持ってるタイトルがプリフィックスとして使用される。
