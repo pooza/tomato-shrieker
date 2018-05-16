@@ -65,17 +65,6 @@ Mastodonの設定画面「開発」で作成できる __アクセストークン
 指定すれば、実行中の例外がSlackに通知されるようになる。（省略可）  
 DiscordのSlack互換Webフックでの動作も確認済み。
 
-## リバースプロキシ設定
-
-Mastodonインスタンスがインストールされたサーバに設置するなら、Mastodon本体同様、
-nginxにリバースプロキシを設定する。以下、nginx.confでの設定例。
-
-```
-  location ^~ /feed {
-    proxy_pass http://localhost:3009;
-  }
-```
-
 ## ■rakeタスク
 
 ### bundle exec rake server:hooks
