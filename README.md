@@ -41,7 +41,7 @@ tomato-tootというプログラム名で、syslogに出力している。
 
 ### サーバモードの設定
 
-[サーバスタンドアロンモード](doc/server.md)の設定を行い、local.yamlの編集以降の
+[サーバモード](doc/server.md)の設定を行い、local.yamlの編集以降の
 手順に対応。
 
 ## ■更新適用の手順
