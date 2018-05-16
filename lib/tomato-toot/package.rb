@@ -3,7 +3,7 @@ require 'tomato-toot/config'
 module TomatoToot
   module Package
     def self.name
-      return self.to_s.underscore.split('/').first
+      return 'tomato-toot'
     end
 
     def self.version
