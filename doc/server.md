@@ -27,8 +27,10 @@ entries:
       url: https://another.mstdn.example.com
       token: hogehoge
 slack:
-  hook:
-    url: https://hooks.slack.com/services/*********/*********/************************
+  hooks:
+    - https://hooks.slack.com/services/xxxxx
+    - https://discordapp.com/api/webhooks/xxxxx
+    - https://mstdn.b-shock.org/webhook/v1.0/toot/xxxxx
 ```
 
 ## ■要素の説明
@@ -60,10 +62,10 @@ webhookのURLを決定する際に、ソルトとして使用される。省略�
 Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。  
 また、アクセス権は __write__ 以外は不要。
 
-### /slack/hook/url
+### /slack/hooks/*
 
-指定すれば、実行中の例外がSlackに通知されるようになる。（省略可）  
-DiscordのSlack互換Webフックでの動作も確認済み。
+例外発生時の通知先。  
+SlackのWebhookと互換性のあるURLを列挙。（省略可）
 
 ## ■rakeタスク
 
@@ -89,7 +91,7 @@ URLを知られてしまったら、誰でもトゥートが行える。パス�
 ### POST /webhook/v1.0/toot/フックID
 
 application/json形式でPOSTすると、対象インスタンスにトゥートを行う。  
-jsonの形式は、SlackやDiscordと互換性あり。（Slackを優先）  
+JSONの形式は、SlackやDiscordと互換性あり。（Slackを優先）  
 フックのURLは、事前に `bundle exec rake server:hooks` にて確認しておくこと。
 
 以下、実行例。
@@ -97,6 +99,8 @@ jsonの形式は、SlackやDiscordと互換性あり。（Slackを優先）
 ```
 curl -H 'Content-Type: application/json' -X POST -d '{"text":"敵が増えてきた時に仕掛けてくるフラッシュ攻撃には気をつけろ！"}' https://mstdn.example.com/webhook/v1.0/toot/xxxx
 ```
+
+実在しないフックIDには404を、JSONに適切なトゥート本文が含まれていない場合は400を返す。
 
 ### GET /about
 

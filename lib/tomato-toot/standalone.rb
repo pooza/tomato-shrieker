@@ -11,7 +11,6 @@ module TomatoToot
     def initialize
       @config = Config.instance
       @logger = Logger.new
-      @slack = Slack.new if @config['local']['slack']
       @options = ARGV.getopts('', 'silence')
     rescue => e
       puts "#{e.class} #{e.message}"
@@ -29,8 +28,7 @@ module TomatoToot
           @logger.info(message)
         rescue => e
           message[:error] = e.message
-          @slack.say(message) if @slack
-          @logger.error(message)
+          Slack.all.map{ |h| h.say(message)}
         end
       end
       @logger.info({mode: 'standalone', message: 'complete'})

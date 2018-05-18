@@ -42,8 +42,10 @@ entries:
     bot_account: true
     shorten: true
 slack:
-  hook:
-    url: https://hooks.slack.com/services/*********/*********/************************
+  hooks:
+    - https://hooks.slack.com/services/xxxxx
+    - https://discordapp.com/api/webhooks/xxxxx
+    - https://mstdn.b-shock.org/webhook/v1.0/toot/xxxxx
 bitly:
   token: hogehoge
 ```
@@ -94,10 +96,10 @@ Mastodonの設定画面「開発」で作成できる __アクセストークン
 `true` を指定すると、URLがbit.lyで短縮される。  
 別途 /bitly/token にて、アクセストークンの設定が必要。
 
-### /slack/hook/url
+### /slack/hooks/*
 
-指定すれば、実行中の例外がSlackに通知されるようになる。（省略可）  
-DiscordのSlack互換webhookでの動作も確認済み。
+例外発生時の通知先。  
+SlackのWebhookと互換性のあるURLを列挙。（省略可）
 
 ### /bitly/token
 

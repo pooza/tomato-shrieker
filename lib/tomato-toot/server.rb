@@ -13,7 +13,6 @@ module TomatoToot
     def initialize
       super
       @config = Config.instance
-      @slack = Slack.new if @config['local']['slack']
       @logger = Logger.new
       @logger.info({
         mode: 'webhook',
@@ -85,7 +84,7 @@ module TomatoToot
       @renderer.status = 500
       @message[:response][:message] = env['sinatra.error'].message
       @renderer.message = @message
-      @slack.say(@message) if @slack
+      Slack.all.map{ |h| h.say(@message)}
       return @renderer.to_s
     end
   end
