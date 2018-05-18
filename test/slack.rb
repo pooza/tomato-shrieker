@@ -10,9 +10,7 @@ module TomatoToot
 
     def test_say
       Slack.all do |slack|
-        result = slack.say({text: 'hoge'})
-        assert_true(result.response.is_a?(Net::HTTPOK))
-        assert_equal(result.parsed_response['response']['text'], "{\n  \"text\": \"hoge\"\n}")
+        assert_true(slack.say({text: 'hoge'}).response.is_a?(Net::HTTPOK))
       end
     end
   end
