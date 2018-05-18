@@ -62,7 +62,7 @@ webhookのURLを決定する際に、ソルトとして使用される。省略�
 Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。  
 また、アクセス権は __write__ 以外は不要。
 
-### /slack/hook/url/*
+### /slack/hooks/*
 
 例外発生時の通知先。  
 SlackのWebhookと互換性のあるURLを列挙。（省略可）

@@ -96,7 +96,7 @@ Mastodonの設定画面「開発」で作成できる __アクセストークン
 `true` を指定すると、URLがbit.lyで短縮される。  
 別途 /bitly/token にて、アクセストークンの設定が必要。
 
-### /slack/hook/url/*
+### /slack/hooks/*
 
 例外発生時の通知先。  
 SlackのWebhookと互換性のあるURLを列挙。（省略可）
