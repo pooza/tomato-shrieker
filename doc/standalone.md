@@ -99,7 +99,7 @@ Mastodonの設定画面「開発」で作成できる __アクセストークン
 ### /slack/hooks/*
 
 例外発生時の通知先。  
-SlackのWebhookと互換性のあるURLを列挙。（省略可）
+Slackのwebhookと互換性のあるURLを列挙。（省略可）
 
 ### /bitly/token
 
