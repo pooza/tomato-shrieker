@@ -1,10 +1,10 @@
 require 'addressable/uri'
 require 'digest/sha1'
-require 'mastodon'
 require 'json'
 require 'socket'
 require 'tomato-toot/config'
 require 'tomato-toot/logger'
+require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Webhook
@@ -12,16 +12,13 @@ module TomatoToot
       @config = Config.instance
       @params = params.clone
       @logger = Logger.new
-      @mastodon = Mastodon::REST::Client.new({
-        base_url: @params['mastodon']['url'],
-        bearer_token: @params['mastodon']['token'],
-      })
+      @mastodon = Mastodon.new(@params['mastodon'])
     end
 
     def digest
       values = @params.clone
       values['salt'] = (@config['local']['salt'] || @config['local'])
-      return Digest::SHA1.hexdigest(@values.to_s)
+      return Digest::SHA1.hexdigest(values.to_s)
     end
 
     def mastodon_url
@@ -30,6 +27,10 @@ module TomatoToot
 
     def token
       return @params['mastodon']['token']
+    end
+
+    def visibility
+      return (@params['visibility'] || 'public')
     end
 
     def hook_url
@@ -47,12 +48,15 @@ module TomatoToot
       return ::JSON.pretty_generate({
         mastodon: mastodon_url,
         token: token,
+        visibility: visibility,
         hook: hook_url,
       })
     end
 
     def toot(body)
-      @mastodon.create_status(body)
+      @mastodon.toot(body, {
+        visibility: visibility,
+      })
     end
 
     def self.search(digest)

@@ -26,6 +26,11 @@ entries:
     mastodon:
       url: https://another.mstdn.example.com
       token: hogehoge
+  - webhook: true
+    mastodon:
+      url: https://another.mstdn.example.com
+      token: hogehoge
+    visibility: unlisted
 slack:
   hooks:
     - https://hooks.slack.com/services/xxxxx
@@ -61,6 +66,14 @@ webhookのURLを決定する際に、ソルトとして使用される。省略�
 
 Mastodonの設定画面「開発」で作成できる __アクセストークン__ をコピペ。  
 また、アクセス権は __write__ 以外は不要。
+
+### /entries/*/visibility
+
+トゥートの「投稿のプライバシー」を指定。
+- `direct` ダイレクト
+- `private` 非公開
+- `unlisted` 未収載
+- `public` 公開（デフォルト）
 
 ### /slack/hooks/*
 

@@ -28,7 +28,9 @@ module TomatoToot
     end
 
     def toot
-      @feed.mastodon.create_status(@body)
+      @feed.mastodon.toot(@body, {
+        visibility: @feed.visibility,
+      })
       touch
       @logger.info({mode: 'standalone', entry: {date: @date, body: @body}})
     end

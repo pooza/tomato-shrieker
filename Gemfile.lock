@@ -15,8 +15,6 @@ GEM
     concurrent-ruby (1.0.5)
     crass (1.0.4)
     daemons (1.2.6)
-    domain_name (0.5.20180417)
-      unf (>= 0.0.5, < 1.0.0)
     eventmachine (1.2.7)
     faraday (0.15.2)
       multipart-post (>= 1.2, < 3)
@@ -27,15 +25,6 @@ GEM
       faraday_middleware (>= 0.9)
       loofah (>= 2.0)
       sax-machine (>= 1.0)
-    http (2.2.2)
-      addressable (~> 2.3)
-      http-cookie (~> 1.0)
-      http-form_data (~> 1.0.1)
-      http_parser.rb (~> 0.6.0)
-    http-cookie (1.0.3)
-      domain_name (~> 0.5)
-    http-form_data (1.0.3)
-    http_parser.rb (0.6.0)
     httparty (0.16.2)
       multi_xml (>= 0.5.2)
     httpauth (0.2.1)
@@ -44,9 +33,6 @@ GEM
     loofah (2.2.2)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
-    mastodon-api (1.1.0)
-      addressable (~> 2.4)
-      http (~> 2.0)
     mini_portile2 (2.3.0)
     minitest (5.11.3)
     multi_json (1.13.1)
@@ -82,9 +68,6 @@ GEM
     tilt (2.0.8)
     tzinfo (1.2.5)
       thread_safe (~> 0.1)
-    unf (0.1.4)
-      unf_ext
-    unf_ext (0.0.7.5)
 
 PLATFORMS
   ruby
@@ -95,7 +78,6 @@ DEPENDENCIES
   bitly
   feedjira
   httparty
-  mastodon-api
   rake
   sinatra
   syslog-logger

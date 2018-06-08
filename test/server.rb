@@ -20,22 +20,23 @@ module TomatoToot
     end
 
     def test_webhook_toot
-      return unless @root
-      result = HTTParty.post(@root, {
-        body: {text: '木の水晶球'}.to_json,
-        headers: {'Content-Type' => 'application/json'},
-        ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
-      })
-      assert_true(result.response.is_a?(Net::HTTPOK))
-      assert_equal(result.parsed_response['response']['text'], '木の水晶球')
+      Webhook.all.each do |webhook|
+        result = HTTParty.post(webhook.hook_url, {
+          body: {text: '木の水晶球'}.to_json,
+          headers: {'Content-Type' => 'application/json'},
+          ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
+        })
+        assert_true(result.response.is_a?(Net::HTTPOK))
+        assert_equal('木の水晶球', result.parsed_response['response']['text'])
 
-      result = HTTParty.post(@root, {
-        body: {body: '武田信玄'}.to_json,
-        headers: {'Content-Type' => 'application/json'},
-        ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
-      })
-      assert_true(result.response.is_a?(Net::HTTPOK))
-      assert_equal(result.parsed_response['response']['text'], '武田信玄')
+        result = HTTParty.post(webhook.hook_url, {
+          body: {body: '武田信玄'}.to_json,
+          headers: {'Content-Type' => 'application/json'},
+          ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
+        })
+        assert_true(result.response.is_a?(Net::HTTPOK))
+        assert_equal('武田信玄', result.parsed_response['response']['text'])
+      end
     end
 
     def test_not_found

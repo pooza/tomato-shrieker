@@ -1,11 +1,11 @@
 require 'feedjira'
 require 'digest/sha1'
-require 'mastodon'
 require 'json'
 require 'tomato-toot/config'
 require 'tomato-toot/package'
 require 'tomato-toot/bitly'
 require 'tomato-toot/feed_entry'
+require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Feed
@@ -16,13 +16,6 @@ module TomatoToot
       @config = Config.instance
       @params = params.clone
 
-      case @params['source']['mode']
-      when 'body', 'summary'
-        @params['source']['mode'] = 'summary'
-      else
-        @params['source']['mode'] = 'title'
-      end
-
       Feedjira.configure do |config|
         config.user_agent = "#{Package.full_name} #{Package.url}"
       end
@@ -30,10 +23,7 @@ module TomatoToot
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
       @bitly = Bitly.new if shorten?
-      @mastodon = Mastodon::REST::Client.new({
-        base_url: @params['mastodon']['url'],
-        bearer_token: @params['mastodon']['token'],
-      })
+      @mastodon = Mastodon.new(@params['mastodon'])
     end
 
     def execute(options)
@@ -49,7 +39,7 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      @feed.entries.each.sort_by{ |item| item.published.to_f}.reverse.each do |item|
+      @feed.entries.each.sort_by{ |item| item.published.to_f}.reverse_each do |item|
         entry = FeedEntry.new(self, item)
         break if entry.outdated?
         next if tag && !entry.tag?
@@ -93,11 +83,20 @@ module TomatoToot
     end
 
     def mode
-      return @params['source']['mode']
+      case @params['source']['mode']
+      when 'body', 'summary'
+        return 'summary'
+      else
+        return 'title'
+      end
     end
 
     def tag
       return @params['source']['tag']
+    end
+
+    def visibility
+      return (@params['visibility'] || 'public')
     end
 
     def prefix
