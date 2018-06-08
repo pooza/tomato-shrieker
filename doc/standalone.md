@@ -41,6 +41,7 @@ entries:
       token: hogehoge
     bot_account: true
     shorten: true
+    visibility: unlisted
 slack:
   hooks:
     - https://hooks.slack.com/services/xxxxx
@@ -95,6 +96,14 @@ Mastodonの設定画面「開発」で作成できる __アクセストークン
 
 `true` を指定すると、URLがbit.lyで短縮される。  
 別途 /bitly/token にて、アクセストークンの設定が必要。
+
+### /entries/*/visibility
+
+トゥートの「投稿のプライバシー」を指定。
+- `direct` ダイレクト
+- `private` 非公開
+- `unlisted` 未収載
+- `public` 公開（デフォルト）
 
 ### /slack/hooks/*
 
