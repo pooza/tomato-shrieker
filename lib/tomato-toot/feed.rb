@@ -1,11 +1,11 @@
 require 'feedjira'
 require 'digest/sha1'
-require 'mastodon'
 require 'json'
 require 'tomato-toot/config'
 require 'tomato-toot/package'
 require 'tomato-toot/bitly'
 require 'tomato-toot/feed_entry'
+require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Feed
@@ -30,7 +30,7 @@ module TomatoToot
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
       @bitly = Bitly.new if shorten?
-      @mastodon = Mastodon::REST::Client.new({
+      @mastodon = Mastodon.new({
         base_url: @params['mastodon']['url'],
         bearer_token: @params['mastodon']['token'],
       })
