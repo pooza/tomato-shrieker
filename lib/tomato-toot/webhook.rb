@@ -8,6 +8,8 @@ require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Webhook
+    attr_reader :mastodon
+
     def initialize(params)
       @config = Config.instance
       @params = params.clone
