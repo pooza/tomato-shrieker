@@ -1,10 +1,10 @@
 require 'addressable/uri'
 require 'digest/sha1'
-require 'mastodon'
 require 'json'
 require 'socket'
 require 'tomato-toot/config'
 require 'tomato-toot/logger'
+require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Webhook
@@ -12,7 +12,7 @@ module TomatoToot
       @config = Config.instance
       @params = params.clone
       @logger = Logger.new
-      @mastodon = Mastodon::REST::Client.new({
+      @mastodon = Mastodon.new({
         base_url: @params['mastodon']['url'],
         bearer_token: @params['mastodon']['token'],
       })
@@ -30,6 +30,10 @@ module TomatoToot
 
     def token
       return @params['mastodon']['token']
+    end
+
+    def visibility
+      return @params['source']['visibility']
     end
 
     def hook_url

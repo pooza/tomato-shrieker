@@ -16,13 +16,6 @@ module TomatoToot
       @config = Config.instance
       @params = params.clone
 
-      case @params['source']['mode']
-      when 'body', 'summary'
-        @params['source']['mode'] = 'summary'
-      else
-        @params['source']['mode'] = 'title'
-      end
-
       Feedjira.configure do |config|
         config.user_agent = "#{Package.full_name} #{Package.url}"
       end
@@ -93,11 +86,20 @@ module TomatoToot
     end
 
     def mode
-      return @params['source']['mode']
+      case @params['source']['mode']
+      when 'body', 'summary'
+        return 'summary'
+      else
+        return 'title'
+      end
     end
 
     def tag
       return @params['source']['tag']
+    end
+
+    def visibility
+      return @params['source']['visibility']
     end
 
     def prefix
