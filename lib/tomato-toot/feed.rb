@@ -23,10 +23,7 @@ module TomatoToot
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
 
       @bitly = Bitly.new if shorten?
-      @mastodon = Mastodon.new({
-        base_url: @params['mastodon']['url'],
-        bearer_token: @params['mastodon']['token'],
-      })
+      @mastodon = Mastodon.new(@params['mastodon'])
     end
 
     def execute(options)
@@ -42,7 +39,7 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      @feed.entries.each.sort_by{ |item| item.published.to_f}.reverse.each do |item|
+      @feed.entries.each.sort_by{ |item| item.published.to_f}.reverse_each do |item|
         entry = FeedEntry.new(self, item)
         break if entry.outdated?
         next if tag && !entry.tag?
@@ -99,7 +96,7 @@ module TomatoToot
     end
 
     def visibility
-      return @params['source']['visibility']
+      return (@params['visibility'] || 'public')
     end
 
     def prefix
