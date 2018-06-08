@@ -1,6 +1,7 @@
 require 'addressable/uri'
 require 'httparty'
 require 'json'
+require 'tomato-toot/package'
 
 module TomatoToot
   class Mastodon
@@ -18,6 +19,7 @@ module TomatoToot
         body: values.to_json,
         headers: {
           'Content-Type' => 'application/json',
+          'User-Agent' => "#{Package.full_name} #{Package.url}",
           'Authorization' => "Bearer #{@params['token']}",
         },
         ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
