@@ -26,6 +26,7 @@ module TomatoToot
           headers: {'Content-Type' => 'application/json'},
           ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
         })
+        assert_true(result.response.is_a?(Net::HTTPOK))
         assert_equal('木の水晶球', result.parsed_response['response']['text'])
 
         result = HTTParty.post(webhook.hook_url, {
@@ -33,6 +34,7 @@ module TomatoToot
           headers: {'Content-Type' => 'application/json'},
           ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
         })
+        assert_true(result.response.is_a?(Net::HTTPOK))
         assert_equal('武田信玄', result.parsed_response['response']['text'])
       end
     end
