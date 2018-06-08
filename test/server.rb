@@ -4,11 +4,6 @@ require 'httparty'
 
 module TomatoToot
   class ServerTest < Test::Unit::TestCase
-    def setup
-      return unless @hook = Webhook.all.first
-      @root = URI.parse(@hook.hook_url)
-    end
-
     def test_webhook_toot
       Webhook.all.each do |webhook|
         result = HTTParty.post(webhook.hook_url, {
@@ -30,8 +25,8 @@ module TomatoToot
     end
 
     def test_not_found
-      return unless @root
-      uri = @root.clone
+      return unless @hook = Webhook.all.first
+      uri = URI.parse(@hook.hook_url)
       uri.path = '/not_found'
       begin
         uri.open
