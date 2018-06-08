@@ -8,6 +8,8 @@ require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Webhook
+    attr_reader :mastodon
+
     def initialize(params)
       @config = Config.instance
       @params = params.clone
@@ -16,9 +18,13 @@ module TomatoToot
     end
 
     def digest
-      values = @params.clone
-      values['salt'] = (@config['local']['salt'] || @config['local'])
-      return Digest::SHA1.hexdigest(values.to_s)
+      return Digest::SHA1.hexdigest({
+        mastodon: mastodon_url,
+        token: token,
+        visibility: visibility,
+        shorten: shorten?,
+        salt: (@config['local']['salt'] || @config['local']),
+      }.to_json)
     end
 
     def mastodon_url
@@ -44,11 +50,16 @@ module TomatoToot
       return url.to_s
     end
 
+    def shorten?
+      return @config['local']['bitly'] && @params['shorten']
+    end
+
     def to_json
       return ::JSON.pretty_generate({
         mastodon: mastodon_url,
         token: token,
         visibility: visibility,
+        shorten: shorten?,
         hook: hook_url,
       })
     end
