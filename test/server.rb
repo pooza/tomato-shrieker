@@ -9,16 +9,6 @@ module TomatoToot
       @root = URI.parse(@hook.hook_url)
     end
 
-    def test_about
-      return unless @root
-      uri = @root.clone
-      uri.path = '/about'
-      response = uri.open
-
-      assert_equal(response.status.first, '200')
-      assert_equal(response.meta['content-type'], 'application/json; charset=UTF-8')
-    end
-
     def test_webhook_toot
       Webhook.all.each do |webhook|
         result = HTTParty.post(webhook.hook_url, {
