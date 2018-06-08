@@ -3,6 +3,7 @@ require 'httparty'
 require 'json'
 require 'tomato-toot/config'
 require 'tomato-toot/logger'
+require 'tomato-toot/package'
 
 module TomatoToot
   class Slack
@@ -14,7 +15,10 @@ module TomatoToot
     def say(message)
       response = HTTParty.post(@url, {
         body: {text: JSON.pretty_generate(message)}.to_json,
-        headers: {'Content-Type' => 'application/json'},
+        headers: {
+          'Content-Type' => 'application/json',
+          'User-Agent' => "#{Package.full_name} #{Package.url}",
+        },
         ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
       })
       if message.is_a?(Exception)
