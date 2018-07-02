@@ -71,6 +71,17 @@ module TomatoToot
       return @renderer.to_s
     end
 
+    get '/webhook/v1.0/toot/:digest' do
+      unless webhook = Webhook.search(params[:digest])
+        @renderer.status = 404
+        return @renderer.to_s
+      end
+
+      @message[:response][:text] = 'OK'
+      @renderer.message = @message
+      return @renderer.to_s
+    end
+
     not_found do
       @renderer = JSONRenderer.new
       @renderer.status = 404
