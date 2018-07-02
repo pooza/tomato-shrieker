@@ -27,7 +27,8 @@ module TomatoToot
           Feed.new(entry).execute(@options)
           @logger.info(message)
         rescue => e
-          message[:error] = e.message
+          message[:error] = "#{e.class}: #{e.message}"
+          message[:backtrace] = e.backtrace[0..5]
           Slack.all.map{ |h| h.say(message)}
         end
       end
