@@ -32,8 +32,8 @@ module TomatoToot
         fetch.map(&:touch)
       elsif touched?
         fetch.map(&:toot)
-      elsif present?
-        fetch.to_a.first.toot
+      elsif entry = fetch.to_a.first
+        entry.toot
       end
     end
 
