@@ -37,7 +37,7 @@ module TomatoToot
     after do
       @message[:response][:status] ||= @renderer.status
       if @renderer.status < 400
-        @logger.info(@message)
+        @logger.info(@message.select{ |k, v| [:request, :response, :package].member?(k)})
       else
         @logger.error(@message)
       end
@@ -71,6 +71,17 @@ module TomatoToot
       return @renderer.to_s
     end
 
+    get '/webhook/v1.0/toot/:digest' do
+      unless Webhook.search(params[:digest])
+        @renderer.status = 404
+        return @renderer.to_s
+      end
+
+      @message[:response][:text] = 'OK'
+      @renderer.message = @message
+      return @renderer.to_s
+    end
+
     not_found do
       @renderer = JSONRenderer.new
       @renderer.status = 404
@@ -79,10 +90,11 @@ module TomatoToot
       return @renderer.to_s
     end
 
-    error do
+    error do |e|
       @renderer = JSONRenderer.new
       @renderer.status = 500
-      @message[:response][:message] = env['sinatra.error'].message
+      @message[:response][:error] = "#{e.class}: #{e.message}"
+      @message[:backtrace] = e.backtrace[0..5]
       @renderer.message = @message
       Slack.all.map{ |h| h.say(@message)}
       return @renderer.to_s
