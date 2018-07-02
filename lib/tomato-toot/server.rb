@@ -37,7 +37,7 @@ module TomatoToot
     after do
       @message[:response][:status] ||= @renderer.status
       if @renderer.status < 400
-        @logger.info(@message)
+        @logger.info(@message.select{ |k, v| [:request, :response, :package].member?(k)})
       else
         @logger.error(@message)
       end
