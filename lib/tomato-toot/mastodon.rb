@@ -22,7 +22,7 @@ module TomatoToot
           'User-Agent' => "#{Package.full_name} #{Package.url}",
           'Authorization' => "Bearer #{@params['token']}",
         },
-        ssl_ca_file: File.join(ROOT_DIR, 'cert/cacert.pem'),
+        ssl_ca_file: ENV['SSL_CERT_FILE'],
       })
     end
   end
