@@ -72,7 +72,7 @@ module TomatoToot
     end
 
     get '/webhook/v1.0/toot/:digest' do
-      unless webhook = Webhook.search(params[:digest])
+      unless Webhook.search(params[:digest])
         @renderer.status = 404
         return @renderer.to_s
       end
