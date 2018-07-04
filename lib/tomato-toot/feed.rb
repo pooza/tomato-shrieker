@@ -17,7 +17,7 @@ module TomatoToot
       @params = params.clone
 
       Feedjira.configure do |config|
-        config.user_agent = "#{Package.full_name} #{Package.url}"
+        config.user_agent = Package.user_agent
       end
       Feedjira.logger.level = ::Logger::FATAL
       @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
