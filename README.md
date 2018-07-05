@@ -66,3 +66,15 @@ local.yamlは以下の順に検索しているので、どこにあってもよ�
 - /etc/tomato-toot/local.yml
 - __ROOT_DIR__/config/local.yaml
 - __ROOT_DIR__/config/local.yml
+
+## ■宣伝
+
+- 中の人は普段、個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」か、
+プリキュア専用インスタンス「[キュアスタ！](https://precure.ml/)」に居ます。
+プリキュアに興味ある人は、是非キュアスタ！を覗いてね！
+
+- このtomato-toot、以下の拙作BOTのバーツとしても使われています。
+  - [「東映アニメーション プリキュア公式」の新着情報ボット](https://precure.ml/@toei_bot)
+  - [「ABC毎日放送 プリキュア公式」の新着情報ボット](https://precure.ml/@abc_bot)
+  - [「プリキュアガーデン」の新着情報ボット](https://precure.ml/@garden_bot)
+  - [「プリキュア公式YouTubeチャンネル」の新着情報ボット](https://precure.ml/@youtube_precure_bot)

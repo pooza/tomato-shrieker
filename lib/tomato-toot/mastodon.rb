@@ -19,7 +19,7 @@ module TomatoToot
         body: values.to_json,
         headers: {
           'Content-Type' => 'application/json',
-          'User-Agent' => "#{Package.full_name} #{Package.url}",
+          'User-Agent' => Package.user_agent,
           'Authorization' => "Bearer #{@params['token']}",
         },
         ssl_ca_file: ENV['SSL_CERT_FILE'],

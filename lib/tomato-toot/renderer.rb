@@ -1,4 +1,5 @@
 require 'tomato-toot/config'
+require 'tomato-toot/logger'
 
 module TomatoToot
   class Renderer
@@ -7,6 +8,7 @@ module TomatoToot
     def initialize
       @status = 200
       @config = Config.instance
+      @logger = Logger.new
     end
 
     def type
