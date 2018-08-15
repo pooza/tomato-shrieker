@@ -49,8 +49,7 @@ Slack/Discord互換webhookからトゥートを行うなら。
 
 ```
 cd 設置先
-git fetch
-git checkout バージョン名
+git pull
 bundle install
 bundle exec rake clean
 bundle exec rake touch
