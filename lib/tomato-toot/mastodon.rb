@@ -21,6 +21,7 @@ module TomatoToot
           'Content-Type' => 'application/json',
           'User-Agent' => Package.user_agent,
           'Authorization' => "Bearer #{@params['token']}",
+          'X-Mulukhiya' => 'pass through',
         },
         ssl_ca_file: ENV['SSL_CERT_FILE'],
       })

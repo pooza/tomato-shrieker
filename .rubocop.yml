@@ -16,14 +16,23 @@ Layout/SpaceInsideBlockBraces:
 Layout/SpaceInsideHashLiteralBraces:
   EnforcedStyle: no_space
 
+Layout/EmptyLineAfterGuardClause:
+  Enabled: false
+
 Metrics/AbcSize:
   Max: 30
+  Exclude:
+    - test/*
 
 Metrics/MethodLength:
   Max: 20
+  Exclude:
+    - test/*
 
 Metrics/ClassLength:
   Max: 200
+  Exclude:
+    - test/*
 
 Naming/FileName:
   Exclude:
