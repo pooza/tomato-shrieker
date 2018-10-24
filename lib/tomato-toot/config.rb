@@ -30,5 +30,16 @@ module TomatoToot
     def suffixes
       return ['.yaml', '.yml']
     end
+
+    def self.validate(name)
+      keys = name.split('/')
+      keys.shift
+      config = instance
+      keys.each do |key|
+        config = config[key]
+        raise ConfigError, "#{name} が未定義です。" unless config.present?
+      end
+      return true
+    end
   end
 end

@@ -1,5 +1,6 @@
 require 'tomato-toot/config'
 require 'tomato-toot/logger'
+require 'tomato-toot/error/imprement'
 
 module TomatoToot
   class Renderer
@@ -16,7 +17,7 @@ module TomatoToot
     end
 
     def to_s
-      raise 'to_sが未定義です。'
+      raise ImprementError, "#{__method__}が未定義です。"
     end
   end
 end

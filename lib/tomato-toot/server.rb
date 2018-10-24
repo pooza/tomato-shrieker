@@ -37,7 +37,7 @@ module TomatoToot
     after do
       @message[:response][:status] ||= @renderer.status
       if @renderer.status < 400
-        @logger.info(@message.select{ |k, v| [:request, :response, :package].member?(k)})
+        @logger.info(@message)
       else
         @logger.error(@message)
       end
@@ -92,7 +92,11 @@ module TomatoToot
 
     error do |e|
       @renderer = JSONRenderer.new
-      @renderer.status = 500
+      begin
+        @renderer.status = e.status
+      rescue ::NoMethodError
+        @renderer.status = 500
+      end
       @message[:response][:error] = "#{e.class}: #{e.message}"
       @message[:backtrace] = e.backtrace[0..5]
       @renderer.message = @message
