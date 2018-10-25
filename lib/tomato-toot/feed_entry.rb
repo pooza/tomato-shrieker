@@ -35,10 +35,7 @@ module TomatoToot
 
     def toot
       ids = []
-      if @enclosure
-        id = @feed.mastodon.upload_remote_resource(@enclosure)
-        ids.push(id) if id
-      end
+      ids.push(@feed.mastodon.upload_remote_resource(@enclosure)) if @enclosure
       @feed.mastodon.toot(@body, {
         visibility: @feed.visibility,
         media_ids: ids,
