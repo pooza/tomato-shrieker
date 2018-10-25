@@ -14,6 +14,7 @@ module TomatoToot
       begin
         @enclosure = Addressable::URI.parse(item.enclosure_url)
       rescue ::NoMethodError
+        @enclosure = nil
       end
       @logger = Logger.new
     end
