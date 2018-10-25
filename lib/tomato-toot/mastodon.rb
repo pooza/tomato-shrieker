@@ -20,7 +20,7 @@ module TomatoToot
           'Content-Type' => 'application/json',
           'User-Agent' => Package.user_agent,
           'Authorization' => "Bearer #{@params['token']}",
-          'X-Mulukhiya' => 'pass through',
+          'X-Mulukhiya' => Package.full_name,
         },
         ssl_ca_file: ENV['SSL_CERT_FILE'],
       })
@@ -38,9 +38,9 @@ module TomatoToot
       return JSON.parse(response.body)['id'].to_i
     end
 
-    def upload_remote_resource(url)
-      path = File.join(ROOT_DIR, 'tmp/media', Digest::SHA1.hexdigest(url))
-      File.write(path, fetch(url))
+    def upload_remote_resource(uri)
+      path = File.join(ROOT_DIR, 'tmp/media', Digest::SHA1.hexdigest(uri))
+      File.write(path, fetch(uri))
       return upload(path)
     ensure
       File.unlink(path) if File.exist?(path)
@@ -48,8 +48,8 @@ module TomatoToot
 
     private
 
-    def fetch(url)
-      return HTTParty.get(url, {
+    def fetch(uri)
+      return HTTParty.get(uri, {
         headers: {
           'User-Agent' => Package.user_agent,
         },
