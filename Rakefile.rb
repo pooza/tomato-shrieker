@@ -12,6 +12,11 @@ require 'active_support/core_ext'
   task action => ["standalone:#{action}"]
 end
 
+[:start, :stop, :restart].each do |action|
+  desc "alias of server:#{action}"
+  task action => ["server:#{action}"]
+end
+
 desc 'test'
 task :test do
   require 'test/unit'
