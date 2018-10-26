@@ -5,7 +5,7 @@ require 'tomato-toot/config'
 require 'tomato-toot/webhook'
 require 'tomato-toot/package'
 require 'tomato-toot/logger'
-require 'tomato-toot/json_renderer'
+require 'tomato-toot/renderer/json'
 require 'tomato-toot/slack'
 
 module TomatoToot
@@ -37,7 +37,7 @@ module TomatoToot
     after do
       @message[:response][:status] ||= @renderer.status
       if @renderer.status < 400
-        @logger.info(@message.select{ |k, v| [:request, :response, :package].member?(k)})
+        @logger.info(@message)
       else
         @logger.error(@message)
       end
@@ -56,7 +56,6 @@ module TomatoToot
         @renderer.status = 404
         return @renderer.to_s
       end
-
       @json['text'] ||= @json['body']
       unless @json['text']
         @renderer.status = 400
@@ -64,7 +63,6 @@ module TomatoToot
         @renderer.message = @message
         return @renderer.to_s
       end
-
       webhook.toot(@json['text'])
       @message[:response][:text] = @json['text']
       @renderer.message = @message
@@ -76,7 +74,6 @@ module TomatoToot
         @renderer.status = 404
         return @renderer.to_s
       end
-
       @message[:response][:text] = 'OK'
       @renderer.message = @message
       return @renderer.to_s
@@ -92,7 +89,11 @@ module TomatoToot
 
     error do |e|
       @renderer = JSONRenderer.new
-      @renderer.status = 500
+      begin
+        @renderer.status = e.status
+      rescue ::NoMethodError
+        @renderer.status = 500
+      end
       @message[:response][:error] = "#{e.class}: #{e.message}"
       @message[:backtrace] = e.backtrace[0..5]
       @renderer.message = @message

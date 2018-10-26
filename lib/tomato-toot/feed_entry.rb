@@ -5,11 +5,17 @@ module TomatoToot
   class FeedEntry
     attr_reader :date
     attr_reader :body
+    attr_reader :enclosure
 
     def initialize(feed, item)
       @feed = feed
       @date = item.published
       @body = create_body(item)
+      begin
+        @enclosure = Addressable::URI.parse(item.enclosure_url)
+      rescue ::NoMethodError
+        @enclosure = nil
+      end
       @logger = Logger.new
     end
 
@@ -28,8 +34,11 @@ module TomatoToot
     end
 
     def toot
+      ids = []
+      ids.push(@feed.mastodon.upload_remote_resource(@enclosure)) if @enclosure
       @feed.mastodon.toot(@body, {
         visibility: @feed.visibility,
+        media_ids: ids,
       })
       touch
       @logger.info({mode: 'standalone', entry: {date: @date, body: @body}})

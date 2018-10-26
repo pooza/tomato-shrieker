@@ -1,4 +1,4 @@
-require 'tomato-toot/json_renderer'
+require 'tomato-toot/renderer/json'
 
 module TomatoToot
   class JSONRendererTest < Test::Unit::TestCase

@@ -1,9 +1,10 @@
 require 'yaml'
 require 'singleton'
 require 'tomato-toot/package'
+require 'tomato-toot/error/config'
 
 module TomatoToot
-  class Config < Hash
+  class Config < ::Hash
     include Singleton
 
     def initialize
@@ -16,7 +17,6 @@ module TomatoToot
           end
         end
       end
-      raise 'ローカル設定が見つかりません。' unless self['local']
     end
 
     def dirs
@@ -29,6 +29,17 @@ module TomatoToot
 
     def suffixes
       return ['.yaml', '.yml']
+    end
+
+    def self.validate(name)
+      keys = name.split('/')
+      keys.shift
+      config = instance
+      keys.each do |key|
+        config = config[key]
+        raise ConfigError, "#{name} が未定義です。" unless config.present?
+      end
+      return true
     end
   end
 end
