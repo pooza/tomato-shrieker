@@ -105,7 +105,7 @@ module TomatoToot
 
     def timestamp
       return Time.parse(status[:date])
-    rescue ::ArgumentError
+    rescue
       return Time.parse('1970/01/01')
     end
 
