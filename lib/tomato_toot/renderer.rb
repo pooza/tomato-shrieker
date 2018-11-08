@@ -1,7 +1,3 @@
-require 'tomato-toot/config'
-require 'tomato-toot/logger'
-require 'tomato-toot/error/imprement'
-
 module TomatoToot
   class Renderer
     attr_accessor :status

@@ -1,6 +1,3 @@
-require 'tomato-toot/webhook'
-require 'tomato-toot/mastodon'
-
 module TomatoToot
   class MastodonTest < Test::Unit::TestCase
     def setup

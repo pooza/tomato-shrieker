@@ -1,5 +1,5 @@
 module TomatoToot
-  class RequestError < ::StandardError
+  class RequestError < StandardError
     def status
       return 400
     end

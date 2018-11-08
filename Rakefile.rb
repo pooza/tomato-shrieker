@@ -4,8 +4,7 @@ ENV['BUNDLE_GEMFILE'] ||= File.join(ROOT_DIR, 'Gemfile')
 ENV['SSL_CERT_FILE'] ||= File.join(ROOT_DIR, 'cert/cacert.pem')
 
 require 'bundler/setup'
-require 'active_support'
-require 'active_support/core_ext'
+require 'tomato_toot'
 
 [:run, :touch, :clean].each do |action|
   desc "alias of standalone:#{action}"

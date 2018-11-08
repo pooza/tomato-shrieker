@@ -1,6 +1,5 @@
 require 'json'
 require 'syslog/logger'
-require 'tomato-toot/package'
 
 module TomatoToot
   class Logger

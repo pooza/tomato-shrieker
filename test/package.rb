@@ -1,5 +1,3 @@
-require 'tomato-toot/package'
-
 module TomatoToot
   class PackageTest < Test::Unit::TestCase
     def test_name

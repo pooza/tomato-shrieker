@@ -2,8 +2,6 @@ require 'addressable/uri'
 require 'httparty'
 require 'rest-client'
 require 'json'
-require 'tomato-toot/package'
-require 'tomato-toot/error/external_service'
 
 module TomatoToot
   class Mastodon

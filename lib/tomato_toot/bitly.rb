@@ -1,5 +1,4 @@
 require 'bitly'
-require 'tomato-toot/config'
 
 module TomatoToot
   class Bitly

@@ -1,6 +1,3 @@
-require 'tomato-toot/slack'
-require 'tomato-toot/package'
-
 module TomatoToot
   class SlackTest < Test::Unit::TestCase
     def test_all

@@ -1,5 +1,3 @@
-require 'tomato-toot/config'
-
 module TomatoToot
   module Package
     def self.name
