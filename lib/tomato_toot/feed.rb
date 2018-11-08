@@ -22,7 +22,7 @@ module TomatoToot
     end
 
     def execute(options)
-      raise 'empty' unless present?
+      raise NotFoundError, "Entries not found. (#{@params['source']['url']})" unless present?
       if options['silence']
         fetch.map(&:touch)
       elsif touched?
