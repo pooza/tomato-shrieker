@@ -18,4 +18,5 @@ Mastodonむけ、トゥート支援ツール。
   - [「ABC毎日放送 プリキュア公式」の新着情報ボット](https://precure.ml/@abc_bot)
   - [「プリキュアガーデン」の新着情報ボット](https://precure.ml/@garden_bot)
   - [「プリキュア公式YouTubeチャンネル」の新着情報ボット](https://precure.ml/@youtube_precure_bot)
+  - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざの録画お知らせボット](https://mstdn.b-shock.org/@pooza_recorder_bot)
