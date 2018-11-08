@@ -2,9 +2,6 @@ require 'addressable/uri'
 require 'digest/sha1'
 require 'json'
 require 'socket'
-require 'tomato-toot/config'
-require 'tomato-toot/logger'
-require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Webhook
@@ -55,7 +52,7 @@ module TomatoToot
     end
 
     def to_json
-      return ::JSON.pretty_generate({
+      return JSON.pretty_generate({
         mastodon: mastodon_url,
         token: token,
         visibility: visibility,

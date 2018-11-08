@@ -1,10 +1,4 @@
 require 'optparse'
-require 'active_support'
-require 'active_support/core_ext'
-require 'tomato-toot/feed'
-require 'tomato-toot/slack'
-require 'tomato-toot/config'
-require 'tomato-toot/logger'
 
 module TomatoToot
   class Standalone

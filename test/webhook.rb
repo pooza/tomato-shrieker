@@ -1,4 +1,3 @@
-require 'tomato-toot/webhook'
 require 'addressable/uri'
 
 module TomatoToot

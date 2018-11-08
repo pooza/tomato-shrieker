@@ -1,11 +1,6 @@
 require 'feedjira'
 require 'digest/sha1'
 require 'json'
-require 'tomato-toot/config'
-require 'tomato-toot/package'
-require 'tomato-toot/bitly'
-require 'tomato-toot/feed_entry'
-require 'tomato-toot/mastodon'
 
 module TomatoToot
   class Feed

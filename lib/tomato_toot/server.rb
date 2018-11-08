@@ -1,12 +1,4 @@
 require 'sinatra'
-require 'active_support'
-require 'active_support/core_ext'
-require 'tomato-toot/config'
-require 'tomato-toot/webhook'
-require 'tomato-toot/package'
-require 'tomato-toot/logger'
-require 'tomato-toot/renderer/json'
-require 'tomato-toot/slack'
 
 module TomatoToot
   class Server < Sinatra::Base
@@ -18,6 +10,7 @@ module TomatoToot
         mode: 'webhook',
         message: 'starting...',
         server: {port: @config['thin']['port']},
+        version: Package.version,
       })
     end
 
@@ -27,7 +20,7 @@ module TomatoToot
         request: {path: request.path, params: params},
         response: {},
       }
-      @renderer = JSONRenderer.new
+      @renderer = JsonRenderer.new
       if request.request_method == 'POST'
         @json = JSON.parse(request.body.read.to_s)
         @message[:request][:params] = @json
@@ -53,8 +46,7 @@ module TomatoToot
 
     post '/webhook/v1.0/toot/:digest' do
       unless webhook = Webhook.search(params[:digest])
-        @renderer.status = 404
-        return @renderer.to_s
+        raise NotFoundError, "Resource #{@message[:request][:path]} not found."
       end
       @json['text'] ||= @json['body']
       unless @json['text']
@@ -71,8 +63,7 @@ module TomatoToot
 
     get '/webhook/v1.0/toot/:digest' do
       unless Webhook.search(params[:digest])
-        @renderer.status = 404
-        return @renderer.to_s
+        raise NotFoundError, "Resource #{@message[:request][:path]} not found."
       end
       @message[:response][:text] = 'OK'
       @renderer.message = @message
@@ -80,7 +71,7 @@ module TomatoToot
     end
 
     not_found do
-      @renderer = JSONRenderer.new
+      @renderer = JsonRenderer.new
       @renderer.status = 404
       @message[:response][:message] = "Resource #{@message[:request][:path]} not found."
       @renderer.message = @message
@@ -88,10 +79,10 @@ module TomatoToot
     end
 
     error do |e|
-      @renderer = JSONRenderer.new
+      @renderer = JsonRenderer.new
       begin
         @renderer.status = e.status
-      rescue ::NoMethodError
+      rescue NoMethodError
         @renderer.status = 500
       end
       @message[:response][:error] = "#{e.class}: #{e.message}"

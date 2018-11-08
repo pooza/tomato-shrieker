@@ -1,5 +1,4 @@
 require 'addressable/uri'
-require 'tomato-toot/logger'
 
 module TomatoToot
   class FeedEntry
@@ -13,7 +12,7 @@ module TomatoToot
       @body = create_body(item)
       begin
         @enclosure = Addressable::URI.parse(item.enclosure_url)
-      rescue ::NoMethodError
+      rescue NoMethodError
         @enclosure = nil
       end
       @logger = Logger.new

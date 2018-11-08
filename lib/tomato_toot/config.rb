@@ -1,10 +1,8 @@
 require 'yaml'
 require 'singleton'
-require 'tomato-toot/package'
-require 'tomato-toot/error/config'
 
 module TomatoToot
-  class Config < ::Hash
+  class Config < Hash
     include Singleton
 
     def initialize

@@ -1,5 +1,3 @@
-require 'tomato-toot/bitly'
-require 'tomato-toot/config'
 require 'addressable/uri'
 
 module TomatoToot

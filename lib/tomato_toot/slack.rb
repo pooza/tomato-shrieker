@@ -1,9 +1,6 @@
 require 'addressable/uri'
 require 'httparty'
 require 'json'
-require 'tomato-toot/config'
-require 'tomato-toot/logger'
-require 'tomato-toot/package'
 
 module TomatoToot
   class Slack
