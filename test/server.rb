@@ -4,7 +4,7 @@ require 'httparty'
 module TomatoToot
   class ServerTest < Test::Unit::TestCase
     def test_webhook_toot
-      Webhook.all.each do |webhook|
+      Webhook.all do |webhook|
         result = HTTParty.post(webhook.hook_url, {
           body: {text: '木の水晶球'}.to_json,
           headers: {'Content-Type' => 'application/json'},
