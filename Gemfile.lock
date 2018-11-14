@@ -113,7 +113,6 @@ DEPENDENCIES
   bitly
   feedjira
   httparty
-  loofah (>= 2.2.3)
   rake
   rest-client
   rubocop

@@ -5,7 +5,6 @@ gem 'addressable'
 gem 'bitly'
 gem 'feedjira'
 gem 'httparty'
-gem 'loofah', '>= 2.2.3' # CVE-2018-16468
 gem 'rake'
 gem 'rest-client'
 gem 'rubocop'
