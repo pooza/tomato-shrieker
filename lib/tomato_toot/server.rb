@@ -21,6 +21,7 @@ module TomatoToot
         response: {},
       }
       @renderer = JsonRenderer.new
+      @headers = request.env.select{ |k, v| k.start_with?('HTTP_')}
       if request.request_method == 'POST'
         @json = JSON.parse(request.body.read.to_s)
         @message[:request][:params] = @json
@@ -30,7 +31,7 @@ module TomatoToot
     after do
       @message[:response][:status] ||= @renderer.status
       if @renderer.status < 400
-        @logger.info(@message)
+        @logger.info(@message.select{ |k, v| [:request, :response].member?(k)})
       else
         @logger.error(@message)
       end
