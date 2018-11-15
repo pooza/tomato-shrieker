@@ -1,5 +1,5 @@
 module TomatoToot
-  class NotFoundError < StandardError
+  class NotFoundError < Error
     def status
       return 404
     end
