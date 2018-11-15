@@ -1,7 +1,4 @@
 module TomatoToot
-  class ImprementError < StandardError
-    def status
-      return 500
-    end
+  class ImprementError < Error
   end
 end

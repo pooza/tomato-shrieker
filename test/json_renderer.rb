@@ -16,8 +16,8 @@ module TomatoToot
     end
 
     def test_to_s
-      @renderer.message = {test: 123, null: nil}
-      assert_equal(@renderer.to_s, '{"test":123,"null":null}')
+      @renderer.message = '123'
+      assert_equal(@renderer.to_s, '"123"')
     end
   end
 end

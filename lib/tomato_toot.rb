@@ -7,6 +7,7 @@ module TomatoToot
 
   autoload :Bitly
   autoload :Config
+  autoload :Error
   autoload :FeedEntry
   autoload :Feed
   autoload :Logger
