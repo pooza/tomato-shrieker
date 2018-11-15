@@ -53,14 +53,14 @@ module TomatoToot
     not_found do
       @renderer = JsonRenderer.new
       @renderer.status = 404
-      @renderer.message = "Resource #{request.path} not found."
+      @renderer.message = NotFoundError.new("Resource #{request.path} not found.").to_h
       return @renderer.to_s
     end
 
     error do |e|
       e = Error.create(e)
       @renderer = JsonRenderer.new
-      @renderer.message = "#{e.class}: #{e.message}"
+      @renderer.message = e.to_h.delete_if{ |k, v| k == :backtrace}
       Slack.broadcast(e.to_h)
       @logger.error(e.to_h)
       return @renderer.to_s
