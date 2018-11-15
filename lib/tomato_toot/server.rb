@@ -60,6 +60,7 @@ module TomatoToot
     error do |e|
       e = Error.create(e)
       @renderer = JsonRenderer.new
+      @renderer.status = e.status
       @renderer.message = e.to_h.delete_if{ |k, v| k == :backtrace}
       Slack.broadcast(e.to_h)
       @logger.error(e.to_h)
