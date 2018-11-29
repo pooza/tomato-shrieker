@@ -66,14 +66,14 @@ module TomatoToot
     end
 
     def shorten?
-      return @config['local']['bitly'] && @params['shorten']
+      return @config['/bitly/token'] && @params['shorten']
     end
 
     def present?
       return @feed.entries.present?
     end
 
-    def url
+    def uri
       return @params['source']['url']
     end
 

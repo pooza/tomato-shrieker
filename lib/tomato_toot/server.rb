@@ -9,7 +9,7 @@ module TomatoToot
       @logger.info({
         mode: 'webhook',
         message: 'starting...',
-        server: {port: @config['thin']['port']},
+        server: {port: @config['/thin/port']},
         version: Package.version,
       })
     end

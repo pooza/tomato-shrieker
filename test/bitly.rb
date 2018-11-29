@@ -3,10 +3,10 @@ require 'addressable/uri'
 module TomatoToot
   class BitlyTest < Test::Unit::TestCase
     def test_shorten
-      return unless Config.instance['local']['bitly']
+      return unless Config.instance['/bitly/token']
       bitly = Bitly.new
-      url = bitly.shorten('https://bitly.com/')
-      assert_not_nil(Addressable::URI.parse(url))
+      uri = bitly.shorten('https://bitly.com/')
+      assert_not_nil(Addressable::URI.parse(uri))
     end
   end
 end

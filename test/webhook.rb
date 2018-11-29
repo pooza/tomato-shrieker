@@ -16,35 +16,31 @@ module TomatoToot
 
     def test_digest
       Webhook.all do |hook|
-        assert_false(hook.digest.empty?)
-        assert_false(hook.digest.nil?)
+        assert_true(hook.digest.present?)
       end
     end
 
-    def test_mastodon_url
+    def test_mastodon_uri
       Webhook.all do |hook|
-        assert_false(hook.mastodon_url.empty?)
-        assert_false(hook.mastodon_url.nil?)
-        assert_not_nil(Addressable::URI.parse(hook.mastodon_url))
+        assert_true(hook.mastodon_uri.is_a?(Addressable::URI))
       end
     end
 
     def test_token
       Webhook.all do |hook|
-        assert_false(hook.token.empty?)
-        assert_false(hook.token.nil?)
+        assert_true(hook.token.present?)
       end
     end
 
-    def test_hook_url
+    def test_uri
       Webhook.all do |hook|
-        assert_not_nil(Addressable::URI.parse(hook.hook_url))
+        assert_true(hook.uri.is_a?(Addressable::URI))
       end
     end
 
     def test_to_json
       Webhook.all do |hook|
-        assert_false(hook.to_json.empty?)
+        assert_true(hook.to_json.present?)
       end
     end
   end

@@ -4,12 +4,12 @@ require 'json'
 
 module TomatoToot
   class Slack
-    def initialize(url)
-      @url = Addressable::URI.parse(url)
+    def initialize(uri)
+      @uri = Addressable::URI.parse(uri)
     end
 
     def say(message)
-      return HTTParty.post(@url, {
+      return HTTParty.post(@uri, {
         body: {text: JSON.pretty_generate(message)}.to_json,
         headers: {
           'Content-Type' => 'application/json',
@@ -21,13 +21,8 @@ module TomatoToot
 
     def self.all
       return enum_for(__method__) unless block_given?
-      Config.instance['local']['slack'] ||= {}
-      if hook = Config.instance['local']['slack']['hook']
-        yield Slack.new(hook['url'])
-      else
-        (Config.instance['local']['slack']['hooks'] || []).each do |url|
-          yield Slack.new(url)
-        end
+      Config.instance['/slack/hooks'].each do |uri|
+        yield Slack.new(uri)
       end
     end
 

@@ -13,7 +13,7 @@ module TomatoToot
 
     def execute
       @logger.info({mode: 'standalone', message: 'start'})
-      @config['local']['entries'].each do |entry|
+      @config['/entries'].each do |entry|
         next unless entry['source']
         next if entry['webhook']
         @logger.info({mode: 'standalone', entry: entry})
