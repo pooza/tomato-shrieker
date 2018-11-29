@@ -37,7 +37,7 @@ module TomatoToot
     end
 
     def upload_remote_resource(uri)
-      path = File.join(ROOT_DIR, 'tmp/media', Digest::SHA1.hexdigest(uri))
+      path = File.join(ROOT_DIR, 'tmp/media', Digest::SHA1.hexdigest(uri.to_s))
       File.write(path, fetch(uri))
       return upload(path)
     ensure

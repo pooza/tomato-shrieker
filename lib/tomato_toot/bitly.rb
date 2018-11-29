@@ -1,4 +1,5 @@
 require 'bitly'
+require 'addressable/uri'
 
 module TomatoToot
   class Bitly
@@ -12,7 +13,7 @@ module TomatoToot
     end
 
     def shorten(uri)
-      return @service.shorten(uri).short_url
+      return Addressable::URI.parse(@service.shorten(uri.to_s).short_url)
     end
   end
 end

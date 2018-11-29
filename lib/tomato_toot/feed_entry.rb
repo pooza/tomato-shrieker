@@ -58,7 +58,7 @@ module TomatoToot
       body = []
       body.push("[#{@feed.prefix}]") unless @feed.bot_account?
       body.push(item.send(@feed.mode))
-      body.push(create_uri(item.url))
+      body.push(create_uri(item.url).to_s)
       return body.join(' ')
     end
 
@@ -66,12 +66,11 @@ module TomatoToot
       uri = Addressable::URI.parse(href)
       unless uri.absolute?
         local_uri = uri
-        uri = Addressable::URI.parse(@feed.uri)
+        uri = feed.uri.clone
         uri.path = local_uri.path
         uri.query = local_uri.query
         uri.fragment = local_uri.fragment
       end
-      uri = uri.to_s
       uri = @feed.bitly.shorten(uri) if @feed.shorten?
       return uri
     end

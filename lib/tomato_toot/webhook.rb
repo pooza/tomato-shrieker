@@ -50,6 +50,8 @@ module TomatoToot
 
     def shorten?
       return @config['/bitly/token'] && @params['shorten']
+    rescue
+      return false
     end
 
     def to_json
