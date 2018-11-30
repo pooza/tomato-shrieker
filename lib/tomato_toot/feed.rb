@@ -1,28 +1,17 @@
 require 'feedjira'
 require 'digest/sha1'
 require 'json'
+require 'addressable/uri'
 
 module TomatoToot
   class Feed
-    attr_reader :bitly
-    attr_reader :mastodon
-
     def initialize(params)
       @config = Config.instance
       @params = params.clone
-
-      Feedjira.configure do |config|
-        config.user_agent = Package.user_agent
-      end
-      Feedjira.logger.level = ::Logger::FATAL
-      @feed = Feedjira::Feed.fetch_and_parse(@params['source']['url'])
-
-      @bitly = Bitly.new if shorten?
-      @mastodon = Mastodon.new(@params['mastodon'])
     end
 
     def execute(options)
-      raise 'empty' unless present?
+      raise NotFoundError, "Entries not found. (#{uri})" unless present?
       if options['silence']
         fetch.map(&:touch)
       elsif touched?
@@ -34,7 +23,7 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      @feed.entries.each.sort_by{ |item| item.published.to_f}.reverse_each do |item|
+      feed.entries.each.sort_by{ |item| item.published.to_f}.reverse_each do |item|
         entry = FeedEntry.new(self, item)
         break if entry.outdated?
         next if tag && !entry.tag?
@@ -66,15 +55,27 @@ module TomatoToot
     end
 
     def shorten?
-      return @config['local']['bitly'] && @params['shorten']
+      return @config['/bitly/token'] && @params['shorten']
+    rescue
+      return false
     end
 
     def present?
-      return @feed.entries.present?
+      return feed.entries.present?
     end
 
-    def url
-      return @params['source']['url']
+    def uri
+      return Addressable::URI.parse(@params['source']['url'])
+    end
+
+    def bitly
+      @bitly ||= Bitly.new if shorten?
+      return @bitly
+    end
+
+    def mastodon
+      @mastodon ||= Mastodon.new(@params['mastodon'])
+      return @mastodon
     end
 
     def mode
@@ -84,6 +85,14 @@ module TomatoToot
       else
         return 'title'
       end
+    rescue
+      return 'title'
+    end
+
+    def toot_tags
+      return @params['toot']['tags'] || []
+    rescue
+      return []
     end
 
     def tag
@@ -92,10 +101,12 @@ module TomatoToot
 
     def visibility
       return (@params['visibility'] || 'public')
+    rescue
+      return 'public'
     end
 
     def prefix
-      return (@params['prefix'] || @feed.title)
+      return (@params['prefix'] || feed.title)
     end
 
     def timestamp
@@ -110,6 +121,17 @@ module TomatoToot
         'tmp/timestamps',
         "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )
+    end
+
+    private
+
+    def feed
+      Feedjira.configure do |config|
+        config.user_agent = Package.user_agent
+      end
+      Feedjira.logger.level = ::Logger::FATAL
+      @feed ||= Feedjira::Feed.fetch_and_parse(uri.to_s)
+      return @feed
     end
   end
 end

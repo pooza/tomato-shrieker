@@ -1,7 +1,6 @@
 require 'addressable/uri'
 require 'digest/sha1'
 require 'json'
-require 'socket'
 
 module TomatoToot
   class Webhook
@@ -16,16 +15,16 @@ module TomatoToot
 
     def digest
       return Digest::SHA1.hexdigest({
-        mastodon: mastodon_url,
+        mastodon: mastodon_uri.to_s,
         token: token,
         visibility: visibility,
         shorten: shorten?,
-        salt: (@config['local']['salt'] || @config['local']),
+        salt: @config['/salt'],
       }.to_json)
     end
 
-    def mastodon_url
-      return @params['mastodon']['url']
+    def mastodon_uri
+      return Addressable::URI.parse(@params['mastodon']['url'])
     end
 
     def token
@@ -36,35 +35,46 @@ module TomatoToot
       return (@params['visibility'] || 'public')
     end
 
-    def hook_url
-      unless url = Addressable::URI.parse(@config['local']['root_url'])
-        url = Addressable::URI.new
-        url.host = Socket.gethostname
-        url.port = @config['thin']['port']
-        url.scheme = 'http'
+    def toot_tags
+      return @params['toot']['tags'] || []
+    rescue
+      return []
+    end
+
+    def uri
+      begin
+        uri = Addressable::URI.parse(@config['/root_url'])
+      rescue ConfigError
+        uri = Addressable::URI.new
+        uri.host = Environment.hostname
+        uri.port = @config['/thin/port']
+        uri.scheme = 'http'
       end
-      url.path = "/webhook/v1.0/toot/#{digest}"
-      return url.to_s
+      uri.path = "/webhook/v1.0/toot/#{digest}"
+      return uri
     end
 
     def shorten?
-      return @config['local']['bitly'] && @params['shorten']
+      return @config['/bitly/token'] && @params['shorten']
+    rescue
+      return false
     end
 
     def to_json
       return JSON.pretty_generate({
-        mastodon: mastodon_url,
+        mastodon: mastodon_uri.to_s,
         token: token,
         visibility: visibility,
         shorten: shorten?,
-        hook: hook_url,
+        hook: uri.to_s,
       })
     end
 
     def toot(body)
-      @mastodon.toot(body, {
-        visibility: visibility,
-      })
+      @mastodon.toot(
+        [body].concat(toot_tags.map{ |tag| Mastodon.create_tag(tag)}).join(' '),
+        {visibility: visibility},
+      )
     end
 
     def self.search(digest)
@@ -76,7 +86,7 @@ module TomatoToot
 
     def self.all
       return enum_for(__method__) unless block_given?
-      Config.instance['local']['entries'].each do |entry|
+      Config.instance['/entries'].each do |entry|
         next unless entry['webhook']
         yield Webhook.new(entry)
       end

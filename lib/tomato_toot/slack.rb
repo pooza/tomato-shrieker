@@ -4,13 +4,12 @@ require 'json'
 
 module TomatoToot
   class Slack
-    def initialize(url)
-      @url = Addressable::URI.parse(url)
-      @logger = Logger.new
+    def initialize(uri)
+      @uri = Addressable::URI.parse(uri)
     end
 
     def say(message)
-      response = HTTParty.post(@url, {
+      return HTTParty.post(@uri, {
         body: {text: JSON.pretty_generate(message)}.to_json,
         headers: {
           'Content-Type' => 'application/json',
@@ -18,28 +17,17 @@ module TomatoToot
         },
         ssl_ca_file: ENV['SSL_CERT_FILE'],
       })
-      if message.is_a?(::StandardError)
-        @logger.error(message)
-      else
-        @logger.info(message)
-      end
-      return response
     end
 
     def self.all
       return enum_for(__method__) unless block_given?
-      Config.instance['local']['slack'] ||= {}
-      if hook = Config.instance['local']['slack']['hook']
-        yield Slack.new(hook['url'])
-      else
-        (Config.instance['local']['slack']['hooks'] || []).each do |url|
-          yield Slack.new(url)
-        end
+      Config.instance['/slack/hooks'].each do |uri|
+        yield Slack.new(uri)
       end
     end
 
     def self.broadcast(message)
-      all.each do |slack|
+      all do |slack|
         slack.say(message)
       end
     end

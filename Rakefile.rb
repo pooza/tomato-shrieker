@@ -54,7 +54,6 @@ namespace :server do
 
   desc 'show webhooks'
   task :hooks do
-    require 'tomato-toot/webhook'
     TomatoToot::Webhook.all do |hook|
       puts hook.to_json
     end
