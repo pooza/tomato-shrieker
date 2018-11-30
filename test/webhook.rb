@@ -38,6 +38,12 @@ module TomatoToot
       end
     end
 
+    def test_toot_tags
+      Webhook.all do |hook|
+        assert_true(hook.toot_tags.is_a?(Array))
+      end
+    end
+
     def test_to_json
       Webhook.all do |hook|
         assert_true(hook.to_json.present?)

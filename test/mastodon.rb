@@ -15,5 +15,11 @@ module TomatoToot
       response = @mastodon.toot('トランキライザーガン', {visibility: 'unlisted'})
       assert_equal(response.to_h['visibility'], 'unlisted')
     end
+
+    def test_create_tag
+      assert_equal(Mastodon.create_tag('宮本佳那子'), '#宮本佳那子')
+      assert_equal(Mastodon.create_tag('宮本 佳那子'), '#宮本_佳那子')
+      assert_equal(Mastodon.create_tag('宮本 佳那子 '), '#宮本_佳那子')
+    end
   end
 end
