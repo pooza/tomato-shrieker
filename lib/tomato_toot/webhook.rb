@@ -35,6 +35,12 @@ module TomatoToot
       return (@params['visibility'] || 'public')
     end
 
+    def toot_tags
+      return @params['toot']['tags'] || []
+    rescue
+      return []
+    end
+
     def uri
       begin
         uri = Addressable::URI.parse(@config['/root_url'])
@@ -65,9 +71,10 @@ module TomatoToot
     end
 
     def toot(body)
-      @mastodon.toot(body, {
-        visibility: visibility,
-      })
+      @mastodon.toot(
+        [body].concat(toot_tags.map{ |tag| Mastodon.create_tag(tag)}).join(' '),
+        {visibility: visibility},
+      )
     end
 
     def self.search(digest)

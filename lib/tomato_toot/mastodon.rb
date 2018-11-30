@@ -44,6 +44,10 @@ module TomatoToot
       File.unlink(path) if File.exist?(path)
     end
 
+    def self.create_tag(word)
+      return '#' + word.strip.gsub(/[^[:alnum:]]+/, '_').sub(/^_/, '').sub(/_$/, '')
+    end
+
     private
 
     def fetch(uri)

@@ -85,6 +85,14 @@ module TomatoToot
       else
         return 'title'
       end
+    rescue
+      return 'title'
+    end
+
+    def toot_tags
+      return @params['toot']['tags'] || []
+    rescue
+      return []
     end
 
     def tag
@@ -93,6 +101,8 @@ module TomatoToot
 
     def visibility
       return (@params['visibility'] || 'public')
+    rescue
+      return 'public'
     end
 
     def prefix
