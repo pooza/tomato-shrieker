@@ -92,7 +92,9 @@ module TomatoToot
     end
 
     def toot_tags
-      return @params['toot']['tags'] || []
+      return @params['toot']['tags'].map do |tag|
+        Mastodon.create_tag(tag)
+      end
     rescue
       return []
     end

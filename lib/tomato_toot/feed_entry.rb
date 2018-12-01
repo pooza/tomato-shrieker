@@ -51,7 +51,7 @@ module TomatoToot
         body = []
         body.push("[#{@feed.prefix}]") unless @feed.bot_account?
         body.push(@item.send(@feed.mode))
-        body.concat(@feed.toot_tags.map{ |tag| Mastodon.create_tag(tag)})
+        body.concat(@feed.toot_tags)
         body.push(create_uri(@item.url).to_s)
         @body = body.join(' ')
       end
