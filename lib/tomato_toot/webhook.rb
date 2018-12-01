@@ -36,7 +36,9 @@ module TomatoToot
     end
 
     def toot_tags
-      return @params['toot']['tags'] || []
+      return @params['toot']['tags'].map do |tag|
+        Mastodon.create_tag(tag)
+      end
     rescue
       return []
     end
@@ -72,7 +74,7 @@ module TomatoToot
 
     def toot(body)
       @mastodon.toot(
-        [body].concat(toot_tags.map{ |tag| Mastodon.create_tag(tag)}).join(' '),
+        [body].concat(toot_tags).join(' '),
         {visibility: visibility},
       )
     end

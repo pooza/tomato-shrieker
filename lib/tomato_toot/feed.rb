@@ -5,6 +5,8 @@ require 'addressable/uri'
 
 module TomatoToot
   class Feed
+    attr_reader :params
+
     def initialize(params)
       @config = Config.instance
       @params = params.clone
@@ -90,7 +92,9 @@ module TomatoToot
     end
 
     def toot_tags
-      return @params['toot']['tags'] || []
+      return @params['toot']['tags'].map do |tag|
+        Mastodon.create_tag(tag)
+      end
     rescue
       return []
     end
@@ -121,6 +125,15 @@ module TomatoToot
         'tmp/timestamps',
         "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )
+    end
+
+    def self.all
+      return enum_for(__method__) unless block_given?
+      Config.instance['/entries'].each do |entry|
+        next unless entry['source']
+        next if entry['webhook']
+        yield Feed.new(entry)
+      end
     end
 
     private
