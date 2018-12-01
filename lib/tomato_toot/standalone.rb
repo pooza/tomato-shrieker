@@ -3,7 +3,6 @@ require 'optparse'
 module TomatoToot
   class Standalone
     def initialize
-      @config = Config.instance
       @logger = Logger.new
       @options = ARGV.getopts('', 'silence')
     rescue => e
@@ -22,7 +21,6 @@ module TomatoToot
         @logger.error(e.to_h)
         next
       end
-    ensure
       @logger.info({mode: 'standalone', message: 'complete'})
     end
   end

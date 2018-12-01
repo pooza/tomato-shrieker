@@ -67,7 +67,9 @@ module TomatoToot
     end
 
     def uri
-      return Addressable::URI.parse(@params['source']['url'])
+      @uri ||= Addressable::URI.parse(@params['source']['url'])
+      raise ConfigError, "Invalid feed URL '#{@uri}'" unless @uri.absolute?
+      return @uri
     end
 
     def bitly
@@ -101,6 +103,8 @@ module TomatoToot
 
     def tag
       return @params['source']['tag']
+    rescue
+      return nil
     end
 
     def visibility
@@ -120,11 +124,12 @@ module TomatoToot
     end
 
     def status_path
-      return File.join(
+      @status_path ||= File.join(
         ROOT_DIR,
         'tmp/timestamps',
         "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )
+      return @status_path
     end
 
     def self.all
