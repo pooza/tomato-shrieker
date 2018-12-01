@@ -13,11 +13,9 @@ module TomatoToot
 
     def execute
       @logger.info({mode: 'standalone', message: 'start'})
-      @config['/entries'].each do |entry|
-        next unless entry['source']
-        next if entry['webhook']
-        @logger.info({mode: 'standalone', entry: entry})
-        Feed.new(entry).execute(@options)
+      Feed.all do |feed|
+        @logger.info({mode: 'standalone', feed: feed.params})
+        feed.execute(@options)
       rescue => e
         e = Error.create(e)
         Slack.broadcast(e.to_h)
