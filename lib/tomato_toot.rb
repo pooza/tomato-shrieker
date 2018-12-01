@@ -28,7 +28,5 @@ module TomatoToot
     autoload :RequestError
   end
 
-  autoload_under 'renderer' do
-    autoload :JsonRenderer
-  end
+  autoload :JSONRenderer, 'tomato_toot/renderer/json_renderer'
 end

@@ -16,7 +16,7 @@ module TomatoToot
 
     before do
       @logger.info({mode: 'webhook', request: {path: request.path, params: params}})
-      @renderer = JsonRenderer.new
+      @renderer = JSONRenderer.new
       @headers = request.env.select{ |k, v| k.start_with?('HTTP_')}
       @json = JSON.parse(request.body.read.to_s) if request.request_method == 'POST'
     end
@@ -51,7 +51,7 @@ module TomatoToot
     end
 
     not_found do
-      @renderer = JsonRenderer.new
+      @renderer = JSONRenderer.new
       @renderer.status = 404
       @renderer.message = NotFoundError.new("Resource #{request.path} not found.").to_h
       return @renderer.to_s
@@ -59,7 +59,7 @@ module TomatoToot
 
     error do |e|
       e = Error.create(e)
-      @renderer = JsonRenderer.new
+      @renderer = JSONRenderer.new
       @renderer.status = e.status
       @renderer.message = e.to_h.delete_if{ |k, v| k == :backtrace}
       Slack.broadcast(e.to_h)

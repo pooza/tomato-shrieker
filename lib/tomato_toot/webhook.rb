@@ -58,18 +58,19 @@ module TomatoToot
 
     def shorten?
       return @config['/bitly/token'] && @params['shorten']
-    rescue
+    rescue ConfigError
       return false
     end
 
     def to_json
-      return JSON.pretty_generate({
+      @json ||= JSON.pretty_generate({
         mastodon: mastodon_uri.to_s,
         token: token,
         visibility: visibility,
         shorten: shorten?,
         hook: uri.to_s,
       })
+      return @json
     end
 
     def toot(body)
