@@ -2,6 +2,10 @@ require 'active_support'
 require 'active_support/core_ext'
 require 'active_support/dependencies/autoload'
 
+ActiveSupport::Inflector.inflections do |inflect|
+  inflect.acronym 'JSON'
+end
+
 module TomatoToot
   extend ActiveSupport::Autoload
 
@@ -28,5 +32,7 @@ module TomatoToot
     autoload :RequestError
   end
 
-  autoload :JSONRenderer, 'tomato_toot/renderer/json_renderer'
+  autoload_under 'renderer' do
+    autoload :JSONRenderer
+  end
 end
