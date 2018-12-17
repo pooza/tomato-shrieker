@@ -54,7 +54,7 @@ module TomatoToot
         headers: {'User-Agent' => Package.user_agent},
       })
     rescue => e
-      raise ExternalServiceError, "外部ファイルが取得できません。 (#{e.message})"
+      raise ExternalServiceError, "Fetch error (#{e.message})"
     end
 
     def create_uri(href)
