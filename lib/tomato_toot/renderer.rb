@@ -13,7 +13,7 @@ module TomatoToot
     end
 
     def to_s
-      raise ImprementError, "#{__method__}が未定義です。"
+      raise ImplementError, "#{__method__}が未定義です。"
     end
   end
 end

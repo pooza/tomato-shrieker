@@ -27,7 +27,7 @@ module TomatoToot
   autoload_under 'error' do
     autoload :ConfigError
     autoload :ExternalServiceError
-    autoload :ImprementError
+    autoload :ImplementError
     autoload :NotFoundError
     autoload :RequestError
   end
