@@ -2,6 +2,10 @@ require 'active_support'
 require 'active_support/core_ext'
 require 'active_support/dependencies/autoload'
 
+ActiveSupport::Inflector.inflections do |inflect|
+  inflect.acronym 'JSON'
+end
+
 module TomatoToot
   extend ActiveSupport::Autoload
 
@@ -23,12 +27,12 @@ module TomatoToot
   autoload_under 'error' do
     autoload :ConfigError
     autoload :ExternalServiceError
-    autoload :ImprementError
+    autoload :ImplementError
     autoload :NotFoundError
     autoload :RequestError
   end
 
   autoload_under 'renderer' do
-    autoload :JsonRenderer
+    autoload :JSONRenderer
   end
 end

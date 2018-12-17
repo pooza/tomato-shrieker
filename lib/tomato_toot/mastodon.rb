@@ -20,7 +20,6 @@ module TomatoToot
           'Authorization' => "Bearer #{@params['token']}",
           'X-Mulukhiya' => Package.full_name,
         },
-        ssl_ca_file: ENV['SSL_CERT_FILE'],
       })
     end
 
@@ -52,13 +51,10 @@ module TomatoToot
 
     def fetch(uri)
       return HTTParty.get(uri, {
-        headers: {
-          'User-Agent' => Package.user_agent,
-        },
-        ssl_ca_file: ENV['SSL_CERT_FILE'],
+        headers: {'User-Agent' => Package.user_agent},
       })
     rescue => e
-      raise ExternalServiceError, "外部ファイルが取得できません。 (#{e.message})"
+      raise ExternalServiceError, "Fetch error (#{e.message})"
     end
 
     def create_uri(href)

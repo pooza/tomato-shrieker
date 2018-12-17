@@ -59,7 +59,10 @@ module TomatoToot
     end
 
     def enclosure
-      return Addressable::URI.parse(@item.enclosure_url)
+      @enclosure ||= Addressable::URI.parse(@item.enclosure_url)
+      @enclosure = create_uri(@enclosure.path) unless @enclosure.absolute?
+      return nil unless @enclosure.absolute?
+      return @enclosure
     rescue
       return nil
     end
@@ -68,13 +71,9 @@ module TomatoToot
 
     def create_uri(href)
       uri = Addressable::URI.parse(href)
-      unless uri.absolute?
-        local_uri = uri
-        uri = feed.uri.clone
-        uri.path = local_uri.path
-        uri.query = local_uri.query
-        uri.fragment = local_uri.fragment
-      end
+      uri.path ||= @feed.uri.path
+      uri.query ||= @feed.uri.query
+      uri.fragment ||= @feed.uri.fragment
       uri = @feed.bitly.shorten(uri) if @feed.shorten?
       return uri
     end

@@ -8,7 +8,6 @@ module TomatoToot
         result = HTTParty.post(webhook.uri, {
           body: {text: '木の水晶球'}.to_json,
           headers: {'Content-Type' => 'application/json'},
-          ssl_ca_file: ENV['SSL_CERT_FILE'],
         })
         assert_true(result.response.is_a?(Net::HTTPOK))
         assert_equal('木の水晶球', result.to_h['text'])
@@ -16,7 +15,6 @@ module TomatoToot
         result = HTTParty.post(webhook.uri, {
           body: {body: '武田信玄'}.to_json,
           headers: {'Content-Type' => 'application/json'},
-          ssl_ca_file: ENV['SSL_CERT_FILE'],
         })
         assert_true(result.response.is_a?(Net::HTTPOK))
         assert_equal('武田信玄', result.to_h['text'])

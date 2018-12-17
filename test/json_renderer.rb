@@ -1,7 +1,7 @@
 module TomatoToot
-  class JsonRendererTest < Test::Unit::TestCase
+  class JSONRendererTest < Test::Unit::TestCase
     def setup
-      @renderer = JsonRenderer.new
+      @renderer = JSONRenderer.new
     end
 
     def test_status
