@@ -1,7 +1,7 @@
-ROOT_DIR = File.expand_path(__dir__)
-$LOAD_PATH.push(File.join(ROOT_DIR, 'lib'))
-ENV['BUNDLE_GEMFILE'] ||= File.join(ROOT_DIR, 'Gemfile')
-ENV['SSL_CERT_FILE'] ||= File.join(ROOT_DIR, 'cert/cacert.pem')
+dir = File.expand_path(__dir__)
+$LOAD_PATH.unshift(File.join(dir, 'lib'))
+ENV['BUNDLE_GEMFILE'] ||= File.join(dir, 'Gemfile')
+ENV['SSL_CERT_FILE'] ||= File.join(dir, 'cert/cacert.pem')
 
 require 'bundler/setup'
 require 'tomato_toot'
@@ -19,7 +19,7 @@ end
 desc 'test'
 task :test do
   require 'test/unit'
-  Dir.glob(File.join(ROOT_DIR, 'test/*')).each do |t|
+  Dir.glob(File.join(TomatoToot::Environment.dir, 'test/*')).each do |t|
     require t
   end
 end
@@ -29,7 +29,7 @@ namespace :cert do
   task :update do
     require 'httparty'
     File.write(
-      File.join(ROOT_DIR, 'cert/cacert.pem'),
+      File.join(TomatoToot::Environment.dir, 'cert/cacert.pem'),
       HTTParty.get('https://curl.haxx.se/ca/cacert.pem'),
     )
   end
@@ -48,7 +48,7 @@ namespace :standalone do
 
   desc 'clear timestamps'
   task :clean do
-    Dir.glob(File.join(ROOT_DIR, 'tmp/timestamps/*')) do |f|
+    Dir.glob(File.join(TomatoToot::Environment.dir, 'tmp/timestamps/*')) do |f|
       puts "delete #{f}"
       File.unlink(f)
     end

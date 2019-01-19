@@ -1,5 +1,21 @@
 module TomatoToot
   module Package
+    def environment_class
+      return 'TomatoToot::Environment'
+    end
+
+    def package_class
+      return 'TomatoToot::Package'
+    end
+
+    def config_class
+      return 'TomatoToot::Config'
+    end
+
+    def logger_class
+      return 'TomatoToot::Logger'
+    end
+
     def self.name
       return 'tomato-toot'
     end

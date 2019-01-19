@@ -11,17 +11,15 @@ module TomatoToot
     end
 
     def execute
-      @logger.info({mode: 'standalone', message: 'start'})
       Feed.all do |feed|
-        @logger.info({mode: 'standalone', feed: feed.params})
+        @logger.info(feed.params)
         feed.execute(@options)
       rescue => e
-        e = Error.create(e)
+        e = Ginseng::Error.create(e)
         Slack.broadcast(e.to_h)
         @logger.error(e.to_h)
         next
       end
-      @logger.info({mode: 'standalone', message: 'complete'})
     end
   end
 end

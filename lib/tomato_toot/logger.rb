@@ -1,18 +1,5 @@
-require 'json'
-require 'syslog/logger'
-
 module TomatoToot
-  class Logger < Syslog::Logger
-    def initialize
-      super(Package.name)
-    end
-
-    def info(message)
-      super(message.to_json)
-    end
-
-    def error(message)
-      super(message.to_json)
-    end
+  class Logger < Ginseng::Logger
+    include Package
   end
 end

@@ -5,6 +5,9 @@ module TomatoToot
   class ServerTest < Test::Unit::TestCase
     def test_webhook_toot
       Webhook.all do |webhook|
+        result = HTTParty.get(webhook.uri)
+        assert_true(result.response.is_a?(Net::HTTPOK))
+
         result = HTTParty.post(webhook.uri, {
           body: {text: '木の水晶球'}.to_json,
           headers: {'Content-Type' => 'application/json'},

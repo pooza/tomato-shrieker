@@ -8,9 +8,9 @@ module TomatoToot
 
     def initialize(params)
       @config = Config.instance
-      @params = params.clone
+      @params = Config.flatten('', params)
       @logger = Logger.new
-      @mastodon = Mastodon.new(@params['mastodon'])
+      @mastodon = Mastodon.new(@params['/mastodon/url'], @params['/mastodon/token'])
     end
 
     def digest
@@ -24,19 +24,19 @@ module TomatoToot
     end
 
     def mastodon_uri
-      return Addressable::URI.parse(@params['mastodon']['url'])
+      return Addressable::URI.parse(@params['/mastodon/url'])
     end
 
     def token
-      return @params['mastodon']['token']
+      return @params['/mastodon/token']
     end
 
     def visibility
-      return (@params['visibility'] || 'public')
+      return (@params['/visibility'] || 'public')
     end
 
     def toot_tags
-      return @params['toot']['tags'].map do |tag|
+      return @params['/toot/tags'].map do |tag|
         Mastodon.create_tag(tag)
       end
     rescue
@@ -46,7 +46,7 @@ module TomatoToot
     def uri
       begin
         uri = Addressable::URI.parse(@config['/root_url'])
-      rescue ConfigError
+      rescue Ginseng::ConfigError
         uri = Addressable::URI.new
         uri.host = Environment.hostname
         uri.port = @config['/thin/port']
@@ -57,8 +57,8 @@ module TomatoToot
     end
 
     def shorten?
-      return @config['/bitly/token'] && @params['shorten']
-    rescue ConfigError
+      return @config['/bitly/token'] && @params['/shorten']
+    rescue Ginseng::ConfigError
       return false
     end
 
@@ -74,13 +74,13 @@ module TomatoToot
     end
 
     def toot(body)
-      @mastodon.toot(
-        [body].concat(toot_tags).join(' '),
-        {visibility: visibility},
-      )
+      @mastodon.toot({
+        status: [body].concat(toot_tags).join(' '),
+        visibility: visibility,
+      })
     end
 
-    def self.search(digest)
+    def self.create(digest)
       all do |webhook|
         return webhook if digest == webhook.digest
       end

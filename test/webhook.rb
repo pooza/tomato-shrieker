@@ -8,9 +8,9 @@ module TomatoToot
       end
     end
 
-    def test_search
+    def test_create
       Webhook.all do |hook|
-        assert_not_nil(Webhook.search(hook.digest))
+        assert_not_nil(Webhook.create(hook.digest))
       end
     end
 
