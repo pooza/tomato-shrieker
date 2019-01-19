@@ -1,67 +1,33 @@
-require 'sinatra'
-
 module TomatoToot
-  class Server < Sinatra::Base
-    def initialize
-      super
-      @config = Config.instance
-      @logger = Logger.new
-      @logger.info({
-        mode: 'webhook',
-        message: 'starting...',
-        server: {port: @config['/thin/port']},
-        version: Package.version,
-      })
-    end
-
-    before do
-      @logger.info({mode: 'webhook', request: {path: request.path, params: params}})
-      @renderer = JSONRenderer.new
-      @headers = request.env.select{ |k, v| k.start_with?('HTTP_')}
-      @json = JSON.parse(request.body.read.to_s) if request.request_method == 'POST'
-    end
-
-    after do
-      status @renderer.status
-      content_type @renderer.type
-    end
-
-    get '/about' do
-      @renderer.message = Package.full_name
-      return @renderer.to_s
-    end
+  class Server < Ginseng::Sinatra
+    include Package
 
     post '/webhook/v1.0/toot/:digest' do
-      unless webhook = Webhook.search(params[:digest])
-        raise NotFoundError, "Resource #{request.path} not found."
+      unless Webhook.create(params[:digest])
+        raise Ginseng::NotFoundError, "Resource #{request.path} not found."
       end
-      @json['text'] ||= @json['body']
-      raise RequestError, 'empty message' unless @json['text'].present?
-      webhook.toot(@json['text'])
-      @renderer.message = {text: @json['text']}
+      @params['text'] ||= @params['body']
+      raise Ginseng::RequestError, 'empty message' unless @params['text'].present?
+      webhook = Webhook.create(params[:digest])
+      webhook.toot(@params['text'])
+      @renderer.message = {text: @params['text']}
       return @renderer.to_s
     end
 
     get '/webhook/v1.0/toot/:digest' do
-      unless Webhook.search(params[:digest])
-        raise NotFoundError, "Resource #{request.path} not found."
+      unless Webhook.create(params[:digest])
+        raise Ginseng::NotFoundError, "Resource #{request.path} not found."
       end
       @renderer.message = 'OK'
       return @renderer.to_s
     end
 
-    not_found do
-      @renderer = JSONRenderer.new
-      @renderer.status = 404
-      @renderer.message = NotFoundError.new("Resource #{request.path} not found.").to_h
-      return @renderer.to_s
-    end
-
     error do |e|
-      e = Error.create(e)
-      @renderer = JSONRenderer.new
+      e = Ginseng::Error.create(e)
+      @renderer = default_renderer_class.constantize.new
       @renderer.status = e.status
       @renderer.message = e.to_h.delete_if{ |k, v| k == :backtrace}
+      @renderer.message['error'] = e.message
       Slack.broadcast(e.to_h)
       @logger.error(e.to_h)
       return @renderer.to_s

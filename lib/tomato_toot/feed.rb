@@ -9,11 +9,11 @@ module TomatoToot
 
     def initialize(params)
       @config = Config.instance
-      @params = params.clone
+      @params = Config.flatten('', params)
     end
 
     def execute(options)
-      raise NotFoundError, "Entries not found. (#{uri})" unless present?
+      raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
       if options['silence']
         fetch.map(&:touch)
       elsif touched?
@@ -53,7 +53,7 @@ module TomatoToot
     end
 
     def bot_account?
-      return @params['bot_account']
+      return @params['/bot_account']
     end
 
     def shorten?
@@ -67,8 +67,8 @@ module TomatoToot
     end
 
     def uri
-      @uri ||= Addressable::URI.parse(@params['source']['url'])
-      raise ConfigError, "Invalid feed URL '#{@uri}'" unless @uri.absolute?
+      @uri ||= Addressable::URI.parse(@params['/source/url'])
+      raise Ginseng::ConfigError, "Invalid feed URL '#{@uri}'" unless @uri.absolute?
       return @uri
     end
 
@@ -78,12 +78,12 @@ module TomatoToot
     end
 
     def mastodon
-      @mastodon ||= Mastodon.new(@params['mastodon'])
+      @mastodon ||= Mastodon.new(@params['/mastodon/url'], @params['/mastodon/token'])
       return @mastodon
     end
 
     def mode
-      case @params['source']['mode']
+      case @params['/source/mode']
       when 'body', 'summary'
         return 'summary'
       else
@@ -94,7 +94,7 @@ module TomatoToot
     end
 
     def toot_tags
-      return @params['toot']['tags'].map do |tag|
+      return @params['/toot/tags'].map do |tag|
         Mastodon.create_tag(tag)
       end
     rescue
@@ -102,19 +102,19 @@ module TomatoToot
     end
 
     def tag
-      return @params['source']['tag']
+      return @params['/source/tag']
     rescue
       return nil
     end
 
     def visibility
-      return (@params['visibility'] || 'public')
+      return (@params['/visibility'] || 'public')
     rescue
       return 'public'
     end
 
     def prefix
-      return (@params['prefix'] || feed.title)
+      return (@params['/prefix'] || feed.title)
     end
 
     def timestamp
@@ -125,7 +125,7 @@ module TomatoToot
 
     def status_path
       @status_path ||= File.join(
-        ROOT_DIR,
+        Environment.dir,
         'tmp/timestamps',
         "#{Digest::SHA1.hexdigest(@params.to_s)}.json",
       )

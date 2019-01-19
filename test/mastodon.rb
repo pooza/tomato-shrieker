@@ -4,7 +4,7 @@ module TomatoToot
       @mastodon = Webhook.all.first.mastodon
     end
 
-    def test_search
+    def test_create
       assert_true(@mastodon.is_a?(Mastodon))
     end
 
@@ -12,7 +12,7 @@ module TomatoToot
       response = @mastodon.toot('アイドル八犬伝')
       assert_equal(response.to_h['visibility'], 'public')
 
-      response = @mastodon.toot('トランキライザーガン', {visibility: 'unlisted'})
+      response = @mastodon.toot({status: 'トランキライザーガン', visibility: 'unlisted'})
       assert_equal(response.to_h['visibility'], 'unlisted')
     end
 
