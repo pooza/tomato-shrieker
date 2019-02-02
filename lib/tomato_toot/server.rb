@@ -6,11 +6,11 @@ module TomatoToot
       unless Webhook.create(params[:digest])
         raise Ginseng::NotFoundError, "Resource #{request.path} not found."
       end
-      @params['text'] ||= @params['body']
-      raise Ginseng::RequestError, 'empty message' unless @params['text'].present?
+      params[:text] ||= params[:body]
+      raise Ginseng::RequestError, 'empty message' unless params[:text].present?
       webhook = Webhook.create(params[:digest])
-      webhook.toot(@params['text'])
-      @renderer.message = {text: @params['text']}
+      webhook.toot(params[:text])
+      @renderer.message = {text: params[:text]}
       return @renderer.to_s
     end
 
@@ -27,7 +27,6 @@ module TomatoToot
       @renderer = default_renderer_class.constantize.new
       @renderer.status = e.status
       @renderer.message = e.to_h.delete_if{ |k, v| k == :backtrace}
-      @renderer.message['error'] = e.message
       Slack.broadcast(e.to_h)
       @logger.error(e.to_h)
       return @renderer.to_s
