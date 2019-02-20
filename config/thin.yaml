@@ -1,6 +1,0 @@
-timeout: 30
-port: 3009
-environment: production
-daemonize: true
-quiet: true
-rackup: config.ru

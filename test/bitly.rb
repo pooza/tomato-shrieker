@@ -3,7 +3,7 @@ module TomatoToot
     def test_shorten
       return unless Config.instance['/bitly/token']
       bitly = Bitly.new
-      assert_true(bitly.shorten('https://bitly.com/').is_a?(Addressable::URI))
+      assert(bitly.shorten('https://bitly.com/').is_a?(Addressable::URI))
     end
   end
 end

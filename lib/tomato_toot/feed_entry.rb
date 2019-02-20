@@ -31,7 +31,7 @@ module TomatoToot
         media_ids: ids,
       })
       touch
-      @logger.info({mode: 'standalone', entry: {date: date, body: body}})
+      @logger.info({entry: {date: date, body: body}})
     end
 
     def touch

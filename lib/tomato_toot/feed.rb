@@ -2,6 +2,7 @@ require 'feedjira'
 require 'digest/sha1'
 require 'json'
 require 'addressable/uri'
+require 'optparse'
 
 module TomatoToot
   class Feed
@@ -25,7 +26,7 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feed.entries.each.sort_by{ |item| item.published.to_f}.reverse_each do |item|
+      feed.entries.each.sort_by{|item| item.published.to_f}.reverse_each do |item|
         entry = FeedEntry.new(self, item)
         break if entry.outdated?
         next if tag && !entry.tag?
@@ -138,6 +139,20 @@ module TomatoToot
         next unless entry['source']
         next if entry['webhook']
         yield Feed.new(entry)
+      end
+    end
+
+    def self.crawl_all
+      logger = Logger.new
+      options = ARGV.getopts('', 'silence')
+      all do |feed|
+        logger.info(feed.params)
+        feed.execute(options)
+      rescue => e
+        e = Ginseng::Error.create(e)
+        Slack.broadcast(e.to_h)
+        @logger.error(e.to_h)
+        next
       end
     end
 
