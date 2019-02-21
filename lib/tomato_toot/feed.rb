@@ -34,12 +34,19 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.each.sort_by{|item| item.published.to_f}.reverse_each do |item|
+      fetch_all do |item|
         entry = FeedEntry.new(self, item)
         break if entry.outdated?
         next if tag && !entry.tag?
         next if entry.tooted?
         yield entry
+      end
+    end
+
+    def fetch_all
+      return enum_for(__method__) unless block_given?
+      feedjira.entries.each.sort_by{|item| item.published.to_f}.reverse_each do |item|
+        yield item
       end
     end
 
@@ -159,12 +166,10 @@ module TomatoToot
       rescue => e
         e = Ginseng::Error.create(e)
         Slack.broadcast(e.to_h)
-        @logger.error(e.to_h)
+        logger.error(e.to_h)
         next
       end
     end
-
-    private
 
     def feedjira
       Feedjira.configure do |config|
