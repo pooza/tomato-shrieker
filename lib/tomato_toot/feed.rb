@@ -68,6 +68,12 @@ module TomatoToot
       return File.exist?(status_path)
     end
 
+    def mulukhiya?
+      return self['/mulukhiya/enable'] || false
+    rescue
+      return false
+    end
+
     def bot_account?
       return self['/bot_account']
     end
@@ -94,7 +100,10 @@ module TomatoToot
     end
 
     def mastodon
-      @mastodon ||= Mastodon.new(self['/mastodon/url'], self['/mastodon/token'])
+      unless @mastodon
+        @mastodon = Mastodon.new(self['/mastodon/url'], self['/mastodon/token'])
+        @mastodon.mulukhiya_enable = mulukhiya?
+      end
       return @mastodon
     end
 
