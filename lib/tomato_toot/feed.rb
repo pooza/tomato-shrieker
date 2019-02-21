@@ -34,8 +34,7 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      fetch_all do |item|
-        entry = FeedEntry.new(self, item)
+      fetch_all do |entry|
         break if entry.outdated?
         next if tag && !entry.tag?
         next if entry.tooted?
@@ -46,7 +45,7 @@ module TomatoToot
     def fetch_all
       return enum_for(__method__) unless block_given?
       feedjira.entries.each.sort_by{|item| item.published.to_f}.reverse_each do |item|
-        yield item
+        yield FeedEntry.new(self, item)
       end
     end
 
@@ -105,6 +104,15 @@ module TomatoToot
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
+    end
+
+    def feedjira
+      Feedjira.configure do |config|
+        config.user_agent = Package.user_agent
+      end
+      Feedjira.logger.level = ::Logger::FATAL
+      @feedjira ||= Feedjira::Feed.fetch_and_parse(uri.to_s)
+      return @feedjira
     end
 
     def mode
@@ -178,15 +186,6 @@ module TomatoToot
         logger.error(e.to_h)
         next
       end
-    end
-
-    def feedjira
-      Feedjira.configure do |config|
-        config.user_agent = Package.user_agent
-      end
-      Feedjira.logger.level = ::Logger::FATAL
-      @feedjira ||= Feedjira::Feed.fetch_and_parse(uri.to_s)
-      return @feedjira
     end
   end
 end
