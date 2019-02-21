@@ -1,11 +1,12 @@
 package:
-  version: 2.2.6
+  version: 2.3.0
   url: https://github.com/pooza/tomato-toot
   authors:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
-salt: null
+cert:
+  url: https://curl.haxx.se/ca/cacert.pem
 slack:
   hooks: []
 entries: []

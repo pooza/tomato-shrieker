@@ -1,9 +1,7 @@
 # tomato-toot
 
-Mastodonむけ、トゥート支援ツール。
-
-- RSS/Atomフィードの新着エントリーをトゥートする。
-- Slack/Discord互換のwebhookを提供。
+Mastodonむけ、トゥート支援ツール。  
+RSS/Atomフィードの新着エントリーをトゥートする。
 
 詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
 
@@ -20,3 +18,4 @@ Mastodonむけ、トゥート支援ツール。
   - [「プリキュア公式YouTubeチャンネル」の新着情報ボット](https://precure.ml/@youtube_precure_bot)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざの録画お知らせボット](https://mstdn.b-shock.org/@pooza_recorder_bot)
+  - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
