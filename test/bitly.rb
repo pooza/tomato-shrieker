@@ -4,6 +4,8 @@ module TomatoToot
       return unless Config.instance['/bitly/token']
       bitly = Bitly.new
       assert(bitly.shorten('https://bitly.com/').is_a?(Addressable::URI))
+    rescue Ginseng::ConfigError
+      assert(true)
     end
   end
 end
