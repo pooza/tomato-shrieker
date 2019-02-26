@@ -14,8 +14,6 @@ module TomatoToot
   autoload :Logger
   autoload :Mastodon
   autoload :Package
-  autoload :Server
   autoload :Slack
-  autoload :Standalone
   autoload :Webhook
 end

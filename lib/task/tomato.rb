@@ -1,5 +1,5 @@
 namespace :tomato do
-  desc 'crawl'
+  desc 'alias of tomato:crawl'
   task run: :crawl
 
   desc 'crawl'
