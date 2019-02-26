@@ -5,7 +5,7 @@ module TomatoToot
       bitly = Bitly.new
       assert(bitly.shorten('https://bitly.com/').is_a?(Addressable::URI))
     rescue Ginseng::ConfigError
-      # nothing
+      assert(true)
     end
   end
 end
