@@ -28,7 +28,7 @@ module TomatoToot
     def test_enclosure
       Feed.all do |feed|
         feed.fetch_all do |entry|
-          assert(entry.enclosure.is_a?(Addressable::URI)) unless entry.nil?
+          assert(entry.enclosure.is_a?(Addressable::URI)) unless entry.enclosure.nil?
         end
       end
     end
