@@ -132,11 +132,9 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  addressable
   bitly
   feedjira
   ginseng-core!
-  httparty
   rubocop
 
 RUBY VERSION
