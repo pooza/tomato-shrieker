@@ -5,8 +5,6 @@ package:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
-cert:
-  url: https://curl.haxx.se/ca/cacert.pem
 slack:
   hooks: []
 entries: []
