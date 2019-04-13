@@ -25,13 +25,14 @@ module TomatoToot
     def toot
       ids = []
       ids.push(@feed.mastodon.upload_remote_resource(enclosure)) if enclosure
-      @feed.mastodon.toot({
+      r = @feed.mastodon.toot({
         status: body,
         visibility: @feed.visibility,
         media_ids: ids,
       })
       touch
       @logger.info({entry: {date: date, body: body}})
+      return r
     end
 
     def touch
@@ -43,29 +44,42 @@ module TomatoToot
       @feed.status = values
     end
 
+    def title
+      return @item.title
+    end
+
+    def summary
+      return @item.summary
+    end
+
     def date
       return @item.published
     end
 
     def body
       unless @body
-        body = []
-        body.push("[#{@feed.prefix}]") unless @feed.bot_account?
-        body.push(@item.send(@feed.mode))
-        body.concat(@feed.toot_tags)
-        body.push(create_uri(@item.url).to_s)
-        @body = body.join(' ')
+        template = Template.new("toot.#{@feed.template}")
+        template[:feed] = @feed
+        template[:entry] = self
+        @body = template.to_s
       end
       return @body
     end
 
-    def enclosure
+    def enclosure_uri
       @enclosure ||= Addressable::URI.parse(@item.enclosure_url)
       @enclosure = create_uri(@enclosure.path) unless @enclosure.absolute?
       return nil unless @enclosure.absolute?
       return @enclosure
     rescue
       return nil
+    end
+
+    alias enclosure enclosure_uri
+
+    def uri
+      @uri ||= create_uri(@item.url)
+      return @uri
     end
 
     private

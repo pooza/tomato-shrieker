@@ -68,19 +68,25 @@ module TomatoToot
     end
 
     def mulukhiya?
-      return self['/mulukhiya/enable'] || false
+      return self['/mulukhiya/enable'] || true
     rescue
-      return false
+      return true
     end
 
     def bot_account?
       return self['/bot_account']
     end
 
+    alias bot? bot_account?
+
     def shorten?
       return @config['/bitly/token'] && self['/shorten']
     rescue
       return false
+    end
+
+    def template
+      return self['/template'] || 'default'
     end
 
     def present?
@@ -183,8 +189,8 @@ module TomatoToot
       rescue => e
         e = Ginseng::Error.create(e)
         e.package = Package.full_name
-        Slack.broadcast(e.to_h)
-        logger.error(e.to_h)
+        Slack.broadcast(e)
+        logger.error(e)
         next
       end
     end
