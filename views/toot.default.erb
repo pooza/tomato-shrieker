@@ -1,0 +1,5 @@
+<%# encoding: UTF-8 -%>
+<% unless @params[:feed].bot? %>[<%= @params[:feed].prefix %>]<% end -%>
+<%= @params[:entry].send(@params[:feed].mode) %>
+<%= @params[:entry].uri %>
+<%= @params[:feed].toot_tags.join(' ') %>

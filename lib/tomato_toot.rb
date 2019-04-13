@@ -16,4 +16,5 @@ module TomatoToot
   autoload :Package
   autoload :Slack
   autoload :Webhook
+  autoload :Template
 end
