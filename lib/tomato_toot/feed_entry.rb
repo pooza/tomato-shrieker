@@ -24,7 +24,11 @@ module TomatoToot
 
     def toot
       ids = []
-      ids.push(@feed.mastodon.upload_remote_resource(enclosure)) if enclosure
+      begin
+        ids.push(@feed.mastodon.upload_remote_resource(enclosure)) if enclosure
+      rescue Ginseng::GatewayError => e
+        @logger.error(e)
+      end
       r = @feed.mastodon.toot({
         status: body,
         visibility: @feed.visibility,
