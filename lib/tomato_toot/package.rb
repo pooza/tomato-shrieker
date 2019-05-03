@@ -21,7 +21,7 @@ module TomatoToot
     end
 
     def http_class
-      return 'Ginseng::HTTP'
+      return "#{module_name}::HTTP"
     end
 
     def self.name

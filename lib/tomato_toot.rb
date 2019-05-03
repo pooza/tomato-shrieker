@@ -11,6 +11,7 @@ module TomatoToot
   autoload :Environment
   autoload :FeedEntry
   autoload :Feed
+  autoload :HTTP
   autoload :Logger
   autoload :Mastodon
   autoload :Package
