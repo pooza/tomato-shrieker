@@ -1,19 +1,27 @@
 module TomatoToot
   module Package
+    def module_name
+      return 'TomatoToot'
+    end
+
     def environment_class
-      return 'TomatoToot::Environment'
+      return "#{module_name}::Environment"
     end
 
     def package_class
-      return 'TomatoToot::Package'
+      return "#{module_name}::Package"
     end
 
     def config_class
-      return 'TomatoToot::Config'
+      return "#{module_name}::Config"
     end
 
     def logger_class
-      return 'TomatoToot::Logger'
+      return "#{module_name}::Logger"
+    end
+
+    def http_class
+      return "#{module_name}::HTTP"
     end
 
     def self.name

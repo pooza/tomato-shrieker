@@ -26,9 +26,9 @@ module TomatoToot
       if options['silence']
         fetch.map(&:touch)
       elsif touched?
-        fetch.map(&:toot)
+        fetch.map(&:post)
       elsif entry = fetch.to_a.first
-        entry.toot
+        entry.post
       end
     end
 
@@ -105,12 +105,23 @@ module TomatoToot
     end
 
     def mastodon
+      return nil unless self['/mastodon/url'].present?
+      return nil unless self['/mastodon/token'].present?
       unless @mastodon
         @mastodon = Mastodon.new(self['/mastodon/url'], self['/mastodon/token'])
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
     end
+
+    def webhooks
+      return [] unless self['/hooks'].present?
+      return self['/hooks'].map do |hook|
+        Addressable::URI.parse(hook)
+      end
+    end
+
+    alias hooks webhooks
 
     def feedjira
       Feedjira.configure do |config|
