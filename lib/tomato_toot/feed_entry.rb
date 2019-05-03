@@ -25,7 +25,9 @@ module TomatoToot
     def post
       toot if @feed.mastodon
       @feed.hooks.map do |hook|
-        Slack.new(hook).say(body, :text)
+        message = {text: body}
+        message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
+        Slack.new(hook).say(message, :hash)
       rescue => e
         @logger.error(e)
       end
