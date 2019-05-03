@@ -36,7 +36,14 @@ module TomatoToot
 
     def test_mastodon
       Feed.all do |feed|
+        next unless feed.mastodon
         assert(feed.mastodon.is_a?(Mastodon))
+      end
+    end
+
+    def test_hooks
+      Feed.all do |feed|
+        assert(feed.hooks.is_a?(Array))
       end
     end
 

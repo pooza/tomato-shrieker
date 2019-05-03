@@ -22,6 +22,17 @@ module TomatoToot
       return @feed.status[:bodies].include?(body)
     end
 
+    def post
+      toot if @feed.mastodon
+      @feed.hooks.map do |hook|
+        Slack.new(hook).say(body, :text)
+      rescue => e
+        @logger.error(e)
+      end
+      touch
+      @logger.info({entry: {date: date, body: body}})
+    end
+
     def toot
       ids = []
       begin
@@ -29,14 +40,11 @@ module TomatoToot
       rescue Ginseng::GatewayError => e
         @logger.error(e)
       end
-      r = @feed.mastodon.toot({
+      return @feed.mastodon.toot({
         status: body,
         visibility: @feed.visibility,
         media_ids: ids,
       })
-      touch
-      @logger.info({entry: {date: date, body: body}})
-      return r
     end
 
     def touch
