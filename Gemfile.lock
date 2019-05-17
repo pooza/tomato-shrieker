@@ -1,11 +1,12 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 9e08b0811a615e390d741f816414613dd8a06224
+  revision: 351d06cbe529637f6deae6480f4831051e3ec29a
   specs:
-    ginseng-core (1.2.9)
+    ginseng-core (1.3.3)
       activesupport
       addressable
-      bundler (< 2.0)
+      bundler
+      csv
       daemon-spawn
       httparty
       rack-test
@@ -35,6 +36,7 @@ GEM
       oauth2 (>= 0.5.0, < 2.0)
     concurrent-ruby (1.1.5)
     crass (1.0.4)
+    csv (3.1.1)
     daemon-spawn (0.4.2)
     daemons (1.3.1)
     domain_name (0.5.20180417)
@@ -69,7 +71,7 @@ GEM
     minitest (5.11.3)
     multi_json (1.13.1)
     multi_xml (0.6.0)
-    multipart-post (2.0.0)
+    multipart-post (2.1.1)
     mustermann (1.0.3)
     netrc (0.11.0)
     nokogiri (1.10.3)
@@ -99,13 +101,13 @@ GEM
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
-    rubocop (0.68.1)
+    rubocop (0.69.0)
       jaro_winkler (~> 1.5.1)
       parallel (~> 1.10)
-      parser (>= 2.5, != 2.5.1.1)
+      parser (>= 2.6)
       rainbow (>= 2.2.2, < 4.0)
       ruby-progressbar (~> 1.7)
-      unicode-display_width (>= 1.4.0, < 1.6)
+      unicode-display_width (>= 1.4.0, < 1.7)
     ruby-progressbar (1.10.0)
     sass (3.7.4)
       sass-listen (~> 4.0.0)
@@ -119,7 +121,7 @@ GEM
       rack-protection (= 2.0.5)
       tilt (~> 2.0)
     syslog-logger (1.6.8)
-    test-unit (3.3.2)
+    test-unit (3.3.3)
       power_assert
     thin (1.7.2)
       daemons (~> 1.0, >= 1.0.9)
@@ -132,7 +134,7 @@ GEM
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.7.6)
-    unicode-display_width (1.5.0)
+    unicode-display_width (1.6.0)
 
 PLATFORMS
   ruby
@@ -144,7 +146,7 @@ DEPENDENCIES
   rubocop
 
 RUBY VERSION
-   ruby 2.5.5p157
+   ruby 2.6.3p62
 
 BUNDLED WITH
-   1.17.3
+   2.0.1
