@@ -1,23 +1,19 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 351d06cbe529637f6deae6480f4831051e3ec29a
+  revision: b9c133bcaeb258996187d1f95f8e966b67c2e947
   specs:
-    ginseng-core (1.3.3)
+    ginseng-core (1.4.1)
       activesupport
       addressable
       bundler
       csv
       daemon-spawn
       httparty
-      rack-test
       rake
       rest-client
       rubocop
-      sass
-      sinatra
       syslog-logger
       test-unit
-      thin
 
 GEM
   remote: https://rubygems.org/
@@ -38,10 +34,8 @@ GEM
     crass (1.0.4)
     csv (3.1.1)
     daemon-spawn (0.4.2)
-    daemons (1.3.1)
     domain_name (0.5.20180417)
       unf (>= 0.0.5, < 1.0.0)
-    eventmachine (1.2.7)
     faraday (0.15.4)
       multipart-post (>= 1.2, < 3)
     faraday_middleware (0.13.1)
@@ -51,7 +45,6 @@ GEM
       faraday_middleware (>= 0.9)
       loofah (>= 2.0)
       sax-machine (>= 1.0)
-    ffi (1.11.1)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
     httparty (0.17.0)
@@ -72,7 +65,6 @@ GEM
     multi_json (1.13.1)
     multi_xml (0.6.0)
     multipart-post (2.1.1)
-    mustermann (1.0.3)
     netrc (0.11.0)
     nokogiri (1.10.3)
       mini_portile2 (~> 2.4.0)
@@ -88,20 +80,13 @@ GEM
     power_assert (1.1.4)
     public_suffix (3.1.0)
     rack (2.0.7)
-    rack-protection (2.0.5)
-      rack
-    rack-test (1.1.0)
-      rack (>= 1.0, < 3)
     rainbow (3.0.0)
     rake (12.3.2)
-    rb-fsevent (0.10.3)
-    rb-inotify (0.10.0)
-      ffi (~> 1.0)
     rest-client (2.0.2)
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
-    rubocop (0.70.0)
+    rubocop (0.71.0)
       jaro_winkler (~> 1.5.1)
       parallel (~> 1.10)
       parser (>= 2.6)
@@ -109,26 +94,11 @@ GEM
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 1.4.0, < 1.7)
     ruby-progressbar (1.10.1)
-    sass (3.7.4)
-      sass-listen (~> 4.0.0)
-    sass-listen (4.0.0)
-      rb-fsevent (~> 0.9, >= 0.9.4)
-      rb-inotify (~> 0.9, >= 0.9.7)
     sax-machine (1.3.2)
-    sinatra (2.0.5)
-      mustermann (~> 1.0)
-      rack (~> 2.0)
-      rack-protection (= 2.0.5)
-      tilt (~> 2.0)
     syslog-logger (1.6.8)
     test-unit (3.3.3)
       power_assert
-    thin (1.7.2)
-      daemons (~> 1.0, >= 1.0.9)
-      eventmachine (~> 1.0, >= 1.0.4)
-      rack (>= 1, < 3)
     thread_safe (0.3.6)
-    tilt (2.0.9)
     tzinfo (1.2.5)
       thread_safe (~> 0.1)
     unf (0.1.4)
