@@ -1,5 +1,3 @@
-require 'addressable/uri'
-
 module TomatoToot
   class FeedEntry
     def initialize(feed, item)
@@ -81,7 +79,7 @@ module TomatoToot
     end
 
     def enclosure_uri
-      @enclosure ||= Addressable::URI.parse(@item.enclosure_url)
+      @enclosure ||= Ginseng::URI.parse(@item.enclosure_url)
       @enclosure = create_uri(@enclosure.path) unless @enclosure.absolute?
       return nil unless @enclosure.absolute?
       return @enclosure
@@ -99,7 +97,7 @@ module TomatoToot
     private
 
     def create_uri(href)
-      uri = Addressable::URI.parse(href)
+      uri = Ginseng::URI.parse(href)
       uri.path ||= @feed.uri.path
       uri.query ||= @feed.uri.query
       uri.fragment ||= @feed.uri.fragment

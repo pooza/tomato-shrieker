@@ -1,7 +1,6 @@
 require 'feedjira'
 require 'digest/sha1'
 require 'json'
-require 'addressable/uri'
 require 'optparse'
 
 module TomatoToot
@@ -94,7 +93,7 @@ module TomatoToot
     end
 
     def uri
-      @uri ||= Addressable::URI.parse(self['/source/url'])
+      @uri ||= Ginseng::URI.parse(self['/source/url'])
       raise Ginseng::ConfigError, "Invalid feed URL '#{@uri}'" unless @uri.absolute?
       return @uri
     end
@@ -117,7 +116,7 @@ module TomatoToot
     def webhooks
       return [] unless self['/hooks'].present?
       return self['/hooks'].map do |hook|
-        Addressable::URI.parse(hook)
+        Ginseng::URI.parse(hook)
       end
     end
 
