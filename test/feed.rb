@@ -30,7 +30,7 @@ module TomatoToot
 
     def test_uri
       Feed.all do |feed|
-        assert(feed.uri.is_a?(Addressable::URI))
+        assert(feed.uri.is_a?(Ginseng::URI))
       end
     end
 

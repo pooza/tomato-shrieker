@@ -5,9 +5,6 @@ ENV['BUNDLE_GEMFILE'] ||= File.join(dir, 'Gemfile')
 require 'bundler/setup'
 require 'tomato_toot'
 
-desc 'test all'
-task test: ['tomato:test']
-
 [:crawl, :run, :clean, :touch].each do |action|
   desc "alias of tomato:#{action}"
   task action => "tomato:#{action}"
