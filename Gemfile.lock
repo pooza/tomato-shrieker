@@ -111,7 +111,7 @@ PLATFORMS
 
 DEPENDENCIES
   bitly
-  feedjira
+  feedjira (~> 2.2)
   ginseng-core!
   rubocop
 
