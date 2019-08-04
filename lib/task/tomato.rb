@@ -1,6 +1,8 @@
 namespace :tomato do
-  desc 'alias of tomato:crawl'
-  task run: :crawl
+  desc 'crawl (silence)'
+  task :run do
+    system File.join(TomatoToot::Environment.dir, 'bin/crawl.rb')
+  end
 
   desc 'crawl'
   task :crawl do
