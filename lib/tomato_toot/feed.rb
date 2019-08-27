@@ -1,6 +1,5 @@
 require 'feedjira'
 require 'digest/sha1'
-require 'json'
 require 'optparse'
 
 module TomatoToot
