@@ -1,6 +1,5 @@
 require 'feedjira'
 require 'digest/sha1'
-require 'json'
 require 'optparse'
 
 module TomatoToot
@@ -199,8 +198,9 @@ module TomatoToot
       rescue => e
         e = Ginseng::Error.create(e)
         e.package = Package.full_name
-        Slack.broadcast(e)
-        logger.error(e)
+        message = e.to_h.merge(feed: feed.params)
+        Slack.broadcast(message)
+        logger.error(message)
         next
       end
     end

@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: da6a24fd19633c2b6dbf9f1ef85f44949816afeb
+  revision: d68e5450bc2e527ee923fb3a0008485c7f55f80a
   specs:
-    ginseng-core (1.4.4)
+    ginseng-core (1.4.7)
       activesupport
       addressable
       bundler
@@ -14,15 +14,17 @@ GIT
       rubocop
       syslog-logger
       test-unit
+      yajl-ruby
 
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (5.2.3)
+    activesupport (6.0.0)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 0.7, < 2)
       minitest (~> 5.1)
       tzinfo (~> 1.1)
+      zeitwerk (~> 2.1, >= 2.1.8)
     addressable (2.6.0)
       public_suffix (>= 2.0.2, < 4.0)
     ast (2.4.0)
@@ -45,6 +47,7 @@ GEM
       faraday_middleware (>= 0.9)
       loofah (>= 2.0)
       sax-machine (>= 1.0)
+    http-accept (1.7.0)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
     httparty (0.17.0)
@@ -66,7 +69,7 @@ GEM
     multi_xml (0.6.0)
     multipart-post (2.1.1)
     netrc (0.11.0)
-    nokogiri (1.10.3)
+    nokogiri (1.10.4)
       mini_portile2 (~> 2.4.0)
     oauth2 (1.4.1)
       faraday (>= 0.8, < 0.16.0)
@@ -77,12 +80,13 @@ GEM
     parallel (1.17.0)
     parser (2.6.3.0)
       ast (~> 2.4.0)
-    power_assert (1.1.4)
+    power_assert (1.1.5)
     public_suffix (3.1.1)
     rack (2.0.7)
     rainbow (3.0.0)
     rake (12.3.3)
-    rest-client (2.0.2)
+    rest-client (2.1.0)
+      http-accept (>= 1.7.0, < 2.0)
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
@@ -105,6 +109,8 @@ GEM
       unf_ext
     unf_ext (0.0.7.6)
     unicode-display_width (1.6.0)
+    yajl-ruby (1.4.1)
+    zeitwerk (2.1.9)
 
 PLATFORMS
   ruby

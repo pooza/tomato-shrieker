@@ -30,7 +30,7 @@ module TomatoToot
         @logger.error(e)
       end
       touch
-      @logger.info({entry: {date: date, body: body}})
+      @logger.info(entry: {date: date, body: body})
     end
 
     def toot
@@ -40,11 +40,11 @@ module TomatoToot
       rescue Ginseng::GatewayError => e
         @logger.error(e)
       end
-      return @feed.mastodon.toot({
+      return @feed.mastodon.toot(
         status: body,
         visibility: @feed.visibility,
         media_ids: ids,
-      })
+      )
     end
 
     def touch
