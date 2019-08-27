@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: bca4d2c45bb900838a8cb087ba3b9d40328bc9f9
+  revision: d68e5450bc2e527ee923fb3a0008485c7f55f80a
   specs:
-    ginseng-core (1.4.5)
+    ginseng-core (1.4.7)
       activesupport
       addressable
       bundler
@@ -14,6 +14,7 @@ GIT
       rubocop
       syslog-logger
       test-unit
+      yajl-ruby
 
 GEM
   remote: https://rubygems.org/
@@ -46,6 +47,7 @@ GEM
       faraday_middleware (>= 0.9)
       loofah (>= 2.0)
       sax-machine (>= 1.0)
+    http-accept (1.7.0)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
     httparty (0.17.0)
@@ -83,7 +85,8 @@ GEM
     rack (2.0.7)
     rainbow (3.0.0)
     rake (12.3.3)
-    rest-client (2.0.2)
+    rest-client (2.1.0)
+      http-accept (>= 1.7.0, < 2.0)
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
@@ -106,6 +109,7 @@ GEM
       unf_ext
     unf_ext (0.0.7.6)
     unicode-display_width (1.6.0)
+    yajl-ruby (1.4.1)
     zeitwerk (2.1.9)
 
 PLATFORMS
