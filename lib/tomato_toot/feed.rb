@@ -123,7 +123,7 @@ module TomatoToot
     alias hooks webhooks
 
     def feedjira
-      @feedjira ||= Feedjira.parse(@http.get(uri.to_s))
+      @feedjira ||= Feedjira.parse(@http.get(uri.to_s).to_s)
       return @feedjira
     end
 
