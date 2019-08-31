@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: d68e5450bc2e527ee923fb3a0008485c7f55f80a
+  revision: dbb163924d960a092f199b87207881a7be00a5df
   specs:
-    ginseng-core (1.4.7)
+    ginseng-core (1.4.8)
       activesupport
       addressable
       bundler
@@ -25,8 +25,8 @@ GEM
       minitest (~> 5.1)
       tzinfo (~> 1.1)
       zeitwerk (~> 2.1, >= 2.1.8)
-    addressable (2.6.0)
-      public_suffix (>= 2.0.2, < 4.0)
+    addressable (2.7.0)
+      public_suffix (>= 2.0.2, < 5.0)
     ast (2.4.0)
     bitly (1.1.2)
       httparty (>= 0.7.6)
@@ -40,12 +40,8 @@ GEM
       unf (>= 0.0.5, < 1.0.0)
     faraday (0.15.4)
       multipart-post (>= 1.2, < 3)
-    faraday_middleware (0.13.1)
-      faraday (>= 0.7.4, < 1.0)
-    feedjira (2.2.0)
-      faraday (>= 0.9)
-      faraday_middleware (>= 0.9)
-      loofah (>= 2.0)
+    feedjira (3.0.0)
+      loofah (>= 2.2.1)
       sax-machine (>= 1.0)
     http-accept (1.7.0)
     http-cookie (1.0.3)
@@ -78,10 +74,10 @@ GEM
       multi_xml (~> 0.5)
       rack (>= 1.2, < 3)
     parallel (1.17.0)
-    parser (2.6.3.0)
+    parser (2.6.4.0)
       ast (~> 2.4.0)
     power_assert (1.1.5)
-    public_suffix (3.1.1)
+    public_suffix (4.0.1)
     rack (2.0.7)
     rainbow (3.0.0)
     rake (12.3.3)
@@ -117,12 +113,12 @@ PLATFORMS
 
 DEPENDENCIES
   bitly
-  feedjira (~> 2.2)
+  feedjira
   ginseng-core!
   rubocop
 
 RUBY VERSION
-   ruby 2.6.3p62
+   ruby 2.6.4p104
 
 BUNDLED WITH
    2.0.2

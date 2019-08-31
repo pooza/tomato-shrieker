@@ -10,6 +10,7 @@ module TomatoToot
       @config = Config.instance
       @params = params
       @params_flatten = Config.flatten('', params)
+      @http = HTTP.new
     end
 
     def [](name)
@@ -122,11 +123,7 @@ module TomatoToot
     alias hooks webhooks
 
     def feedjira
-      Feedjira.configure do |config|
-        config.user_agent = Package.user_agent
-      end
-      Feedjira.logger.level = ::Logger::FATAL
-      @feedjira ||= Feedjira::Feed.fetch_and_parse(uri.to_s)
+      @feedjira ||= Feedjira.parse(@http.get(uri.to_s))
       return @feedjira
     end
 
