@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 ruby '2.6.4'
 gem 'bitly'
-gem 'feedjira'
+gem 'feedjira', '~>3.0'
 gem 'ginseng-core', git: 'https://github.com/pooza/ginseng-core.git'
 gem 'rubocop'
