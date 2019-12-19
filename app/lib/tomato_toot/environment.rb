@@ -5,7 +5,7 @@ module TomatoToot
     end
 
     def self.dir
-      return File.expand_path('../..', __dir__)
+      return TomatoToot.dir
     end
   end
 end
