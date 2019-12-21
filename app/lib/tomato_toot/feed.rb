@@ -43,7 +43,7 @@ module TomatoToot
 
     def fetch_all
       return enum_for(__method__) unless block_given?
-      feedjira.entries.each.sort_by{|item| item.published.to_f}.reverse_each do |item|
+      feedjira.entries.each.sort_by {|item| item.published.to_f}.reverse_each do |item|
         yield FeedEntry.new(self, item)
       end
     end

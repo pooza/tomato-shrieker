@@ -10,6 +10,6 @@ require 'tomato_toot'
   task action => "tomato:#{action}"
 end
 
-Dir.glob(File.join(TomatoToot::Environment.dir, 'app/task/*.rb')).each do |f|
+Dir.glob(File.join(TomatoToot::Environment.dir, 'app/task/*.rb')).sort.each do |f|
   require f
 end
