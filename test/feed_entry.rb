@@ -11,7 +11,7 @@ module TomatoToot
     def test_date
       Feed.all do |feed|
         feed.fetch_all do |entry|
-          assert(entry.date.is_a?(Time))
+          assert_kind_of(Time, entry.date)
         end
       end
     end
@@ -20,7 +20,7 @@ module TomatoToot
       Feed.all do |feed|
         feed.fetch_all do |entry|
           assert(entry.body.present?)
-          assert(entry.body.is_a?(String))
+          assert_kind_of(String, entry.body)
         end
       end
     end
@@ -28,7 +28,8 @@ module TomatoToot
     def test_enclosure
       Feed.all do |feed|
         feed.fetch_all do |entry|
-          assert(entry.enclosure.is_a?(Ginseng::URI)) unless entry.enclosure.nil?
+          next unless entry.enclosure
+          assert_kind_of(Ginseng::URI, entry.enclosure)
         end
       end
     end
