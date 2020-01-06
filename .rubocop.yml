@@ -1,3 +1,5 @@
+require: rubocop-performance
+
 AllCops:
   AllowSymlinksInCacheRootDirectory: true
   DisplayCopNames: true
@@ -90,7 +92,7 @@ Style/IdenticalConditionalBranches:
   Exclude:
     - test/*
 
-Metrics/LineLength:
+Layout/LineLength:
   Max: 100
   Exclude:
     - test/*
