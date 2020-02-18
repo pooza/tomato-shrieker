@@ -3,7 +3,7 @@ module TomatoToot
     def test_tooted?
       Feed.all do |feed|
         feed.fetch do |entry|
-          assert_false(entry.tooted?)
+          assert_boolean(entry.tooted?)
         end
       end
     end
