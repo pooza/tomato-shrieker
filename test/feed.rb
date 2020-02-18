@@ -2,14 +2,14 @@ module TomatoToot
   class FeedTest < Test::Unit::TestCase
     def test_all
       Feed.all do |feed|
-        assert(feed.is_a?(Feed))
+        assert_kind_of(Feed, feed)
       end
     end
 
     def test_fetch
       Feed.all do |feed|
         feed.fetch do |entry|
-          assert(entry.is_a?(FeedEntry))
+          assert_kind_of(FeedEntry, entry)
         end
       end
     end
@@ -17,51 +17,51 @@ module TomatoToot
     def test_fetch_all
       Feed.all do |feed|
         feed.fetch_all do |entry|
-          assert(entry.is_a?(FeedEntry))
+          assert_kind_of(FeedEntry, entry)
         end
       end
     end
 
     def test_status
       Feed.all do |feed|
-        assert(feed.status.is_a?(Hash))
+        assert_kind_of(Hash, feed.status)
       end
     end
 
     def test_uri
       Feed.all do |feed|
-        assert(feed.uri.is_a?(Ginseng::URI))
+        assert_kind_of(Ginseng::URI, feed.uri)
       end
     end
 
     def test_mastodon
       Feed.all do |feed|
         next unless feed.mastodon
-        assert(feed.mastodon.is_a?(Mastodon))
+        assert_kind_of(Mastodon, feed.mastodon)
       end
     end
 
     def test_hooks
       Feed.all do |feed|
-        assert(feed.hooks.is_a?(Array))
+        assert_kind_of(Array, feed.hooks)
       end
     end
 
     def test_toot_tags
       Feed.all do |feed|
-        assert(feed.toot_tags.is_a?(Array))
+        assert_kind_of(Array, feed.toot_tags)
       end
     end
 
     def test_visibility
       Feed.all do |feed|
-        assert(feed.visibility.is_a?(String))
+        assert_kind_of(String, feed.visibility)
       end
     end
 
     def test_timestamp
       Feed.all do |feed|
-        assert(feed.timestamp.is_a?(Time))
+        assert_kind_of(Time, feed.timestamp)
       end
     end
   end

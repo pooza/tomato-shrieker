@@ -22,3 +22,8 @@ namespace :tomato do
     end
   end
 end
+
+[:crawl, :run, :clean, :touch].each do |action|
+  desc "alias of tomato:#{action}"
+  task action => "tomato:#{action}"
+end

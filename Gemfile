@@ -1,7 +1,6 @@
 source 'https://rubygems.org'
-ruby '2.6.5'
+ruby '2.7.0'
 gem 'bitly'
 gem 'bootsnap'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', git: 'https://github.com/pooza/ginseng-core.git'
-gem 'rubocop', '0.77.0'
