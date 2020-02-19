@@ -5,7 +5,7 @@ AllCops:
   DisplayCopNames: true
   Exclude:
     - '**/._*'
-  TargetRubyVersion: 2.6
+  TargetRubyVersion: 2.7
 
 Style/FrozenStringLiteralComment:
   Enabled: false
@@ -50,16 +50,6 @@ Metrics/ClassLength:
   Max: 200
   Exclude:
     - test/*
-
-Naming/FileName:
-  Exclude:
-    - Rakefile.rb
-    - '**/Rakefile*.rb'
-
-Metrics/BlockLength:
-  Exclude:
-    - Rakefile.rb
-    - '**/Rakefile*.rb'
 
 Style/Documentation:
   Enabled: false
@@ -139,3 +129,6 @@ Metrics/CyclomaticComplexity:
 
 Metrics/PerceivedComplexity:
   Max: 10
+
+Naming/RescuedExceptionsVariableName:
+  PreferredName: e
