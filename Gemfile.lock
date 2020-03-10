@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 1529a5f322e342fad2d34a24de8e152421d0a3c4
+  revision: b95cebe5e70c8e16867b482f7d857464d5c81ced
   specs:
-    ginseng-core (1.6.1)
+    ginseng-core (1.6.3)
       activesupport
       addressable
       bundler
@@ -51,7 +51,7 @@ GEM
     http-accept (1.7.0)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
-    httparty (0.17.3)
+    httparty (0.18.0)
       mime-types (~> 3.0)
       multi_xml (>= 0.5.2)
     i18n (1.8.2)
@@ -80,9 +80,9 @@ GEM
       multi_xml (~> 0.5)
       rack (>= 1.2, < 3)
     parallel (1.19.1)
-    parser (2.7.0.2)
+    parser (2.7.0.4)
       ast (~> 2.4.0)
-    power_assert (1.1.5)
+    power_assert (1.1.6)
     public_suffix (4.0.3)
     rack (2.2.2)
     rainbow (3.0.0)
@@ -93,7 +93,7 @@ GEM
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
     rexml (3.2.4)
-    rubocop (0.80.0)
+    rubocop (0.80.1)
       jaro_winkler (~> 1.5.1)
       parallel (~> 1.10)
       parser (>= 2.7.0.1)
@@ -117,7 +117,7 @@ GEM
     unicode (0.4.4.4)
     unicode-display_width (1.6.1)
     yajl-ruby (1.4.1)
-    zeitwerk (2.2.2)
+    zeitwerk (2.3.0)
 
 PLATFORMS
   ruby
