@@ -9,12 +9,11 @@ module TomatoToot
     def initialize(params)
       @config = Config.instance
       @params = params
-      @params_flatten = Config.flatten('', params)
       @http = HTTP.new
     end
 
     def [](name)
-      [@params_flatten, @params].each do |v|
+      [@params.key_flatten, @params].each do |v|
         return v[name] unless v[name].nil?
       end
       return nil
@@ -172,7 +171,7 @@ module TomatoToot
       @status_path ||= File.join(
         Environment.dir,
         'tmp/timestamps',
-        "#{Digest::SHA1.hexdigest(@params_flatten.to_s)}.json",
+        "#{Digest::SHA1.hexdigest(@params.key_flatten.to_s)}.json",
       )
       return @status_path
     end
