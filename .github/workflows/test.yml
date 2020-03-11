@@ -8,8 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: setup Ruby 2.7
-        uses: actions/setup-ruby@v1
+      - uses: actions/setup-ruby@v1
         with:
           ruby-version: 2.7.x
       - name: bundle install
@@ -18,9 +17,5 @@ jobs:
           bundle install --jobs 4 --retry 3
           bundle exec rake bundle:update
           bundle exec rake bundle:check
-      - name: Run lint
-        run: |
-          bundle exec rubocop
-      - name: Run test
-        run: |
-          bundle exec rake test
+      - run: bundle exec rubocop
+      - run: bundle exec rake test
