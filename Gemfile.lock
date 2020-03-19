@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: b95cebe5e70c8e16867b482f7d857464d5c81ced
+  revision: fbaf7066472c244bd37cec2580a5f3ead7f904c9
   specs:
-    ginseng-core (1.6.3)
+    ginseng-core (1.6.4)
       activesupport
       addressable
       bundler
@@ -22,7 +22,7 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (6.0.2.1)
+    activesupport (6.0.2.2)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 0.7, < 2)
       minitest (~> 5.1)
