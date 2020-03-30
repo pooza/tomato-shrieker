@@ -77,12 +77,6 @@ module TomatoToot
 
     alias bot? bot_account?
 
-    def shorten?
-      return @config['/bitly/token'] && self['/shorten']
-    rescue
-      return false
-    end
-
     def template
       return self['/template'] || 'default'
     end
@@ -95,11 +89,6 @@ module TomatoToot
       @uri ||= Ginseng::URI.parse(self['/source/url'])
       raise Ginseng::ConfigError, "Invalid feed URL '#{@uri}'" unless @uri.absolute?
       return @uri
-    end
-
-    def bitly
-      @bitly ||= Bitly.new if shorten?
-      return @bitly
     end
 
     def mastodon

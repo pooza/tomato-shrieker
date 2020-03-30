@@ -101,7 +101,6 @@ module TomatoToot
       uri.path ||= @feed.uri.path
       uri.query ||= @feed.uri.query
       uri.fragment ||= @feed.uri.fragment
-      uri = @feed.bitly.shorten(uri) if @feed.shorten?
       return uri
     end
   end
