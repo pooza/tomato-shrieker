@@ -8,10 +8,26 @@ module TomatoToot
       end
     end
 
+    def test_tag?
+      Feed.all do |feed|
+        feed.fetch do |entry|
+          assert_boolean(entry.tag?)
+        end
+      end
+    end
+
     def test_date
       Feed.all do |feed|
         feed.fetch do |entry|
           assert_kind_of(Time, entry.date)
+        end
+      end
+    end
+
+    def test_feed
+      Feed.all do |feed|
+        feed.fetch do |entry|
+          assert_kind_of(Feed, entry.feed)
         end
       end
     end
@@ -21,6 +37,14 @@ module TomatoToot
         feed.fetch do |entry|
           assert(entry.body.present?)
           assert_kind_of(String, entry.body)
+        end
+      end
+    end
+
+    def test_uri
+      Feed.all do |feed|
+        feed.fetch do |entry|
+          assert_kind_of(Ginseng::URI, entry.uri)
         end
       end
     end
