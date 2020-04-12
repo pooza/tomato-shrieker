@@ -120,6 +120,8 @@ module TomatoToot
       return []
     end
 
+    alias toot_tags tags
+
     def tag
       return self['/source/tag']
     rescue
