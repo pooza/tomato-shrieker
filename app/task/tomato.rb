@@ -1,6 +1,6 @@
 namespace :tomato do
   desc 'crawl'
-  task :run => [:crawl]
+  task run: [:crawl]
 
   desc 'crawl'
   task :crawl do
