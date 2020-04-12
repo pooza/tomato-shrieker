@@ -5,6 +5,9 @@ AllCops:
   DisplayCopNames: true
   Exclude:
     - '**/._*'
+    - '.git/**/*'
+    - 'public/**/*'
+    - 'tmp/**/*'
   TargetRubyVersion: 2.7
 
 Style/FrozenStringLiteralComment:
@@ -132,3 +135,10 @@ Metrics/PerceivedComplexity:
 
 Naming/RescuedExceptionsVariableName:
   PreferredName: e
+
+Lint/RaiseException:
+  Enabled: true
+
+Lint/StructNewOverride:
+  Enabled: true
+

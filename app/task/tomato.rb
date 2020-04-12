@@ -1,8 +1,6 @@
 namespace :tomato do
-  desc 'crawl (silence)'
-  task :run do
-    system File.join(TomatoToot::Environment.dir, 'bin/crawl.rb')
-  end
+  desc 'crawl'
+  task run: [:crawl]
 
   desc 'crawl'
   task :crawl do
@@ -16,10 +14,8 @@ namespace :tomato do
 
   desc 'clear timestamps'
   task :clean do
-    Dir.glob(File.join(TomatoToot::Environment.dir, 'tmp/timestamps/*')) do |f|
-      puts "delete #{f}"
-      File.unlink(f)
-    end
+    Sequel.connect(TomatoToot.dsn)
+    TomatoToot::Entry.dataset.destroy
   end
 end
 

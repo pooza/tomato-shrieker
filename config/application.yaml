@@ -1,10 +1,12 @@
 package:
-  version: 2.3.18
+  version: 2.4.0
   url: https://github.com/pooza/tomato-toot
   authors:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
+sqlite3:
+  db: db.sqlite3
 slack:
   hooks: []
 entries: []
