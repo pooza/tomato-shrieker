@@ -71,7 +71,7 @@ module TomatoToot
       feed.hooks do |hook|
         message = {text: body}
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        Slack.new(hook).say(message, :hash)
+        hook.say(message, :hash)
       rescue => e
         logger.error(e)
       end

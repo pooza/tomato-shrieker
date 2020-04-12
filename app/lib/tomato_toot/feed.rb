@@ -4,8 +4,6 @@ require 'optparse'
 
 module TomatoToot
   class Feed
-    attr_reader :params
-
     def initialize(params)
       @config = Config.instance
       @params = params
@@ -22,7 +20,7 @@ module TomatoToot
     end
 
     def to_h
-      return {hash: hash}.merge(params)
+      return {hash: hash}.merge(@params)
     end
 
     def hash
@@ -44,10 +42,10 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.each.sort_by {|item| item.published.to_f}.each do |item|
-        yield Entry.get(self, item)
+      feedjira.entries.each.sort_by {|item| item.published.to_f}.each do |entry|
+        yield Entry.get(self, entry)
       rescue => e
-        @logger.error(Ginseng::Error.create(e).to_h.merge(entry: item))
+        @logger.error(Ginseng::Error.create(e).to_h.merge(entry: entry))
       end
     end
 
@@ -58,7 +56,7 @@ module TomatoToot
     end
 
     def bot_account?
-      return self['/bot_account']
+      return self['/bot_account'] || false
     end
 
     alias bot? bot_account?
@@ -72,16 +70,16 @@ module TomatoToot
     end
 
     def uri
-      @uri ||= Ginseng::URI.parse(self['/source/url'])
-      raise Ginseng::ConfigError, "Invalid feed URL '#{@uri}'" unless @uri.absolute?
-      return @uri
+      return nil unless uri = Ginseng::URI.parse(self['/source/url'])
+      return nil unless uri.absolute?
+      return uri
     end
 
     def mastodon
-      return nil unless self['/mastodon/url'].present?
-      return nil unless self['/mastodon/token'].present?
       unless @mastodon
-        @mastodon = Mastodon.new(self['/mastodon/url'], self['/mastodon/token'])
+        return nil unless uri.present?
+        return nil unless token = self['/mastodon/token']
+        @mastodon = Mastodon.new(uri, token)
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
@@ -90,7 +88,7 @@ module TomatoToot
     def webhooks
       return enum_for(__method__) unless block_given?
       (self['/hooks'] || []).each do |hook|
-        yield Ginseng::URI.parse(hook)
+        yield Slack.new(Ginseng::URI.parse(hook))
       end
     end
 
