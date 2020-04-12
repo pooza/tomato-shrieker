@@ -1,4 +1,5 @@
 require 'bootsnap'
+require 'sequel'
 require 'ginseng'
 
 module TomatoToot
@@ -23,6 +24,18 @@ module TomatoToot
     loader.push_dir(File.join(dir, 'app/lib'))
     loader.collapse('app/lib/tomato_toot/*')
     return loader
+  end
+
+  def self.dsn
+    return "sqlite://#{db_path}"
+  end
+
+  def self.db_path
+    return File.join(
+      dir,
+      'tmp/db',
+      Config.instance['/sqlite3/db'],
+    )
   end
 end
 

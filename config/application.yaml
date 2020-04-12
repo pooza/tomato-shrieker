@@ -5,6 +5,8 @@ package:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
+sqlite3:
+  db: db.sqlite3
 slack:
   hooks: []
 entries: []

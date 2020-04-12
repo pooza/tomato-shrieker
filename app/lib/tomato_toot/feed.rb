@@ -10,6 +10,8 @@ module TomatoToot
       @config = Config.instance
       @params = params
       @http = HTTP.new
+      @http.base_uri = uri
+      @logger = Logger.new
     end
 
     def [](name)
@@ -19,50 +21,34 @@ module TomatoToot
       return nil
     end
 
+    def to_h
+      return {hash: hash}.merge(params)
+    end
+
+    def hash
+      Digest::SHA1.hexdigest(@params.to_json)
+    end
+
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      if options['silence']
-        fetch.map(&:touch)
-      elsif touched?
-        fetch.map(&:post)
-      elsif entry = fetch.to_a.first
-        entry.post
+      Sequel.connect(TomatoToot.dsn).transaction do
+        if options['silence']
+          fetch.to_a.map(&:touch)
+        else
+          fetch.to_a.map(&:post)
+        end
       end
+    rescue => e
+      @logger.error(e)
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
-      fetch_all do |entry|
-        break if entry.outdated?
-        next if tag && !entry.tag?
-        next if entry.tooted?
-        yield entry
+      feedjira.entries.each.sort_by {|item| item.published.to_f}.each do |item|
+        yield Entry.get(self, item)
+      rescue => e
+        @logger.error(Ginseng::Error.create(e).to_h.merge(entry: item))
       end
-    end
-
-    def fetch_all
-      return enum_for(__method__) unless block_given?
-      feedjira.entries.each.sort_by {|item| item.published.to_f}.reverse_each do |item|
-        yield FeedEntry.new(self, item)
-      end
-    end
-
-    def status
-      unless @status
-        @status = {}
-        @status = JSON.parse(File.read(status_path), {symbolize_names: true}) if touched?
-        @status[:bodies] ||= []
-      end
-      return @status
-    end
-
-    def status=(values)
-      @status = nil
-      File.write(status_path, JSON.pretty_generate(values))
-    end
-
-    def touched?
-      return File.exist?(status_path)
     end
 
     def mulukhiya?
@@ -102,9 +88,9 @@ module TomatoToot
     end
 
     def webhooks
-      return [] unless self['/hooks'].present?
-      return self['/hooks'].map do |hook|
-        Ginseng::URI.parse(hook)
+      return enum_for(__method__) unless block_given?
+      (self['/hooks'] || []).each do |hook|
+        yield Ginseng::URI.parse(hook)
       end
     end
 
@@ -126,7 +112,7 @@ module TomatoToot
       return 'title'
     end
 
-    def toot_tags
+    def tags
       return self['/toot/tags'].map do |tag|
         Mastodon.create_tag(tag)
       end
@@ -150,19 +136,10 @@ module TomatoToot
       return (self['/prefix'] || feedjira.title)
     end
 
-    def timestamp
-      return Time.parse(status[:date])
-    rescue
-      return Time.parse('1970/01/01')
-    end
-
-    def status_path
-      @status_path ||= File.join(
-        Environment.dir,
-        'tmp/timestamps',
-        "#{Digest::SHA1.hexdigest(@params.key_flatten.to_s)}.json",
-      )
-      return @status_path
+    def create_uri(href)
+      uri = @http.create_uri(href)
+      uri.fragment ||= self.uri.fragment
+      return uri
     end
 
     def self.all
@@ -178,15 +155,14 @@ module TomatoToot
       logger = Logger.new
       options = ARGV.getopts('', 'silence')
       all do |feed|
-        logger.info(feed.params)
+        logger.info(feed: feed.to_h)
         feed.execute(options)
       rescue => e
         e = Ginseng::Error.create(e)
         e.package = Package.full_name
-        message = e.to_h.merge(feed: feed.params)
+        message = e.to_h.merge(feed: feed.to_h)
         Slack.broadcast(message)
         logger.error(message)
-        next
       end
     end
   end

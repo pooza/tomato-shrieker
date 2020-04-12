@@ -47,9 +47,9 @@ module TomatoToot
       end
     end
 
-    def test_toot_tags
+    def test_tags
       Feed.all do |feed|
-        assert_kind_of(Array, feed.toot_tags)
+        assert_kind_of(Array, feed.tags)
       end
     end
 
