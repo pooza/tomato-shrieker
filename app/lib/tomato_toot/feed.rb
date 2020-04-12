@@ -36,8 +36,13 @@ module TomatoToot
           fetch.to_a.map(&:post)
         end
       end
+      @logger.info(feed: to_h)
     rescue => e
-      @logger.error(e)
+      e = Ginseng::Error.create(e)
+      e.package = Package.full_name
+      message = e.to_h.merge(feed: feed.to_h)
+      Slack.broadcast(message)
+      @logger.error(message)
     end
 
     def fetch
@@ -150,18 +155,12 @@ module TomatoToot
     end
 
     def self.crawl_all
-      logger = Logger.new
       options = ARGV.getopts('', 'silence')
+      threads = []
       all do |feed|
-        logger.info(feed: feed.to_h)
-        feed.execute(options)
-      rescue => e
-        e = Ginseng::Error.create(e)
-        e.package = Package.full_name
-        message = e.to_h.merge(feed: feed.to_h)
-        Slack.broadcast(message)
-        logger.error(message)
+        threads.push(Thread.new {feed.execute(options)})
       end
+      threads.map(&:join)
     end
   end
 end
