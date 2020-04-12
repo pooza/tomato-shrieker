@@ -31,7 +31,7 @@ module TomatoToot
 
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      Sequel.connect(TomatoToot.dsn).transaction do
+      Sequel.connect(Environment.dsn).transaction do
         if options['silence']
           fetch.to_a.map(&:touch)
         else

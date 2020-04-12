@@ -14,7 +14,7 @@ namespace :tomato do
 
   desc 'clear timestamps'
   task :clean do
-    Sequel.connect(TomatoToot.dsn)
+    Sequel.connect(TomatoToot::Environment.dsn)
     TomatoToot::Entry.dataset.destroy
   end
 end
