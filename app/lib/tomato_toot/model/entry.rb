@@ -37,16 +37,18 @@ module TomatoToot
       return @body
     end
 
-    def enclosure_uri
-      @enclosure ||= Ginseng::URI.parse(enclosure_url)
-      @enclosure = feed.create_uri(@enclosure.path) unless @enclosure.absolute?
-      return nil unless @enclosure.absolute?
+    def enclosure
+      unless @enclosure
+        return nil unless @enclosure ||= Ginseng::URI.parse(enclosure_url)
+        @enclosure = feed.create_uri(@enclosure.path)
+        return nil unless @enclosure.absolute?
+      end
       return @enclosure
     rescue
       return nil
     end
 
-    alias enclosure enclosure_uri
+    alias enclosure_uri enclosure
 
     def uri
       @uri ||= feed.create_uri(url)
