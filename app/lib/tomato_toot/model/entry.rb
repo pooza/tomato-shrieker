@@ -56,7 +56,7 @@ module TomatoToot
     end
 
     def tag?
-      return feed.tag && body.match("\##{feed.tag}")
+      return feed.tag && body.include?(Matodon.create_tag(feed.tag))
     end
 
     def tooted?
