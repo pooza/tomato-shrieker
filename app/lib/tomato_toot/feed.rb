@@ -100,21 +100,19 @@ module TomatoToot
     end
 
     def mode
-      case self['/source/mode']
-      when 'body', 'summary'
-        return 'summary'
-      else
-        return 'title'
+      unless @mode
+        @mode = self['/source/mode'] || 'title'
+        @mode = 'summary' if @mode == 'body'
       end
-    rescue
-      return 'title'
+      return @mode
     end
 
     def tags
       return self['/toot/tags'].map do |tag|
         Mastodon.create_tag(tag)
       end
-    rescue
+    rescue => e
+      @logger.error(e)
       return []
     end
 
@@ -127,13 +125,13 @@ module TomatoToot
     end
 
     def visibility
-      return (self['/visibility'] || 'public')
+      return self['/visibility'] || 'public'
     rescue
       return 'public'
     end
 
     def prefix
-      return (self['/prefix'] || feedjira.title)
+      return self['/prefix'] || feedjira.title
     end
 
     def create_uri(href)
