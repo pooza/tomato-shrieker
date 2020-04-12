@@ -65,10 +65,11 @@ module TomatoToot
 
     def touch
       update(tooted: Time.now.to_s) unless tooted?
+      logger.info(entry: to_h)
     end
 
     def post
-      return if tooted
+      return if tooted?
       toot if feed.mastodon
       feed.hooks do |hook|
         message = {text: body}
@@ -78,18 +79,16 @@ module TomatoToot
         logger.error(e)
       end
       touch
-      logger.info(entry: to_h)
     end
 
     def toot
       ids = []
       ids.push(feed.mastodon.upload_remote_resource(enclosure)) if enclosure
-      response = feed.mastodon.toot(
+      return feed.mastodon.toot(
         status: body,
         visibility: feed.visibility,
         media_ids: ids,
       )
-      return response
     rescue => e
       logger.error(e)
     end
