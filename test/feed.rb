@@ -9,22 +9,8 @@ module TomatoToot
     def test_fetch
       Feed.all do |feed|
         feed.fetch do |entry|
-          assert_kind_of(FeedEntry, entry)
+          assert_kind_of(Entry, entry)
         end
-      end
-    end
-
-    def test_fetch_all
-      Feed.all do |feed|
-        feed.fetch_all do |entry|
-          assert_kind_of(FeedEntry, entry)
-        end
-      end
-    end
-
-    def test_status
-      Feed.all do |feed|
-        assert_kind_of(Hash, feed.status)
       end
     end
 
@@ -43,25 +29,24 @@ module TomatoToot
 
     def test_hooks
       Feed.all do |feed|
-        assert_kind_of(Array, feed.hooks)
+        feed.hooks do |hook|
+          assert_kind_of(Ginseng::URI, hook)
+        end
       end
     end
 
     def test_tags
       Feed.all do |feed|
         assert_kind_of(Array, feed.tags)
+        feed.tags do |tag|
+          assert_kind_of(String, tag)
+        end
       end
     end
 
     def test_visibility
       Feed.all do |feed|
         assert_kind_of(String, feed.visibility)
-      end
-    end
-
-    def test_timestamp
-      Feed.all do |feed|
-        assert_kind_of(Time, feed.timestamp)
       end
     end
   end
