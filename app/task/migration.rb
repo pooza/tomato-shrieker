@@ -10,10 +10,10 @@ namespace :migration do
 
   desc 'migrate database'
   task run: [:db] do
-    sh "bundle exec sequel -m #{path} '#{TomatoToot.dsn}' -E"
+    sh "bundle exec sequel -m #{path} '#{TomatoToot::Environment.dsn}' -E"
   end
 
   file :db do
-    FileUtils.touch(TomatoToot.db_path)
+    FileUtils.touch(TomatoToot::Environment.db)
   end
 end

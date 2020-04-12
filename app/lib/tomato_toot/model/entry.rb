@@ -37,16 +37,18 @@ module TomatoToot
       return @body
     end
 
-    def enclosure_uri
-      @enclosure ||= Ginseng::URI.parse(enclosure_url)
-      @enclosure = feed.create_uri(@enclosure.path) unless @enclosure.absolute?
-      return nil unless @enclosure.absolute?
+    def enclosure
+      unless @enclosure
+        return nil unless @enclosure ||= Ginseng::URI.parse(enclosure_url)
+        @enclosure = feed.create_uri(@enclosure.path)
+        return nil unless @enclosure.absolute?
+      end
       return @enclosure
     rescue
       return nil
     end
 
-    alias enclosure enclosure_uri
+    alias enclosure_uri enclosure
 
     def uri
       @uri ||= feed.create_uri(url)
@@ -54,7 +56,7 @@ module TomatoToot
     end
 
     def tag?
-      return feed.tag && body.match("\##{feed.tag}")
+      return feed.tag && body.include?(Matodon.create_tag(feed.tag))
     end
 
     def tooted?
@@ -63,31 +65,30 @@ module TomatoToot
 
     def touch
       update(tooted: Time.now.to_s) unless tooted?
+      logger.info(entry: to_h)
     end
 
     def post
-      return if tooted
+      return if tooted?
       toot if feed.mastodon
       feed.hooks do |hook|
         message = {text: body}
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        Slack.new(hook).say(message, :hash)
+        hook.say(message, :hash)
       rescue => e
         logger.error(e)
       end
       touch
-      logger.info(entry: to_h)
     end
 
     def toot
       ids = []
       ids.push(feed.mastodon.upload_remote_resource(enclosure)) if enclosure
-      response = feed.mastodon.toot(
+      return feed.mastodon.toot(
         status: body,
         visibility: feed.visibility,
         media_ids: ids,
       )
-      return response
     rescue => e
       logger.error(e)
     end

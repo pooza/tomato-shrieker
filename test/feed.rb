@@ -14,6 +14,12 @@ module TomatoToot
       end
     end
 
+    def test_to_h
+      Feed.all do |feed|
+        assert_kind_of(Hash, feed.to_h)
+      end
+    end
+
     def test_uri
       Feed.all do |feed|
         assert_kind_of(Ginseng::URI, feed.uri)
@@ -27,10 +33,53 @@ module TomatoToot
       end
     end
 
+    def test_tag
+      Feed.all do |feed|
+        next unless feed.tag
+        assert_kind_of(String, feed.tag)
+      end
+    end
+
+    def test_prefix
+      Feed.all do |feed|
+        assert_kind_of(String, feed.prefix)
+      end
+    end
+
+    def test_mulukhiya?
+      Feed.all do |feed|
+        assert_boolean(feed.mulukhiya?)
+      end
+    end
+
+    def test_bot?
+      Feed.all do |feed|
+        assert_boolean(feed.bot?)
+      end
+    end
+
+    def test_template
+      Feed.all do |feed|
+        assert_kind_of(String, feed.template)
+      end
+    end
+
+    def test_mode
+      Feed.all do |feed|
+        assert_kind_of(String, feed.mode)
+      end
+    end
+
+    def test_present?
+      Feed.all do |feed|
+        assert_boolean(feed.present?)
+      end
+    end
+
     def test_hooks
       Feed.all do |feed|
         feed.hooks do |hook|
-          assert_kind_of(Ginseng::URI, hook)
+          assert_kind_of(Slack, hook)
         end
       end
     end
