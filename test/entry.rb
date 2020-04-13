@@ -8,14 +8,6 @@ module TomatoToot
       end
     end
 
-    def test_tag?
-      Feed.all do |feed|
-        feed.fetch do |entry|
-          assert_boolean(entry.tag?)
-        end
-      end
-    end
-
     def test_time
       Feed.all do |feed|
         feed.fetch do |entry|

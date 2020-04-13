@@ -33,13 +33,6 @@ module TomatoToot
       end
     end
 
-    def test_tag
-      Feed.all do |feed|
-        next unless feed.tag
-        assert_kind_of(String, feed.tag)
-      end
-    end
-
     def test_prefix
       Feed.all do |feed|
         assert_kind_of(String, feed.prefix)
