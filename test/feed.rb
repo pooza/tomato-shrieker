@@ -58,6 +58,12 @@ module TomatoToot
       end
     end
 
+    def test_touched?
+      Feed.all do |feed|
+        assert_boolean(feed.touched?)
+      end
+    end
+
     def test_template
       Feed.all do |feed|
         assert_kind_of(String, feed.template)

@@ -16,10 +16,10 @@ module TomatoToot
       end
     end
 
-    def test_date
+    def test_time
       Feed.all do |feed|
         feed.fetch do |entry|
-          assert_kind_of(Time, entry.date)
+          assert_kind_of(Time, entry.time)
         end
       end
     end

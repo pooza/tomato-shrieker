@@ -1,4 +1,7 @@
 require 'sequel/model'
+require 'time'
+
+Sequel.connect(TomatoToot::Environment.dsn)
 
 module TomatoToot
   class Entry < Sequel::Model(:entry)
@@ -15,12 +18,7 @@ module TomatoToot
       return @feed
     end
 
-    def time
-      @date ||= Time.parse(published)
-      return @date
-    end
-
-    alias date time
+    alias time published
 
     def body
       unless @body
@@ -50,7 +48,8 @@ module TomatoToot
     end
 
     def tag?
-      return feed.tag && body.include?(Matodon.create_tag(feed.tag))
+      return false unless feed.tag
+      return body.include?(Matodon.create_tag(feed.tag))
     end
 
     def tooted?
@@ -63,6 +62,7 @@ module TomatoToot
 
     def post
       return false if tooted?
+      return false unless feed.tag && tag?
       if feed.mastodon
         unless toot.code == 200
           raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"

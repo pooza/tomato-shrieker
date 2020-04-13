@@ -30,7 +30,6 @@ module TomatoToot
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
       @logger.info(feed: to_h)
-      Sequel.connect(Environment.dsn)
       if options['silence']
         fetch.to_a.map(&:touch)
       elsif touched?
@@ -53,15 +52,14 @@ module TomatoToot
     alias exec execute
 
     def touched?
-      return Entry.first(feed: hash).present?
+      return false if Entry.first(feed: hash).nil?
+      return true
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.each.sort_by {|item| item.published.to_f}.each do |entry|
         yield Entry.get(self, entry)
-      rescue => e
-        @logger.error(Ginseng::Error.create(e).to_h.merge(entry: entry))
       end
     end
 
@@ -127,25 +125,16 @@ module TomatoToot
       return (self['/toot/tags'] || []).map do |tag|
         Mastodon.create_tag(tag)
       end
-    rescue => e
-      @logger.error(e)
-      return []
     end
 
     alias toot_tags tags
 
     def tag
       return self['/source/tag']
-    rescue => e
-      @logger.error(e)
-      return nil
     end
 
     def visibility
       return self['/visibility'] || 'public'
-    rescue => e
-      @logger.error(e)
-      return 'public'
     end
 
     def prefix
