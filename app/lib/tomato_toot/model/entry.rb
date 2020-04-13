@@ -62,7 +62,7 @@ module TomatoToot
     end
 
     def post
-      return if tooted?
+      return false if tooted?
       if feed.mastodon
         unless toot.code == 200
           raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"
@@ -77,6 +77,7 @@ module TomatoToot
         end
       end
       touch
+      return true
     end
 
     def toot

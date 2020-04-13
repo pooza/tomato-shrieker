@@ -31,23 +31,30 @@ module TomatoToot
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
       @logger.info(feed: to_h)
       Sequel.connect(Environment.dsn)
-      fetch do |entry|
-        if options['silence']
-          entry.touch
-        else
-          entry.post
-          @logger.info(entry: entry.to_h)
+      if options['silence']
+        fetch.to_a.map(&:touch)
+      elsif touched?
+        fetch do |entry|
+          @logger.info(entry: entry.to_h) if entry.post
+        rescue Ginseng::GatewayError => e
+          raise Ginseng::GatewayError, e.message, e.backtrace
+        rescue => e
+          @logger.error(e)
         end
-      rescue Ginseng::GatewayError => e
-        raise Ginseng::GatewayError, e.message, e.backtrace
-      rescue => e
-        @logger.error(e)
+      elsif entry = fetch.to_a.last
+        entry.post
+        @logger.info(entry: entry.to_h)
+        fetch.to_a.map(&:touch)
       end
     end
 
     alias crawl execute
 
     alias exec execute
+
+    def touched?
+      return Entry.first(feed: hash).present?
+    end
 
     def fetch
       return enum_for(__method__) unless block_given?
