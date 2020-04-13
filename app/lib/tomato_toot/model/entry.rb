@@ -92,9 +92,8 @@ module TomatoToot
         summary: item['summary'],
         url: item['url'],
         enclosure_url: item['enclosure_url'],
-        published: item['published'],
       }
-      return Entry.first(values) || Entry.create(values)
+      return Entry.first(values) || Entry.create(values.merge(published: item['published']))
     end
   end
 end
