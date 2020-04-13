@@ -29,21 +29,25 @@ module TomatoToot
 
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      Sequel.connect(Environment.dsn).transaction do
-        if options['silence']
-          fetch.to_a.map(&:touch)
-        else
-          fetch.to_a.map(&:post)
-        end
-      end
       @logger.info(feed: to_h)
-    rescue => e
-      e = Ginseng::Error.create(e)
-      e.package = Package.full_name
-      message = e.to_h.merge(feed: feed.to_h)
-      Slack.broadcast(message)
-      @logger.error(message)
+      Sequel.connect(Environment.dsn)
+      fetch do |entry|
+        if options['silence']
+          entry.touch
+        else
+          entry.post
+          @logger.info(entry: entry.to_h)
+        end
+      rescue Ginseng::GatewayError => e
+        raise Ginseng::GatewayError, e.message, e.backtrace
+      rescue => e
+        @logger.error(e)
+      end
     end
+
+    alias crawl execute
+
+    alias exec execute
 
     def fetch
       return enum_for(__method__) unless block_given?
@@ -82,7 +86,7 @@ module TomatoToot
 
     def mastodon
       unless @mastodon
-        return nil unless uri.present?
+        return nil unless uri = self['/mastodon/url']
         return nil unless token = self['/mastodon/token']
         @mastodon = Mastodon.new(uri, token)
         @mastodon.mulukhiya_enable = mulukhiya?
@@ -113,7 +117,7 @@ module TomatoToot
     end
 
     def tags
-      return self['/toot/tags'].map do |tag|
+      return (self['/toot/tags'] || []).map do |tag|
         Mastodon.create_tag(tag)
       end
     rescue => e
@@ -125,13 +129,15 @@ module TomatoToot
 
     def tag
       return self['/source/tag']
-    rescue
+    rescue => e
+      @logger.error(e)
       return nil
     end
 
     def visibility
       return self['/visibility'] || 'public'
-    rescue
+    rescue => e
+      @logger.error(e)
       return 'public'
     end
 
@@ -154,13 +160,18 @@ module TomatoToot
       end
     end
 
-    def self.crawl_all
+    def self.exec_all
       options = ARGV.getopts('', 'silence')
       threads = []
       all do |feed|
-        threads.push(Thread.new {feed.execute(options)})
+        threads.push(Thread.new {feed.exec(options)})
       end
       threads.map(&:join)
+    rescue => e
+      e = Ginseng::Error.create(e)
+      e.package = Package.full_name
+      Slack.broadcast(e)
+      Logger.new.error(e)
     end
   end
 end

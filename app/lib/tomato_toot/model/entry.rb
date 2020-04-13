@@ -2,11 +2,6 @@ require 'sequel/model'
 
 module TomatoToot
   class Entry < Sequel::Model(:entry)
-    def logger
-      @logger ||= Logger.new
-      return @logger
-    end
-
     alias to_h values
 
     def feed
@@ -40,7 +35,6 @@ module TomatoToot
     def enclosure
       unless @enclosure
         return nil unless @enclosure ||= Ginseng::URI.parse(enclosure_url)
-        @enclosure = feed.create_uri(@enclosure.path)
         return nil unless @enclosure.absolute?
       end
       return @enclosure
@@ -65,18 +59,22 @@ module TomatoToot
 
     def touch
       update(tooted: Time.now.to_s) unless tooted?
-      logger.info(entry: to_h)
     end
 
     def post
       return if tooted?
-      toot if feed.mastodon
+      if feed.mastodon
+        unless toot.code == 200
+          raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"
+        end
+      end
       feed.hooks do |hook|
         message = {text: body}
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        hook.say(message, :hash)
-      rescue => e
-        logger.error(e)
+        response = hook.say(message, :hash)
+        unless response.code == 200
+          raise Ginseng::GatewayError, "response #{response.code} #{hook.uri}"
+        end
       end
       touch
     end
@@ -89,8 +87,6 @@ module TomatoToot
         visibility: feed.visibility,
         media_ids: ids,
       )
-    rescue => e
-      logger.error(e)
     end
 
     def self.get(feed, item)
