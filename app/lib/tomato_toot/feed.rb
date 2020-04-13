@@ -129,10 +129,6 @@ module TomatoToot
 
     alias toot_tags tags
 
-    def tag
-      return self['/source/tag']
-    end
-
     def visibility
       return self['/visibility'] || 'public'
     end

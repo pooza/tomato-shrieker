@@ -47,11 +47,6 @@ module TomatoToot
       return @uri
     end
 
-    def tag?
-      return false unless feed.tag
-      return body.include?(Matodon.create_tag(feed.tag))
-    end
-
     def tooted?
       return tooted.present?
     end
@@ -62,7 +57,6 @@ module TomatoToot
 
     def post
       return false if tooted?
-      return false unless feed.tag && tag?
       if feed.mastodon
         unless toot.code == 200
           raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"
