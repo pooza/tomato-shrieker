@@ -4,6 +4,8 @@ require 'optparse'
 
 module TomatoToot
   class Feed
+    attr_reader :logger
+
     def initialize(params)
       @config = Config.instance
       @params = params
@@ -29,19 +31,19 @@ module TomatoToot
 
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      @logger.info(feed: to_h)
+      logger.info(feed: to_h)
       if options['silence']
         touch
       elsif touched?
         fetch do |entry|
-          @logger.info(entry: entry.to_h) if entry.post
+          logger.info(entry: entry.to_h) if entry.post
         rescue Ginseng::GatewayError => e
           raise Ginseng::GatewayError, e.message, e.backtrace
         rescue => e
-          @logger.error(e)
+          logger.error(e)
         end
       elsif entry = fetch.to_a.last
-        @logger.info(entry: entry.to_h) if entry.post
+        logger.info(entry: entry.to_h) if entry.post
         touch
       end
     end
@@ -72,8 +74,9 @@ module TomatoToot
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|item| item.published.to_f}.each do |entry|
-        yield Entry.get(self, entry)
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
+        entry = Entry.get(self, entry)
+        yield entry if entry
       end
     end
 
@@ -85,6 +88,10 @@ module TomatoToot
 
     def bot_account?
       return self['/bot_account'] || false
+    end
+
+    def recent?
+      return self['/recent'] || false
     end
 
     alias bot? bot_account?
