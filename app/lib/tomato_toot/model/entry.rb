@@ -96,18 +96,18 @@ module TomatoToot
       )
     end
 
-    def self.get(feed, item)
-      item = item.to_h
+    def self.get(feed, entry)
+      entry = entry.to_h
       values = {
         feed: feed.hash,
-        title: item['title'],
-        summary: item['summary'],
-        url: item['url'],
-        enclosure_url: item['enclosure_url'],
+        title: entry['title'],
+        summary: entry['summary'],
+        url: entry['url'],
+        enclosure_url: entry['enclosure_url'],
       }
-      return Entry.first(values) || Entry.create(values.merge(published: item['published']))
+      return Entry.first(values) || Entry.create(values.merge(published: entry['published']))
     rescue => e
-      feed.logger.error(error: e.message, entry: item)
+      feed.logger.error(error: e.message, entry: entry)
     end
   end
 end

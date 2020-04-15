@@ -176,10 +176,12 @@ module TomatoToot
     def self.exec_all
       options = ARGV.getopts('', 'silence')
       threads = []
-      all do |feed|
-        threads.push(Thread.new {feed.exec(options)})
+      Sequel.connect(Environment.dsn).transaction do
+        all do |feed|
+          threads.push(Thread.new {feed.exec(options)})
+        end
+        threads.map(&:join)
       end
-      threads.map(&:join)
     rescue => e
       e = Ginseng::Error.create(e)
       e.package = Package.full_name
