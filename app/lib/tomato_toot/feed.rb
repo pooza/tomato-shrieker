@@ -4,6 +4,8 @@ require 'optparse'
 
 module TomatoToot
   class Feed
+    attr_reader :logger
+
     def initialize(params)
       @config = Config.instance
       @params = params
@@ -29,21 +31,20 @@ module TomatoToot
 
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      @logger.info(feed: to_h)
+      logger.info(feed: to_h)
       if options['silence']
-        fetch.to_a.map(&:touch)
+        touch
       elsif touched?
         fetch do |entry|
-          @logger.info(entry: entry.to_h) if entry.post
+          logger.info(entry: entry.to_h) if entry.post
         rescue Ginseng::GatewayError => e
           raise Ginseng::GatewayError, e.message, e.backtrace
         rescue => e
-          @logger.error(e)
+          logger.error(e)
         end
       elsif entry = fetch.to_a.last
-        entry.post
-        @logger.info(entry: entry.to_h)
-        fetch.to_a.map(&:touch)
+        logger.info(entry: entry.to_h) if entry.post
+        touch
       end
     end
 
@@ -51,15 +52,31 @@ module TomatoToot
 
     alias exec execute
 
+    def time
+      unless @time
+        records = Entry.dataset
+          .select(:published)
+          .where(feed: hash)
+          .order(Sequel.desc(:published))
+          .limit(1)
+        @time = records.first&.published
+      end
+      return @time
+    end
+
     def touched?
-      return false if Entry.first(feed: hash).nil?
-      return true
+      return time.present?
+    end
+
+    def touch
+      fetch.to_a.map(&:touch)
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.each.sort_by {|item| item.published.to_f}.each do |entry|
-        yield Entry.get(self, entry)
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
+        entry = Entry.get(self, entry)
+        yield entry if entry
       end
     end
 
@@ -71,6 +88,10 @@ module TomatoToot
 
     def bot_account?
       return self['/bot_account'] || false
+    end
+
+    def recent?
+      return self['/recent'] || false
     end
 
     alias bot? bot_account?
@@ -155,10 +176,12 @@ module TomatoToot
     def self.exec_all
       options = ARGV.getopts('', 'silence')
       threads = []
-      all do |feed|
-        threads.push(Thread.new {feed.exec(options)})
+      Sequel.connect(Environment.dsn).transaction do
+        all do |feed|
+          threads.push(Thread.new {feed.exec(options)})
+        end
+        threads.map(&:join)
       end
-      threads.map(&:join)
     rescue => e
       e = Ginseng::Error.create(e)
       e.package = Package.full_name

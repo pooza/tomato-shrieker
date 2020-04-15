@@ -47,16 +47,28 @@ module TomatoToot
       return @uri
     end
 
+    def new?
+      return false unless feed
+      return true unless feed.touched?
+      return feed.time < published
+    rescue => e
+      feed.logger.error(error: e.message, entry: to_h)
+      return false
+    end
+
     def tooted?
       return tooted.present?
     end
 
     def touch
       update(tooted: Time.now.to_s) unless tooted?
+    rescue => e
+      feed.logger.error(error: e.message, entry: to_h)
     end
 
     def post
       return false if tooted?
+      return if feed.recent? && !new?
       if feed.mastodon
         unless toot.code == 200
           raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"
@@ -84,16 +96,18 @@ module TomatoToot
       )
     end
 
-    def self.get(feed, item)
-      item = item.to_h
+    def self.get(feed, entry)
+      entry = entry.to_h
       values = {
         feed: feed.hash,
-        title: item['title'],
-        summary: item['summary'],
-        url: item['url'],
-        enclosure_url: item['enclosure_url'],
+        title: entry['title'],
+        summary: entry['summary'],
+        url: entry['url'],
+        enclosure_url: entry['enclosure_url'],
       }
-      return Entry.first(values) || Entry.create(values.merge(published: item['published']))
+      return Entry.first(values) || Entry.create(values.merge(published: entry['published']))
+    rescue => e
+      feed.logger.error(error: e.message, entry: entry)
     end
   end
 end
