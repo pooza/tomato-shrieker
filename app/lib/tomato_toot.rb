@@ -25,6 +25,12 @@ module TomatoToot
     loader.collapse('app/lib/tomato_toot/*')
     return loader
   end
+
+  def self.load_tasks
+    Dir.glob(File.join(dir, 'app/task/*.rb')).sort.each do |f|
+      require f
+    end
+  end
 end
 
 TomatoToot.bootsnap
