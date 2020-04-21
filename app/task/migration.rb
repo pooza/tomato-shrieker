@@ -19,4 +19,4 @@ namespace :migration do
 end
 
 desc 'alias of migration:run'
-task migrate => 'migration:run'
+task migrate: 'migration:run'
