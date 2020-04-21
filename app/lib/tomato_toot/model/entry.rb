@@ -1,8 +1,6 @@
 require 'sequel/model'
 require 'time'
 
-Sequel.connect(TomatoToot::Environment.dsn)
-
 module TomatoToot
   class Entry < Sequel::Model(:entry)
     alias to_h values
@@ -49,10 +47,11 @@ module TomatoToot
 
     def new?
       return false unless feed
+      return false unless published
       return true unless feed.touched?
       return feed.time < published
     rescue => e
-      feed.logger.error(error: e.message, entry: to_h)
+      feed.logger.error(error: e.message, entry: values)
       return false
     end
 
@@ -62,8 +61,10 @@ module TomatoToot
 
     def touch
       update(tooted: Time.now.to_s) unless tooted?
+    rescue SQLite3::ConstraintException
+      return nil
     rescue => e
-      feed.logger.error(error: e.message, entry: to_h)
+      feed.logger.error(error: e.message, entry: values)
     end
 
     def post
@@ -97,17 +98,23 @@ module TomatoToot
     end
 
     def self.get(feed, entry)
-      entry = entry.to_h
+      h = entry.to_h
       values = {
         feed: feed.hash,
-        title: entry['title'],
-        summary: entry['summary'],
-        url: entry['url'],
-        enclosure_url: entry['enclosure_url'],
+        title: h['title'],
+        summary: h['summary'],
+        url: h['url'],
+        enclosure_url: h['enclosure_url'],
       }
-      return Entry.first(values) || Entry.create(values.merge(published: entry['published']))
+      entry = Entry.first(values)
+      return entry if entry.is_a?(Entry)
+      values[:published] = h['published'] || Time.now
+      entry = Entry.create(values)
+      return entry if entry.is_a?(Entry)
+    rescue SQLite3::ConstraintException, Sequel::NotNullConstraintViolation
+      return nil
     rescue => e
-      feed.logger.error(error: e.message, entry: entry)
+      feed.logger.error(error: e.message, entry: values)
     end
   end
 end
