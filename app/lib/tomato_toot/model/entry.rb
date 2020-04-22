@@ -55,12 +55,7 @@ module TomatoToot
       return false
     end
 
-    def tooted?
-      return tooted.present?
-    end
-
     def post
-      return false if tooted?
       return if feed.recent? && !new?
       if feed.mastodon
         unless toot.code == 200
