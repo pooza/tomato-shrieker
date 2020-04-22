@@ -69,7 +69,7 @@ module TomatoToot
     end
 
     def touch
-      fetch.to_a.map(&:touch)
+      feedjira.entries.map {|v| Entry.get(self, v)}
     end
 
     def fetch

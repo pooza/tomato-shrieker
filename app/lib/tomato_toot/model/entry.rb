@@ -59,14 +59,6 @@ module TomatoToot
       return tooted.present?
     end
 
-    def touch
-      update(tooted: Time.now.to_s) unless tooted?
-    rescue SQLite3::ConstraintException
-      return nil
-    rescue => e
-      feed.logger.error(error: e.message, entry: values)
-    end
-
     def post
       return false if tooted?
       return if feed.recent? && !new?
@@ -83,7 +75,6 @@ module TomatoToot
           raise Ginseng::GatewayError, "response #{response.code} #{hook.uri}"
         end
       end
-      touch
       return true
     end
 
@@ -106,15 +97,13 @@ module TomatoToot
         url: h['url'],
         enclosure_url: h['enclosure_url'],
       }
-      entry = Entry.first(values)
-      return entry if entry.is_a?(Entry)
+      return nil if Entry.first(values)
       values[:published] = h['published'] || Time.now
       entry = Entry.create(values)
       return entry if entry.is_a?(Entry)
-    rescue SQLite3::ConstraintException, Sequel::NotNullConstraintViolation
-      return nil
     rescue => e
       feed.logger.error(error: e.message, entry: values)
+      return nil
     end
   end
 end
