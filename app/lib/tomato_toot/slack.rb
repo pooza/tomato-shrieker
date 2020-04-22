@@ -1,9 +1,12 @@
 module TomatoToot
   class Slack < Ginseng::Slack
     include Package
-    attr_reader :url
 
-    alias uri url
+    def say(message, type = :yaml)
+      r = super(message, type)
+      raise Ginseng::GatewayError, "response #{r.code} (#{uri})" unless r.code == 200
+      return r
+    end
 
     def self.all
       return enum_for(__method__) unless block_given?

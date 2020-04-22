@@ -1,6 +1,5 @@
 require 'sequel/model'
 require 'time'
-require 'sanitize'
 
 module TomatoToot
   class Entry < Sequel::Model(:entry)
@@ -16,8 +15,6 @@ module TomatoToot
       end
       return @feed
     end
-
-    alias time published
 
     def body
       unless @body
@@ -58,19 +55,13 @@ module TomatoToot
 
     def post
       return if feed.recent? && !new?
-      if feed.mastodon
-        unless toot.code == 200
-          raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"
-        end
-      end
+      toot if feed.mastodon?
       feed.hooks do |hook|
         message = {text: body}
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        response = hook.say(message, :hash)
-        unless response.code == 200
-          raise Ginseng::GatewayError, "response #{response.code} #{hook.uri}"
-        end
+        hook.say(message, :hash)
       end
+      feed.logger.info(entry: to_h)
       return true
     end
 
@@ -82,24 +73,6 @@ module TomatoToot
         visibility: feed.visibility,
         media_ids: ids,
       )
-    end
-
-    def self.get(feed, entry)
-      h = entry.to_h
-      values = {
-        feed: feed.hash,
-        title: Sanitize.clean(h['title']),
-        summary: Sanitize.clean(h['summary']),
-        url: h['url'],
-        enclosure_url: h['enclosure_url'],
-      }
-      return nil if Entry.first(values)
-      values[:published] = h['published'] || Time.now
-      entry = Entry.create(values)
-      return entry if entry.is_a?(Entry)
-    rescue => e
-      feed.logger.error(error: e.message, entry: values)
-      return nil
     end
   end
 end

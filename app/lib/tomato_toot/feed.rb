@@ -1,6 +1,7 @@
 require 'feedjira'
 require 'digest/sha1'
 require 'optparse'
+require 'sanitize'
 
 module TomatoToot
   class Feed
@@ -31,21 +32,23 @@ module TomatoToot
 
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      logger.info(feed: to_h)
       if options['silence']
         touch
       elsif touched?
         fetch do |entry|
-          logger.info(entry: entry.to_h) if entry.post
-        rescue Ginseng::GatewayError => e
-          raise Ginseng::GatewayError, e.message, e.backtrace
+          entry.post
         rescue => e
           logger.error(e)
         end
       elsif entry = fetch.to_a.last
-        logger.info(entry: entry.to_h) if entry.post
+        entry.post
         touch
       end
+    rescue => e
+      e = Ginseng::Error.create(e)
+      e.package = Package.full_name
+      Slack.broadcast(e)
+      logger.error(e)
     end
 
     alias crawl execute
@@ -69,13 +72,13 @@ module TomatoToot
     end
 
     def touch
-      feedjira.entries.map {|v| Entry.get(self, v)}
+      feedjira.entries.map {|v| create_entry(v)}
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        entry = Entry.get(self, entry)
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
+        entry = create_entry(v)
         yield entry if entry
       end
     end
@@ -118,6 +121,10 @@ module TomatoToot
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
+    end
+
+    def mastodon?
+      return mastodon.present?
     end
 
     def webhooks
@@ -182,11 +189,25 @@ module TomatoToot
         end
         threads.map(&:join)
       end
+    end
+
+    private
+
+    def create_entry(entry)
+      h = entry.to_h
+      return Entry.create(
+        feed: hash,
+        title: Sanitize.clean(h['title']),
+        summary: Sanitize.clean(h['summary']),
+        url: h['url'],
+        enclosure_url: h['enclosure_url'],
+        published: h['published'] || Time.now,
+      )
+    rescue Sequel::UniqueConstraintViolation, Sequel::NoExistingObject
+      return nil
     rescue => e
-      e = Ginseng::Error.create(e)
-      e.package = Package.full_name
-      Slack.broadcast(e)
-      Logger.new.error(e)
+      logger.error(error: e.message, entry: entry)
+      return nil
     end
   end
 end
