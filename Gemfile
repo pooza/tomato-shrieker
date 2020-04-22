@@ -4,6 +4,7 @@ gem 'bootsnap'
 gem 'bundler', '>=2.0.0'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core'
+gem 'sanitize'
 gem 'sequel'
 gem 'sqlite3'
 

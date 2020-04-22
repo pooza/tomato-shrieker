@@ -1,5 +1,6 @@
 require 'sequel/model'
 require 'time'
+require 'sanitize'
 
 module TomatoToot
   class Entry < Sequel::Model(:entry)
@@ -87,8 +88,8 @@ module TomatoToot
       h = entry.to_h
       values = {
         feed: feed.hash,
-        title: h['title'],
-        summary: h['summary'],
+        title: Sanitize.clean(h['title']),
+        summary: Sanitize.clean(h['summary']),
         url: h['url'],
         enclosure_url: h['enclosure_url'],
       }
