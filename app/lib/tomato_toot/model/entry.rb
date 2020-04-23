@@ -55,7 +55,7 @@ module TomatoToot
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
         hook.say(message, :hash)
       end
-      logger.info(entry: to_h)
+      logger.info(entry: to_h, message: 'post')
       return true
     end
 
