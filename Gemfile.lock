@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: ae04675f3fb73d4979a2c64252fab4640bdd4781
+  revision: 50f10e7626ecd1a87180b2a957c4af2c5fc195ab
   specs:
-    ginseng-core (1.6.5)
+    ginseng-core (1.6.6)
       activesupport
       addressable
       bundler (>= 2.0.0)
@@ -64,10 +64,12 @@ GEM
     netrc (0.11.0)
     nokogiri (1.10.9)
       mini_portile2 (~> 2.4.0)
+    nokogumbo (2.0.2)
+      nokogiri (~> 1.8, >= 1.8.4)
     parallel (1.19.1)
     parser (2.7.1.1)
       ast (~> 2.4.0)
-    power_assert (1.1.7)
+    power_assert (1.2.0)
     public_suffix (4.0.4)
     rainbow (3.0.0)
     rake (13.0.1)
@@ -77,7 +79,7 @@ GEM
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
     rexml (3.2.4)
-    rubocop (0.81.0)
+    rubocop (0.82.0)
       jaro_winkler (~> 1.5.1)
       parallel (~> 1.10)
       parser (>= 2.7.0.1)
@@ -88,6 +90,10 @@ GEM
     rubocop-performance (1.5.2)
       rubocop (>= 0.71.0)
     ruby-progressbar (1.10.1)
+    sanitize (5.1.0)
+      crass (~> 1.0.2)
+      nokogiri (>= 1.8.0)
+      nokogumbo (~> 2.0)
     sax-machine (1.3.2)
     sequel (5.31.0)
     sqlite3 (1.4.2)
@@ -110,10 +116,12 @@ PLATFORMS
 
 DEPENDENCIES
   bootsnap
+  bundler (>= 2.0.0)
   feedjira (~> 3.0)
   ginseng-core!
   rubocop
   rubocop-performance
+  sanitize
   sequel
   sqlite3
 

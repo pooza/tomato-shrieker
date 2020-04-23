@@ -5,6 +5,4 @@ ENV['BUNDLE_GEMFILE'] ||= File.join(dir, 'Gemfile')
 require 'bundler/setup'
 require 'tomato_toot'
 
-Dir.glob(File.join(TomatoToot::Environment.dir, 'app/task/*.rb')).sort.each do |f|
-  require f
-end
+TomatoToot.load_tasks

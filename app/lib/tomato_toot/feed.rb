@@ -1,6 +1,7 @@
 require 'feedjira'
 require 'digest/sha1'
 require 'optparse'
+require 'sanitize'
 
 module TomatoToot
   class Feed
@@ -31,21 +32,24 @@ module TomatoToot
 
     def execute(options)
       raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
-      logger.info(feed: to_h)
       if options['silence']
         touch
       elsif touched?
         fetch do |entry|
-          logger.info(entry: entry.to_h) if entry.post
-        rescue Ginseng::GatewayError => e
-          raise Ginseng::GatewayError, e.message, e.backtrace
+          entry.post
         rescue => e
           logger.error(e)
         end
+        logger.error(feed: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
-        logger.info(entry: entry.to_h) if entry.post
+        entry.post
         touch
       end
+    rescue => e
+      e = Ginseng::Error.create(e)
+      e.package = Package.full_name
+      Slack.broadcast(e)
+      logger.error(e)
     end
 
     alias crawl execute
@@ -69,13 +73,14 @@ module TomatoToot
     end
 
     def touch
-      fetch.to_a.map(&:touch)
+      feedjira.entries.map {|v| create_entry(v)}
+      logger.error(feed: hash, message: 'touch')
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        entry = Entry.get(self, entry)
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
+        entry = create_entry(v)
         yield entry if entry
       end
     end
@@ -88,10 +93,6 @@ module TomatoToot
 
     def bot_account?
       return self['/bot_account'] || false
-    end
-
-    def recent?
-      return self['/recent'] || false
     end
 
     alias bot? bot_account?
@@ -118,6 +119,10 @@ module TomatoToot
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
+    end
+
+    def mastodon?
+      return mastodon.present?
     end
 
     def webhooks
@@ -182,11 +187,31 @@ module TomatoToot
         end
         threads.map(&:join)
       end
+    end
+
+    private
+
+    def create_entry(entry)
+      return if touched? && entry.published <= time
+      values = entry.to_h
+      id = Entry.insert(
+        feed: hash,
+        title: Sanitize.clean(values['title']),
+        summary: Sanitize.clean(values['summary']),
+        url: values['url'],
+        enclosure_url: values['enclosure_url'],
+        published: values['published'].getlocal,
+      )
+      created = Entry[id]
+      logger.info(entry: created.to_h, message: 'created')
+      return created
+    rescue SQLite3::BusyException
+      retry
+    rescue Sequel::UniqueConstraintViolation
+      return nil
     rescue => e
-      e = Ginseng::Error.create(e)
-      e.package = Package.full_name
-      Slack.broadcast(e)
-      Logger.new.error(e)
+      logger.error(error: e.message, entry: entry)
+      return nil
     end
   end
 end

@@ -1,11 +1,14 @@
 require 'sequel/model'
 require 'time'
 
-Sequel.connect(TomatoToot::Environment.dsn)
-
 module TomatoToot
   class Entry < Sequel::Model(:entry)
     alias to_h values
+
+    def logger
+      @logger ||= Logger.new
+      return @logger
+    end
 
     def feed
       unless @feed
@@ -17,8 +20,6 @@ module TomatoToot
       end
       return @feed
     end
-
-    alias time published
 
     def body
       unless @body
@@ -47,42 +48,14 @@ module TomatoToot
       return @uri
     end
 
-    def new?
-      return false unless feed
-      return true unless feed.touched?
-      return feed.time < published
-    rescue => e
-      feed.logger.error(error: e.message, entry: to_h)
-      return false
-    end
-
-    def tooted?
-      return tooted.present?
-    end
-
-    def touch
-      update(tooted: Time.now.to_s) unless tooted?
-    rescue => e
-      feed.logger.error(error: e.message, entry: to_h)
-    end
-
     def post
-      return false if tooted?
-      return if feed.recent? && !new?
-      if feed.mastodon
-        unless toot.code == 200
-          raise Ginseng::GatewayError, "response #{toot.code} #{feed.mastodon.uri}"
-        end
-      end
+      toot if feed.mastodon?
       feed.hooks do |hook|
         message = {text: body}
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        response = hook.say(message, :hash)
-        unless response.code == 200
-          raise Ginseng::GatewayError, "response #{response.code} #{hook.uri}"
-        end
+        hook.say(message, :hash)
       end
-      touch
+      logger.info(entry: to_h, message: 'post')
       return true
     end
 
@@ -94,20 +67,6 @@ module TomatoToot
         visibility: feed.visibility,
         media_ids: ids,
       )
-    end
-
-    def self.get(feed, entry)
-      entry = entry.to_h
-      values = {
-        feed: feed.hash,
-        title: entry['title'],
-        summary: entry['summary'],
-        url: entry['url'],
-        enclosure_url: entry['enclosure_url'],
-      }
-      return Entry.first(values) || Entry.create(values.merge(published: entry['published']))
-    rescue => e
-      feed.logger.error(error: e.message, entry: entry)
     end
   end
 end

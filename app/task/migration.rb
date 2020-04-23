@@ -17,3 +17,6 @@ namespace :migration do
     FileUtils.touch(TomatoToot::Environment.db)
   end
 end
+
+desc 'alias of migration:run'
+task migrate: 'migration:run'

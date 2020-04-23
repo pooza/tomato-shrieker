@@ -1,21 +1,5 @@
 module TomatoToot
   class EntryTest < Test::Unit::TestCase
-    def test_tooted?
-      Feed.all do |feed|
-        feed.fetch do |entry|
-          assert_boolean(entry.tooted?)
-        end
-      end
-    end
-
-    def test_time
-      Feed.all do |feed|
-        feed.fetch do |entry|
-          assert_kind_of(Time, entry.time)
-        end
-      end
-    end
-
     def test_feed
       Feed.all do |feed|
         feed.fetch do |entry|
