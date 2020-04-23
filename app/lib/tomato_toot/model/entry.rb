@@ -5,6 +5,11 @@ module TomatoToot
   class Entry < Sequel::Model(:entry)
     alias to_h values
 
+    def logger
+      @logger ||= Logger.new
+      return @logger
+    end
+
     def feed
       unless @feed
         Feed.all do |feed|
@@ -43,25 +48,14 @@ module TomatoToot
       return @uri
     end
 
-    def new?
-      return false unless feed
-      return false unless published
-      return true unless feed.touched?
-      return feed.time < published
-    rescue => e
-      feed.logger.error(error: e.message, entry: values)
-      return false
-    end
-
     def post
-      return if feed.recent? && !new?
       toot if feed.mastodon?
       feed.hooks do |hook|
         message = {text: body}
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
         hook.say(message, :hash)
       end
-      feed.logger.info(entry: to_h)
+      logger.info(entry: to_h)
       return true
     end
 

@@ -40,6 +40,7 @@ module TomatoToot
         rescue => e
           logger.error(e)
         end
+        logger.error(feed: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.post
         touch
@@ -73,6 +74,7 @@ module TomatoToot
 
     def touch
       feedjira.entries.map {|v| create_entry(v)}
+      logger.error(feed: hash, message: 'touch')
     end
 
     def fetch
@@ -91,10 +93,6 @@ module TomatoToot
 
     def bot_account?
       return self['/bot_account'] || false
-    end
-
-    def recent?
-      return self['/recent'] || false
     end
 
     alias bot? bot_account?
@@ -194,16 +192,22 @@ module TomatoToot
     private
 
     def create_entry(entry)
-      h = entry.to_h
-      return Entry.create(
+      return if touched? && entry.published <= time
+      values = entry.to_h
+      id = Entry.insert(
         feed: hash,
-        title: Sanitize.clean(h['title']),
-        summary: Sanitize.clean(h['summary']),
-        url: h['url'],
-        enclosure_url: h['enclosure_url'],
-        published: h['published'] || Time.now,
+        title: Sanitize.clean(values['title']),
+        summary: Sanitize.clean(values['summary']),
+        url: values['url'],
+        enclosure_url: values['enclosure_url'],
+        published: values['published'].getlocal,
       )
-    rescue Sequel::UniqueConstraintViolation, Sequel::NoExistingObject
+      created = Entry[id]
+      logger.info(entry: created.to_h, message: 'created')
+      return created
+    rescue SQLite3::BusyException
+      retry
+    rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
       logger.error(error: e.message, entry: entry)
