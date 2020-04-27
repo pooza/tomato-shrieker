@@ -1,6 +1,7 @@
 require 'bootsnap'
 require 'sequel'
 require 'ginseng'
+require 'ginseng/fediverse'
 
 module TomatoToot
   def self.dir
