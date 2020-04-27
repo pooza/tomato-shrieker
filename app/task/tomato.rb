@@ -4,12 +4,19 @@ namespace :tomato do
 
   desc 'crawl'
   task :crawl do
-    sh File.join(TomatoToot::Environment.dir, 'bin/crawl.rb')
+    command = Ginseng::CommandLine.new([
+      File.join(TomatoToot::Environment.dir, 'bin/crawl.rb'),
+    ])
+    command.exec
   end
 
   desc 'update timestamps'
   task :touch do
-    sh "#{File.join(TomatoToot::Environment.dir, 'bin/crawl.rb')} --silence"
+    command = Ginseng::CommandLine.new([
+      File.join(TomatoToot::Environment.dir, 'bin/crawl.rb'),
+      '--silence',
+    ])
+    command.exec
   end
 
   desc 'clear timestamps'
