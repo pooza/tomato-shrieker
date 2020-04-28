@@ -1,5 +1,6 @@
 require 'feedjira'
 require 'digest/sha1'
+require 'nokogiri'
 require 'optparse'
 require 'sanitize'
 
@@ -40,7 +41,7 @@ module TomatoToot
         rescue => e
           logger.error(e)
         end
-        logger.error(feed: hash, message: 'crawl')
+        logger.info(feed: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.post
         touch
@@ -74,7 +75,7 @@ module TomatoToot
 
     def touch
       feedjira.entries.map {|v| create_entry(v)}
-      logger.error(feed: hash, message: 'touch')
+      logger.info(feed: hash, message: 'touch')
     end
 
     def fetch
@@ -196,8 +197,8 @@ module TomatoToot
       values = entry.to_h
       id = Entry.insert(
         feed: hash,
-        title: Sanitize.clean(values['title']),
-        summary: Sanitize.clean(values['summary']),
+        title: sanitize(values['title']),
+        summary: sanitize(values['summary']),
         url: values['url'],
         enclosure_url: values['enclosure_url'],
         published: values['published'].getlocal,
@@ -212,6 +213,12 @@ module TomatoToot
     rescue => e
       logger.error(error: e.message, entry: entry)
       return nil
+    end
+
+    def sanitize(text)
+      text = Sanitize.clean(text)
+      text = Nokogiri::HTML.parse(text).text
+      return text
     end
   end
 end
