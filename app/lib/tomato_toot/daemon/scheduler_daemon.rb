@@ -10,6 +10,7 @@ module TomatoToot
 
     def motd
       return [
+        self.class.to_s,
         Package.full_name,
       ].join("\n")
     end
