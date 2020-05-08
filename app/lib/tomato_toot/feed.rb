@@ -70,6 +70,7 @@ module TomatoToot
     end
 
     def touch
+      return unless feedjira
       feedjira.entries.map {|v| create_entry(v)}
       logger.info(feed: hash, message: 'touch')
     end
@@ -105,11 +106,9 @@ module TomatoToot
       return self['/mulukhiya/enable'] || true
     end
 
-    def bot_account?
+    def bot?
       return self['/bot_account'] || false
     end
-
-    alias bot? bot_account?
 
     def template
       return self['/template'] || 'default'
