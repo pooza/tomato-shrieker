@@ -31,8 +31,7 @@ module TomatoToot
       return Digest::SHA1.hexdigest(@params.to_json)
     end
 
-    def execute(options)
-      raise Ginseng::NotFoundError, "Entries not found. (#{uri})" unless present?
+    def execute(options = {})
       if options['silence']
         touch
       elsif touched?
@@ -103,7 +102,7 @@ module TomatoToot
     end
 
     def present?
-      return feedjira.entries.present?
+      return feedjira.entries&.present?
     end
 
     def uri
@@ -138,6 +137,8 @@ module TomatoToot
     def feedjira
       @feedjira ||= Feedjira.parse(@http.get(uri).body)
       return @feedjira
+    rescue Feedjira::NoParserAvailable => e
+      raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
     end
 
     def mode
@@ -162,6 +163,10 @@ module TomatoToot
 
     def prefix
       return self['/prefix'] || feedjira.title
+    end
+
+    def period
+      return self['/period'] || '5m'
     end
 
     def create_uri(href)
