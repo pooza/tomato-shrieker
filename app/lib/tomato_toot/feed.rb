@@ -12,7 +12,7 @@ module TomatoToot
       @config = Config.instance
       @params = params
       @http = HTTP.new
-      @http.base_uri = uri
+      @http.base_uri = uri if uri
       @logger = Logger.new
     end
 
@@ -31,9 +31,13 @@ module TomatoToot
       return Digest::SHA1.hexdigest(@params.to_json)
     end
 
-    def execute(options = {})
+    def exec(options = {})
       if options['silence']
         touch
+      elsif command?
+        command.exec
+        raise command.stderr unless command.status.zero?
+        post(command.stdout)
       elsif touched?
         fetch do |entry|
           entry.post
@@ -45,16 +49,9 @@ module TomatoToot
         entry.post
         touch
       end
-    rescue => e
-      e = Ginseng::Error.create(e)
-      e.package = Package.full_name
-      Slack.broadcast(e)
-      logger.error(e)
     end
 
-    alias crawl execute
-
-    alias exec execute
+    alias crawl exec
 
     def time
       unless @time
@@ -77,6 +74,16 @@ module TomatoToot
       logger.info(feed: hash, message: 'touch')
     end
 
+    def command?
+      return command.present?
+    end
+
+    def command
+      return nil unless self['/source/command'].present?
+      @command ||= Ginseng::CommandLine.new(self['/source/command'].split(/\s+/))
+      return @command
+    end
+
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
@@ -85,10 +92,17 @@ module TomatoToot
       end
     end
 
+    def post(body)
+      mastodon&.toot(status: body, visibility: visibility)
+      hooks do |hook|
+        hook.say({text: body}, :hash)
+      end
+      logger.info(feed: hash, message: 'post')
+      return true
+    end
+
     def mulukhiya?
       return self['/mulukhiya/enable'] || true
-    rescue
-      return true
     end
 
     def bot_account?
@@ -102,7 +116,7 @@ module TomatoToot
     end
 
     def present?
-      return feedjira.entries&.present?
+      return feedjira&.entries.present?
     end
 
     def uri
@@ -125,17 +139,15 @@ module TomatoToot
       return mastodon.present?
     end
 
-    def webhooks
+    def hooks
       return enum_for(__method__) unless block_given?
       (self['/hooks'] || []).each do |hook|
         yield Slack.new(Ginseng::URI.parse(hook))
       end
     end
 
-    alias hooks webhooks
-
     def feedjira
-      @feedjira ||= Feedjira.parse(@http.get(uri).body)
+      @feedjira ||= Feedjira.parse(@http.get(uri).body) if uri
       return @feedjira
     rescue Feedjira::NoParserAvailable => e
       raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
@@ -154,8 +166,6 @@ module TomatoToot
         Mastodon.create_tag(tag)
       end
     end
-
-    alias toot_tags tags
 
     def visibility
       return self['/visibility'] || 'public'
@@ -179,17 +189,22 @@ module TomatoToot
       return enum_for(__method__) unless block_given?
       Config.instance['/entries'].each do |entry|
         next unless entry['source']
-        next if entry['webhook']
         yield Feed.new(entry)
       end
     end
 
     def self.exec_all
       options = ARGV.getopts('', 'silence')
+      logger = Logger.new
       threads = []
       Sequel.connect(Environment.dsn).transaction do
         all do |feed|
           threads.push(Thread.new {feed.exec(options)})
+        rescue => e
+          e = Ginseng::Error.create(e)
+          e.package = Package.full_name
+          Slack.broadcast(e)
+          logger.error(e)
         end
         threads.map(&:join)
       end

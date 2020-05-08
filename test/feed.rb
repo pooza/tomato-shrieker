@@ -8,6 +8,7 @@ module TomatoToot
 
     def test_fetch
       Feed.all do |feed|
+        next if feed.command?
         feed.fetch do |entry|
           assert_kind_of(Entry, entry)
         end
@@ -22,6 +23,7 @@ module TomatoToot
 
     def test_uri
       Feed.all do |feed|
+        next if feed.command?
         assert_kind_of(Ginseng::URI, feed.uri)
       end
     end
@@ -35,6 +37,7 @@ module TomatoToot
 
     def test_prefix
       Feed.all do |feed|
+        next if feed.command?
         assert_kind_of(String, feed.prefix)
       end
     end
