@@ -1,5 +1,6 @@
 require 'sequel/model'
 require 'time'
+require 'sanitize'
 
 module TomatoToot
   class Entry < Sequel::Model(:entry)
@@ -67,6 +68,39 @@ module TomatoToot
         visibility: feed.visibility,
         media_ids: ids,
       )
+    end
+
+    def self.create_new(feed, entry)
+      return if feed.touched? && entry.published <= feed.time
+      values = entry.to_h
+      id = insert(
+        feed: feed.hash,
+        title: sanitize(values['title']),
+        summary: sanitize(values['summary']),
+        url: values['url'],
+        enclosure_url: values['enclosure_url'],
+        published: values['published'].getlocal,
+      )
+      created = Entry[id]
+      feed.logger.info(entry: created.to_h, message: 'created')
+      return created
+    rescue SQLite3::BusyException
+      retry
+    rescue Sequel::UniqueConstraintViolation
+      return nil
+    rescue => e
+      feed.logger.error(error: e.message, entry: entry)
+      return nil
+    end
+
+    def self.clean
+      dataset.destroy
+    end
+
+    def self.sanitize(text)
+      text = Sanitize.clean(text)
+      text = Nokogiri::HTML.parse(text).text
+      return text
     end
   end
 end

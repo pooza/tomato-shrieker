@@ -2,7 +2,6 @@ require 'feedjira'
 require 'digest/sha1'
 require 'nokogiri'
 require 'optparse'
-require 'sanitize'
 
 module TomatoToot
   class Feed
@@ -47,7 +46,6 @@ module TomatoToot
         logger.info(feed: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.post
-        touch
       end
     end
 
@@ -69,7 +67,7 @@ module TomatoToot
 
     def touch
       return unless feedjira
-      feedjira.entries.map {|v| create_entry(v)}
+      Entry.create_new(self, feedjira.entries.first)
       logger.info(feed: hash, message: 'touch')
     end
 
@@ -86,7 +84,7 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        entry = create_entry(v)
+        entry = create_new(self, v)
         yield entry if entry
       end
     end
@@ -205,37 +203,6 @@ module TomatoToot
         end
         threads.map(&:join)
       end
-    end
-
-    private
-
-    def create_entry(entry)
-      return if touched? && entry.published <= time
-      values = entry.to_h
-      id = Entry.insert(
-        feed: hash,
-        title: sanitize(values['title']),
-        summary: sanitize(values['summary']),
-        url: values['url'],
-        enclosure_url: values['enclosure_url'],
-        published: values['published'].getlocal,
-      )
-      created = Entry[id]
-      logger.info(entry: created.to_h, message: 'created')
-      return created
-    rescue SQLite3::BusyException
-      retry
-    rescue Sequel::UniqueConstraintViolation
-      return nil
-    rescue => e
-      logger.error(error: e.message, entry: entry)
-      return nil
-    end
-
-    def sanitize(text)
-      text = Sanitize.clean(text)
-      text = Nokogiri::HTML.parse(text).text
-      return text
     end
   end
 end
