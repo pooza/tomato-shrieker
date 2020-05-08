@@ -90,10 +90,6 @@ module TomatoToot
       return nil
     end
 
-    def self.clean
-      dataset.destroy
-    end
-
     def self.sanitize(text)
       text = Sanitize.clean(text)
       text = Nokogiri::HTML.parse(text).text

@@ -7,7 +7,7 @@ namespace :tomato do
     sh File.join(TomatoToot::Environment.dir, 'bin/crawl.rb').to_s
   end
 
-  desc 'update timestamp'
+  desc 'update timestamps'
   task :touch do
     sh "#{File.join(TomatoToot::Environment.dir, 'bin/crawl.rb')} --silence"
   end
@@ -15,7 +15,7 @@ namespace :tomato do
   desc 'clear entries'
   task :clean do
     Sequel.connect(TomatoToot::Environment.dsn)
-    TomatoToot::Entry.clean
+    TomatoToot::Entry.dataset.destroy
   end
 end
 
