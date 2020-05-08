@@ -45,6 +45,8 @@ module TomatoToot
       end
     end
 
+    alias crawl exec
+
     def time
       unless @time
         records = Entry.dataset
