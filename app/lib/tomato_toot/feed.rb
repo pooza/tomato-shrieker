@@ -38,11 +38,7 @@ module TomatoToot
         raise command.stderr unless command.status.zero?
         post(command.stdout)
       elsif touched?
-        fetch do |entry|
-          entry.post
-        rescue => e
-          logger.error(e)
-        end
+        fetch(&:post)
         logger.info(feed: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.post
@@ -196,7 +192,6 @@ module TomatoToot
 
     def self.exec_all
       options = ARGV.getopts('', 'silence')
-      logger = Logger.new
       threads = []
       Sequel.connect(Environment.dsn).transaction do
         all do |feed|
@@ -205,7 +200,7 @@ module TomatoToot
           e = Ginseng::Error.create(e)
           e.package = Package.full_name
           Slack.broadcast(e)
-          logger.error(e)
+          feed.logger.error(e)
         end
         threads.map(&:join)
       end

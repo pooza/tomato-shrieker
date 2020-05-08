@@ -6,11 +6,6 @@ module TomatoToot
   class Entry < Sequel::Model(:entry)
     alias to_h values
 
-    def logger
-      @logger ||= Logger.new
-      return @logger
-    end
-
     def feed
       unless @feed
         Feed.all do |feed|
@@ -56,8 +51,10 @@ module TomatoToot
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
         hook.say(message, :hash)
       end
-      logger.info(entry: to_h, message: 'post')
+      feed.logger.info(entry: to_h, message: 'post')
       return true
+    rescue => e
+      feed.logger.error(e)
     end
 
     def toot
