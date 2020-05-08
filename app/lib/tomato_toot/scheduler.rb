@@ -7,10 +7,9 @@ module TomatoToot
     def exec
       Feed.all do |feed|
         @logger.info(feed: feed.hash, period: feed.period, message: 'start scheduler')
+        Sequel.connect(Environment.dsn)
         @scheduler.every(feed.period) do
-          Sequel.connect(Environment.dsn).transaction do
-            feed.exec
-          end
+          feed.exec
         end
       end
       @scheduler.join
