@@ -51,8 +51,6 @@ module TomatoToot
       end
     end
 
-    alias crawl exec
-
     def time
       unless @time
         records = Entry.dataset
@@ -146,8 +144,8 @@ module TomatoToot
     end
 
     def feedjira
-      @feedjira ||= Feedjira.parse(@http.get(uri).body) if uri
-      return @feedjira
+      return Feedjira.parse(@http.get(uri).body) if uri
+      return nil
     rescue Feedjira::NoParserAvailable => e
       raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
     end
