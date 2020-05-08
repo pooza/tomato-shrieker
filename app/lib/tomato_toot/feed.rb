@@ -102,9 +102,11 @@ module TomatoToot
       return self['/mulukhiya/enable'] || true
     end
 
-    def bot?
+    def bot_account?
       return self['/bot_account'] || false
     end
+
+    alias bot? bot_account?
 
     def template
       return self['/template'] || 'default'
@@ -134,12 +136,14 @@ module TomatoToot
       return mastodon.present?
     end
 
-    def hooks
+    def webhooks
       return enum_for(__method__) unless block_given?
       (self['/hooks'] || []).each do |hook|
         yield Slack.new(Ginseng::URI.parse(hook))
       end
     end
+
+    alias hooks webhooks
 
     def feedjira
       return Feedjira.parse(@http.get(uri).body) if uri
@@ -161,6 +165,8 @@ module TomatoToot
         Mastodon.create_tag(tag)
       end
     end
+
+    alias toot_tags tags
 
     def visibility
       return self['/visibility'] || 'public'
