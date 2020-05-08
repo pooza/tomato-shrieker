@@ -65,7 +65,7 @@ module TomatoToot
 
     def touch
       return unless feedjira
-      Entry.create_new(self, feedjira.entries.first)
+      Entry.create_new(self, feedjira.entries.max_by {|entry| entry.published.to_f})
       logger.info(feed: hash, message: 'touch')
     end
 
