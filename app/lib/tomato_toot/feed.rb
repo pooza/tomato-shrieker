@@ -84,7 +84,7 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        entry = create_new(self, v)
+        entry = Entry.create_new(self, v)
         yield entry if entry
       end
     end
