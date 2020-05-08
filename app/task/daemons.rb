@@ -1,16 +1,16 @@
 namespace :tomato do
-  [:scheduler].each do |ns|
-    namespace ns do
+  [:scheduler].each do |daemon|
+    namespace daemon do
       [:start, :stop].each do |action|
-        desc "#{action} #{ns}"
+        desc "#{action} #{daemon}"
         task action do
-          sh "#{File.join(TomatoToot::Environment.dir, 'bin', "#{ns}_daemon.rb")} #{action}"
+          sh "#{File.join(TomatoToot::Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
         rescue => e
-          warn "#{e.class} #{ns}:#{action} #{e.message}"
+          warn "#{e.class} #{daemon}:#{action} #{e.message}"
         end
       end
 
-      desc "restart #{ns}"
+      desc "restart #{daemon}"
       task restart: [:stop, :start]
     end
   end

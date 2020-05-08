@@ -11,7 +11,7 @@ module TomatoToot
       @config = Config.instance
       @params = params
       @http = HTTP.new
-      @http.base_uri = uri if uri
+      @http.base_uri = uri
       @logger = Logger.new
     end
 
@@ -35,7 +35,7 @@ module TomatoToot
         touch
       elsif command?
         command.exec
-        raise command.stderr unless command.status.zero?
+        raise command.stderr || command.stdout unless command.status.zero?
         post(command.stdout)
       elsif touched?
         fetch(&:post)
@@ -65,7 +65,7 @@ module TomatoToot
 
     def touch
       return unless feedjira
-      Entry.create_new(self, feedjira.entries.max_by {|entry| entry.published.to_f})
+      Entry.create(feedjira.entries.max_by(&:published), self)
       logger.info(feed: hash, message: 'touch')
     end
 
@@ -75,23 +75,23 @@ module TomatoToot
 
     def command
       return nil unless self['/source/command'].present?
-      @command ||= Ginseng::CommandLine.new(self['/source/command'].split(/\s+/))
+      args = self['/source/command']
+      args = args.split(/\s+/) unless args.is_a?(Array)
+      @command ||= Ginseng::CommandLine.new(args)
       return @command
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        entry = Entry.create_new(self, v)
+        entry = Entry.create(v, self)
         yield entry if entry
       end
     end
 
     def post(body)
       mastodon&.toot(status: body, visibility: visibility)
-      hooks do |hook|
-        hook.say({text: body}, :hash)
-      end
+      hooks {|hook| hook.say({text: body}, :hash)}
       logger.info(feed: hash, message: 'post')
       return true
     end
@@ -189,6 +189,12 @@ module TomatoToot
       Config.instance['/entries'].each do |entry|
         next unless entry['source']
         yield Feed.new(entry)
+      end
+    end
+
+    def self.create(hash)
+      all do |feed|
+        return feed if feed.hash == hash
       end
     end
 

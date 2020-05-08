@@ -67,9 +67,11 @@ module TomatoToot
       )
     end
 
-    def self.create_new(feed, entry)
-      return if feed.touched? && entry.published <= feed.time
-      values = entry.to_h
+    def self.create(entry, feed = nil)
+      values = entry.clone
+      values = values.to_h unless values.is_a?(Hash)
+      feed ||= Feed.create(values['feed'])
+      return if feed.touched? && entry['published'] <= feed.time
       id = insert(
         feed: feed.hash,
         title: sanitize(values['title']),
@@ -78,13 +80,9 @@ module TomatoToot
         enclosure_url: values['enclosure_url'],
         published: values['published'].getlocal,
       )
-      created = Entry[id]
-      feed.logger.info(entry: created.to_h, message: 'created')
-      return created
+      return Entry[id]
     rescue SQLite3::BusyException
       retry
-    rescue Sequel::UniqueConstraintViolation
-      return nil
     rescue => e
       feed.logger.error(error: e.message, entry: entry)
       return nil
