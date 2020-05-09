@@ -89,11 +89,10 @@ module TomatoToot
       end
     end
 
-    def post(body)
-      mastodon&.toot(status: body, visibility: visibility)
-      hooks {|hook| hook.say({text: body}, :hash)}
+    def post(text)
+      mastodon&.toot(status: text, visibility: visibility)
+      hooks {|hook| hook.say({text: text}, :hash)}
       logger.info(feed: hash, message: 'post')
-      return true
     end
 
     def mulukhiya?

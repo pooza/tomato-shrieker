@@ -52,7 +52,6 @@ module TomatoToot
         hook.say(message, :hash)
       end
       feed.logger.info(entry: to_h, message: 'post')
-      return true
     rescue => e
       feed.logger.error(e)
     end
