@@ -1,8 +1,5 @@
 namespace :tomato do
   desc 'crawl'
-  task run: [:crawl]
-
-  desc 'crawl'
   task :crawl do
     sh File.join(TomatoToot::Environment.dir, 'bin/crawl.rb').to_s
   end
@@ -19,7 +16,7 @@ namespace :tomato do
   end
 end
 
-[:crawl, :run, :clean, :touch].each do |action|
+[:crawl, :clean, :touch].each do |action|
   desc "alias of tomato:#{action}"
   task action => "tomato:#{action}"
 end
