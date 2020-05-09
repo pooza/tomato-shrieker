@@ -91,7 +91,7 @@ module TomatoToot
 
     def self.all
       return enum_for(__method__) unless block_given?
-      (Config.instance['/sources'] || []).each do |entry|
+      Config.instance['/sources'].each do |entry|
         values = entry.key_flatten
         if values['/source/url']
           yield FeedSource.new(entry)
