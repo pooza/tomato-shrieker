@@ -177,7 +177,7 @@ module TomatoToot
 
     def self.all
       return enum_for(__method__) unless block_given?
-      Config.instance['/entries'].each do |entry|
+      Config.instance['/sources'].each do |entry|
         next unless entry['source']
         yield Feed.new(entry)
       end

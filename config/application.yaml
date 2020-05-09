@@ -9,4 +9,4 @@ sqlite3:
   db: db.sqlite3
 slack:
   hooks: []
-entries: []
+sources: []
