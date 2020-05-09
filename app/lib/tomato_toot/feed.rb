@@ -84,8 +84,8 @@ module TomatoToot
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        entry = Entry.create(v, self)
-        yield entry if entry
+        next unless entry = Entry.create(v, self)
+        yield entry
       end
     end
 
@@ -106,7 +106,7 @@ module TomatoToot
     alias bot? bot_account?
 
     def template
-      return self['/template'] || 'default'
+      return self['/template'] || 'title'
     end
 
     def present?
@@ -147,14 +147,6 @@ module TomatoToot
       return nil
     rescue Feedjira::NoParserAvailable => e
       raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
-    end
-
-    def mode
-      unless @mode
-        @mode = self['/source/mode'] || 'title'
-        @mode = 'summary' if @mode == 'body'
-      end
-      return @mode
     end
 
     def tags

@@ -66,12 +66,6 @@ module TomatoToot
       end
     end
 
-    def test_mode
-      Feed.all do |feed|
-        assert_kind_of(String, feed.mode)
-      end
-    end
-
     def test_present?
       Feed.all do |feed|
         assert_boolean(feed.present?)
