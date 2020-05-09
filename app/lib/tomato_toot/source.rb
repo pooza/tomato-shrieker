@@ -84,8 +84,10 @@ module TomatoToot
     end
 
     def period
-      return self['/period'] || '5m'
+      return self['/period'] || self['/every'] || '5m'
     end
+
+    alias every period
 
     def self.all
       return enum_for(__method__) unless block_given?
