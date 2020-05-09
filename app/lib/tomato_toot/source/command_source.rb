@@ -1,6 +1,7 @@
 module TomatoToot
   class CommandSource < Source
     def exec(options = {})
+      return if options['silence']
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       text = command.stdout
