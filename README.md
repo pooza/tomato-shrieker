@@ -1,7 +1,7 @@
 # tomato-toot
 
-Mastodonむけ、トゥート支援ツール。  
-RSS/Atomフィードの新着エントリーをトゥートする。
+ボット作成支援ツール。
+RSS/Atomフィードの新着エントリー等を、MastodonやSlack互換webhookに投稿する。
 
 詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
 

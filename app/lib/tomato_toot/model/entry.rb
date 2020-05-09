@@ -1,20 +1,17 @@
 require 'sequel/model'
 require 'time'
+require 'sanitize'
 
 module TomatoToot
   class Entry < Sequel::Model(:entry)
     alias to_h values
 
-    def logger
-      @logger ||= Logger.new
-      return @logger
-    end
-
     def feed
       unless @feed
-        Feed.all do |feed|
-          next unless feed.hash == values[:feed]
-          @feed = feed
+        Source.all do |source|
+          next unless source.is_a?(FeedSource)
+          next unless source.hash == values[:feed]
+          @feed = source
           break
         end
       end
@@ -55,8 +52,9 @@ module TomatoToot
         message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
         hook.say(message, :hash)
       end
-      logger.info(entry: to_h, message: 'post')
-      return true
+      feed.logger.info(entry: to_h, message: 'post')
+    rescue => e
+      feed.logger.error(e)
     end
 
     def toot
@@ -67,6 +65,35 @@ module TomatoToot
         visibility: feed.visibility,
         media_ids: ids,
       )
+    end
+
+    def self.create(entry, feed = nil)
+      values = entry.clone
+      values = values.to_h unless values.is_a?(Hash)
+      feed ||= Source.create(values['feed'])
+      return if feed.touched? && entry['published'] <= feed.time
+      id = insert(
+        feed: feed.hash,
+        title: sanitize(values['title']),
+        summary: sanitize(values['summary']),
+        url: values['url'],
+        enclosure_url: values['enclosure_url'],
+        published: values['published'].getlocal,
+      )
+      return Entry[id]
+    rescue SQLite3::BusyException
+      retry
+    rescue Sequel::UniqueConstraintViolation
+      return nil
+    rescue => e
+      feed.logger.error(error: e.message, entry: entry)
+      return nil
+    end
+
+    def self.sanitize(text)
+      text = Sanitize.clean(text)
+      text = Nokogiri::HTML.parse(text).text
+      return text
     end
   end
 end

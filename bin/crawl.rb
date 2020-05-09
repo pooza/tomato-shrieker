@@ -9,4 +9,4 @@ ENV['BUNDLE_GEMFILE'] ||= File.join(dir, 'Gemfile')
 require 'bundler/setup'
 require 'tomato_toot'
 
-TomatoToot::Feed.exec_all
+TomatoToot::Source.exec_all
