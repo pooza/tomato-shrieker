@@ -6,7 +6,7 @@ module TomatoToot
       text = command.stdout
       mastodon&.toot(status: text, visibility: visibility)
       hooks {|hook| hook.say({text: text}, :hash)}
-      logger.info(feed: hash, message: 'post')
+      logger.info(source: hash, message: 'post')
     end
 
     def command

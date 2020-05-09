@@ -8,10 +8,10 @@ module TomatoToot
 
     def feed
       unless @feed
-        Source.all do |feed|
-          next unless feed.is_a?(FeedSource)
-          next unless feed.hash == values[:feed]
-          @feed = feed
+        Source.all do |source|
+          next unless source.is_a?(FeedSource)
+          next unless source.hash == values[:feed]
+          @feed = source
           break
         end
       end

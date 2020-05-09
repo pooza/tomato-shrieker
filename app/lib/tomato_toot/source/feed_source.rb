@@ -13,7 +13,7 @@ module TomatoToot
         touch
       elsif touched?
         fetch(&:post)
-        logger.info(feed: hash, message: 'crawl')
+        logger.info(source: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.post
       end
@@ -37,7 +37,7 @@ module TomatoToot
 
     def touch
       Entry.create(feedjira.entries.max_by(&:published), self)
-      logger.info(feed: hash, message: 'touch')
+      logger.info(source: hash, message: 'touch')
     end
 
     def fetch

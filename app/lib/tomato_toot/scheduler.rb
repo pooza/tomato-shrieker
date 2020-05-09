@@ -5,11 +5,11 @@ module TomatoToot
     include Singleton
 
     def exec
-      Source.all do |feed|
-        @logger.info(feed: feed.hash, period: feed.period, message: 'start scheduler')
+      Source.all do |source|
+        @logger.info(source: source.hash, period: source.period, message: 'start scheduler')
         Sequel.connect(Environment.dsn)
-        @scheduler.every(feed.period) do
-          feed.exec
+        @scheduler.every(source.period) do
+          source.exec
         end
       end
       @scheduler.join
