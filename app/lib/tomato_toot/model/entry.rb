@@ -8,7 +8,8 @@ module TomatoToot
 
     def feed
       unless @feed
-        Feed.all do |feed|
+        Source.all do |feed|
+          next unless feed.is_a?(FeedSource)
           next unless feed.hash == values[:feed]
           @feed = feed
           break
@@ -69,7 +70,7 @@ module TomatoToot
     def self.create(entry, feed = nil)
       values = entry.clone
       values = values.to_h unless values.is_a?(Hash)
-      feed ||= Feed.create(values['feed'])
+      feed ||= Source.create(values['feed'])
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
         feed: feed.hash,
