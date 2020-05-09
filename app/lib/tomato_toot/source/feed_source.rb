@@ -64,6 +64,10 @@ module TomatoToot
       raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
     end
 
+    def prefix
+      return self['/prefix'] || feedjira.title
+    end
+
     def create_uri(href)
       uri = @http.create_uri(href)
       uri.fragment ||= self.uri.fragment
