@@ -8,8 +8,12 @@ module TomatoToot
       Source.all do |source|
         @logger.info(source: source.hash, period: source.period, message: 'start scheduler')
         Sequel.connect(Environment.dsn)
-        @scheduler.every(source.period) do
-          source.exec
+        if source.post_at
+          @scheduler.at(source.post_at, {tag: source.hash}) {source.exec}
+        elsif source.cron
+          @scheduler.cron(source.cron, {tag: source.hash}) {source.exec}
+        else
+          @scheduler.every(source.period, {tag: source.hash}) {source.exec}
         end
       end
       @scheduler.join

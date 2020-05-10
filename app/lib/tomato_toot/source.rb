@@ -83,7 +83,20 @@ module TomatoToot
       return self['/prefix']
     end
 
+    def post_at
+      return self['/post_at'] || self['/at']
+    end
+
+    alias at post_at
+
+    def cron
+      return nil if post_at
+      return self['/cron']
+    end
+
     def period
+      return nil if post_at
+      return nil if cron
       return self['/period'] || self['/every'] || '5m'
     end
 
@@ -95,6 +108,8 @@ module TomatoToot
         values = entry.key_flatten
         if values['/source/url']
           yield FeedSource.new(entry)
+        elsif values['/source/text']
+          yield TextSource.new(entry)
         elsif values['/source/command']
           yield CommandSource.new(entry)
         end

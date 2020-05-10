@@ -1,3 +1,5 @@
+require 'rufus-scheduler'
+
 module TomatoToot
   class SourceTest < Test::Unit::TestCase
     def test_all
@@ -68,9 +70,29 @@ module TomatoToot
       end
     end
 
+    def test_post_at
+      Source.all do |source|
+        next if source.post_at.nil?
+        assert_kind_of(String, source.post_at)
+        assert_kind_of(String, source.at)
+        assert(Rufus::Scheduler.parse(source.post_at).present?)
+      end
+    end
+
+    def test_cron
+      Source.all do |source|
+        next if source.cron.nil?
+        assert_kind_of(String, source.cron)
+        assert(Rufus::Scheduler.parse(source.cron).present?)
+      end
+    end
+
     def test_period
       Source.all do |source|
+        next if source.period.nil?
         assert_kind_of(String, source.period)
+        assert_kind_of(String, source.every)
+        assert(Rufus::Scheduler.parse(source.every).present?)
       end
     end
   end
