@@ -95,6 +95,8 @@ module TomatoToot
         values = entry.key_flatten
         if values['/source/url']
           yield FeedSource.new(entry)
+        elsif values['/source/text']
+          yield TextSource.new(entry)
         elsif values['/source/command']
           yield CommandSource.new(entry)
         end
