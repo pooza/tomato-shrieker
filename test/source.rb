@@ -71,6 +71,15 @@ module TomatoToot
     def test_period
       Source.all do |source|
         assert_kind_of(String, source.period)
+        assert_kind_of(String, source.every)
+      end
+    end
+
+    def test_post_at
+      Source.all do |source|
+        next if source.post_at.nil?
+        assert_kind_of(String, source.post_at)
+        assert_kind_of(String, source.at)
       end
     end
   end

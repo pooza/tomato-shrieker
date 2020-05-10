@@ -89,6 +89,12 @@ module TomatoToot
 
     alias every period
 
+    def post_at
+      return self['/post_at'] || self['/at']
+    end
+
+    alias at post_at
+
     def self.all
       return enum_for(__method__) unless block_given?
       Config.instance['/sources'].each do |entry|
