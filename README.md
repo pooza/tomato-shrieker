@@ -1,8 +1,6 @@
 # tomato-toot
 
-ボット作成支援ツール。
-
-詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
+ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
 
 ### 送信できるもの
 
@@ -12,11 +10,11 @@
 
 ### 送信できるタイミング
 
-[rufus-scheduler](https://github.com/jmettraux/rufus-scheduler)に準じる
-
+- 定期的に（デフォルトは5分ごと）
 - 指定時刻
-- 定期的に
 - cron
+
+[rufus-scheduler](https://github.com/jmettraux/rufus-scheduler)に準じる
 
 ### 送信先
 
