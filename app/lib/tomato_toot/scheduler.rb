@@ -10,6 +10,8 @@ module TomatoToot
         Sequel.connect(Environment.dsn)
         if source.post_at
           @scheduler.at(source.post_at) {source.exec}
+        elsif source.cron
+          @scheduler.cron(source.cron) {source.exec}
         else
           @scheduler.every(source.period) {source.exec}
         end

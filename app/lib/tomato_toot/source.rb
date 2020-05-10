@@ -83,17 +83,24 @@ module TomatoToot
       return self['/prefix']
     end
 
-    def period
-      return self['/period'] || self['/every'] || '5m'
-    end
-
-    alias every period
-
     def post_at
       return self['/post_at'] || self['/at']
     end
 
     alias at post_at
+
+    def cron
+      return nil if post_at
+      return self['/cron']
+    end
+
+    def period
+      return nil if post_at
+      return nil if cron
+      return self['/period'] || self['/every'] || '5m'
+    end
+
+    alias every period
 
     def self.all
       return enum_for(__method__) unless block_given?
