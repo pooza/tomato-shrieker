@@ -2,12 +2,17 @@ module TomatoToot
   class CommandSource < Source
     def exec(options = {})
       return if options['silence']
+      Dir.chdir(dir) if dir
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       text = command.stdout
       mastodon&.toot(status: text, visibility: visibility)
       hooks {|hook| hook.say({text: text}, :hash)}
       logger.info(source: hash, message: 'post')
+    end
+
+    def dir
+      return self['/source/dir']
     end
 
     def command
