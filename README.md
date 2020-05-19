@@ -4,21 +4,19 @@
 
 ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
 
-### 送信できるもの
+### 投稿できるもの
 
 - 定型文
 - RSS/Atomフィードの新着エントリー
 - コマンドの実行結果（標準出力）
 
-### 送信できるタイミング
+### 投稿できるタイミング
 
 - 定期的に（デフォルトは5分ごと）
 - 指定時刻
-- cron
+- cron形式の指定
 
-[rufus-scheduler](https://github.com/jmettraux/rufus-scheduler)に準じる
-
-### 送信先
+### 投稿先
 
 - Mastodon
 - Slack互換webhookをもつサービス（拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む）
@@ -30,6 +28,8 @@
   - [「ABC毎日放送 プリキュア公式」の新着情報ボット](https://precure.ml/@abc_bot)
   - [「プリキュアガーデン」の新着情報ボット](https://precure.ml/@garden_bot)
   - [「プリキュア公式YouTubeチャンネル」の新着情報ボット](https://precure.ml/@youtube_precure_bot)
+  - [「シュビドゥビ☆スイーツタイム」の再生回数を淡々と喋るボット](https://mstdn.b-shock.org/@shooby_do_bop_bot)
+  - [「レッツ・ラ・クッキン☆ショータイム」の再生回数ボット](https://mstdn.b-shock.org/@lets_la_bot)
   - [増子](https://precure.ml/@mikabot)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
