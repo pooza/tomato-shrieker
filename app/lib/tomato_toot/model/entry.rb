@@ -45,6 +45,10 @@ module TomatoToot
       return @uri
     end
 
+    def posted?
+      return 1 < Entry.dataset.where(feed: feed.hash, url: uri.to_s).count
+    end
+
     def post
       toot if feed.mastodon?
       feed.hooks do |hook|
