@@ -1,7 +1,6 @@
 require 'bootsnap'
 require 'sequel'
 require 'ginseng'
-require 'ginseng/fediverse'
 
 module TomatoToot
   def self.dir
@@ -36,3 +35,4 @@ end
 
 TomatoToot.bootsnap
 TomatoToot.loader.setup
+Bundler.require
