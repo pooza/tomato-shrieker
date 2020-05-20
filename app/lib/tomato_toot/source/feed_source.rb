@@ -15,7 +15,6 @@ module TomatoToot
         fetch(&:post)
         logger.info(source: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
-        return if unique_uri? && entry.posted?
         entry.post
       end
     end
@@ -57,10 +56,6 @@ module TomatoToot
       return nil unless uri = Ginseng::URI.parse(self['/source/url'])
       return nil unless uri.absolute?
       return uri
-    end
-
-    def unique_uri?
-      return self['/source/unique_url'] || false
     end
 
     def feedjira
