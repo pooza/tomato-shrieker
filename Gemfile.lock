@@ -1,14 +1,16 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 2c4cb5345d5ac562e3c62078b8422ef83a68db3a
+  revision: 97a5a9470a437ab05897ea98a426592e03c96251
   specs:
-    ginseng-core (1.7.3)
+    ginseng-core (1.7.4)
       activesupport
       addressable
       daemon-spawn
       httparty
+      nokogiri
       rake
       rest-client
+      sanitize
       syslog-logger
       unicode
       yajl-ruby
