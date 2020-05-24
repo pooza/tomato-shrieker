@@ -1,14 +1,16 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 2c4cb5345d5ac562e3c62078b8422ef83a68db3a
+  revision: 97a5a9470a437ab05897ea98a426592e03c96251
   specs:
-    ginseng-core (1.7.3)
+    ginseng-core (1.7.4)
       activesupport
       addressable
       daemon-spawn
       httparty
+      nokogiri
       rake
       rest-client
+      sanitize
       syslog-logger
       unicode
       yajl-ruby
@@ -16,11 +18,9 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 53fbdfc665526f4f0c9aec855267a8e5e6353c92
+  revision: ae906a6558c1dff364c438a6197f23077bed95ad
   specs:
-    ginseng-fediverse (1.1.1)
-      nokogiri
-      sanitize
+    ginseng-fediverse (1.1.2)
 
 GEM
   remote: https://rubygems.org/
@@ -86,14 +86,17 @@ GEM
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
     rexml (3.2.4)
-    rubocop (0.83.0)
+    rubocop (0.84.0)
       parallel (~> 1.10)
       parser (>= 2.7.0.1)
       rainbow (>= 2.2.2, < 4.0)
       rexml
+      rubocop-ast (>= 0.0.3)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 1.4.0, < 2.0)
-    rubocop-performance (1.5.2)
+    rubocop-ast (0.0.3)
+      parser (>= 2.7.0.1)
+    rubocop-performance (1.6.0)
       rubocop (>= 0.71.0)
     ruby-progressbar (1.10.1)
     rufus-scheduler (3.6.0)
@@ -124,7 +127,6 @@ PLATFORMS
 
 DEPENDENCIES
   bootsnap
-  bundler (>= 2.0.0)
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!
