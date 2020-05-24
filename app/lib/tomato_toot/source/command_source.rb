@@ -4,16 +4,24 @@ module TomatoToot
       return if options['silence']
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
-      mastodon&.toot(status: status, visibility: visibility)
-      hooks {|hook| hook.say({text: status}, :hash)}
+      statuses do |status|
+        mastodon&.toot(status: status, visibility: visibility)
+        hooks {|hook| hook.say({text: status}, :hash)}
+      end
       logger.info(source: hash, message: 'post')
     end
 
-    def status
-      template = Template.new('toot.common')
-      template[:status] = command.stdout
-      template[:source] = self
-      return template.to_s
+    def statuses
+      command.stdout.split(delimiter).each do |status|
+        template = Template.new('toot.common')
+        template[:status] = status
+        template[:source] = self
+        yield template.to_s
+      end
+    end
+
+    def delimiter
+      return Regexp.new("#{self['/source/delimiter'] || '====='}\n?")
     end
 
     def command
