@@ -16,7 +16,8 @@ module TomatoToot
         template = Template.new('toot.common')
         template[:status] = status
         template[:source] = self
-        yield template.to_s
+        status = template.to_s.strip
+        yield status if status.present?
       end
     end
 
