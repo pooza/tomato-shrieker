@@ -5,20 +5,20 @@ module TomatoToot
     end
 
     def test_feed
-      assert_kind_of(FeedSource, @entry.feed)
+      assert_kind_of(FeedSource, @entry.feed) if @entry
     end
 
     def test_body
       assert(@entry.body.present?)
-      assert_kind_of(String, @entry.body)
+      assert_kind_of(String, @entry.body) if @entry
     end
 
     def test_uri
-      assert_kind_of(Ginseng::URI, @entry.uri)
+      assert_kind_of(Ginseng::URI, @entry.uri) if @entry
     end
 
     def test_enclosure
-      assert_kind_of(Ginseng::URI, @entry.enclosure) if @entry.enclosure
+      assert_kind_of(Ginseng::URI, @entry.enclosure) if @entry&.enclosure
     end
   end
 end
