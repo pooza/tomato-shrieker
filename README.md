@@ -41,5 +41,5 @@
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
 
-- 中の人は普段、個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」か、プリキュア専用Mastodonインスタンス「[キュアスタ！](https://precure.ml/)」に居ます。
+- 中の人は普段、個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」か、プリキュア専用インスタンス「[キュアスタ！](https://precure.ml/)」に居ます。（いずれもMastodon）
 - プリキュアに興味ある人は、是非キュアスタ！に来てください。
