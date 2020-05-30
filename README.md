@@ -4,7 +4,9 @@
 
 ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
 
-### 投稿できるもの
+## tomato-tootにできること
+
+### 投稿できるテキスト
 
 - 定型文
 - RSS/Atomフィードの新着エントリー
@@ -21,7 +23,12 @@
 - Mastodon
 - Slack互換webhookをもつサービス（拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む）
 
-## ■宣伝
+## 由来
+
+- forsquareのチェックインを自動投稿する用途が最初でした。プリキュア関連のニュースボットのエンジンとして利用を始めたのがその次です。
+- いずれも、Atom/RSSフィードからMastodonへ投稿（トゥート）を行う仕様でした。tomato-tootの名前は、その頃の名残です。（トマトに深い意味はない）
+
+## 宣伝
 
 - 以下の拙作ボットのパーツとして使われています。
   - [「東映アニメーション プリキュア公式」の新着情報ボット](https://precure.ml/@toei_bot)
@@ -34,6 +41,5 @@
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
 
-- 中の人は普段、個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」か、
-プリキュア専用インスタンス「[キュアスタ！](https://precure.ml/)」に居ます。
-プリキュアに興味ある人は、是非キュアスタ！に来てください。
+- 中の人は普段、個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」か、プリキュア専用インスタンス「[キュアスタ！](https://precure.ml/)」に居ます。（いずれもMastodon）
+- プリキュアに興味ある人は、是非キュアスタ！に来てください。

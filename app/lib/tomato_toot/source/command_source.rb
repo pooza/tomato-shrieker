@@ -31,6 +31,7 @@ module TomatoToot
         args = [args] unless args.is_a?(Array)
         @command = Ginseng::CommandLine.new(args)
         @command.dir = self['/source/dir']
+        @command.env = @params.dig('source', 'env') || {}
       end
       return @command
     end
