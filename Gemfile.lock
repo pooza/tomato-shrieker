@@ -111,7 +111,7 @@ GEM
     sequel (5.33.0)
     sqlite3 (1.4.2)
     syslog-logger (1.6.8)
-    test-unit (3.3.5)
+    test-unit (3.3.6)
       power_assert
     thread_safe (0.3.6)
     tzinfo (1.2.7)
