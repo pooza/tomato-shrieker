@@ -135,7 +135,6 @@ DEPENDENCIES
   rubocop
   rubocop-performance
   rufus-scheduler
-  sanitize
   sequel
   sqlite3
   test-unit

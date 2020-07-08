@@ -5,7 +5,6 @@ gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core'
 gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', require: 'ginseng/fediverse'
 gem 'rufus-scheduler'
-gem 'sanitize'
 gem 'sequel'
 gem 'sqlite3'
 
