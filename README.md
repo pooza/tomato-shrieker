@@ -1,5 +1,6 @@
 # tomato-toot
 
+![release](https://img.shields.io/github/v/release/pooza/tomato-toot.svg)
 ![test](https://github.com/pooza/tomato-toot/workflows/test/badge.svg)
 
 ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
