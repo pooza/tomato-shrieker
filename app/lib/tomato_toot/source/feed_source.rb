@@ -19,6 +19,11 @@ module TomatoToot
       end
     end
 
+    def unique_title?
+      return self['/source/title/unique'] unless self['/source/title/unique'].nil?
+      return true
+    end
+
     def time
       unless @time
         records = Entry.dataset
