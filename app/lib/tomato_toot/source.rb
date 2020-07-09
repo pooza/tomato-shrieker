@@ -37,7 +37,9 @@ module TomatoToot
     end
 
     def bot_account?
-      return self['/dest/account/bot'] || self['/bot_account'] || false
+      return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
+      return self['/bot_account'] unless self['/bot_account'].nil?
+      return false
     end
 
     alias bot? bot_account?
