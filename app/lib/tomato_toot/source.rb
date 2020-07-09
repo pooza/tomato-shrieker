@@ -60,7 +60,7 @@ module TomatoToot
 
     def webhooks
       return enum_for(__method__) unless block_given?
-      (self['/hooks'] || []).each do |hook|
+      (self['/dest/hooks'] || self['/hooks'] || []).each do |hook|
         yield Slack.new(Ginseng::URI.parse(hook))
       end
     end
