@@ -23,7 +23,7 @@ module TomatoToot
     end
 
     def hash
-      return Digest::SHA1.hexdigest(@params.to_json)
+      return self['/hash'] || Digest::SHA1.hexdigest(@params.to_json)
     end
 
     def exec(options = {})
