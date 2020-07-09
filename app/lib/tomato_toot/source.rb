@@ -68,7 +68,7 @@ module TomatoToot
     alias hooks webhooks
 
     def tags
-      return (self['/toot/tags'] || []).map do |tag|
+      return (self['/dest/tags'] || self['/toot/tags'] || []).map do |tag|
         Mastodon.create_tag(tag)
       end
     end
