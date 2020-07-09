@@ -70,7 +70,7 @@ module TomatoToot
     end
 
     def prefix
-      return self['/prefix'] || feedjira.title
+      return super || feedjira.title
     end
 
     def create_uri(href)

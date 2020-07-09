@@ -80,7 +80,7 @@ module TomatoToot
     end
 
     def prefix
-      return self['/prefix']
+      return self['/dest/prefix'] || self['/prefix']
     end
 
     def post_at
