@@ -46,7 +46,7 @@ module TomatoToot
 
     def mastodon
       unless @mastodon
-        return nil unless uri = self['/mastodon/url']
+        return nil unless uri = self['/dest/mastodon/url'] || self['/mastodon/url']
         return nil unless token = self['/mastodon/token']
         @mastodon = Mastodon.new(uri, token)
         @mastodon.mulukhiya_enable = mulukhiya?
