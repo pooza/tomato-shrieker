@@ -31,7 +31,9 @@ module TomatoToot
     end
 
     def mulukhiya?
-      return self['/dest/mulukhiya/enable'] || self['/mulukhiya/enable'] || true
+      return self['/dest/mulukhiya/enable'] unless self['/def/mulukhiya/enable'].nil?
+      return self['/mulukhiya/enable'] unless self['/mulukhiya/enable'].nil?
+      return true
     end
 
     def bot_account?
