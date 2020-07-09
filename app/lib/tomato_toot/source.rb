@@ -35,13 +35,13 @@ module TomatoToot
     end
 
     def bot_account?
-      return self['/bot_account'] || false
+      return self['/dest/account/bot'] || self['/bot_account'] || false
     end
 
     alias bot? bot_account?
 
     def template
-      return self['/template'] || 'title'
+      return self['/dest/template'] || self['/template'] || 'title'
     end
 
     def mastodon
@@ -84,20 +84,20 @@ module TomatoToot
     end
 
     def post_at
-      return self['/post_at'] || self['/at']
+      return self['/schedule/at'] || self['/post_at'] || self['/at']
     end
 
     alias at post_at
 
     def cron
       return nil if post_at
-      return self['/cron']
+      return self['/schedule/cron'] || self['/cron']
     end
 
     def period
       return nil if post_at
       return nil if cron
-      return self['/period'] || self['/every'] || '5m'
+      return self['/schedule/every'] || self['/period'] || self['/every'] || '5m'
     end
 
     alias every period
