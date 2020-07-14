@@ -37,7 +37,7 @@ module TomatoToot
       Source.all do |source|
         assert_boolean(source.mastodon?)
         next unless source.mastodon?
-        assert_kind_of(Mastodon, source.mastodon)
+        assert_kind_of(MastodonShrieker, source.mastodon)
       end
     end
 

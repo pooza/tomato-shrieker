@@ -52,7 +52,7 @@ module TomatoToot
       unless @mastodon
         return nil unless uri = self['/dest/mastodon/url'] || self['/mastodon/url']
         return nil unless token = self['/dest/mastodon/token'] || self['/mastodon/token']
-        @mastodon = Mastodon.new(uri, token)
+        @mastodon = MastodonShrieker.new(uri, token)
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
@@ -73,7 +73,7 @@ module TomatoToot
 
     def tags
       return (self['/dest/tags'] || self['/toot/tags'] || []).map do |tag|
-        Mastodon.create_tag(tag)
+        MastodonShrieker.create_tag(tag)
       end
     end
 
