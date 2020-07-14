@@ -27,9 +27,7 @@ module TomatoToot
 
     def command
       unless @command
-        args = self['/source/command']
-        args = [args] unless args.is_a?(Array)
-        @command = Ginseng::CommandLine.new(args)
+        @command = Ginseng::CommandLine.new(Array(self['/source/command']))
         @command.dir = self['/source/dir']
         @command.env = @params.dig('source', 'env') || {}
       end
