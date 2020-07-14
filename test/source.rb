@@ -44,7 +44,7 @@ module TomatoToot
     def test_webhooks
       Source.all do |source|
         source.webhooks.each do |webhook|
-          assert_kind_of(Slack, webhook)
+          assert_kind_of(WebhookShrieker, webhook)
         end
       end
     end
