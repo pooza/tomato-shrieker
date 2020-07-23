@@ -51,7 +51,7 @@ module TomatoToot
     def shriekers
       yield mastodon if mastodon?
       yield misskey if misskey?
-      webhooks do webhook
+      webhooks do |webhook|
         yield webhook
       end
     end
