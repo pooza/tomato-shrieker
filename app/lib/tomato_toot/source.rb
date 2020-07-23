@@ -48,6 +48,14 @@ module TomatoToot
       return self['/dest/template'] || self['/template'] || 'title'
     end
 
+    def shriekers
+      yield mastodon if mastodon?
+      yield misskey if misskey?
+      webhooks do webhook
+        yield webhook
+      end
+    end
+
     def mastodon
       unless @mastodon
         return nil unless uri = self['/dest/mastodon/url'] || self['/mastodon/url']
@@ -60,6 +68,20 @@ module TomatoToot
 
     def mastodon?
       return mastodon.present?
+    end
+
+    def misskey
+      unless @misskey
+        return nil unless uri = self['/dest/misskey/url']
+        return nil unless token = self['/dest/misskey/token']
+        @misskey = MisskeyShrieker.new(uri, token)
+        @misskey.mulukhiya_enable = mulukhiya?
+      end
+      return @misskey
+    end
+
+    def misskey?
+      return misskey.present?
     end
 
     def webhooks
