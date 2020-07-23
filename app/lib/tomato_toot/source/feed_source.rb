@@ -12,10 +12,10 @@ module TomatoToot
       if options['silence']
         touch
       elsif touched?
-        fetch(&:post)
+        fetch(&:shriek)
         logger.info(source: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
-        entry.post
+        entry.shriek
       end
     end
 

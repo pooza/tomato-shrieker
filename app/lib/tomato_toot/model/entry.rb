@@ -44,27 +44,15 @@ module TomatoToot
       return @uri
     end
 
-    def post
-      toot if feed.mastodon?
-      feed.hooks do |hook|
-        message = {text: body}
-        message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        hook.say(message, :hash)
-      end
+    def shriek
+      feed.shriek(
+        text: body,
+        attachments: [{image_url: enclosure.to_s}],
+      )
       feed.logger.info(entry: to_h, message: 'post')
-    rescue => e
-      feed.logger.error(e)
     end
 
-    def toot
-      ids = []
-      ids.push(feed.mastodon.upload_remote_resource(enclosure)) if enclosure
-      return feed.mastodon.toot(
-        status: body,
-        visibility: feed.visibility,
-        media_ids: ids,
-      )
-    end
+    alias post shriek
 
     def self.create(entry, feed = nil)
       values = entry.clone

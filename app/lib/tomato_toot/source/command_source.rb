@@ -5,8 +5,7 @@ module TomatoToot
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       statuses do |status|
-        mastodon&.toot(status: status, visibility: visibility)
-        hooks {|hook| hook.say({text: status}, :hash)}
+        shriek(text: status)
       end
       logger.info(source: hash, message: 'post')
     end

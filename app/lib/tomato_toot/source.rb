@@ -30,6 +30,12 @@ module TomatoToot
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 
+    def shriek(params = {})
+      shriekers do |shrieker|
+        shrieker.exec(params)
+      end
+    end
+
     def mulukhiya?
       return self['/dest/mulukhiya/enable'] unless self['/def/mulukhiya/enable'].nil?
       return self['/mulukhiya/enable'] unless self['/mulukhiya/enable'].nil?
