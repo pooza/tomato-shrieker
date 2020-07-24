@@ -5,9 +5,9 @@ module TomatoToot
     include Singleton
 
     def exec
+      Sequel.connect(Environment.dsn)
       Source.all do |source|
         @logger.info(source: source.hash, period: source.period, message: 'start scheduler')
-        Sequel.connect(Environment.dsn)
         if source.post_at
           @scheduler.at(source.post_at, {tag: source.hash}) {source.exec}
         elsif source.cron
