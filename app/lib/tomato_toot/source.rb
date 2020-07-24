@@ -155,7 +155,7 @@ module TomatoToot
     end
 
     def self.exec_all
-      options = ARGV.getopts('', 'silence')
+      options = ARGV.getopts('', 'silence', 'all')
       threads = []
       Sequel.connect(Environment.dsn).transaction do
         all do |source|

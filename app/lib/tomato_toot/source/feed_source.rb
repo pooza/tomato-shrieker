@@ -11,7 +11,7 @@ module TomatoToot
     def exec(options = {})
       if options['silence']
         touch
-      elsif touched?
+      elsif touched? && options['all']
         fetch(&:shriek)
         logger.info(source: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
