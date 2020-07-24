@@ -45,10 +45,9 @@ module TomatoToot
     end
 
     def shriek
-      feed.shriek(
-        text: body,
-        attachments: [{image_url: enclosure.to_s}],
-      )
+      v = {text: body, attachments: []}
+      v[:attachments].push(image_url: enclosure.to_s) if enclosure
+      feed.shriek(v)
       feed.logger.info(entry: to_h, message: 'post')
     end
 

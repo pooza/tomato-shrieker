@@ -2,15 +2,8 @@ module TomatoToot
   class WebhookShrieker < Ginseng::Slack
     include Package
 
-    def exec(params)
-      params[:attachments] ||= []
-      if params[:image_url]
-        params[:attachments].push(image_url: params[:image_url])
-        params.delete(:image_url)
-      end
-      params[:text] = params[:status]
-      params.delete(:status)
-      return say(params, :hash)
+    def exec(body)
+      return say(body, :hash)
     end
   end
 end
