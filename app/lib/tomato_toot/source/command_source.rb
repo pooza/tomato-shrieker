@@ -5,7 +5,7 @@ module TomatoToot
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       statuses do |status|
-        shriek(text: status)
+        shriek(text: status, visibility: visibility)
       end
       logger.info(source: hash, message: 'post')
     end

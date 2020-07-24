@@ -108,7 +108,7 @@ module TomatoToot
     alias toot_tags tags
 
     def visibility
-      return self['/visibility'] || 'public'
+      return self['/dest/visibility'] || self['/visibility'] || 'public'
     end
 
     def prefix

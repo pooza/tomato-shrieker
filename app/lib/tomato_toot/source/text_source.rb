@@ -1,7 +1,7 @@
 module TomatoToot
   class TextSource < Source
     def exec(options = {})
-      shriek(text: status)
+      shriek(text: status, visibility: visibility)
       logger.info(source: hash, message: 'post')
     end
 
