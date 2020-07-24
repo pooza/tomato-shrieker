@@ -23,7 +23,7 @@ module TomatoShrieker
     end
 
     def hash
-      return self['/hash'] || Digest::SHA1.hexdigest(@params.to_json)
+      return self['/hash'] || self['/id'] || Digest::SHA1.hexdigest(@params.to_json)
     end
 
     def exec(options = {})
