@@ -1,6 +1,6 @@
 require 'rufus-scheduler'
 
-module TomatoToot
+module TomatoShrieker
   class Scheduler
     include Singleton
 

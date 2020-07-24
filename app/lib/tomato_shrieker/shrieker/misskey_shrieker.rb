@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class MisskeyShrieker < Ginseng::Fediverse::MisskeyService
     include Package
 

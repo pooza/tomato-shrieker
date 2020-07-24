@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class FeedSourceTest < Test::Unit::TestCase
     def test_time
       Source.all do |source|

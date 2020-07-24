@@ -1,7 +1,7 @@
 require 'optparse'
 require 'digest/sha1'
 
-module TomatoToot
+module TomatoShrieker
   class Source
     attr_reader :logger
 

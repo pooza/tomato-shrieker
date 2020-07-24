@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class TextSource < Source
     def exec(options = {})
       shriek(text: status, visibility: visibility)

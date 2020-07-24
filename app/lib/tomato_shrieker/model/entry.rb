@@ -1,7 +1,7 @@
 require 'sequel/model'
 require 'time'
 
-module TomatoToot
+module TomatoShrieker
   class Entry < Sequel::Model(:entry)
     alias to_h values
 

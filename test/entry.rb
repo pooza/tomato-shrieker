@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class EntryTest < Test::Unit::TestCase
     def setup
       @entry = Entry.dataset.all.last

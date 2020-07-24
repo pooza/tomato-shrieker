@@ -1,6 +1,6 @@
 require 'rufus-scheduler'
 
-module TomatoToot
+module TomatoShrieker
   class SourceTest < Test::Unit::TestCase
     def test_all
       Source.all do |source|

@@ -1,11 +1,11 @@
-module TomatoToot
+module TomatoShrieker
   class Environment < Ginseng::Environment
     def self.name
       return File.basename(dir)
     end
 
     def self.dir
-      return TomatoToot.dir
+      return TomatoShrieker.dir
     end
 
     def self.dsn

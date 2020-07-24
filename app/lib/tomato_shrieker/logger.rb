@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class Logger < Ginseng::Logger
     include Package
   end

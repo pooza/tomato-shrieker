@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class SchedulerDaemon < Ginseng::Daemon
     include Package
 

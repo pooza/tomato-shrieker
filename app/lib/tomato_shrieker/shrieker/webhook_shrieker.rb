@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class WebhookShrieker < Ginseng::Slack
     include Package
 

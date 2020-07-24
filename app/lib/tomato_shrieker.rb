@@ -2,7 +2,7 @@ require 'bootsnap'
 require 'sequel'
 require 'ginseng'
 
-module TomatoToot
+module TomatoShrieker
   def self.dir
     return File.expand_path('../..', __dir__)
   end
@@ -22,7 +22,7 @@ module TomatoToot
     loader = Zeitwerk::Loader.new
     loader.inflector.inflect(config['inflections'])
     loader.push_dir(File.join(dir, 'app/lib'))
-    loader.collapse('app/lib/tomato_toot/*')
+    loader.collapse('app/lib/tomato_shrieker/*')
     return loader
   end
 
@@ -33,6 +33,6 @@ module TomatoToot
   end
 end
 
-TomatoToot.bootsnap
-TomatoToot.loader.setup
+TomatoShrieker.bootsnap
+TomatoShrieker.loader.setup
 Bundler.require

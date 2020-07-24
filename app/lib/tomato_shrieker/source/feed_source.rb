@@ -1,6 +1,6 @@
 require 'feedjira'
 
-module TomatoToot
+module TomatoShrieker
   class FeedSource < Source
     def initialize(params)
       super

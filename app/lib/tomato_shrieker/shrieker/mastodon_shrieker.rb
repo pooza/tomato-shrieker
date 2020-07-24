@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class MastodonShrieker < Ginseng::Fediverse::MastodonService
     include Package
 

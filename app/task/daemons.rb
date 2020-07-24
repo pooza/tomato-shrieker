@@ -4,7 +4,7 @@ namespace :tomato do
       [:start, :stop].each do |action|
         desc "#{action} #{daemon}"
         task action do
-          sh "#{File.join(TomatoToot::Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
+          sh "#{File.join(TomatoShrieker::Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
         rescue => e
           warn "#{e.class} #{daemon}:#{action} #{e.message}"
         end

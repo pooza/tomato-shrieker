@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class CommandSource < Source
     def exec(options = {})
       return if options['silence']
