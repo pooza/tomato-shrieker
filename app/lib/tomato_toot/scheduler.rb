@@ -6,8 +6,9 @@ module TomatoToot
 
     def exec
       Sequel.connect(Environment.dsn)
+      @logger.info(scheduler: {message: 'start'})
       Source.all do |source|
-        @logger.info(source: source.hash, period: source.period, message: 'start scheduler')
+        @logger.info(source: source.to_h)
         if source.post_at
           @scheduler.at(source.post_at, {tag: source.hash}) {source.exec}
         elsif source.cron
@@ -16,6 +17,7 @@ module TomatoToot
           @scheduler.every(source.period, {tag: source.hash}) {source.exec}
         end
       end
+      @logger.info(scheduler: {message: 'initialized'})
       @scheduler.join
     end
 
