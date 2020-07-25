@@ -19,7 +19,7 @@ module TomatoShrieker
 
     def body
       unless @body
-        template = Template.new("toot.#{feed.template}")
+        template = Template.new(feed.template)
         template[:feed] = feed
         template[:entry] = self
         @body = template.to_s
