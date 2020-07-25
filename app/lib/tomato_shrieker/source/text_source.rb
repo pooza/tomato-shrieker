@@ -6,7 +6,7 @@ module TomatoShrieker
     end
 
     def status
-      template = Template.new('toot.common')
+      template = Template.new('common')
       template[:status] = text
       template[:source] = self
       return template.to_s

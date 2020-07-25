@@ -12,7 +12,7 @@ module TomatoShrieker
 
     def statuses
       command.stdout.split(delimiter).each do |status|
-        template = Template.new('toot.common')
+        template = Template.new('common')
         template[:status] = status
         template[:source] = self
         status = template.to_s.strip
