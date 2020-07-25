@@ -106,7 +106,7 @@ module TomatoShrieker
 
     def tags
       return (self['/dest/tags'] || self['/toot/tags'] || []).map do |tag|
-        MastodonShrieker.create_tag(tag)
+        Ginseng::Fediverse::Service.create_tag(tag)
       end
     end
 
@@ -143,13 +143,9 @@ module TomatoShrieker
       return enum_for(__method__) unless block_given?
       Config.instance['/sources'].each do |entry|
         values = entry.key_flatten
-        if values['/source/url']
-          yield FeedSource.new(entry)
-        elsif values['/source/text']
-          yield TextSource.new(entry)
-        elsif values['/source/command']
-          yield CommandSource.new(entry)
-        end
+        yield FeedSource.new(entry) if values['/source/url']
+        yield TextSource.new(entry) if values['/source/text']
+        yield CommandSource.new(entry) if values['/source/command']
       end
     end
 
