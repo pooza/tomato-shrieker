@@ -154,8 +154,8 @@ module TomatoShrieker
     end
 
     def self.create(id)
-      all do |feed|
-        return feed if feed.id == id
+      all do |source|
+        return source if source.id == id
       end
     end
 
