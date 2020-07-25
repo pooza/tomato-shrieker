@@ -35,5 +35,12 @@ module TomatoShrieker
         assert(source.feedjira.present?)
       end
     end
+
+    def test_unique_title?
+      Source.all do |source|
+        next unless source.is_a?(FeedSource)
+        assert_boolean(source.unique_title?)
+      end
+    end
   end
 end
