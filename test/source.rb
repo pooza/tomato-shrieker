@@ -1,6 +1,6 @@
 require 'rufus-scheduler'
 
-module TomatoToot
+module TomatoShrieker
   class SourceTest < Test::Unit::TestCase
     def test_all
       Source.all do |source|
@@ -37,14 +37,30 @@ module TomatoToot
       Source.all do |source|
         assert_boolean(source.mastodon?)
         next unless source.mastodon?
-        assert_kind_of(Mastodon, source.mastodon)
+        assert_kind_of(MastodonShrieker, source.mastodon)
+      end
+    end
+
+    def test_misskey
+      Source.all do |source|
+        assert_boolean(source.misskey?)
+        next unless source.misskey?
+        assert_kind_of(MisskeyShrieker, source.misskey)
+      end
+    end
+
+    def test_shrieker
+      Source.all do |source|
+        source.shriekers do |shrieker|
+          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker], shrieker)
+        end
       end
     end
 
     def test_webhooks
       Source.all do |source|
         source.webhooks.each do |webhook|
-          assert_kind_of(Slack, webhook)
+          assert_kind_of(WebhookShrieker, webhook)
         end
       end
     end

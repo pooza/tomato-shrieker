@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class TextSourceTest < Test::Unit::TestCase
     def test_command
       Source.all do |source|

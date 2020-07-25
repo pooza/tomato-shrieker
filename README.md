@@ -1,11 +1,11 @@
-# tomato-toot
+# tomato-shrieker
 
-![release](https://img.shields.io/github/v/release/pooza/tomato-toot.svg)
-![test](https://github.com/pooza/tomato-toot/workflows/test/badge.svg)
+![release](https://img.shields.io/github/v/release/pooza/tomato-shrieker.svg)
+![test](https://github.com/pooza/tomato-shrieker/workflows/test/badge.svg)
 
-ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-toot/wiki)にて。
+ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-shrieker/wiki)にて。
 
-## tomato-tootにできること
+## tomato-shriekerにできること
 
 ### 投稿できるテキスト
 
@@ -28,7 +28,7 @@
 ## 由来
 
 - forsquareのチェックインを自動投稿する用途が最初でした。プリキュア関連のニュースボットのエンジンとして利用を始めたのがその次です。
-- いずれも、Atom/RSSフィードからMastodonへ投稿（トゥート）を行う仕様でした。tomato-tootの名前は、その頃の名残です。（トマトに深い意味はない）
+- いずれも、Atom/RSSフィードからMastodonへ投稿（トゥート）を行う仕様でした。その為、この頃はtomato-tootという名前でした。
 
 ## 宣伝
 

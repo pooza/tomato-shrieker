@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   module Package
     def environment_class
       return Environment
@@ -21,7 +21,7 @@ module TomatoToot
     end
 
     def self.name
-      return 'tomato-toot'
+      return 'tomato-shrieker'
     end
 
     def self.version

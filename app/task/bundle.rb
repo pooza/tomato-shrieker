@@ -6,7 +6,7 @@ namespace :bundle do
 
   desc 'check gems'
   task :check do
-    unless TomatoToot::Environment.gem_fresh?
+    unless TomatoShrieker::Environment.gem_fresh?
       warn 'gems is not fresh.'
       exit 1
     end

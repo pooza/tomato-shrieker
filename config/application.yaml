@@ -1,6 +1,6 @@
 package:
-  version: 3.0.10
-  url: https://github.com/pooza/tomato-toot
+  version: 3.1.0
+  url: https://github.com/pooza/tomato-shrieker
   authors:
     - Tatsuya Koishi
   email:

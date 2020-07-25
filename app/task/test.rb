@@ -1,9 +1,9 @@
 desc 'test all'
 task :test do
-  ENV['TEST'] = TomatoToot::Package.name
+  ENV['TEST'] = TomatoShrieker::Package.name
   require 'test/unit'
-  Sequel.connect(TomatoToot::Environment.dsn)
-  Dir.glob(File.join(TomatoToot::Environment.dir, 'test/*.rb')).sort.each do |t|
+  Sequel.connect(TomatoShrieker::Environment.dsn)
+  Dir.glob(File.join(TomatoShrieker::Environment.dir, 'test/*.rb')).sort.each do |t|
     require t
   end
 end

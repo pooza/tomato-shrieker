@@ -1,6 +1,6 @@
 require 'feedjira'
 
-module TomatoToot
+module TomatoShrieker
   class FeedSource < Source
     def initialize(params)
       super
@@ -11,11 +11,11 @@ module TomatoToot
     def exec(options = {})
       if options['silence']
         touch
-      elsif touched?
-        fetch(&:post)
+      elsif touched? && options['all']
+        fetch(&:shriek)
         logger.info(source: hash, message: 'crawl')
       elsif entry = fetch.to_a.last
-        entry.post
+        entry.shriek
       end
     end
 
@@ -70,7 +70,7 @@ module TomatoToot
     end
 
     def prefix
-      return self['/prefix'] || feedjira.title
+      return super || feedjira.title
     end
 
     def create_uri(href)

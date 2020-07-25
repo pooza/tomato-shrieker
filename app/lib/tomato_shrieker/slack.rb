@@ -1,4 +1,4 @@
-module TomatoToot
+module TomatoShrieker
   class Slack < Ginseng::Slack
     include Package
 

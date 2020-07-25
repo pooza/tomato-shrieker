@@ -1,12 +1,11 @@
-module TomatoToot
+module TomatoShrieker
   class CommandSource < Source
     def exec(options = {})
       return if options['silence']
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       statuses do |status|
-        mastodon&.toot(status: status, visibility: visibility)
-        hooks {|hook| hook.say({text: status}, :hash)}
+        shriek(text: status, visibility: visibility)
       end
       logger.info(source: hash, message: 'post')
     end
@@ -27,9 +26,7 @@ module TomatoToot
 
     def command
       unless @command
-        args = self['/source/command']
-        args = [args] unless args.is_a?(Array)
-        @command = Ginseng::CommandLine.new(args)
+        @command = Ginseng::CommandLine.new(Array(self['/source/command']))
         @command.dir = self['/source/dir']
         @command.env = @params.dig('source', 'env') || {}
       end

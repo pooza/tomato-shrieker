@@ -1,18 +1,18 @@
 namespace :tomato do
   desc 'crawl'
   task :crawl do
-    sh File.join(TomatoToot::Environment.dir, 'bin/crawl.rb').to_s
+    sh File.join(TomatoShrieker::Environment.dir, 'bin/crawl.rb').to_s
   end
 
   desc 'update timestamps'
   task :touch do
-    sh "#{File.join(TomatoToot::Environment.dir, 'bin/crawl.rb')} --silence"
+    sh "#{File.join(TomatoShrieker::Environment.dir, 'bin/crawl.rb')} --silence"
   end
 
   desc 'clear entries'
   task :clean do
-    Sequel.connect(TomatoToot::Environment.dsn)
-    TomatoToot::Entry.dataset.destroy
+    Sequel.connect(TomatoShrieker::Environment.dsn)
+    TomatoShrieker::Entry.dataset.destroy
   end
 end
 

@@ -1,7 +1,7 @@
 require 'sequel/model'
 require 'time'
 
-module TomatoToot
+module TomatoShrieker
   class Entry < Sequel::Model(:entry)
     alias to_h values
 
@@ -9,7 +9,7 @@ module TomatoToot
       unless @feed
         Source.all do |source|
           next unless source.is_a?(FeedSource)
-          next unless source.hash == values[:feed]
+          next unless source.id == values[:feed]
           @feed = source
           break
         end
@@ -44,27 +44,14 @@ module TomatoToot
       return @uri
     end
 
-    def post
-      toot if feed.mastodon?
-      feed.hooks do |hook|
-        message = {text: body}
-        message[:attachments] = [{image_url: enclosure.to_s}] if enclosure
-        hook.say(message, :hash)
-      end
+    def shriek
+      v = {text: body, visibility: feed.visibility, attachments: []}
+      v[:attachments].push(image_url: enclosure.to_s) if enclosure
+      feed.shriek(v)
       feed.logger.info(entry: to_h, message: 'post')
-    rescue => e
-      feed.logger.error(e)
     end
 
-    def toot
-      ids = []
-      ids.push(feed.mastodon.upload_remote_resource(enclosure)) if enclosure
-      return feed.mastodon.toot(
-        status: body,
-        visibility: feed.visibility,
-        media_ids: ids,
-      )
-    end
+    alias post shriek
 
     def self.create(entry, feed = nil)
       values = entry.clone
@@ -72,7 +59,7 @@ module TomatoToot
       feed ||= Source.create(values['feed'])
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
-        feed: feed.hash,
+        feed: feed.id,
         title: create_title(values['title'], values['published'], feed).sanitize,
         summary: values['summary']&.sanitize,
         url: values['url'],

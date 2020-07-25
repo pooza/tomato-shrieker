@@ -1,8 +1,7 @@
-module TomatoToot
+module TomatoShrieker
   class TextSource < Source
     def exec(options = {})
-      mastodon&.toot(status: status, visibility: visibility)
-      hooks {|hook| hook.say({text: status}, :hash)}
+      shriek(text: status, visibility: visibility)
       logger.info(source: hash, message: 'post')
     end
 

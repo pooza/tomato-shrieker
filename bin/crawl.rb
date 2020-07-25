@@ -7,6 +7,6 @@ $LOAD_PATH.unshift(File.join(dir, 'app/lib'))
 ENV['BUNDLE_GEMFILE'] = File.join(dir, 'Gemfile')
 
 require 'bundler/setup'
-require 'tomato_toot'
+require 'tomato_shrieker'
 
-TomatoToot::Source.exec_all
+TomatoShrieker::Source.exec_all
