@@ -12,19 +12,24 @@ module TomatoShrieker
     end
 
     def [](name)
-      [@params.key_flatten, @params].each do |v|
-        return v[name] unless v[name].nil?
-      end
-      return nil
+      return @params.key_flatten[name] if name.start_with?('/')
+      return @params[name]
     end
 
     def to_h
-      return {hash: hash}.merge(@params)
+      return {id: id}.merge(@params)
     end
 
-    def hash
-      return self['/hash'] || self['/id'] || Digest::SHA1.hexdigest(@params.to_json)
+    def id
+      unless @id
+        @id = self['/id']
+        @id ||= self['/hash']
+        @id ||= Digest::SHA1.hexdigest(@params.to_json)
+      end
+      return @id
     end
+
+    alias hash id
 
     def exec(options = {})
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
@@ -148,9 +153,9 @@ module TomatoShrieker
       end
     end
 
-    def self.create(hash)
+    def self.create(id)
       all do |feed|
-        return feed if feed.hash == hash
+        return feed if feed.id == id
       end
     end
 

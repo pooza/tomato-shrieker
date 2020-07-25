@@ -9,7 +9,7 @@ module TomatoShrieker
       unless @feed
         Source.all do |source|
           next unless source.is_a?(FeedSource)
-          next unless source.hash == values[:feed]
+          next unless source.id == values[:feed]
           @feed = source
           break
         end
@@ -59,7 +59,7 @@ module TomatoShrieker
       feed ||= Source.create(values['feed'])
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
-        feed: feed.hash,
+        feed: feed.id,
         title: create_title(values['title'], values['published'], feed).sanitize,
         summary: values['summary']&.sanitize,
         url: values['url'],
