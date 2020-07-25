@@ -16,5 +16,12 @@ module TomatoShrieker
         end
       end
     end
+
+    def test_delimiter
+      Source.all do |source|
+        next unless source.is_a?(CommandSource)
+        assert_kind_of(Regexp, source.delimiter)
+      end
+    end
   end
 end
