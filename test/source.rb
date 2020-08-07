@@ -57,14 +57,6 @@ module TomatoShrieker
       end
     end
 
-    def test_webhooks
-      Source.all do |source|
-        source.webhooks.each do |webhook|
-          assert_kind_of(WebhookShrieker, webhook)
-        end
-      end
-    end
-
     def test_tags
       Source.all do |source|
         source.tags.each do |tag|

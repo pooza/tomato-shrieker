@@ -60,10 +60,11 @@ module TomatoShrieker
     end
 
     def shriekers
+      return enum_for(__method__) unless block_given?
       yield mastodon if mastodon?
       yield misskey if misskey?
-      webhooks do |webhook|
-        yield webhook
+      (self['/dest/hooks'] || self['/hooks'] || []).each do |hook|
+        yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
     end
 
@@ -94,15 +95,6 @@ module TomatoShrieker
     def misskey?
       return misskey.present?
     end
-
-    def webhooks
-      return enum_for(__method__) unless block_given?
-      (self['/dest/hooks'] || self['/hooks'] || []).each do |hook|
-        yield WebhookShrieker.new(Ginseng::URI.parse(hook))
-      end
-    end
-
-    alias hooks webhooks
 
     def tags
       return (self['/dest/tags'] || self['/toot/tags'] || []).map do |tag|
