@@ -1,2 +1,5 @@
 *
-!default.erb
+!4sq.erb
+!common.erb
+!summary.erb
+!title.erb

@@ -9,7 +9,9 @@ module TomatoShrieker
     end
 
     def exec(options = {})
-      if options['silence']
+      if multi_entries?
+        shriek(text: multi_entries_body, visibility: visibility)
+      elsif options['silence']
         touch
       elsif touched? || options['all']
         fetch(&:shriek)
@@ -22,6 +24,29 @@ module TomatoShrieker
     def unique_title?
       return self['/source/title/unique'] unless self['/source/title/unique'].nil?
       return true
+    end
+
+    def multi_entries?
+      return self['/dest/multi_entries'] unless self['/dest/multi_entries'].nil?
+      return false
+    end
+
+    def category
+      return self['/dest/category']
+    end
+
+    def limit
+      return self['/dest/limit'] || 5
+    end
+
+    def multi_entries_body
+      template = Template.new(self.template)
+      template[:entries] = feedjira.entries
+        .select {|entry| category.nil? || entry.categories.member?(category)}
+        .sort_by {|entry| entry.published.to_f}
+        .first(limit)
+        .reverse
+      return template.to_s
     end
 
     def time
