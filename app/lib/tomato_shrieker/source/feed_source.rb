@@ -45,7 +45,7 @@ module TomatoShrieker
         .select {|entry| category.nil? || entry.categories.member?(category)}
         .sort_by {|entry| entry.published.to_f}
         .first(limit)
-        .reverse_each
+        .reverse
       return template.to_s
     end
 
