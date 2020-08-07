@@ -64,8 +64,7 @@ module TomatoShrieker
     end
 
     def feedjira
-      @feedjira ||= Feedjira.parse(@http.get(uri).body)
-      return @feedjira
+      return Feedjira.parse(@http.get(uri).body)
     rescue Feedjira::NoParserAvailable => e
       raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
     end
