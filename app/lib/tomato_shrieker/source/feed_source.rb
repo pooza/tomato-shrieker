@@ -24,6 +24,10 @@ module TomatoShrieker
       return true
     end
 
+    def summary?
+      return self['/source/summary'] || false
+    end
+
     def time
       unless @time
         records = Entry.dataset
