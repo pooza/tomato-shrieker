@@ -14,6 +14,7 @@ module TomatoShrieker
         body[:status] = body[:text]
         body.delete(:text)
       end
+      body[:visibility] = Ginseng::Fediverse::TootParser.visibility_name(body[:visibility])
       return toot(body)
     end
   end
