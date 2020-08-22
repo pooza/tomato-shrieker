@@ -36,7 +36,7 @@ GEM
     ast (2.4.1)
     bootsnap (1.4.8)
       msgpack (~> 1.0)
-    concurrent-ruby (1.1.6)
+    concurrent-ruby (1.1.7)
     crass (1.0.6)
     daemon-spawn (0.4.2)
     domain_name (0.5.20190701)
