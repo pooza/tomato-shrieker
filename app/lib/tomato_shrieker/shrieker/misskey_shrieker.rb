@@ -10,6 +10,7 @@ module TomatoShrieker
         end
         body.delete(:attachments)
       end
+      body.delete(:fileIds) unless body[:fileIds].present?
       body[:visibility] = Ginseng::Fediverse::NoteParser.visibility_name(body[:visibility])
       return note(body)
     end
