@@ -5,7 +5,6 @@ module TomatoShrieker
     include Singleton
 
     def exec
-      Sequel.connect(Environment.dsn)
       @logger.info(scheduler: {message: 'start'})
       Source.all do |source|
         @logger.info(source: source.to_h)

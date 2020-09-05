@@ -1,7 +1,7 @@
 require 'rufus-scheduler'
 
 module TomatoShrieker
-  class SourceTest < Test::Unit::TestCase
+  class SourceTest < TestCase
     def test_all
       Source.all do |source|
         assert_kind_of(Source, source)

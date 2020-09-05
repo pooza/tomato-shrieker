@@ -36,3 +36,4 @@ end
 TomatoShrieker.bootsnap
 TomatoShrieker.loader.setup
 Bundler.require
+Sequel.connect(TomatoShrieker::Environment.dsn)

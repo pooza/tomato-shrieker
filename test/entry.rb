@@ -1,5 +1,5 @@
 module TomatoShrieker
-  class EntryTest < Test::Unit::TestCase
+  class EntryTest < TestCase
     def setup
       @entry = Entry.dataset.all.last
     end
