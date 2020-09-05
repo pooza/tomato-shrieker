@@ -26,7 +26,14 @@ module TomatoShrieker
 
     def command
       unless @command
-        @command = Ginseng::CommandLine.new(Array(self['/source/command']))
+        @command = Ginseng::CommandLine.new
+        if self['/source/command'].is_a?(Array)
+          @command.args = self['/source/command']
+        else
+          @command.args.push('sh')
+          @command.args.push('-c')
+          @command.args.push(self['/source/command'])
+        end
         @command.dir = self['/source/dir']
         @command.env = @params.dig('source', 'env') || {}
       end
