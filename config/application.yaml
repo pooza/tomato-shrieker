@@ -5,6 +5,10 @@ package:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
+test:
+  filters:
+    - name: ci
+      cases: []
 sqlite3:
   db: db.sqlite3
 slack:

@@ -1,5 +1,5 @@
 module TomatoShrieker
-  class FeedSourceTest < Test::Unit::TestCase
+  class FeedSourceTest < TestCase
     def test_time
       Source.all do |source|
         next unless source.is_a?(FeedSource)

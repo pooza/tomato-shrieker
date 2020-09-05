@@ -1,5 +1,5 @@
 module TomatoShrieker
-  class TextSourceTest < Test::Unit::TestCase
+  class TextSourceTest < TestCase
     def test_command
       Source.all do |source|
         next unless source.is_a?(TextSource)

@@ -11,7 +11,6 @@ namespace :tomato do
 
   desc 'clear entries'
   task :clean do
-    Sequel.connect(TomatoShrieker::Environment.dsn)
     TomatoShrieker::Entry.dataset.destroy
   end
 end
