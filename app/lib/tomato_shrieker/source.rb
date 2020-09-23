@@ -97,9 +97,7 @@ module TomatoShrieker
     end
 
     def tags
-      return (self['/dest/tags'] || self['/toot/tags'] || []).map do |tag|
-        Ginseng::Fediverse::Service.create_tag(tag)
-      end
+      return (self['/dest/tags'] || self['/toot/tags'] || []).map(&:to_hashtag)
     end
 
     alias toot_tags tags
