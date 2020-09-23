@@ -1,0 +1,105 @@
+$schema: http://json-schema.org/draft-04/hyper-schema
+title: Local config
+type: object
+required:
+  - sources
+properties:
+  slack:
+    type: object
+    required:
+      - hooks
+    properties:
+      hooks:
+        type: array
+        items:
+          type: string
+          format: url
+  sources:
+    type: array
+    items:
+      type: object
+      required:
+        - source
+        - dest
+      properties:
+        source:
+          type: hash
+          properties:
+            text:
+              type: string
+            command:
+              type:
+                - array
+                - string
+              item:
+                type: string
+            env:
+              type: hash
+            delimiter:
+              type: string
+            url:
+              type: string
+              format: url
+            title:
+              type: hash
+              properties:
+                unique:
+                  type: boolean
+        dest:
+          type: hash
+          properties:
+            dest:
+              prefix:
+                type: string
+              account:
+                type: hash
+                properties:
+                  bot:
+                    type: boolean
+              template:
+                type: string
+              mastodon:
+                type: hash
+                required:
+                  - url
+                  - token
+                properties:
+                  url:
+                    type: string
+                    format: url
+                  token:
+                    type: string
+              misskey:
+                type: hash
+                required:
+                  - url
+                  - token
+                properties:
+                  url:
+                    type: string
+                    format: url
+                  token:
+                    type: string
+              hooks:
+                type: array
+                items:
+                  type: string
+                  format: url
+              mulukhiya:
+                type: hash
+                required:
+                  - enable
+                properties:
+                  enable: boolean
+        schedule:
+          type: hash
+          properties:
+            at:
+              type: string
+            every:
+              type: string
+            cron:
+              type: string
+        id:
+          type: string
+
