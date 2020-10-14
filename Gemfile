@@ -1,5 +1,5 @@
 source 'https://rubygems.org'
-ruby '2.7.1'
+ruby '2.7.2'
 gem 'bootsnap'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core'
