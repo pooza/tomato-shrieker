@@ -21,6 +21,25 @@ module TomatoShrieker
       end
     end
 
+    def purge(params = {})
+      records = Entry.dataset
+        .select(:published)
+        .where(feed: hash)
+        .order {published.desc}
+        .limit(1)
+        .offset(feedjira.entries.count * expire)
+      return unless date = records.first&.published
+      records = Entry.dataset.where(feed: hash).where(
+        Sequel.lit("published < '#{date.strftime('%Y-%m-%d %H:%M:%S %z')}'"),
+      )
+      records.destroy unless params[:dryrun]
+      return date
+    end
+
+    def expire
+      return self['/source/expire'] || 2
+    end
+
     def unique_title?
       return self['/source/title/unique'] unless self['/source/title/unique'].nil?
       return true

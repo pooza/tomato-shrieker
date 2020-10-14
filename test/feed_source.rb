@@ -42,5 +42,19 @@ module TomatoShrieker
         assert_boolean(source.unique_title?)
       end
     end
+
+    def test_expire
+      Source.all do |source|
+        next unless source.is_a?(FeedSource)
+        assert_kind_of(Integer, source.expire)
+      end
+    end
+
+    def test_purge
+      Source.all do |source|
+        next unless source.is_a?(FeedSource)
+        assert_kind_of(Time, source.purge(dryrun: true))
+      end
+    end
   end
 end
