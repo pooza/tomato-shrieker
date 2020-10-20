@@ -53,7 +53,8 @@ module TomatoShrieker
     def test_purge
       Source.all do |source|
         next unless source.is_a?(FeedSource)
-        assert_kind_of(Time, source.purge(dryrun: true))
+        next unless time = source.purge(dryrun: true)
+        assert_kind_of(Time, time)
       end
     end
   end

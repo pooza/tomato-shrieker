@@ -58,13 +58,18 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
+    def multi_entries
+      entries = feedjira.entries
+        .select {|entry| entry.categories.member?(category)}
+        .sort_by {|entry| entry.published.to_f}
+        .reverse
+        .first(limit)
+      return entries
+    end
+
     def multi_entries_body
       template = Template.new(self.template)
-      template[:entries] = feedjira.entries
-        .select {|entry| category.nil? || entry.categories.member?(category)}
-        .sort_by {|entry| entry.published.to_f}
-        .first(limit)
-        .reverse
+      template[:entries] = multi_entries
       return template.to_s
     end
 
