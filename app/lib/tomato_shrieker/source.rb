@@ -17,7 +17,7 @@ module TomatoShrieker
     end
 
     def to_h
-      return {id: id}.merge(@params)
+      return {'id' => id, 'class' => self.class.to_s}.merge(@params)
     end
 
     def id
