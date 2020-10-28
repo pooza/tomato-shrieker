@@ -127,5 +127,29 @@ module TomatoShrieker
       uri.fragment ||= self.uri.fragment
       return uri
     end
+
+    def self.all
+      return enum_for(__method__) unless block_given?
+      Source.all do |source|
+        next unless source.is_a?(FeedSource)
+        yield source
+      end
+    end
+
+    def self.purge_all(params = {})
+      logger = Logger.new
+      FeedSource.all do |source|
+        date = source.purge(params)
+        logger.info(message: "purge (older than #{date})", feed: source.id, params: params)
+        if date && params[:echo]
+          puts "#{source.id}: purge (older than #{date}) #{params[:dryrun] ? 'dryrun' : ''}"
+        end
+      rescue => e
+        logger.error(error: "purge error (#{e.message})", feed: source.id, params: params)
+        if params[:echo]
+          warn "#{source.id}: purge error (#{e.message}) #{params[:dryrun] ? 'dryrun' : ''}"
+        end
+      end
+    end
   end
 end

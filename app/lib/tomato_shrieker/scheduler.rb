@@ -24,6 +24,9 @@ module TomatoShrieker
 
     def initialize
       @scheduler = Rufus::Scheduler.new
+      @scheduler.every('1h', '@purge') do
+        FeedSource.purge_all
+      end
       @logger = Logger.new
     end
   end
