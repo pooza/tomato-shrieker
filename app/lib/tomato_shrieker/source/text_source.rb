@@ -15,5 +15,13 @@ module TomatoShrieker
     def text
       return self['/source/text']
     end
+
+    def self.all
+      return enum_for(__method__) unless block_given?
+      Source.all do |source|
+        next unless source.is_a?(TextSource)
+        yield source
+      end
+    end
   end
 end
