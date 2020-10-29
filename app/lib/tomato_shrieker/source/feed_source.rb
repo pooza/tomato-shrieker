@@ -139,16 +139,14 @@ module TomatoShrieker
     def self.purge_all(params = {})
       logger = Logger.new
       FeedSource.all do |source|
-        date = source.purge(params)
-        logger.info(message: "purge (older than #{date})", feed: source.id, params: params)
-        if date && params[:echo]
-          puts "#{source.id}: purge (older than #{date}) #{params[:dryrun] ? 'dryrun' : ''}"
-        end
+        next unless date = source.purge(params)
+        message = "purge (older than #{date})"
+        logger.info(message: message, feed: source.id, params: params)
+        puts "#{source.id}: #{message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
       rescue => e
-        logger.error(error: "purge error (#{e.message})", feed: source.id, params: params)
-        if params[:echo]
-          warn "#{source.id}: purge error (#{e.message}) #{params[:dryrun] ? 'dryrun' : ''}"
-        end
+        message = "purge error (#{e.message})"
+        logger.error(error: message, feed: source.id, params: params)
+        warn "#{source.id}: #{message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
       end
     end
   end
