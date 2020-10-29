@@ -39,5 +39,13 @@ module TomatoShrieker
       end
       return @command
     end
+
+    def self.all
+      return enum_for(__method__) unless block_given?
+      Source.all do |source|
+        next unless source.is_a?(CommandSource)
+        yield source
+      end
+    end
   end
 end

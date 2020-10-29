@@ -1,61 +1,57 @@
 module TomatoShrieker
   class FeedSourceTest < TestCase
     def test_time
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         next if source.time.nil?
         assert_kind_of(Time, source.time)
       end
     end
 
     def test_touched?
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         assert_boolean(source.touched?)
       end
     end
 
     def test_present?
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         assert_boolean(source.present?)
       end
     end
 
     def test_uri
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         assert_kind_of(Ginseng::URI, source.uri)
       end
     end
 
     def test_feedjira
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         assert(source.feedjira.present?)
       end
     end
 
     def test_unique_title?
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         assert_boolean(source.unique_title?)
       end
     end
 
     def test_expire
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         assert_kind_of(Integer, source.expire)
       end
     end
 
     def test_purge
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
+      FeedSource.all do |source|
         next unless time = source.purge(dryrun: true)
         assert_kind_of(Time, time)
       end
+    end
+
+    def test_all
+      assert_kind_of(Enumerator, FeedSource.all)
     end
   end
 end
