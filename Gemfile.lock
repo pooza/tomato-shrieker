@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: ae58ca7da8b8a333180df1988f04b45f5f746f29
+  revision: 7138104c683993e366efdcd5f9a02fc726da0f9e
   specs:
-    ginseng-core (1.8.2)
+    ginseng-core (1.8.4)
       activesupport
       addressable
       daemon-spawn
@@ -126,7 +126,7 @@ GEM
     unicode (0.4.4.4)
     unicode-display_width (1.7.0)
     yajl-ruby (1.4.1)
-    zeitwerk (2.4.0)
+    zeitwerk (2.4.1)
 
 PLATFORMS
   ruby
