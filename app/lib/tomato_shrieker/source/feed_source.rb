@@ -140,13 +140,11 @@ module TomatoShrieker
       logger = Logger.new
       FeedSource.all do |source|
         next unless date = source.purge(params)
-        message = "purge (older than #{date})"
-        logger.info(message: message, feed: source.id, params: params)
-        puts "#{source.id}: #{message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
+        logger.info(message: 'purge', date: date, feed: source.id, params: params)
+        puts "#{source.id}: #{message} #{date} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
       rescue => e
-        message = "purge error (#{e.message})"
-        logger.error(error: message, feed: source.id, params: params)
-        warn "#{source.id}: #{message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
+        logger.error(error: e.message, feed: source.id, params: params)
+        warn "#{source.id}: #{e.message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
       end
     end
   end
