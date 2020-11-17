@@ -1,3 +1,4 @@
+require 'bundler/setup'
 require 'bootsnap'
 require 'sequel'
 require 'ginseng'
@@ -7,9 +8,10 @@ module TomatoShrieker
     return File.expand_path('../..', __dir__)
   end
 
-  def self.bootsnap
+  def self.setup_bootsnap
     Bootsnap.setup(
       cache_dir: File.join(dir, 'tmp/cache'),
+      development_mode: Environment.development?,
       load_path_cache: true,
       autoload_paths_cache: true,
       compile_cache_iseq: true,
@@ -33,7 +35,7 @@ module TomatoShrieker
   end
 end
 
-TomatoShrieker.bootsnap
-TomatoShrieker.loader.setup
 Bundler.require
+TomatoShrieker.loader.setup
+TomatoShrieker.setup_bootsnap
 Sequel.connect(TomatoShrieker::Environment.dsn)

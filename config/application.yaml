@@ -1,10 +1,11 @@
 package:
-  version: 3.1.8
+  version: 3.1.9
   url: https://github.com/pooza/tomato-shrieker
   authors:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
+environment: development
 test:
   filters:
     - name: ci

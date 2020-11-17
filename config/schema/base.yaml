@@ -3,7 +3,13 @@ title: Local config
 type: object
 required:
   - sources
+  - environment
 properties:
+  environment:
+    type: string
+    enum:
+      - development
+      - production
   slack:
     type: object
     required:
