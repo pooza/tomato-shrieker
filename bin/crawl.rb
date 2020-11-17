@@ -6,7 +6,5 @@ dir = File.expand_path('../..', path)
 $LOAD_PATH.unshift(File.join(dir, 'app/lib'))
 ENV['BUNDLE_GEMFILE'] = File.join(dir, 'Gemfile')
 
-require 'bundler/setup'
 require 'tomato_shrieker'
-
 TomatoShrieker::Source.exec_all
