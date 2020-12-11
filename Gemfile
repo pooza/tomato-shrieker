@@ -11,5 +11,6 @@ gem 'sqlite3'
 group :development do
   gem 'rubocop'
   gem 'rubocop-performance'
+  gem 'rubocop-sequel'
   gem 'test-unit'
 end

@@ -1,4 +1,6 @@
-require: rubocop-performance
+require:
+  - rubocop-performance
+  - rubocop-sequel
 
 AllCops:
   AllowSymlinksInCacheRootDirectory: true
@@ -301,3 +303,6 @@ Performance/StringInclude:
 
 Performance/Sum: # (new in 1.8)
   Enabled: true
+
+Sequel/ConcurrentIndex:
+  Enabled: false
