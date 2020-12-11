@@ -93,7 +93,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e)
+      feed.logger.error(error: e, entry: entry)
       return nil
     end
 
@@ -101,7 +101,7 @@ module TomatoShrieker
       return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
       return title
     rescue => e
-      feed.logger.error(error: e)
+      feed.logger.error(error: e, entry: entry)
       return title
     end
   end
