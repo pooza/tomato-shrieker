@@ -1,4 +1,5 @@
 require 'bundler/setup'
+require 'tomato_shrieker/refines'
 require 'bootsnap'
 require 'sequel'
 require 'ginseng'
