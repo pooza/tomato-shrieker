@@ -1,6 +1,4 @@
 require 'bundler/setup'
-require 'bootsnap'
-require 'sequel'
 require 'tomato_shrieker/refines'
 require 'ginseng'
 
@@ -30,6 +28,7 @@ module TomatoShrieker
   end
 
   def self.connect_dbms
+    require 'sequel'
     Sequel.connect(Environment.dsn)
   end
 
