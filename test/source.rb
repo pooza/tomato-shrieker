@@ -57,6 +57,13 @@ module TomatoShrieker
       end
     end
 
+    def test_mulukhiya
+      Source.all do |source|
+        next unless source.mulukhiya
+        assert_kind_of(MulukhiyaService, source.mulukhiya)
+      end
+    end
+
     def test_tags
       Source.all do |source|
         source.tags.each do |tag|

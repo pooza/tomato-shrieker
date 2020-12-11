@@ -73,6 +73,9 @@ module TomatoShrieker
         @mastodon.mulukhiya_enable = mulukhiya?
       end
       return @mastodon
+    rescue => e
+      logger.error(error: e, url: self['/dest/mastodon/url'])
+      return nil
     end
 
     def mastodon?
@@ -87,10 +90,22 @@ module TomatoShrieker
         @misskey.mulukhiya_enable = mulukhiya?
       end
       return @misskey
+    rescue => e
+      logger.error(error: e, url: self['/dest/misskey/url'])
+      return nil
     end
 
     def misskey?
       return misskey.present?
+    end
+
+    def mulukhiya
+      return nil unless uri = Ginseng::URI.parse(self['/dest/mulukhiya/url'])
+      @mulukhiya ||= MulukhiyaService.new(uri)
+      return @mulukhiya
+    rescue => e
+      logger.error(error: e, url: self['/dest/mulukhiya/url'])
+      return nil
     end
 
     def tags
