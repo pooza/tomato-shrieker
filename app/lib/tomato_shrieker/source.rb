@@ -114,6 +114,10 @@ module TomatoShrieker
 
     alias toot_tags tags
 
+    def tagging?
+      return mulukhiya.present? && (self['/dest/mulukhiya/tagging/enable'] == true)
+    end
+
     def visibility
       return self['/dest/visibility'] || 'public'
     end

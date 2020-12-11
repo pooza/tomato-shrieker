@@ -1,4 +1,6 @@
 require 'sequel/model'
+require 'nokogiri'
+require 'sanitize'
 require 'time'
 
 module TomatoShrieker
@@ -39,6 +41,25 @@ module TomatoShrieker
 
     alias enclosure_uri enclosure
 
+    def tags
+      unless @tags
+        @tags = []
+        @tags.concat(feed.tags)
+        if feed.tagging?
+          html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
+          contents = Sanitize.clean(html.xpath('//body').inner_text)
+          contents.gsub!(/\s+/, ' ')
+          @tags.concat(feed.mulukhiya.search_hashtags(contents).map(&:to_hashtag))
+          @tags.compact!
+          @tags.uniq!
+        end
+      end
+      return @tags
+    rescue => e
+      feed.logger.error(error: e)
+      return feed.tags
+    end
+
     def uri
       @uri ||= feed.create_uri(url)
       return @uri
@@ -72,7 +93,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e.message, entry: entry)
+      feed.logger.error(error: e)
       return nil
     end
 
@@ -80,7 +101,7 @@ module TomatoShrieker
       return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
       return title
     rescue => e
-      feed.logger.error(error: e.message, entry: entry)
+      feed.logger.error(error: e)
       return title
     end
   end

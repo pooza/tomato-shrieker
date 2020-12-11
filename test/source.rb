@@ -64,6 +64,12 @@ module TomatoShrieker
       end
     end
 
+    def test_tagging?
+      Source.all do |source|
+        assert_boolean(source.tagging?)
+      end
+    end
+
     def test_tags
       Source.all do |source|
         source.tags.each do |tag|
