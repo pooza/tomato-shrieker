@@ -42,36 +42,33 @@ module TomatoShrieker
     end
 
     def mulukhiya?
-      return self['/dest/mulukhiya/enable'] unless self['/def/mulukhiya/enable'].nil?
-      return self['/mulukhiya/enable'] unless self['/mulukhiya/enable'].nil?
-      return true
+      return self['/dest/mulukhiya/enable'] == true
     end
 
     def bot_account?
       return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
-      return self['/bot_account'] unless self['/bot_account'].nil?
       return false
     end
 
     alias bot? bot_account?
 
     def template
-      return self['/dest/template'] || self['/template'] || 'title'
+      return self['/dest/template'] || 'title'
     end
 
     def shriekers
       return enum_for(__method__) unless block_given?
       yield mastodon if mastodon?
       yield misskey if misskey?
-      (self['/dest/hooks'] || self['/hooks'] || []).each do |hook|
+      (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
     end
 
     def mastodon
       unless @mastodon
-        return nil unless uri = self['/dest/mastodon/url'] || self['/mastodon/url']
-        return nil unless token = self['/dest/mastodon/token'] || self['/mastodon/token']
+        return nil unless uri = self['/dest/mastodon/url']
+        return nil unless token = self['/dest/mastodon/token']
         @mastodon = MastodonShrieker.new(uri, token)
         @mastodon.mulukhiya_enable = mulukhiya?
       end
@@ -97,34 +94,34 @@ module TomatoShrieker
     end
 
     def tags
-      return (self['/dest/tags'] || self['/toot/tags'] || []).map(&:to_hashtag)
+      return (self['/dest/tags'] || []).map(&:to_hashtag)
     end
 
     alias toot_tags tags
 
     def visibility
-      return self['/dest/visibility'] || self['/visibility'] || 'public'
+      return self['/dest/visibility'] || 'public'
     end
 
     def prefix
-      return self['/dest/prefix'] || self['/prefix']
+      return self['/dest/prefix']
     end
 
     def post_at
-      return self['/schedule/at'] || self['/post_at'] || self['/at']
+      return self['/schedule/at']
     end
 
     alias at post_at
 
     def cron
       return nil if post_at
-      return self['/schedule/cron'] || self['/cron']
+      return self['/schedule/cron']
     end
 
     def period
       return nil if post_at
       return nil if cron
-      return self['/schedule/every'] || self['/period'] || self['/every'] || '5m'
+      return self['/schedule/every'] || '5m'
     end
 
     alias every period
