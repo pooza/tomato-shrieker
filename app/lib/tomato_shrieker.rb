@@ -1,7 +1,7 @@
 require 'bundler/setup'
-require 'tomato_shrieker/refines'
 require 'bootsnap'
 require 'sequel'
+require 'tomato_shrieker/refines'
 require 'ginseng'
 
 module TomatoShrieker
@@ -29,6 +29,10 @@ module TomatoShrieker
     return loader
   end
 
+  def self.connect_dbms
+    Sequel.connect(Environment.dsn)
+  end
+
   def self.load_tasks
     Dir.glob(File.join(dir, 'app/task/*.rb')).sort.each do |f|
       require f
@@ -39,4 +43,4 @@ end
 Bundler.require
 TomatoShrieker.loader.setup
 TomatoShrieker.setup_bootsnap
-Sequel.connect(TomatoShrieker::Environment.dsn)
+TomatoShrieker.connect_dbms
