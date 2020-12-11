@@ -69,7 +69,7 @@ module TomatoShrieker
       v = {text: body, visibility: feed.visibility, attachments: []}
       v[:attachments].push(image_url: enclosure.to_s) if enclosure
       feed.shriek(v)
-      feed.logger.info(entry: to_h, message: 'post')
+      feed.logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
