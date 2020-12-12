@@ -60,6 +60,7 @@ module TomatoShrieker
       return enum_for(__method__) unless block_given?
       yield mastodon if mastodon?
       yield misskey if misskey?
+      yield line if line?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
@@ -97,6 +98,22 @@ module TomatoShrieker
 
     def misskey?
       return misskey.present?
+    end
+
+    def line
+      unless @line
+        return nil unless user_id = self['/dest/line/user_id']
+        return nil unless token = self['/dest/line/token']
+        @line = LineShrieker.new(user_id, token)
+      end
+      return @line
+    rescue => e
+      logger.error(error: e, user_id: self['/dest/line/user_id'])
+      return nil
+    end
+
+    def line?
+      return line.present?
     end
 
     def mulukhiya
