@@ -15,7 +15,7 @@ module TomatoShrieker
         body: {
           to: @user_id,
           messages: [{type: 'text', text: body[:text]}],
-        }.to_json
+        }.to_json,
       })
     end
   end
