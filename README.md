@@ -24,6 +24,7 @@
 - Mastodon （またはPleroma等、互換APIをもつサービス）
 - Misskey API （または互換APIをもつサービス）
 - Slack互換webhookをもつサービス（拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む）
+- LINE
 
 ## 由来
 
