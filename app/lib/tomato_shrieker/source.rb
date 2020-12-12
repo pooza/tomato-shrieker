@@ -112,7 +112,9 @@ module TomatoShrieker
       return (self['/dest/tags'] || []).map(&:to_hashtag)
     end
 
-    alias toot_tags tags
+    def tag_min_length
+      return 2
+    end
 
     def tagging?
       return mulukhiya.present? && (self['/dest/mulukhiya/tagging/enable'] == true)

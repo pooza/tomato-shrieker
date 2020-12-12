@@ -1,6 +1,5 @@
 require 'sequel/model'
 require 'nokogiri'
-require 'sanitize'
 require 'time'
 
 module TomatoShrieker
@@ -43,21 +42,25 @@ module TomatoShrieker
 
     def tags
       unless @tags
-        @tags = []
-        @tags.concat(feed.tags)
-        if feed.tagging?
-          html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
-          contents = Sanitize.clean(html.xpath('//body').inner_text)
-          contents.gsub!(/\s+/, ' ')
-          @tags.concat(feed.mulukhiya.search_hashtags(contents).map(&:to_hashtag))
-          @tags.compact!
-          @tags.uniq!
-        end
+        @tags = feed.tags.clone
+        @tags.concat(fetch_remote_tags) if feed.tagging?
+        @tags.uniq!
+        @tags.select! {|v| feed.tag_min_length < v.to_s.length}
+        @tags = @tags.map(&:to_hashtag)
       end
       return @tags
     rescue => e
       feed.logger.error(error: e)
       return feed.tags
+    end
+
+    def fetch_remote_tags
+      html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
+      contents = []
+      ['h1', 'h2'].map do |v|
+        contents.push(html.xpath("//#{v}").inner_text)
+      end
+      return feed.mulukhiya.search_hashtags(contents.join(' '))
     end
 
     def uri
