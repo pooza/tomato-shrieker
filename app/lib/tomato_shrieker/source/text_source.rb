@@ -2,7 +2,7 @@ module TomatoShrieker
   class TextSource < Source
     def exec(options = {})
       shriek(text: status, visibility: visibility)
-      logger.info(source: hash, message: 'post')
+      logger.info(source: id, message: 'post')
     end
 
     def status

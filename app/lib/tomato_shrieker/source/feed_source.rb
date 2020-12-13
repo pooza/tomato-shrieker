@@ -15,7 +15,7 @@ module TomatoShrieker
         touch
       elsif touched? || options['all']
         fetch(&:shriek)
-        logger.info(source: hash, message: 'crawl')
+        logger.info(source: id, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.shriek
       end
@@ -91,7 +91,7 @@ module TomatoShrieker
 
     def touch
       Entry.create(feedjira.entries.max_by(&:published), self)
-      logger.info(source: hash, message: 'touch')
+      logger.info(source: id, message: 'touch')
     end
 
     def fetch
@@ -140,10 +140,10 @@ module TomatoShrieker
       logger = Logger.new
       FeedSource.all do |source|
         next unless date = source.purge(params)
-        logger.info(message: 'purge', date: date, feed: source.id, params: params)
+        logger.info(source: source.id, message: 'purge', date: date, params: params)
         puts "#{source.id}: #{message} #{date} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
       rescue => e
-        logger.error(error: e.message, feed: source.id, params: params)
+        logger.error(error: e, source: source.id, params: params)
         warn "#{source.id}: #{e.message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
       end
     end

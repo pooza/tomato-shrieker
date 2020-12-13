@@ -1,4 +1,5 @@
 require 'sequel/model'
+require 'nokogiri'
 require 'time'
 
 module TomatoShrieker
@@ -39,6 +40,30 @@ module TomatoShrieker
 
     alias enclosure_uri enclosure
 
+    def tags
+      unless @tags
+        tags = Ginseng::Fediverse::TagContainer.new
+        tags.concat(feed.tags.clone)
+        tags.concat(fetch_remote_tags) if feed.tagging?
+        tags.select! {|v| feed.tag_min_length < v.to_s.length}
+        @tags = tags.create_tags
+      end
+      return @tags
+    rescue => e
+      return [] unless feed
+      feed.logger.error(error: e)
+      return feed.tags
+    end
+
+    def fetch_remote_tags
+      html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
+      contents = []
+      ['h1', 'h2', 'title', 'meta'].map do |v|
+        contents.push(html.xpath("//#{v}").inner_text)
+      end
+      return feed.mulukhiya.search_hashtags(contents.join(' '))
+    end
+
     def uri
       @uri ||= feed.create_uri(url)
       return @uri
@@ -48,7 +73,7 @@ module TomatoShrieker
       v = {text: body, visibility: feed.visibility, attachments: []}
       v[:attachments].push(image_url: enclosure.to_s) if enclosure
       feed.shriek(v)
-      feed.logger.info(entry: to_h, message: 'post')
+      feed.logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
@@ -72,7 +97,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e.message, entry: entry)
+      feed.logger.error(error: e, entry: entry)
       return nil
     end
 
@@ -80,7 +105,7 @@ module TomatoShrieker
       return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
       return title
     rescue => e
-      feed.logger.error(error: e.message, entry: entry)
+      feed.logger.error(error: e, entry: entry)
       return title
     end
   end

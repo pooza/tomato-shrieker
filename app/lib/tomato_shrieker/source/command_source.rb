@@ -7,7 +7,7 @@ module TomatoShrieker
       statuses do |status|
         shriek(text: status, visibility: visibility)
       end
-      logger.info(source: hash, message: 'post')
+      logger.info(source: id, message: 'post')
     end
 
     def statuses

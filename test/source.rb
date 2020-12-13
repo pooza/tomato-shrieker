@@ -52,8 +52,21 @@ module TomatoShrieker
     def test_shrieker
       Source.all do |source|
         source.shriekers do |shrieker|
-          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker], shrieker)
+          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker, LineShrieker], shrieker)
         end
+      end
+    end
+
+    def test_mulukhiya
+      Source.all do |source|
+        next unless source.mulukhiya
+        assert_kind_of(MulukhiyaService, source.mulukhiya)
+      end
+    end
+
+    def test_tagging?
+      Source.all do |source|
+        assert_boolean(source.tagging?)
       end
     end
 

@@ -20,5 +20,11 @@ module TomatoShrieker
     def test_enclosure
       assert_kind_of(Ginseng::URI, @entry.enclosure) if @entry&.enclosure
     end
+
+    def test_tags
+      (@entry.tags || []).each do |tag|
+        assert_kind_of(String, tag)
+      end
+    end
   end
 end
