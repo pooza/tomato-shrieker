@@ -117,7 +117,7 @@ GEM
     sequel (5.39.0)
     sqlite3 (1.4.2)
     syslog-logger (1.6.8)
-    test-unit (3.3.7)
+    test-unit (3.3.8)
       power_assert
     tzinfo (2.0.3)
       concurrent-ruby (~> 1.0)
