@@ -16,7 +16,7 @@ AllCops:
     - 'public/**/*'
     - 'config/**/*'
     - 'tmp/**/*'
-  TargetRubyVersion: 2.7
+  TargetRubyVersion: 3.0
 
 Naming/RescuedExceptionsVariableName:
   PreferredName: e
@@ -202,31 +202,33 @@ Metrics/AbcSize:
   Max: 30
   Exclude:
     - 'test/*'
-    - '**/contract/*'
 
 Metrics/BlockLength:
   Exclude:
     - 'test/*'
     - '**/contract/*'
+    - '**/controller/*'
+    - 'app/task/*'
     - '*.gemspec'
 
 Metrics/MethodLength:
   Max: 20
   Exclude:
     - 'test/*'
-    - '**/contract/*'
 
 Metrics/ClassLength:
   Max: 200
   Exclude:
     - 'test/*'
     - '**/contract/*'
+    - '**/controller/*'
 
 Metrics/ModuleLength:
   Max: 200
   Exclude:
     - 'test/*'
     - '**/contract/*'
+    - '**/controller/*'
 
 Metrics/CyclomaticComplexity:
   Max: 10
