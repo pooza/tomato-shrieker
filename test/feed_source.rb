@@ -43,6 +43,13 @@ module TomatoShrieker
       end
     end
 
+    def test_multi_entries_body
+      FeedSource.all do |source|
+        puts source.multi_entries_body
+        assert_kind_of([String, NilClass], source.multi_entries_body)
+      end
+    end
+
     def test_purge
       FeedSource.all do |source|
         next unless time = source.purge(dryrun: true)
