@@ -68,6 +68,7 @@ module TomatoShrieker
     end
 
     def multi_entries_body
+      return nil unless multi_entries?
       template = Template.new(self.template)
       template[:entries] = multi_entries
       return template.to_s
