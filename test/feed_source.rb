@@ -45,7 +45,6 @@ module TomatoShrieker
 
     def test_multi_entries_body
       FeedSource.all do |source|
-        puts source.multi_entries_body
         assert_kind_of([String, NilClass], source.multi_entries_body)
       end
     end
