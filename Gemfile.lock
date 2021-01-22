@@ -20,9 +20,9 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 73bdb1ba3baa06e1923683a296bcf5724523428d
+  revision: 155a1223cc9cd05386bde4ed3277ea1bc664f795
   specs:
-    ginseng-fediverse (1.4.8)
+    ginseng-fediverse (1.5.1)
 
 GIT
   remote: https://github.com/pooza/rubocop-sequel.git
