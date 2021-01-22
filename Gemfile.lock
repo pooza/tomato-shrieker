@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 138db502fd714bdc0b5c41f61bc220b60b4de718
+  revision: 2dd82f8aa28102e9d7b42eebad648e5d0c854160
   specs:
-    ginseng-core (1.8.10)
+    ginseng-core (1.9.3)
       activesupport (>= 6.1.1)
       addressable
       daemon-spawn
@@ -16,7 +16,7 @@ GIT
       syslog-logger
       unicode
       yajl-ruby
-      zeitwerk (>= 2.3.0)
+      zeitwerk (>= 2.4.0)
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
@@ -46,7 +46,7 @@ GEM
     ast (2.4.1)
     bootsnap (1.5.1)
       msgpack (~> 1.0)
-    concurrent-ruby (1.1.7)
+    concurrent-ruby (1.1.8)
     crass (1.0.6)
     daemon-spawn (0.4.2)
     domain_name (0.5.20190701)
