@@ -1,5 +1,5 @@
 package:
-  version: 3.2.2
+  version: 3.2.3
   url: https://github.com/pooza/tomato-shrieker
   authors:
     - Tatsuya Koishi
@@ -8,11 +8,11 @@ package:
   description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse等に投稿する。
   license: MIT
 environment: development
-test:
-  filters:
-    - name: ci
-      cases: []
 sqlite3:
   db: db.sqlite3
 slack:
   hooks: []
+http:
+  retry:
+    limit: 3
+    seconds: 1
