@@ -81,7 +81,7 @@ GEM
     mini_mime (1.0.2)
     mini_portile2 (2.5.0)
     minitest (5.14.3)
-    msgpack (1.4.1)
+    msgpack (1.4.2)
     multi_json (1.15.0)
     multi_xml (0.6.0)
     netrc (0.11.0)
@@ -130,7 +130,7 @@ GEM
       nokogiri (>= 1.8.0)
       nokogumbo (~> 2.0)
     sax-machine (1.3.2)
-    sequel (5.40.0)
+    sequel (5.41.0)
     sqlite3 (1.4.2)
     syslog-logger (1.6.8)
     test-unit (3.4.0)
@@ -146,6 +146,7 @@ GEM
     zeitwerk (2.4.2)
 
 PLATFORMS
+  ruby
   x86_64-freebsd-12
   x86_64-linux
 
