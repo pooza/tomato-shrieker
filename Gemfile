@@ -11,6 +11,6 @@ gem 'sqlite3'
 group :development do
   gem 'rubocop'
   gem 'rubocop-performance'
-  gem 'rubocop-sequel', github: 'pooza/rubocop-sequel', branch: 'master.pooza'
+  gem 'rubocop-sequel'
   gem 'test-unit'
 end
