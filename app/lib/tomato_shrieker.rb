@@ -41,4 +41,3 @@ module TomatoShrieker
   setup_bootsnap
   connect_dbms
 end
-
