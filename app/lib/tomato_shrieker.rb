@@ -1,6 +1,5 @@
 require 'bundler/setup'
 require 'tomato_shrieker/refines'
-require 'ginseng'
 
 module TomatoShrieker
   def self.dir
@@ -12,7 +11,6 @@ module TomatoShrieker
       cache_dir: File.join(dir, 'tmp/cache'),
       development_mode: Environment.development?,
       load_path_cache: true,
-      autoload_paths_cache: true,
       compile_cache_iseq: true,
       compile_cache_yaml: true,
     )
@@ -37,9 +35,10 @@ module TomatoShrieker
       require f
     end
   end
+
+  Bundler.require
+  loader.setup
+  setup_bootsnap
+  connect_dbms
 end
 
-Bundler.require
-TomatoShrieker.loader.setup
-TomatoShrieker.setup_bootsnap
-TomatoShrieker.connect_dbms
