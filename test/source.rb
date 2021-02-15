@@ -49,7 +49,7 @@ module TomatoShrieker
       end
     end
 
-    def test_shrieker
+    def test_shriekers
       Source.all do |source|
         source.shriekers do |shrieker|
           assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker, LineShrieker], shrieker)

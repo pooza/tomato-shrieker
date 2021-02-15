@@ -9,12 +9,14 @@ module TomatoShrieker
     end
 
     def exec(body)
-      @logger.info(body)
       return @http.post('/v2/bot/message/push', {
         headers: {'Authorization' => "Bearer #{@token}"},
         body: {
           to: @user_id,
-          messages: [{type: 'text', text: body[:text]}],
+          messages: [{
+            type: 'text',
+            text: body[:text_without_tags] || body[:text],
+          }],
         }.to_json,
       })
     end
