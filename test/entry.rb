@@ -8,9 +8,9 @@ module TomatoShrieker
       assert_kind_of(FeedSource, @entry.feed) if @entry
     end
 
-    def test_body
-      assert(@entry.body.present?)
-      assert_kind_of(String, @entry.body) if @entry
+    def test_create_body
+      assert(@entry.create_body.present?)
+      assert_kind_of(String, @entry.create_body) if @entry
     end
 
     def test_uri

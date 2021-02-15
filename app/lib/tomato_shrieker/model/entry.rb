@@ -18,16 +18,6 @@ module TomatoShrieker
       return @feed
     end
 
-    def body
-      unless @body
-        template = Template.new(feed.template)
-        template[:feed] = feed
-        template[:entry] = self
-        @body = template.to_s
-      end
-      return @body
-    end
-
     def enclosure
       unless @enclosure
         return nil unless @enclosure ||= Ginseng::URI.parse(enclosure_url)
@@ -69,8 +59,21 @@ module TomatoShrieker
       return @uri
     end
 
+    def create_body(params = {})
+      template = Template.new(feed.template)
+      template.params = params
+      template[:feed] = feed
+      template[:entry] = self
+      @body = template.to_s
+    end
+
     def shriek
-      v = {text: body, visibility: feed.visibility, attachments: []}
+      v = {
+        text: create_body(tag: true),
+        text_without_tags: create_body,
+        visibility: feed.visibility,
+        attachments: [],
+      }
       v[:attachments].push(image_url: enclosure.to_s) if enclosure
       feed.shriek(v)
       feed.logger.info(source: feed.id, entry: to_h, message: 'post')

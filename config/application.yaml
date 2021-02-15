@@ -1,11 +1,11 @@
 package:
-  version: 3.2.3
+  version: 3.2.4
   url: https://github.com/pooza/tomato-shrieker
   authors:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
-  description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse等に投稿する。
+  description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse、Slack互換webhook、LINEに投稿する。
   license: MIT
 environment: development
 sqlite3:

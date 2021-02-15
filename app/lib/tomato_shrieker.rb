@@ -1,8 +1,10 @@
 require 'bundler/setup'
+require 'ricecream'
 require 'tomato_shrieker/refines'
-require 'ginseng'
 
 module TomatoShrieker
+  using Refines
+
   def self.dir
     return File.expand_path('../..', __dir__)
   end
@@ -12,7 +14,6 @@ module TomatoShrieker
       cache_dir: File.join(dir, 'tmp/cache'),
       development_mode: Environment.development?,
       load_path_cache: true,
-      autoload_paths_cache: true,
       compile_cache_iseq: true,
       compile_cache_yaml: true,
     )
@@ -27,6 +28,16 @@ module TomatoShrieker
     return loader
   end
 
+  def self.setup_debug
+    Ricecream.disable
+    return unless Environment.development?
+    Ricecream.enable
+    Ricecream.include_context = true
+    Ricecream.colorize = true
+    Ricecream.prefix = "#{Package.name} | "
+    Ricecream.define_singleton_method(:arg_to_s, proc {|v| PP.pp(v)})
+  end
+
   def self.connect_dbms
     require 'sequel'
     Sequel.connect(Environment.dsn)
@@ -37,9 +48,10 @@ module TomatoShrieker
       require f
     end
   end
-end
 
-Bundler.require
-TomatoShrieker.loader.setup
-TomatoShrieker.setup_bootsnap
-TomatoShrieker.connect_dbms
+  Bundler.require
+  loader.setup
+  setup_bootsnap
+  setup_debug
+  connect_dbms
+end
