@@ -2,4 +2,6 @@
 <% unless @params[:feed].bot? %>[<%= @params[:feed].prefix %>]<% end -%>
 <%= @params[:entry].summary %>
 <%= @params[:entry].uri %>
+<% if @params[:tag] -%>
 <%= @params[:entry].tags.join(' ') %>
+<% end %>
