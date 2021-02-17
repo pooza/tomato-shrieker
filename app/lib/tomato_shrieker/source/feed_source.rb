@@ -10,7 +10,7 @@ module TomatoShrieker
 
     def exec(options = {})
       if multi_entries?
-        shriek(text: multi_entries_body, visibility: visibility)
+        shriek(template: multi_entries_template, visibility: visibility)
       elsif options['silence']
         touch
       elsif touched? || options['all']
@@ -19,10 +19,6 @@ module TomatoShrieker
       elsif entry = fetch.to_a.last
         entry.shriek
       end
-    end
-
-    def tags
-      return (self['/dest/tags'] || []).map(&:to_hashtag)
     end
 
     def purge(params = {})
@@ -64,18 +60,18 @@ module TomatoShrieker
 
     def multi_entries
       entries = feedjira.entries
-        .select {|entry| entry.categories.member?(category)}
-        .sort_by {|entry| entry.published.to_f}
+        .select {|v| v.categories.member?(category)}
+        .sort_by {|v| v.published.to_f}
         .reverse
         .first(limit)
       return entries
     end
 
-    def multi_entries_body
+    def multi_entries_template
       return nil unless multi_entries?
-      template = Template.new(self.template)
+      template = Template.new(template_name)
       template[:entries] = multi_entries
-      return template.to_s
+      return template
     end
 
     def time

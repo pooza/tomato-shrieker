@@ -3,6 +3,7 @@ module TomatoShrieker
     include Package
 
     def exec(body)
+      body = body.clone
       body[:fileIds] ||= []
       if body[:attachments]
         (body[:attachments] || []).each do |attachment|
@@ -11,6 +12,9 @@ module TomatoShrieker
         body.delete(:attachments)
       end
       body.delete(:fileIds) unless body[:fileIds].present?
+      body[:template][:tag] = true
+      body[:text] = body[:template].to_s.strip
+      body.delete(:template)
       body[:visibility] = Ginseng::Fediverse::NoteParser.visibility_name(body[:visibility])
       return note(body)
     end

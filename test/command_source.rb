@@ -6,15 +6,6 @@ module TomatoShrieker
       end
     end
 
-    def test_statuses
-      CommandSource.all do |source|
-        source.exec
-        source.statuses do |status|
-          assert_kind_of(String, status)
-        end
-      end
-    end
-
     def test_delimiter
       CommandSource.all do |source|
         assert_kind_of(Regexp, source.delimiter)

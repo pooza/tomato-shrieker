@@ -4,20 +4,19 @@ module TomatoShrieker
       return if options['silence']
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
-      statuses do |status|
-        shriek(text: status, visibility: visibility)
+      command.stdout.split(delimiter).each do |status|
+        next unless template = create_template(status)
+        shriek(template: template, visibility: visibility)
       end
       logger.info(source: id, message: 'post')
     end
 
-    def statuses
-      command.stdout.split(delimiter).each do |status|
-        template = Template.new('common')
-        template[:status] = status
-        template[:source] = self
-        status = template.to_s.strip
-        yield status if status.present?
-      end
+    def create_template(status)
+      return nil unless status.present?
+      template = Template.new('common')
+      template[:source] = self
+      template[:status] = status
+      return template
     end
 
     def delimiter

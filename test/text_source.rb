@@ -1,8 +1,8 @@
 module TomatoShrieker
   class TextSourceTest < TestCase
-    def test_command
+    def test_template
       TextSource.all do |source|
-        assert_kind_of(String, source.text)
+        assert_kind_of(Template, source.template)
       end
     end
   end

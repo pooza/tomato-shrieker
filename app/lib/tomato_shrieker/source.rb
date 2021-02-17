@@ -38,6 +38,8 @@ module TomatoShrieker
     def shriek(params = {})
       shriekers do |shrieker|
         shrieker.exec(params)
+      rescue => e
+        @logger.error(error: e)
       end
     end
 
@@ -52,7 +54,7 @@ module TomatoShrieker
 
     alias bot? bot_account?
 
-    def template
+    def template_name
       return self['/dest/template'] || 'title'
     end
 
@@ -126,7 +128,7 @@ module TomatoShrieker
     end
 
     def tags
-      return []
+      return (self['/dest/tags'] || []).map(&:to_hashtag)
     end
 
     def tag_min_length
