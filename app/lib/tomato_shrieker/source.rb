@@ -126,7 +126,7 @@ module TomatoShrieker
     end
 
     def tags
-      return []
+      return (self['/dest/tags'] || []).map(&:to_hashtag)
     end
 
     def tag_min_length

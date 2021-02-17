@@ -21,10 +21,6 @@ module TomatoShrieker
       end
     end
 
-    def tags
-      return (self['/dest/tags'] || []).map(&:to_hashtag)
-    end
-
     def purge(params = {})
       records = Entry.dataset
         .select(:published)
