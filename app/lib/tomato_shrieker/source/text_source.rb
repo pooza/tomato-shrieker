@@ -14,7 +14,7 @@ module TomatoShrieker
       template.params = params
       template[:status] = text
       template[:source] = self
-      @body = template.to_s.strip
+      return template.to_s.strip
     end
 
     def text

@@ -3,5 +3,5 @@
 <%= @params[:entry].summary %>
 <%= @params[:entry].uri %>
 <% if @params[:tag] -%>
-<%= @params[:feed].tags.join(' ') %>
+<%= @params[:entry].tags.join(' ') %>
 <% end -%>
