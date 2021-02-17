@@ -6,10 +6,7 @@ module TomatoShrieker
       raise command.stderr || command.stdout unless command.status.zero?
       command.stdout.split(delimiter).each do |status|
         next unless template = create_template(status)
-        params = {text_without_tags: template.to_s}
-        template[:tag] = true
-        params[:text] = template.to_s
-        shriek(params)
+        shriek(template: template, visibility: visibility)
       end
       logger.info(source: id, message: 'post')
     end

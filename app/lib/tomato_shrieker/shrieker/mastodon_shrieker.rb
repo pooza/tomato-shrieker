@@ -3,6 +3,7 @@ module TomatoShrieker
     include Package
 
     def exec(body)
+      body = body.clone
       body[:media_ids] ||= []
       if body[:attachments]
         (body[:attachments] || []).each do |attachment|
@@ -10,10 +11,9 @@ module TomatoShrieker
         end
         body.delete(:attachments)
       end
-      if body[:text]
-        body[:status] = body[:text]
-        body.delete(:text)
-      end
+      body[:template][:tag] = true
+      body[:status] = body[:template].to_s.strip
+      body.delete(:template)
       body[:visibility] = Ginseng::Fediverse::TootParser.visibility_name(body[:visibility])
       return toot(body)
     end

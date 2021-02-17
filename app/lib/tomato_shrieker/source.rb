@@ -52,7 +52,7 @@ module TomatoShrieker
 
     alias bot? bot_account?
 
-    def template
+    def template_name
       return self['/dest/template'] || 'title'
     end
 

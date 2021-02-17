@@ -15,7 +15,7 @@ module TomatoShrieker
           to: @user_id,
           messages: [{
             type: 'text',
-            text: body[:text_without_tags] || body[:text],
+            text: body[:template].to_s.strip,
           }],
         }.to_json,
       })

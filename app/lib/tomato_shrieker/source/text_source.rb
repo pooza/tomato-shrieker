@@ -1,24 +1,15 @@
 module TomatoShrieker
   class TextSource < Source
     def exec(options = {})
-      shriek(
-        text: create_body(tag: true),
-        text_without_tags: create_body,
-        visibility: visibility,
-      )
+      shriek(template: template, visibility: visibility)
       logger.info(source: id, message: 'post')
     end
 
-    def create_body(params = {})
+    def template
       template = Template.new('common')
-      template.params = params
-      template[:status] = text
+      template[:status] = self['/source/text']
       template[:source] = self
-      return template.to_s.strip
-    end
-
-    def text
-      return self['/source/text']
+      return template
     end
 
     def self.all

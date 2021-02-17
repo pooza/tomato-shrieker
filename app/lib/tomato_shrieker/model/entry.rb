@@ -59,23 +59,17 @@ module TomatoShrieker
       return @uri
     end
 
-    def create_body(params = {})
-      template = Template.new(feed.template)
-      template.params = params
+    def template
+      template = Template.new(feed.template_name)
       template[:feed] = feed
       template[:entry] = self
-      return template.to_s.strip
+      return template
     end
 
     def shriek
-      v = {
-        text: create_body(tag: true),
-        text_without_tags: create_body,
-        visibility: feed.visibility,
-        attachments: [],
-      }
-      v[:attachments].push(image_url: enclosure.to_s) if enclosure
-      feed.shriek(v)
+      params = {template: template, visibility: feed.visibility, attachments: []}
+      params[:attachments].push(image_url: enclosure.to_s) if enclosure
+      feed.shriek(params)
       feed.logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 

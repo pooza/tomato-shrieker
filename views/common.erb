@@ -1,5 +1,5 @@
 <%# encoding: UTF-8 -%>
 <%= @params[:status] -%>
-<% if @params[:tag] -%>
+<% if @params[:tag] && params[:source] -%>
 <%= @params[:source].tags.join(' ') %>
 <% end -%>
