@@ -38,6 +38,8 @@ module TomatoShrieker
     def shriek(params = {})
       shriekers do |shrieker|
         shrieker.exec(params)
+      rescue => e
+        @logger.error(error: e)
       end
     end
 
