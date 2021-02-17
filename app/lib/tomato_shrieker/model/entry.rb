@@ -64,7 +64,7 @@ module TomatoShrieker
       template.params = params
       template[:feed] = feed
       template[:entry] = self
-      @body = template.to_s
+      return template.to_s.strip
     end
 
     def shriek
