@@ -135,6 +135,15 @@ module TomatoShrieker
       return 2
     end
 
+    def fetch_remote_tags(body)
+      html = Nokogiri::HTML.parse(body, nil, 'utf-8')
+      contents = []
+      ['h1', 'h2', 'title', 'meta'].map do |v|
+        contents.push(html.xpath("//#{v}").inner_text)
+      end
+      return mulukhiya.search_hashtags(contents.join(' '))
+    end
+
     def tagging?
       return mulukhiya.present? && (self['/dest/mulukhiya/tagging/enable'] == true)
     end
