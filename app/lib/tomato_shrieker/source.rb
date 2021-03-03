@@ -140,7 +140,7 @@ module TomatoShrieker
       container.concat(tags.clone)
       container.concat(mulukhiya.search_hashtags(status)) if tagging?
       container.select! {|v| tag_min_length < v.to_s.length}
-      return tags.create_tags
+      return container.create_tags
     end
 
     def tagging?
