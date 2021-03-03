@@ -135,13 +135,12 @@ module TomatoShrieker
       return 2
     end
 
-    def fetch_remote_tags(body)
-      html = Nokogiri::HTML.parse(body, nil, 'utf-8')
-      contents = []
-      ['h1', 'h2', 'title', 'meta'].map do |v|
-        contents.push(html.xpath("//#{v}").inner_text)
-      end
-      return mulukhiya.search_hashtags(contents.join(' '))
+    def create_tags(status)
+      container = Ginseng::Fediverse::TagContainer.new
+      container.concat(tags.clone)
+      container.concat(mulukhiya.search_hashtags(status)) if tagging?
+      container.select! {|v| tag_min_length < v.to_s.length}
+      return tags.create_tags
     end
 
     def tagging?

@@ -16,7 +16,6 @@ module TomatoShrieker
       template = Template.new('common')
       template[:source] = self
       template[:status] = status
-      template.mulukhiya = mulukhiya if tagging?
       return template
     end
 

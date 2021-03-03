@@ -34,7 +34,7 @@ module TomatoShrieker
       unless @tags
         tags = Ginseng::Fediverse::TagContainer.new
         tags.concat(feed.tags.clone)
-        tags.concat(feed.fetch_remote_tags(HTTP.new.get(uri).body)) if feed.tagging?
+        tags.concat(fetch_remote_tags) if feed.tagging?
         tags.select! {|v| feed.tag_min_length < v.to_s.length}
         @tags = tags.create_tags
       end
@@ -43,6 +43,15 @@ module TomatoShrieker
       return [] unless feed
       feed.logger.error(error: e)
       return feed.tags
+    end
+
+    def fetch_remote_tags
+      html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
+      contents = []
+      ['h1', 'h2', 'title', 'meta'].map do |v|
+        contents.push(html.xpath("//#{v}").inner_text)
+      end
+      return feed.mulukhiya.search_hashtags(contents.join(' '))
     end
 
     def uri
