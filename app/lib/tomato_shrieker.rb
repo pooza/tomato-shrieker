@@ -38,11 +38,6 @@ module TomatoShrieker
     Ricecream.define_singleton_method(:arg_to_s, proc {|v| PP.pp(v)})
   end
 
-  def self.connect_dbms
-    require 'sequel'
-    Sequel.connect(Environment.dsn)
-  end
-
   def self.load_tasks
     Dir.glob(File.join(dir, 'app/task/*.rb')).each do |f|
       require f
@@ -53,5 +48,5 @@ module TomatoShrieker
   loader.setup
   setup_bootsnap
   setup_debug
-  connect_dbms
+  Sequel.connect(Environment.dsn)
 end
