@@ -16,3 +16,5 @@ http:
   retry:
     limit: 3
     seconds: 1
+websocket:
+  keepalive: 15

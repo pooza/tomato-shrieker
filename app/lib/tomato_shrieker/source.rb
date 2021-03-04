@@ -121,9 +121,11 @@ module TomatoShrieker
 
     def lemmy
       unless @lemmy
-        return nil unless user_id = self['/dest/lemmy/user_id']
-        return nil unless password = self['/dest/lemmy/password']
-        @lemmy = LemmyShrieker.new(user_id, password)
+        return nil unless self['/dest/lemmy/host']
+        return nil unless self['/dest/lemmy/user_id']
+        return nil unless self['/dest/lemmy/password']
+        return nil unless self['/dest/lemmy/community_id']
+        @lemmy = LemmyShrieker.new(@params.dig('dest', 'lemmy'))
       end
       return @lemmy
     end
