@@ -63,6 +63,7 @@ module TomatoShrieker
       yield mastodon if mastodon?
       yield misskey if misskey?
       yield line if line?
+      yield lemmy if lemmy?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
@@ -116,6 +117,19 @@ module TomatoShrieker
 
     def line?
       return line.present?
+    end
+
+    def lemmy
+      unless @lemmy
+        return nil unless user_id = self['/dest/lemmy/user_id']
+        return nil unless password = self['/dest/lemmy/password']
+        @lemmy = LemmyShrieker.new(user_id, password)
+      end
+      return @lemmy
+    end
+
+    def lemmy?
+      return lemmy.present?
     end
 
     def mulukhiya

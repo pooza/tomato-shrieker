@@ -1,6 +1,7 @@
 source 'https://rubygems.org'
 ruby '~>3.0.0'
 gem 'bootsnap', '>=1.7.0'
+gem 'faye-websocket'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core', 'require': 'ginseng'
 gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', require: 'ginseng/fediverse'
