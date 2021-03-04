@@ -1,3 +1,7 @@
 filters:
   - name: ci
     cases: []
+  - name: google_news
+    cases:
+      - google_news_source
+      - news_entry

@@ -21,7 +21,7 @@ module TomatoShrieker
     end
 
     def test_tags
-      (@entry.tags || []).each do |tag|
+      (@entry&.tags || []).each do |tag|
         assert_kind_of(String, tag)
       end
     end

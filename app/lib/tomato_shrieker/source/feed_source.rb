@@ -108,8 +108,9 @@ module TomatoShrieker
     end
 
     def uri
-      return nil unless uri = Ginseng::URI.parse(self['/source/url'])
-      return nil unless uri.absolute?
+      uri = Ginseng::URI.parse(self['/source/feed'])
+      uri ||= Ginseng::URI.parse(self['/source/url'])
+      return nil unless uri&.absolute?
       return uri
     end
 

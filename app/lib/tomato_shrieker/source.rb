@@ -178,9 +178,11 @@ module TomatoShrieker
       return enum_for(__method__) unless block_given?
       Config.instance['/sources'].each do |entry|
         values = entry.key_flatten
+        yield FeedSource.new(entry) if values['/source/feed']
         yield FeedSource.new(entry) if values['/source/url']
-        yield TextSource.new(entry) if values['/source/text']
         yield CommandSource.new(entry) if values['/source/command']
+        yield TextSource.new(entry) if values['/source/text']
+        yield GoogleNewsSource.new(entry) if values['/source/google_news']
       end
     end
 

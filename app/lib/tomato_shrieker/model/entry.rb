@@ -82,7 +82,7 @@ module TomatoShrieker
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
         feed: feed.id,
-        title: create_title(values['title'], values['published'], feed).sanitize,
+        title: create_title(values['title'], values['published'], feed),
         summary: values['summary']&.sanitize,
         url: values['url'],
         enclosure_url: values['enclosure_url'],
@@ -100,7 +100,7 @@ module TomatoShrieker
 
     def self.create_title(title, published, feed)
       return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
-      return title
+      return title.sanitize
     rescue => e
       feed.logger.error(error: e, entry: entry)
       return title
