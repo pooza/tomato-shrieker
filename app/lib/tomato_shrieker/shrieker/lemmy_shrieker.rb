@@ -23,10 +23,7 @@ module TomatoShrieker
 
     def exec(body)
       EM.run do
-        client.send({
-          op: 'Login',
-          data: {username_or_email: @params['user_id'], password: @params['password']},
-        }.to_json)
+        client.send({op: 'Login', data: login_data}.to_json)
 
         client.on(:close) do |e|
           EM.stop_event_loop
@@ -40,17 +37,18 @@ module TomatoShrieker
           payload = JSON.parse(message.data)
           send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         end
-      rescue => e
-        @logger.error(error: e)
       end
     end
 
     def handle_login(payload, body)
       @auth = payload['jwt']
-      client.send({
-        op: 'CreatePost',
-        data: create_post_data(body),
-      }.to_json)
+      client.send({op: 'CreatePost', data: create_post_data(body)}.to_json)
+    end
+
+    private
+
+    def login_data
+      return {username_or_email: @params['user_id'], password: @params['password']}
     end
 
     def create_post_data(body)
