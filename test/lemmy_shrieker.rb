@@ -1,14 +1,14 @@
 module TomatoShrieker
-  class LineShriekerTest < TestCase
+  class LemmyShriekerTest < TestCase
     def setup
       @config = Config.instance
       @template = Template.new('common')
       @template[:status] = Time.now.to_s
-      @template[:source] = Source.all.find(&:line?)
+      @template[:source] = Source.all.find(&:lemmy?)
     end
 
     def test_exec
-      assert_equal(@template[:source].line.exec(template: @template).code, 200)
+      assert(@template[:source].lemmy.exec(template: @template))
     end
   end
 end

@@ -21,12 +21,13 @@
 
 ### 投稿先
 
-- Mastodon
-  - Pleroma等、互換APIをもつサービスを含む。
-- Misskey
+- [Mastodon](https://github.com/tootsuite/mastodon)
+  - [Pleroma](https://git.pleroma.social/pleroma)等、互換APIをもつサービスを含む。
+- [Misskey](https://github.com/syuilo/misskey)
 - Slack Incoming Webhooks
   - Discord等、webhookに互換性をもつサービスを含む。
   - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む。
+- [Lemmy](https://github.com/LemmyNet/lemmy/)
 - LINE
 
 ## 由来

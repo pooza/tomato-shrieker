@@ -13,7 +13,7 @@ module TomatoShrieker
 
     def create_template(status)
       return nil unless status.present?
-      template = Template.new('common')
+      template = Template.new(template_name)
       template[:source] = self
       template[:status] = status
       return template
@@ -39,12 +39,9 @@ module TomatoShrieker
       return @command
     end
 
-    def self.all
-      return enum_for(__method__) unless block_given?
-      Source.all do |source|
-        next unless source.is_a?(CommandSource)
-        yield source
-      end
+    def self.all(&block)
+      return enum_for(__method__) unless block
+      Source.all.select {|s| s.is_a?(CommandSource)}.each(&block)
     end
   end
 end

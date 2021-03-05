@@ -1,5 +1,3 @@
-require 'rufus-scheduler'
-
 module TomatoShrieker
   class SourceTest < TestCase
     def test_all
@@ -49,10 +47,26 @@ module TomatoShrieker
       end
     end
 
+    def test_line
+      Source.all do |source|
+        assert_boolean(source.line?)
+        next unless source.line?
+        assert_kind_of(LineShrieker, source.line)
+      end
+    end
+
+    def test_lemmy
+      Source.all do |source|
+        assert_boolean(source.lemmy?)
+        next unless source.lemmy?
+        assert_kind_of(LemmyShrieker, source.lemmy)
+      end
+    end
+
     def test_shriekers
       Source.all do |source|
         source.shriekers do |shrieker|
-          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker, LineShrieker], shrieker)
+          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker, LineShrieker, LemmyShrieker], shrieker)
         end
       end
     end
@@ -64,9 +78,9 @@ module TomatoShrieker
       end
     end
 
-    def test_tagging?
+    def test_remote_tagging?
       Source.all do |source|
-        assert_boolean(source.tagging?)
+        assert_boolean(source.remote_tagging?)
       end
     end
 

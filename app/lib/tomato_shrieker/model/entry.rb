@@ -7,14 +7,7 @@ module TomatoShrieker
     alias to_h values
 
     def feed
-      unless @feed
-        Source.all do |source|
-          next unless source.is_a?(FeedSource)
-          next unless source.id == values[:feed]
-          @feed = source
-          break
-        end
-      end
+      @feed ||= FeedSource.all.find {|v| v.id == values[:feed]}
       return @feed
     end
 
@@ -34,7 +27,7 @@ module TomatoShrieker
       unless @tags
         tags = Ginseng::Fediverse::TagContainer.new
         tags.concat(feed.tags.clone)
-        tags.concat(fetch_remote_tags) if feed.tagging?
+        tags.concat(fetch_remote_tags) if feed.remote_tagging?
         tags.select! {|v| feed.tag_min_length < v.to_s.length}
         @tags = tags.create_tags
       end
@@ -82,7 +75,7 @@ module TomatoShrieker
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
         feed: feed.id,
-        title: create_title(values['title'], values['published'], feed).sanitize,
+        title: create_title(values['title'], values['published'], feed),
         summary: values['summary']&.sanitize,
         url: values['url'],
         enclosure_url: values['enclosure_url'],
@@ -91,8 +84,6 @@ module TomatoShrieker
       return Entry[id]
     rescue SQLite3::BusyException
       retry
-    rescue Sequel::UniqueConstraintViolation
-      return nil
     rescue => e
       feed.logger.error(error: e, entry: entry)
       return nil
@@ -100,7 +91,7 @@ module TomatoShrieker
 
     def self.create_title(title, published, feed)
       return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
-      return title
+      return title.sanitize
     rescue => e
       feed.logger.error(error: e, entry: entry)
       return title

@@ -91,6 +91,32 @@ properties:
                 items:
                   type: string
                   format: url
+              line:
+                type: hash
+                required:
+                  - user_id
+                  - token
+                properties:
+                  user_id:
+                    type: string
+                  token:
+                    type: string
+              lemmy:
+                type: hash
+                required:
+                  - host
+                  - user_id
+                  - password
+                  - comunity_id
+                properties:
+                  host:
+                    type: string
+                  user_id:
+                    type: string
+                  password:
+                    type: string
+                  community_id:
+                    type: integer
               mulukhiya:
                 type: hash
                 required:

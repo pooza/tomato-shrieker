@@ -1,5 +1,4 @@
 require 'bundler/setup'
-require 'ricecream'
 require 'tomato_shrieker/refines'
 
 module TomatoShrieker
@@ -29,6 +28,8 @@ module TomatoShrieker
   end
 
   def self.setup_debug
+    require 'ricecream'
+    require 'pp'
     Ricecream.disable
     return unless Environment.development?
     Ricecream.enable

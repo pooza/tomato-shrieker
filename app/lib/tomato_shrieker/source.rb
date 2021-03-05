@@ -55,7 +55,7 @@ module TomatoShrieker
     alias bot? bot_account?
 
     def template_name
-      return self['/dest/template'] || 'title'
+      return 'common'
     end
 
     def shriekers
@@ -63,6 +63,7 @@ module TomatoShrieker
       yield mastodon if mastodon?
       yield misskey if misskey?
       yield line if line?
+      yield lemmy if lemmy?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
@@ -118,6 +119,21 @@ module TomatoShrieker
       return line.present?
     end
 
+    def lemmy
+      unless @lemmy
+        return nil unless self['/dest/lemmy/host']
+        return nil unless self['/dest/lemmy/user_id']
+        return nil unless self['/dest/lemmy/password']
+        return nil unless self['/dest/lemmy/community_id']
+        @lemmy = LemmyShrieker.new(@params.dig('dest', 'lemmy'))
+      end
+      return @lemmy
+    end
+
+    def lemmy?
+      return lemmy.present?
+    end
+
     def mulukhiya
       return nil unless uri = Ginseng::URI.parse(self['/dest/mulukhiya/url'])
       @mulukhiya ||= MulukhiyaService.new(uri)
@@ -138,12 +154,12 @@ module TomatoShrieker
     def create_tags(status)
       container = Ginseng::Fediverse::TagContainer.new
       container.concat(tags.clone)
-      container.concat(mulukhiya.search_hashtags(status)) if tagging?
+      container.concat(mulukhiya.search_hashtags(status)) if remote_tagging?
       container.select! {|v| tag_min_length < v.to_s.length}
       return container.create_tags
     end
 
-    def tagging?
+    def remote_tagging?
       return mulukhiya.present? && (self['/dest/mulukhiya/tagging/enable'] == true)
     end
 
@@ -178,9 +194,11 @@ module TomatoShrieker
       return enum_for(__method__) unless block_given?
       Config.instance['/sources'].each do |entry|
         values = entry.key_flatten
+        yield FeedSource.new(entry) if values['/source/feed']
         yield FeedSource.new(entry) if values['/source/url']
-        yield TextSource.new(entry) if values['/source/text']
         yield CommandSource.new(entry) if values['/source/command']
+        yield TextSource.new(entry) if values['/source/text']
+        yield GoogleNewsSource.new(entry) if values['/source/google_news']
       end
     end
 

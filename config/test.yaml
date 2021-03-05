@@ -1,3 +1,13 @@
 filters:
   - name: ci
     cases: []
+  - name: google_news
+    cases:
+      - google_news_source
+      - news_entry
+  - name: line
+    cases:
+      - line_shrieker
+  - name: lemmy
+    cases:
+      - lemmy_shrieker

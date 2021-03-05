@@ -11,7 +11,6 @@ module TomatoShrieker
         end
         body.delete(:attachments)
       end
-      body.delete(:fileIds) unless body[:fileIds].present?
       body[:template][:tag] = true
       body[:text] = body[:template].to_s.strip
       body.delete(:template)

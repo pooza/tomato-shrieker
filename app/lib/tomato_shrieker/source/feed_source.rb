@@ -58,6 +58,10 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
+    def template_name
+      return self['/dest/template'] || 'title'
+    end
+
     def multi_entries
       entries = feedjira.entries
         .select {|v| v.categories.member?(category)}
@@ -108,8 +112,9 @@ module TomatoShrieker
     end
 
     def uri
-      return nil unless uri = Ginseng::URI.parse(self['/source/url'])
-      return nil unless uri.absolute?
+      uri = Ginseng::URI.parse(self['/source/feed'])
+      uri ||= Ginseng::URI.parse(self['/source/url'])
+      return nil unless uri&.absolute?
       return uri
     end
 
@@ -129,12 +134,9 @@ module TomatoShrieker
       return uri
     end
 
-    def self.all
-      return enum_for(__method__) unless block_given?
-      Source.all do |source|
-        next unless source.is_a?(FeedSource)
-        yield source
-      end
+    def self.all(&block)
+      return enum_for(__method__) unless block
+      Source.all.select {|s| s.is_a?(FeedSource)}.each(&block)
     end
 
     def self.purge_all(params = {})
