@@ -21,10 +21,7 @@ module TomatoShrieker
 
     def self.all
       return enum_for(__method__) unless block_given?
-      Source.all do |source|
-        next unless source.is_a?(GoogleNewsSource)
-        yield source
-      end
+      return Source.all.select {|s| s.is_a?(GoogleNewsSource)}
     end
   end
 end
