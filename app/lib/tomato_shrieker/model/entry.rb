@@ -7,13 +7,7 @@ module TomatoShrieker
     alias to_h values
 
     def feed
-      unless @feed
-        FeedSource.all do |source|
-          next unless source.id == values[:feed]
-          @feed = source
-          break
-        end
-      end
+      @feed ||= FeedSource.all.find {|v| v.id == values[:feed]}
       return @feed
     end
 
