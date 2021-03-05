@@ -58,6 +58,10 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
+    def template_name
+      return self['/dest/template'] || 'title'
+    end
+
     def multi_entries
       entries = feedjira.entries
         .select {|v| v.categories.member?(category)}

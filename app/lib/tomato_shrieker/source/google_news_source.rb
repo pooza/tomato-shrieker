@@ -10,6 +10,10 @@ module TomatoShrieker
       return true
     end
 
+    def template_name
+      return 'title'
+    end
+
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
