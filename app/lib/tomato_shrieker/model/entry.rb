@@ -8,8 +8,7 @@ module TomatoShrieker
 
     def feed
       unless @feed
-        Source.all do |source|
-          next unless source.is_a?(FeedSource)
+        FeedSource.all do |source|
           next unless source.id == values[:feed]
           @feed = source
           break

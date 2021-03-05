@@ -2,8 +2,7 @@ namespace :tomato do
   namespace :feed do
     desc 'entry summary (for "multi_entries" feed source)'
     task :summary do
-      TomatoShrieker::Source.all do |source|
-        next unless source.is_a?(TomatoShrieker::FeedSource)
+      TomatoShrieker::FeedSource.all do |source|
         next unless source.multi_entries?
         puts YAML.dump(
           id: source.id,
