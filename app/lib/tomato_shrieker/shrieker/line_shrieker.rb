@@ -9,6 +9,7 @@ module TomatoShrieker
     end
 
     def exec(body)
+      body = body.clone
       body[:template][:tag] = false
       return @http.post('/v2/bot/message/push', {
         headers: {'Authorization' => "Bearer #{@token}"},
