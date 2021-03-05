@@ -21,7 +21,7 @@ module TomatoShrieker
     end
 
     def self.create_title(title)
-      pattern = /( [|-] .+|[（(].+[）)])$/
+      pattern = / [|-] .+$/
       dest = title.dup
       dest.gsub!(pattern, '') while dest.match?(pattern)
       return dest
