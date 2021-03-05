@@ -30,19 +30,21 @@ module TomatoShrieker
         end
 
         client.on(:error) do |e|
+          @response = e
           @logger.error(error: e.message)
         end
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
-          send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
+          @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         end
       end
+      return @response
     end
 
     def handle_login(payload, body)
       @auth = payload['jwt']
-      client.send({op: 'CreatePost', data: create_post_data(body)}.to_json)
+      return client.send({op: 'CreatePost', data: create_post_data(body)}.to_json)
     end
 
     private
