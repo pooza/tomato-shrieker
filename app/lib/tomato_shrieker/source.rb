@@ -154,12 +154,12 @@ module TomatoShrieker
     def create_tags(status)
       container = Ginseng::Fediverse::TagContainer.new
       container.concat(tags.clone)
-      container.concat(mulukhiya.search_hashtags(status)) if tagging?
+      container.concat(mulukhiya.search_hashtags(status)) if remote_tagging?
       container.select! {|v| tag_min_length < v.to_s.length}
       return container.create_tags
     end
 
-    def tagging?
+    def remote_tagging?
       return mulukhiya.present? && (self['/dest/mulukhiya/tagging/enable'] == true)
     end
 

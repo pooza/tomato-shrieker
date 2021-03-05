@@ -34,7 +34,7 @@ module TomatoShrieker
       unless @tags
         tags = Ginseng::Fediverse::TagContainer.new
         tags.concat(feed.tags.clone)
-        tags.concat(fetch_remote_tags) if feed.tagging?
+        tags.concat(fetch_remote_tags) if feed.remote_tagging?
         tags.select! {|v| feed.tag_min_length < v.to_s.length}
         @tags = tags.create_tags
       end

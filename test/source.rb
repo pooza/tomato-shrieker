@@ -78,9 +78,9 @@ module TomatoShrieker
       end
     end
 
-    def test_tagging?
+    def test_remote_tagging?
       Source.all do |source|
-        assert_boolean(source.tagging?)
+        assert_boolean(source.remote_tagging?)
       end
     end
 
