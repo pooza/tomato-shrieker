@@ -15,6 +15,8 @@ module TomatoShrieker
       return NewsEntry[id]
     rescue SQLite3::BusyException
       retry
+    rescue Sequel::UniqueConstraintViolation
+      return nil
     rescue => e
       feed.logger.error(error: e, entry: entry)
       return nil

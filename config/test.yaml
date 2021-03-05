@@ -11,3 +11,6 @@ filters:
   - name: lemmy
     cases:
       - lemmy_shrieker
+  - name: entry
+    cases:
+      - entry
