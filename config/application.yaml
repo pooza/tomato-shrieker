@@ -5,7 +5,7 @@ package:
     - Tatsuya Koishi
   email:
     - tkoishi@b-shock.co.jp
-  description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse、Slack互換webhook、LINEに投稿する。
+  description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse、Slack互換webhook、LINE、Lemmyに投稿する。
   license: MIT
 environment: development
 sqlite3:
