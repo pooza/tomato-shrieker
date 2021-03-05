@@ -12,9 +12,9 @@ module TomatoShrieker
       return template
     end
 
-    def self.all
-      return enum_for(__method__) unless block_given?
-      return Source.all.select {|s| s.is_a?(TextSource)}
+    def self.all(&block)
+      return enum_for(__method__) unless block
+      Source.all.select {|s| s.is_a?(TextSource)}.each(&block)
     end
   end
 end

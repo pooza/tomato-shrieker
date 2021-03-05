@@ -39,9 +39,9 @@ module TomatoShrieker
       return @command
     end
 
-    def self.all
-      return enum_for(__method__) unless block_given?
-      return Source.all.select {|s| s.is_a?(CommandSource)}
+    def self.all(&block)
+      return enum_for(__method__) unless block
+      Source.all.select {|s| s.is_a?(CommandSource)}.each(&block)
     end
   end
 end
