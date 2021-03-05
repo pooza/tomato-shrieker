@@ -1,5 +1,3 @@
-require 'fileutils'
-
 namespace :migration do
   def path
     return File.join(
