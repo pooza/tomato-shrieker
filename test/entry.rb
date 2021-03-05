@@ -9,28 +9,24 @@ module TomatoShrieker
     end
 
     def test_template
-      if entry = @entries.find(&:template)
-        assert_kind_of(Template, entry.template)
-      end
+      return unless entry = @entries.find(&:template)
+      assert_kind_of(Template, entry.template)
     end
 
     def test_uri
-      if entry = @entries.find(&:uri)
-        assert_kind_of(Ginseng::URI, entry.uri)
-      end
+      return unless entry = @entries.find(&:uri)
+      assert_kind_of(Ginseng::URI, entry.uri)
     end
 
     def test_enclosure
-      if entry = @entries.find(&:enclosure)
-        assert_kind_of(Ginseng::URI, entry.enclosure)
-      end
+      return unless entry = @entries.find(&:enclosure)
+      assert_kind_of(Ginseng::URI, entry.enclosure)
     end
 
     def test_tags
-      if entry = @entries.find {|v| v.tags.count.positive?}
-        entry.tags.each do |tag|
-          assert_kind_of(String, tag)
-        end
+      return unless entry = @entries.find {|v| v.tags.count.positive?}
+      entry.tags.each do |tag|
+        assert_kind_of(String, tag)
       end
     end
   end
