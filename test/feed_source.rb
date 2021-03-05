@@ -1,8 +1,7 @@
 module TomatoShrieker
   class FeedSourceTest < TestCase
     def test_time
-      FeedSource.all do |source|
-        next if source.time.nil?
+      FeedSource.all.select(&:time).each do |source|
         assert_kind_of(Time, source.time)
       end
     end
