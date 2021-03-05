@@ -6,7 +6,7 @@ module TomatoShrieker
     end
 
     def template
-      template = Template.new('common')
+      template = Template.new(template_name)
       template[:status] = self['/source/text']
       template[:source] = self
       return template
