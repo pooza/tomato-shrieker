@@ -2,14 +2,13 @@ module TomatoShrieker
   class LemmyShriekerTest < TestCase
     def setup
       @config = Config.instance
-      @lemmy = LemmyShrieker.new(@config['/lemmy/services'].first)
-
       @template = Template.new('common')
       @template[:status] = Time.now.to_s
+      @template[:source] = Source.all.find(&:lemmy?)
     end
 
     def test_exec
-      assert(@lemmy.exec(template: @template))
+      assert(@template[:source].lemmy.exec(template: @template))
     end
   end
 end
