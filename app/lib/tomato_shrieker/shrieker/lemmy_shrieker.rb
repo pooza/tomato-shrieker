@@ -37,6 +37,9 @@ module TomatoShrieker
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
+        rescue => e
+          @logger.error(error: e.message)
+          EM.stop_event_loop
         end
       end
       return @response
