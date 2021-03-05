@@ -50,7 +50,10 @@ module TomatoShrieker
     private
 
     def login_data
-      return {username_or_email: @params['user_id'], password: @params['password']}
+      return {
+        username_or_email: @params['user_id'],
+        password: @params['password'].decrypt,
+      }
     end
 
     def create_post_data(body)
