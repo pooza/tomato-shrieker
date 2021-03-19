@@ -1,10 +1,11 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 04087e2d68324b5a63a5d3ad07b0ba9017b5b208
+  revision: bdc5732747a2617adb116c13f69102a203b1fc1c
   specs:
-    ginseng-core (1.10.9)
+    ginseng-core (1.10.11)
       activesupport (>= 6.1.1)
       addressable
+      bundler
       daemon-spawn
       facets
       httparty
@@ -18,6 +19,7 @@ GIT
       unicode
       yajl-ruby
       zeitwerk (>= 2.4.0)
+      zlib
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
@@ -83,12 +85,12 @@ GEM
     multi_json (1.15.0)
     multi_xml (0.6.0)
     netrc (0.11.0)
-    nokogiri (1.11.1)
+    nokogiri (1.11.2)
       mini_portile2 (~> 2.5.0)
       racc (~> 1.4)
-    nokogiri (1.11.1-x86_64-linux)
+    nokogiri (1.11.2-x86_64-linux)
       racc (~> 1.4)
-    nokogumbo (2.0.4)
+    nokogumbo (2.0.5)
       nokogiri (~> 1.8, >= 1.8.4)
     parallel (1.20.1)
     parser (3.0.0.0)
@@ -149,6 +151,7 @@ GEM
     websocket-extensions (0.1.5)
     yajl-ruby (1.4.1)
     zeitwerk (2.4.2)
+    zlib (1.1.0)
 
 PLATFORMS
   ruby
