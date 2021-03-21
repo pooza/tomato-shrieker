@@ -46,10 +46,14 @@
   - [「レッツ・ラ・クッキン☆ショータイム」の再生回数ボット](https://mstdn.b-shock.org/@lets_la_bot)
   - [「エビバディ☆ヒーリングッデイ！」再生数ボット](https://precure.ml/@healingoodday)
   - [増子](https://precure.ml/@mikabot)
+  - [あくまのめだまニュース](https://mstdn.delmulin.com/@news)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
-  - [ぷーざの録画お知らせボット](https://mstdn.b-shock.org/@pooza_recorder_bot)
   - [キュアスタ！お知らせボット](https://precure.ml/@infomation)
+  - [デルムリン丼お知らせボット](https://mstdn.delmulin.com/@info)
 
-- 中の人は普段、個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」か、プリキュア専用インスタンス「[キュアスタ！](https://precure.ml/)」に居ます。（いずれもMastodon）
-- プリキュアに興味ある人は、是非キュアスタ！に来てください。
+- 中の人は普段、以下のいずれかに居ます。
+  - 個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」
+  - プリキュアシリーズ専用インスタンス「[キュアスタ！](https://precure.ml/)」
+  - 「ドラゴンクエスト ダイの大冒険」専用インスタンス「[デルムリン丼](https://mstdn.delmulin.com/)」
+- プリキュアかダイ大に興味ある人は、遊びに来てください。
