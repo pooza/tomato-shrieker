@@ -21,3 +21,6 @@ websocket:
 crypt:
   password: null
   encoder: base64
+line:
+  urls:
+    api: https://api.line.me
