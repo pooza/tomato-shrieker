@@ -21,9 +21,13 @@ module TomatoShrieker
       return @uri
     end
 
+    def login
+      client.send({op: 'Login', data: login_data}.to_json)
+    end
+
     def exec(body)
       EM.run do
-        client.send({op: 'Login', data: login_data}.to_json)
+        login
 
         client.on(:close) do |e|
           EM.stop_event_loop
@@ -31,6 +35,7 @@ module TomatoShrieker
 
         client.on(:error) do |e|
           @logger.error(error: e.message)
+          EM.stop_event_loop
           raise Ginseng::GatewayError, e.message
         end
 
@@ -38,7 +43,7 @@ module TomatoShrieker
           payload = JSON.parse(message.data)
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         rescue => e
-          @logger.error(error: e.message)
+          @logger.error(error: e)
           EM.stop_event_loop
         end
       end
@@ -50,14 +55,14 @@ module TomatoShrieker
       return client.send({op: 'CreatePost', data: create_post_data(body)}.to_json)
     end
 
+    private
+
     def login_data
       return {
         username_or_email: @params['user_id'],
         password: @params['password'].decrypt,
       }
     end
-
-    private
 
     def create_post_data(body)
       params = body[:template].params.deep_symbolize_keys

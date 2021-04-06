@@ -4,7 +4,6 @@ module TomatoShrieker
       @source = Source.all.find(&:lemmy?)
       return unless @source
       @shrieker = @source.shriekers.find {|v| v.is_a?(LemmyShrieker)}
-      return unless @shrieker
       @config = Config.instance
       @template = Template.new('common')
       @template[:status] = Time.now.to_s
@@ -12,13 +11,13 @@ module TomatoShrieker
     end
 
     def test_client
-      return unless @shrieker
+      return unless @source
       assert_kind_of(Faye::WebSocket::Client, @shrieker.client)
-      @shrieker.client.send({op: 'Login', data: @shrieker.login_data}.to_json)
+      @shrieker.login
     end
 
     def test_exec
-      return unless @shrieker
+      return unless @source
       assert(@template[:source].lemmy.exec(template: @template))
     end
   end
