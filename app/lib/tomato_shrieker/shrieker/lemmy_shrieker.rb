@@ -17,7 +17,7 @@ module TomatoShrieker
     end
 
     def uri
-      @uri ||= Ginseng::URI.parse("wss://#{@params['host']}/api/v2/ws")
+      @uri ||= Ginseng::URI.parse("wss://#{@params['host']}/api/v3/ws")
       return @uri
     end
 
@@ -30,8 +30,8 @@ module TomatoShrieker
         end
 
         client.on(:error) do |e|
-          @response = e
           @logger.error(error: e.message)
+          raise Ginseng::GatewayError, e.message
         end
 
         client.on(:message) do |message|
@@ -50,14 +50,14 @@ module TomatoShrieker
       return client.send({op: 'CreatePost', data: create_post_data(body)}.to_json)
     end
 
-    private
-
     def login_data
       return {
         username_or_email: @params['user_id'],
         password: @params['password'].decrypt,
       }
     end
+
+    private
 
     def create_post_data(body)
       params = body[:template].params.deep_symbolize_keys
