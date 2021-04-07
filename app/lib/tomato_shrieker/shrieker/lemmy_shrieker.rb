@@ -17,28 +17,33 @@ module TomatoShrieker
     end
 
     def uri
-      @uri ||= Ginseng::URI.parse("wss://#{@params['host']}/api/v2/ws")
+      @uri ||= Ginseng::URI.parse("wss://#{@params['host']}/api/v3/ws")
       return @uri
+    end
+
+    def login
+      client.send({op: 'Login', data: login_data}.to_json)
     end
 
     def exec(body)
       EM.run do
-        client.send({op: 'Login', data: login_data}.to_json)
+        login
 
         client.on(:close) do |e|
           EM.stop_event_loop
         end
 
         client.on(:error) do |e|
-          @response = e
           @logger.error(error: e.message)
+          EM.stop_event_loop
+          raise Ginseng::GatewayError, e.message
         end
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         rescue => e
-          @logger.error(error: e.message)
+          @logger.error(error: e)
           EM.stop_event_loop
         end
       end
