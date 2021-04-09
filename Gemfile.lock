@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: bdc5732747a2617adb116c13f69102a203b1fc1c
+  revision: 1b90713eec32a1e60534834c51559a93c6218af0
   specs:
-    ginseng-core (1.10.11)
+    ginseng-core (1.10.12)
       activesupport (>= 6.1.1)
       addressable
       bundler
@@ -85,10 +85,10 @@ GEM
     multi_json (1.15.0)
     multi_xml (0.6.0)
     netrc (0.11.0)
-    nokogiri (1.11.2)
+    nokogiri (1.11.3)
       mini_portile2 (~> 2.5.0)
       racc (~> 1.4)
-    nokogiri (1.11.2-x86_64-linux)
+    nokogiri (1.11.3-x86_64-linux)
       racc (~> 1.4)
     nokogumbo (2.0.5)
       nokogiri (~> 1.8, >= 1.8.4)
