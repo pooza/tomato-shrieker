@@ -62,6 +62,10 @@ module TomatoShrieker
       return self['/dest/template'] || 'title'
     end
 
+    def keyword
+      return self['/source/keyword']
+    end
+
     def multi_entries
       entries = feedjira.entries
         .select {|v| v.categories.member?(category)}
@@ -102,6 +106,7 @@ module TomatoShrieker
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
+        next if keyword && (!v.title.include?(keyword) || !v.summary.include?(keyword))
         next unless entry = Entry.create(v, self)
         yield entry
       end

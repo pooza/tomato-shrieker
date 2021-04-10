@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: bdc5732747a2617adb116c13f69102a203b1fc1c
+  revision: 1b90713eec32a1e60534834c51559a93c6218af0
   specs:
-    ginseng-core (1.10.11)
+    ginseng-core (1.10.12)
       activesupport (>= 6.1.1)
       addressable
       bundler
@@ -23,9 +23,9 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 87cb7b2e97bb7d0329682698420d440e84d74cd0
+  revision: 5e7972c1f5482aa1163d301e3fe6d01618b8a92a
   specs:
-    ginseng-fediverse (1.5.7)
+    ginseng-fediverse (1.5.8)
 
 GEM
   remote: https://rubygems.org/
@@ -70,7 +70,7 @@ GEM
       concurrent-ruby (~> 1.0)
     json-schema (2.8.1)
       addressable (>= 2.4)
-    loofah (2.9.0)
+    loofah (2.9.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
     mail (2.7.1)
@@ -85,10 +85,10 @@ GEM
     multi_json (1.15.0)
     multi_xml (0.6.0)
     netrc (0.11.0)
-    nokogiri (1.11.2)
+    nokogiri (1.11.3)
       mini_portile2 (~> 2.5.0)
       racc (~> 1.4)
-    nokogiri (1.11.2-x86_64-linux)
+    nokogiri (1.11.3-x86_64-linux)
       racc (~> 1.4)
     nokogumbo (2.0.5)
       nokogiri (~> 1.8, >= 1.8.4)
@@ -179,4 +179,4 @@ RUBY VERSION
    ruby 3.0.0p0
 
 BUNDLED WITH
-   2.2.11
+   2.2.15
