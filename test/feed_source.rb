@@ -42,6 +42,19 @@ module TomatoShrieker
       end
     end
 
+    def test_keyword
+      FeedSource.all.select(&:keyword).each do |source|
+        assert_kind_of(String, source.keyword)
+      end
+    end
+
+    def test_entries
+      FeedSource.all.select(&:keyword).each do |source|
+        source.fetch do |entry|
+        end
+      end
+    end
+
     def test_multi_entries_template
       FeedSource.all do |source|
         assert_kind_of([Template, NilClass], source.multi_entries_template)
