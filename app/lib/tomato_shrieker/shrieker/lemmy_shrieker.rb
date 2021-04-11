@@ -17,7 +17,10 @@ module TomatoShrieker
     end
 
     def uri
-      @uri ||= Ginseng::URI.parse("wss://#{@params['host']}/api/v3/ws")
+      unless @uri
+        @uri = Ginseng::URI.parse("wss://#{@params['host']}")
+        @uri.path = @config['/lemmy/urls/api']
+      end
       return @uri
     end
 

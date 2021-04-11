@@ -24,3 +24,6 @@ crypt:
 line:
   urls:
     api: https://api.line.me
+lemmy:
+  urls:
+    api: /api/v3/ws
