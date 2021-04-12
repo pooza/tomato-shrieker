@@ -44,7 +44,7 @@ module TomatoShrieker
 
     def test_keyword
       FeedSource.all.select(&:keyword).each do |source|
-        assert_kind_of(String, source.keyword)
+        assert_kind_of(Regexp, source.keyword)
       end
     end
 

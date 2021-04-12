@@ -203,9 +203,7 @@ module TomatoShrieker
     end
 
     def self.create(id)
-      all do |source|
-        return source if source.id == id
-      end
+      return all.find {|v| v.id == id}
     end
 
     def self.exec_all

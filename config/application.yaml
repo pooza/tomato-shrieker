@@ -1,5 +1,5 @@
 package:
-  version: 3.2.12
+  version: 3.2.13
   url: https://github.com/pooza/tomato-shrieker
   authors:
     - Tatsuya Koishi
@@ -24,3 +24,6 @@ crypt:
 line:
   urls:
     api: https://api.line.me
+lemmy:
+  urls:
+    api: /api/v3/ws
