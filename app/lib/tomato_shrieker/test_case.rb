@@ -1,15 +1,9 @@
 module TomatoShrieker
   class TestCase < Ginseng::TestCase
-    def handler?
-      return false if @handler.nil?
-      return false if @handler.disable?
-      return true
-    end
-
     def self.load
       ENV['TEST'] = Package.name
       names.each do |name|
-        puts "case: #{name}"
+        puts "+ case: #{name}" if Environment.test?
         require File.join(dir, "#{name}.rb")
       end
     end
