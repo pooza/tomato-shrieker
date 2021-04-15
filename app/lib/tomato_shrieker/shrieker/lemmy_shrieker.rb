@@ -17,15 +17,15 @@ module TomatoShrieker
     end
 
     def uri
-      unless @uri
-        @uri = Ginseng::URI.parse("wss://#{@params['host']}")
-        @uri.path = @config['/lemmy/urls/api']
-      end
+      @uri ||= Ginseng::URI.parse("wss://#{@params['host']}/api/v3/ws")
       return @uri
     end
 
     def login
-      client.send({op: 'Login', data: login_data}.to_json)
+      client.send({op: 'Login', data: {
+        username_or_email: @params['user_id'],
+        password: @params['password'].decrypt,
+      }}.to_json)
     end
 
     def exec(body)
@@ -44,6 +44,7 @@ module TomatoShrieker
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
+          raise payload['error'] if payload['error']
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         rescue => e
           @logger.error(error: e)
@@ -55,28 +56,15 @@ module TomatoShrieker
 
     def handle_login(payload, body)
       @auth = payload['jwt']
-      return client.send({op: 'CreatePost', data: create_post_data(body)}.to_json)
-    end
-
-    private
-
-    def login_data
-      return {
-        username_or_email: @params['user_id'],
-        password: @params['password'].decrypt,
-      }
-    end
-
-    def create_post_data(body)
       params = body[:template].params.deep_symbolize_keys
       source = params[:source] || params[:feed]
-      return {
+      return client.send({op: 'CreatePost', data: {
         name: (params[:entry]&.title || params[:status]),
         url: params[:entry]&.uri&.to_s,
         nsfw: false,
         community_id: source['/dest/lemmy/community_id'],
         auth: @auth,
-      }
+      }}.to_json)
     end
   end
 end
