@@ -21,6 +21,7 @@ module TomatoShrieker
         @uri = Ginseng::URI.parse("wss://#{@params['host']}")
         @uri.path = @config['/lemmy/urls/api']
       end
+      return @uri
     end
 
     def login
