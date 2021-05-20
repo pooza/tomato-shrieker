@@ -10,8 +10,7 @@ module TomatoShrieker
 
     def motd
       return [
-        self.class.to_s,
-        Package.full_name,
+        "#{self.class} #{Package.version}",
       ].join("\n")
     end
   end
