@@ -1,5 +1,4 @@
 require 'sequel/model'
-require 'nokogiri'
 require 'time'
 
 module TomatoShrieker
@@ -39,10 +38,9 @@ module TomatoShrieker
     end
 
     def fetch_remote_tags
-      html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
       contents = []
       ['h1', 'h2', 'title', 'meta'].map do |v|
-        contents.push(html.xpath("//#{v}").inner_text)
+        contents.push(nokogiri.xpath("//#{v}").inner_text)
       end
       return feed.mulukhiya.search_hashtags(contents.join(' '))
     end
@@ -50,6 +48,11 @@ module TomatoShrieker
     def uri
       @uri ||= feed.create_uri(url)
       return @uri
+    end
+
+    def nokogiri
+      @nokogiri ||= HTTP.new.get(uri).body.nokogiri
+      return @nokogiri
     end
 
     def template
