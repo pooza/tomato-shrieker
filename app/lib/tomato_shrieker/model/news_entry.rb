@@ -1,5 +1,7 @@
 module TomatoShrieker
   class NewsEntry < Entry
+    include Package
+
     def self.create(entry, feed = nil)
       values = entry.clone
       values = values.to_h unless values.is_a?(Hash)
@@ -18,7 +20,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return nil
     end
 
@@ -28,7 +30,7 @@ module TomatoShrieker
       dest.gsub!(pattern, '') while dest.match?(pattern)
       return dest
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return title
     end
   end

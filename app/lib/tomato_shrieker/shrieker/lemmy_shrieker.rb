@@ -3,15 +3,15 @@ require 'faye/websocket'
 
 module TomatoShrieker
   class LemmyShrieker
+    include Package
+
     def initialize(params = {})
       @params = params
-      @config = Config.instance
-      @logger = Logger.new
     end
 
     def client
       @client ||= Faye::WebSocket::Client.new(uri.to_s, nil, {
-        ping: @config['/websocket/keepalive'],
+        ping: config['/websocket/keepalive'],
       })
       return @client
     end
@@ -19,7 +19,7 @@ module TomatoShrieker
     def uri
       unless @uri
         @uri = Ginseng::URI.parse("wss://#{@params['host']}")
-        @uri.path = @config['/lemmy/urls/api']
+        @uri.path = config['/lemmy/urls/api']
       end
       return @uri
     end
@@ -40,7 +40,7 @@ module TomatoShrieker
         end
 
         client.on(:error) do |e|
-          @logger.error(error: e.message)
+          logger.error(error: e.message)
           EM.stop_event_loop
           raise Ginseng::GatewayError, e.message
         end
@@ -50,7 +50,7 @@ module TomatoShrieker
           raise payload['error'] if payload['error']
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         rescue => e
-          @logger.error(error: e)
+          logger.error(error: e)
           EM.stop_event_loop
         end
       end

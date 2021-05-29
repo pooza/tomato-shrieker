@@ -3,12 +3,8 @@ require 'digest/sha1'
 
 module TomatoShrieker
   class Source
-    attr_reader :logger
-
     def initialize(params)
       @params = params
-      @config = Config.instance
-      @logger = Logger.new
     end
 
     def [](name)
@@ -39,7 +35,7 @@ module TomatoShrieker
       shriekers do |shrieker|
         shrieker.exec(params)
       rescue => e
-        @logger.error(error: e)
+        logger.error(error: e)
       end
     end
 
@@ -192,7 +188,7 @@ module TomatoShrieker
 
     def self.all
       return enum_for(__method__) unless block_given?
-      Config.instance['/sources'].each do |entry|
+      config['/sources'].each do |entry|
         values = entry.key_flatten
         yield FeedSource.new(entry) if values['/source/feed']
         yield FeedSource.new(entry) if values['/source/url']
@@ -216,7 +212,7 @@ module TomatoShrieker
           e = Ginseng::Error.create(e)
           e.package = Package.full_name
           Slack.broadcast(e)
-          source.logger.error(e)
+          logger.error(e)
         end
         threads.map(&:join)
       end
