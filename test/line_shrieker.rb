@@ -1,7 +1,6 @@
 module TomatoShrieker
   class LineShriekerTest < TestCase
     def setup
-      @config = Config.instance
       @template = Template.new('common')
       @template[:status] = Time.now.to_s
       @template[:source] = Source.all.find(&:line?)

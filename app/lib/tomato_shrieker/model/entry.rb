@@ -3,6 +3,8 @@ require 'time'
 
 module TomatoShrieker
   class Entry < Sequel::Model(:entry)
+    include Package
+
     alias to_h values
 
     def feed
@@ -33,7 +35,7 @@ module TomatoShrieker
       return @tags
     rescue => e
       return [] unless feed
-      feed.logger.error(error: e)
+      logger.error(error: e)
       return feed.tags
     end
 
@@ -66,7 +68,7 @@ module TomatoShrieker
       params = {template: template, visibility: feed.visibility, attachments: []}
       params[:attachments].push(image_url: enclosure.to_s) if enclosure
       feed.shriek(params)
-      feed.logger.info(source: feed.id, entry: to_h, message: 'post')
+      logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
@@ -90,7 +92,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return nil
     end
 
@@ -98,7 +100,7 @@ module TomatoShrieker
       return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
       return title.sanitize
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return title
     end
   end
