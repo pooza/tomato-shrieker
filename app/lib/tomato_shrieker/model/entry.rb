@@ -1,5 +1,4 @@
 require 'sequel/model'
-require 'time'
 
 module TomatoShrieker
   class Entry < Sequel::Model(:entry)
