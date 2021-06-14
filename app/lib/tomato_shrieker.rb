@@ -28,8 +28,6 @@ module TomatoShrieker
   end
 
   def self.setup_debug
-    require 'ricecream'
-    require 'pp'
     Ricecream.disable
     return unless Environment.development?
     Ricecream.enable
