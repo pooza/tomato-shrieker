@@ -1,13 +1,7 @@
 namespace :migration do
-  def path
-    return File.join(
-      TomatoShrieker::Environment.dir,
-      'app/migration',
-    )
-  end
-
   desc 'migrate database'
   task run: [:db] do
+    path = File.join(TomatoShrieker::Environment.dir, 'app/migration')
     sh "bundle exec sequel -m #{path} '#{TomatoShrieker::Environment.dsn}' -E"
   end
 
