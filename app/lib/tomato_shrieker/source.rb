@@ -1,4 +1,3 @@
-require 'optparse'
 require 'digest/sha1'
 
 module TomatoShrieker

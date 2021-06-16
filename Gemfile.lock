@@ -105,6 +105,7 @@ GEM
       racc (~> 1.4)
     nokogumbo (2.0.5)
       nokogiri (~> 1.8, >= 1.8.4)
+    optparse (0.1.0)
     parallel (1.20.1)
     parser (3.0.1.1)
       ast (~> 2.4.1)
@@ -181,6 +182,7 @@ DEPENDENCIES
   fileutils
   ginseng-core!
   ginseng-fediverse!
+  optparse
   ricecream
   rubocop
   rubocop-performance
