@@ -28,7 +28,6 @@ module TomatoShrieker
       pattern = / [|-] .+$/
       dest = title.dup
       dest.gsub!(pattern, '') while dest.match?(pattern)
-      dest = "[#{feed.prefix}] #{dest}" unless feed.bot?
       return dest
     rescue => e
       logger.error(error: e)
