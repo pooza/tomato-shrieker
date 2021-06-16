@@ -3,6 +3,8 @@ require 'digest/sha1'
 
 module TomatoShrieker
   class Source
+    include Package
+
     def initialize(params)
       @params = params
     end

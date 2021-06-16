@@ -1,5 +1,7 @@
 module TomatoShrieker
   class TestCaseFilter < Ginseng::TestCaseFilter
+    include Package
+
     def self.create(name)
       return all.find {|v| v.name == name}
     end
