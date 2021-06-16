@@ -9,7 +9,7 @@ module TomatoShrieker
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
         feed: feed.id,
-        title: create_title(values['title']),
+        title: create_title(values['title'], feed),
         summary: values['summary']&.sanitize,
         url: values['url'],
         published: values['published'].getlocal,
@@ -24,13 +24,14 @@ module TomatoShrieker
       return nil
     end
 
-    def self.create_title(title)
+    def self.create_title(title, feed)
       pattern = / [|-] .+$/
       dest = title.dup
       dest.gsub!(pattern, '') while dest.match?(pattern)
+      dest = "[#{feed.prefix}] #{dest}" unless feed.bot?
       return dest
     rescue => e
-      logger.error(error: e, entry: entry)
+      logger.error(error: e)
       return title
     end
   end

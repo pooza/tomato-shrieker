@@ -17,7 +17,7 @@ module TomatoShrieker
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        next if Entry.first(feed: id, title: NewsEntry.create_title(v['title']))
+        next if Entry.first(feed: id, title: NewsEntry.create_title(v['title'], self))
         next unless entry = NewsEntry.create(v, self)
         yield entry
       end

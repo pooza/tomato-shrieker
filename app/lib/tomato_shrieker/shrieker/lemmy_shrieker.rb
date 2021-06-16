@@ -50,7 +50,7 @@ module TomatoShrieker
           raise payload['error'] if payload['error']
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         rescue => e
-          logger.error(error: e)
+          logger.info(error: e)
           EM.stop_event_loop
         end
       end
