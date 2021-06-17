@@ -59,21 +59,21 @@ module TomatoShrieker
 
     def handle_login(payload, body)
       @auth = payload['jwt']
-      params = body[:template].params.deep_symbolize_keys
-      source = params[:source] || params[:feed]
+      assigned = body[:template].params.deep_symbolize_keys
+      source = assigned[:source] || assigned[:feed]
       return client.send({op: 'CreatePost', data: {
-        name: create_title,
-        url: params[:entry]&.uri&.to_s,
+        name: create_title(assigned),
+        url: assigned[:entry]&.uri&.to_s,
         nsfw: false,
         community_id: source['/dest/lemmy/community_id'],
         auth: @auth,
       }}.to_json)
     end
 
-    def create_title
-      title = params[:entry]&.title
-      title ||= params[:status]
-      title = "[#{params[:source].prefix}] #{title}" unless params[:source].bot?
+    def create_title(assigned)
+      title = assigned[:entry]&.title
+      title ||= assigned[:status]
+      title = "[#{assigned[:source].prefix}] #{title}" unless assigned[:source].bot?
       return title
     end
   end
