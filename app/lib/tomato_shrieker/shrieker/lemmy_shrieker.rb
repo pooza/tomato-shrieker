@@ -73,7 +73,8 @@ module TomatoShrieker
     def create_title(assigned)
       title = assigned[:entry]&.title
       title ||= assigned[:status]
-      title = "[#{assigned[:source].prefix}] #{title}" unless assigned[:source].bot?
+      source = assigned[:source] || assigned[:feed]
+      title = "[#{source.prefix}] #{title}" unless source.bot?
       return title
     end
   end
