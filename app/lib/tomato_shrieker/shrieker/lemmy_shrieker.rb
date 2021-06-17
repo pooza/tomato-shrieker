@@ -62,7 +62,7 @@ module TomatoShrieker
       params = body[:template].params.deep_symbolize_keys
       source = params[:source] || params[:feed]
       return client.send({op: 'CreatePost', data: {
-        name: create_title(source),
+        name: create_title,
         url: params[:entry]&.uri&.to_s,
         nsfw: false,
         community_id: source['/dest/lemmy/community_id'],
@@ -70,10 +70,10 @@ module TomatoShrieker
       }}.to_json)
     end
 
-    def create_title(source)
+    def create_title
       title = params[:entry]&.title
       title ||= params[:status]
-      #title = "[#{source.prefix}] #{title}" unless source.bot?
+      title = "[#{params[:source].prefix}] #{title}" unless params[:source].bot?
       return title
     end
   end
