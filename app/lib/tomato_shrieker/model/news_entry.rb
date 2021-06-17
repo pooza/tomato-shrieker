@@ -1,5 +1,7 @@
 module TomatoShrieker
   class NewsEntry < Entry
+    include Package
+
     def self.create(entry, feed = nil)
       values = entry.clone
       values = values.to_h unless values.is_a?(Hash)
@@ -7,7 +9,7 @@ module TomatoShrieker
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
         feed: feed.id,
-        title: create_title(values['title']),
+        title: create_title(values['title'], feed),
         summary: values['summary']&.sanitize,
         url: values['url'],
         published: values['published'].getlocal,
@@ -18,17 +20,17 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return nil
     end
 
-    def self.create_title(title)
+    def self.create_title(title, feed)
       pattern = / [|-] .+$/
       dest = title.dup
       dest.gsub!(pattern, '') while dest.match?(pattern)
       return dest
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e)
       return title
     end
   end

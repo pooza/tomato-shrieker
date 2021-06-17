@@ -1,9 +1,9 @@
 require 'sequel/model'
-require 'nokogiri'
-require 'time'
 
 module TomatoShrieker
   class Entry < Sequel::Model(:entry)
+    include Package
+
     alias to_h values
 
     def feed
@@ -34,15 +34,14 @@ module TomatoShrieker
       return @tags
     rescue => e
       return [] unless feed
-      feed.logger.error(error: e)
+      logger.error(error: e)
       return feed.tags
     end
 
     def fetch_remote_tags
-      html = Nokogiri::HTML.parse(HTTP.new.get(uri).body, nil, 'utf-8')
       contents = []
       ['h1', 'h2', 'title', 'meta'].map do |v|
-        contents.push(html.xpath("//#{v}").inner_text)
+        contents.push(nokogiri.xpath("//#{v}").inner_text)
       end
       return feed.mulukhiya.search_hashtags(contents.join(' '))
     end
@@ -50,6 +49,11 @@ module TomatoShrieker
     def uri
       @uri ||= feed.create_uri(url)
       return @uri
+    end
+
+    def nokogiri
+      @nokogiri ||= HTTP.new.get(uri).body.nokogiri
+      return @nokogiri
     end
 
     def template
@@ -63,7 +67,7 @@ module TomatoShrieker
       params = {template: template, visibility: feed.visibility, attachments: []}
       params[:attachments].push(image_url: enclosure.to_s) if enclosure
       feed.shriek(params)
-      feed.logger.info(source: feed.id, entry: to_h, message: 'post')
+      logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
@@ -87,15 +91,16 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return nil
     end
 
     def self.create_title(title, published, feed)
-      return "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title}" unless feed.unique_title?
-      return title.sanitize
+      dest = title.sanitize if feed.unique_title?
+      dest ||= "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{dest}"
+      return dest
     rescue => e
-      feed.logger.error(error: e, entry: entry)
+      logger.error(error: e, entry: entry)
       return title
     end
   end

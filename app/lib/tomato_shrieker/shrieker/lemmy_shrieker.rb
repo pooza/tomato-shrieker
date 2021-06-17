@@ -3,15 +3,15 @@ require 'faye/websocket'
 
 module TomatoShrieker
   class LemmyShrieker
+    include Package
+
     def initialize(params = {})
       @params = params
-      @config = Config.instance
-      @logger = Logger.new
     end
 
     def client
       @client ||= Faye::WebSocket::Client.new(uri.to_s, nil, {
-        ping: @config['/websocket/keepalive'],
+        ping: config['/websocket/keepalive'],
       })
       return @client
     end
@@ -19,7 +19,7 @@ module TomatoShrieker
     def uri
       unless @uri
         @uri = Ginseng::URI.parse("wss://#{@params['host']}")
-        @uri.path = @config['/lemmy/urls/api']
+        @uri.path = config['/lemmy/urls/api']
       end
       return @uri
     end
@@ -40,7 +40,7 @@ module TomatoShrieker
         end
 
         client.on(:error) do |e|
-          @logger.error(error: e.message)
+          logger.error(error: e.message)
           EM.stop_event_loop
           raise Ginseng::GatewayError, e.message
         end
@@ -50,7 +50,7 @@ module TomatoShrieker
           raise payload['error'] if payload['error']
           @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
         rescue => e
-          @logger.error(error: e)
+          logger.info(error: e)
           EM.stop_event_loop
         end
       end
@@ -59,15 +59,23 @@ module TomatoShrieker
 
     def handle_login(payload, body)
       @auth = payload['jwt']
-      params = body[:template].params.deep_symbolize_keys
-      source = params[:source] || params[:feed]
+      assigned = body[:template].params.deep_symbolize_keys
+      source = assigned[:source] || assigned[:feed]
       return client.send({op: 'CreatePost', data: {
-        name: (params[:entry]&.title || params[:status]),
-        url: params[:entry]&.uri&.to_s,
+        name: create_title(assigned),
+        url: assigned[:entry]&.uri&.to_s,
         nsfw: false,
         community_id: source['/dest/lemmy/community_id'],
         auth: @auth,
       }}.to_json)
+    end
+
+    def create_title(assigned)
+      title = assigned[:entry]&.title
+      title ||= assigned[:status]
+      source = assigned[:source] || assigned[:feed]
+      title = "[#{source.prefix}] #{title}" unless source.bot?
+      return title
     end
   end
 end
