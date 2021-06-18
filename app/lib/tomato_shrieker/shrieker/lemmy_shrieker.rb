@@ -42,21 +42,18 @@ module TomatoShrieker
         client.on(:error) do |e|
           logger.error(error: e.message)
           EM.stop_event_loop
-          raise Ginseng::GatewayError, e.message
         end
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
           raise payload['error'] if payload['error']
-          if send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body) == :stop
-            EM.stop_event_loop
-          end
+          method = "handle_#{payload['op']}".underscore.to_sym
+          EM.stop_event_loop if send(method, payload['data'], body) == :stop
         rescue => e
           logger.error(error: e)
           EM.stop_event_loop
         end
       end
-      return @response
     end
 
     def handle_create_post(payload, body)

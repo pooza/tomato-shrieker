@@ -17,7 +17,7 @@ module TomatoShrieker
     end
 
     def test_exec
-      assert(@template[:source].lemmy.exec(template: @template))
+      @template[:source].lemmy.exec(template: @template)
     end
   end
 end

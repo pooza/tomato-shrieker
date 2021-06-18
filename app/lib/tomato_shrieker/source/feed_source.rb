@@ -112,7 +112,7 @@ module TomatoShrieker
     def fetch
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        next if keyword && !not_entry?(entry)
+        next if keyword && !hot_entry?(entry)
         next if negative_keyword && negative_entry?(entry)
         next unless record = Entry.create(entry, self)
         yield record
