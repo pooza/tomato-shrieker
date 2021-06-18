@@ -42,26 +42,29 @@ module TomatoShrieker
         client.on(:error) do |e|
           logger.error(error: e.message)
           EM.stop_event_loop
-          raise Ginseng::GatewayError, e.message
         end
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
           raise payload['error'] if payload['error']
-          @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
+          method = "handle_#{payload['op']}".underscore.to_sym
+          EM.stop_event_loop if send(method, payload['data'], body) == :stop
         rescue => e
-          logger.info(error: e)
+          logger.error(error: e)
           EM.stop_event_loop
         end
       end
-      return @response
+    end
+
+    def handle_create_post(payload, body)
+      return :stop
     end
 
     def handle_login(payload, body)
       @auth = payload['jwt']
       assigned = body[:template].params.deep_symbolize_keys
       source = assigned[:source] || assigned[:feed]
-      return client.send({op: 'CreatePost', data: {
+      client.send({op: 'CreatePost', data: {
         name: create_title(assigned),
         url: assigned[:entry]&.uri&.to_s,
         nsfw: false,

@@ -48,6 +48,12 @@ module TomatoShrieker
       end
     end
 
+    def test_negative_keyword
+      FeedSource.all.select(&:negative_keyword).each do |source|
+        assert_kind_of(Regexp, source.negative_keyword)
+      end
+    end
+
     def test_multi_entries_template
       FeedSource.all do |source|
         assert_kind_of([Template, NilClass], source.multi_entries_template)
