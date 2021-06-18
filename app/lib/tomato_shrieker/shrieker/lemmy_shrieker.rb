@@ -48,20 +48,26 @@ module TomatoShrieker
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
           raise payload['error'] if payload['error']
-          @response = send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body)
+          if send("handle_#{payload['op']}".underscore.to_sym, payload['data'], body) == :stop
+            EM.stop_event_loop
+          end
         rescue => e
-          logger.info(error: e)
+          logger.error(error: e)
           EM.stop_event_loop
         end
       end
       return @response
     end
 
+    def handle_create_post(payload, body)
+      return :stop
+    end
+
     def handle_login(payload, body)
       @auth = payload['jwt']
       assigned = body[:template].params.deep_symbolize_keys
       source = assigned[:source] || assigned[:feed]
-      return client.send({op: 'CreatePost', data: {
+      client.send({op: 'CreatePost', data: {
         name: create_title(assigned),
         url: assigned[:entry]&.uri&.to_s,
         nsfw: false,
