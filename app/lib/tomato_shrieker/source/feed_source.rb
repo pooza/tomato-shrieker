@@ -67,6 +67,11 @@ module TomatoShrieker
       return Regexp.new(self['/source/keyword'])
     end
 
+    def negative_keyword
+      return nil unless self['/source/negative_keyword']
+      return Regexp.new(self['/source/negative_keyword'])
+    end
+
     def multi_entries
       entries = feedjira.entries
         .select {|v| v.categories.member?(category)}
@@ -106,11 +111,18 @@ module TomatoShrieker
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        next if keyword && !v.title.match?(keyword) && !v.summary.match?(keyword)
-        next unless entry = Entry.create(v, self)
-        yield entry
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
+        next if ignore?(entry)
+        next unless record = Entry.create(v, self)
+        yield record
       end
+    end
+
+    def ignore?(entry)
+      return true if keyword && !entry.title.match?(keyword) && !entry.summary.match?(keyword)
+      return true if negative_keyword && entry.title.match?(negative_keyword)
+      return true if negative_keyword && entry.summary.match?(negative_keyword)
+      return false
     end
 
     def present?
