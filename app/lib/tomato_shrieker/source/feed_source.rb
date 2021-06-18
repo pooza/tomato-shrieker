@@ -119,9 +119,9 @@ module TomatoShrieker
     end
 
     def ignore?(entry)
-      return true if keyword && !entry.title.match?(keyword) && !entry.summary.match?(keyword)
-      return true if negative_keyword && entry.title.match?(negative_keyword)
-      return true if negative_keyword && entry.summary.match?(negative_keyword)
+      return true if keyword && !entry.title&.match?(keyword) && !entry.summary&.match?(keyword)
+      return true if negative_keyword && entry.title&.match?(negative_keyword)
+      return true if negative_keyword && entry.summary&.match?(negative_keyword)
       return false
     end
 
