@@ -113,7 +113,7 @@ module TomatoShrieker
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
         next if ignore?(entry)
-        next unless record = Entry.create(v, self)
+        next unless record = Entry.create(entry, self)
         yield record
       end
     end
