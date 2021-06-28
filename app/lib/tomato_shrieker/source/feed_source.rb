@@ -120,7 +120,9 @@ module TomatoShrieker
     end
 
     def hot_entry?(entry)
-      return entry.title&.match?(keyword) || entry.summary&.match?(keyword)
+      return true if entry.title&.match?(keyword)
+      return true if entry.summary&.match?(keyword)
+      return false
     end
 
     def negative_entry?(entry)
