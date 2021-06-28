@@ -12,10 +12,6 @@ module TomatoShrieker
       assert_kind_of(Faye::WebSocket::Client, @shrieker.client)
     end
 
-    def test_login
-      @shrieker.login
-    end
-
     def test_exec
       @template[:source].lemmy.exec(template: @template)
     end

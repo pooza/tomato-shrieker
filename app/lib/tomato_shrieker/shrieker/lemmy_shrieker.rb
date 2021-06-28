@@ -6,7 +6,7 @@ module TomatoShrieker
     include Package
 
     def initialize(params = {})
-      @params = params
+      @params = params.deep_symbolize_keys
     end
 
     def client
@@ -18,17 +18,19 @@ module TomatoShrieker
 
     def uri
       unless @uri
-        @uri = Ginseng::URI.parse("wss://#{@params['host']}")
+        @uri = Ginseng::URI.parse("wss://#{@params[:host]}")
         @uri.path = config['/lemmy/urls/api']
       end
       return @uri
     end
 
-    def login
-      client.send({op: 'Login', data: {
-        username_or_email: @params['user_id'],
-        password: @params['password'].decrypt,
-      }}.to_json)
+    def handle_login(payload, body)
+      @jwt = payload['jwt']
+      post(body)
+    end
+
+    def handle_create_post(payload, body)
+      return :stop
     end
 
     def exec(body)
@@ -56,29 +58,26 @@ module TomatoShrieker
       end
     end
 
-    def handle_create_post(payload, body)
-      return :stop
-    end
+    private
 
-    def handle_login(payload, body)
-      @auth = payload['jwt']
-      assigned = body[:template].params.deep_symbolize_keys
-      source = assigned[:source] || assigned[:feed]
-      client.send({op: 'CreatePost', data: {
-        name: create_title(assigned),
-        url: assigned[:entry]&.uri&.to_s,
-        nsfw: false,
-        community_id: source['/dest/lemmy/community_id'],
-        auth: @auth,
+    def login
+      client.send({op: 'Login', data: {
+        username_or_email: @params[:user_id],
+        password: @params[:password].decrypt,
       }}.to_json)
     end
 
-    def create_title(assigned)
-      title = assigned[:entry]&.title
-      title ||= assigned[:status]
-      source = assigned[:source] || assigned[:feed]
-      title = "[#{source.prefix}] #{title}" unless source.bot?
-      return title
+    def post(body)
+      template = body[:template]
+      title = template.entry.title || template[:status]
+      title = "[#{template.source.prefix}] #{title}" unless template.source.bot?
+      client.send({op: 'CreatePost', data: {
+        nsfw: false,
+        name: title,
+        url: template.entry.uri.to_s,
+        community_id: template.source['/dest/lemmy/community_id'],
+        auth: @jwt,
+      }}.to_json)
     end
   end
 end
