@@ -22,6 +22,7 @@ module TomatoShrieker
     end
 
     def purge(params = {})
+      return unless purge?
       records = Entry.dataset
         .select(:published)
         .where(feed: hash)
@@ -34,6 +35,11 @@ module TomatoShrieker
       )
       records.destroy unless params[:dryrun]
       return date
+    end
+
+    def purge?
+      return self['/source/purge'] unless self['/source/purge'].nil?
+      return true
     end
 
     def expire
