@@ -69,12 +69,12 @@ module TomatoShrieker
 
     def post(body)
       template = body[:template]
-      title = template.entry.title || template[:status]
+      title = template.entry&.title || template[:status]
       title = "[#{template.source.prefix}] #{title}" unless template.source.bot?
       client.send({op: 'CreatePost', data: {
         nsfw: false,
         name: title,
-        url: template.entry.uri.to_s,
+        url: (template.entry || template.source).uri.to_s,
         community_id: template.source['/dest/lemmy/community_id'],
         auth: @jwt,
       }}.to_json)
