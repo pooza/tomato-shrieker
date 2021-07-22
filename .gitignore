@@ -1,9 +1,9 @@
-.bundle/
+.bundle
 .DS_Store
 Thumbs.db
 ._*
 .fuse*
-debug.log
+*.log
 config/local.*
 .sass-cache
 dist
