@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 8c4371c4512aa0469cda955157dbb5e5e8d792e6
+  revision: 0b4b58a5001eb97bfc38ad1ce44f1afd3fa67d4c
   specs:
-    ginseng-core (1.10.25)
+    ginseng-core (1.10.29)
       activesupport (>= 6.1.3.2)
       addressable (>= 2.8.0)
       bundler
@@ -16,10 +16,12 @@ GIT
       mail
       multi_json
       net-protocol
-      nokogiri (>= 1.11.4)
+      nokogiri (>= 1.11.4, < 1.12)
+      optparse
       rake
       rest-client
       sanitize
+      securerandom
       time
       unicode
       yajl-ruby
@@ -44,7 +46,7 @@ GEM
     addressable (2.8.0)
       public_suffix (>= 2.0.2, < 5.0)
     ast (2.4.2)
-    bootsnap (1.7.5)
+    bootsnap (1.7.7)
       msgpack (~> 1.0)
     cgi (0.2.0)
     concurrent-ruby (1.1.9)
@@ -80,7 +82,7 @@ GEM
     io-wait (0.1.0)
     json-schema (2.8.1)
       addressable (>= 2.4)
-    loofah (2.10.0)
+    loofah (2.11.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
     mail (2.7.1)
@@ -123,16 +125,16 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.5)
     ricecream (0.2.0)
-    rubocop (1.18.3)
+    rubocop (1.18.4)
       parallel (~> 1.10)
       parser (>= 3.0.0.0)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 1.8, < 3.0)
       rexml
-      rubocop-ast (>= 1.7.0, < 2.0)
+      rubocop-ast (>= 1.8.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 1.4.0, < 3.0)
-    rubocop-ast (1.7.0)
+    rubocop-ast (1.8.0)
       parser (>= 3.0.1.1)
     rubocop-performance (1.11.4)
       rubocop (>= 1.7.0, < 2.0)
@@ -149,7 +151,8 @@ GEM
       nokogiri (>= 1.8.0)
       nokogumbo (~> 2.0)
     sax-machine (1.3.2)
-    sequel (5.46.0)
+    securerandom (0.1.0)
+    sequel (5.47.0)
     sqlite3 (1.4.2)
     test-unit (3.4.4)
       power_assert
@@ -179,10 +182,8 @@ DEPENDENCIES
   bootsnap (>= 1.7.0)
   faye-websocket
   feedjira (~> 3.0)
-  fileutils
   ginseng-core!
   ginseng-fediverse!
-  optparse
   ricecream
   rubocop
   rubocop-performance
