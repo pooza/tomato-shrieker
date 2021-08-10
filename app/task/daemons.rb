@@ -1,5 +1,5 @@
 namespace :tomato do
-  [:scheduler].each do |daemon|
+  [:scheduler].freeze.each do |daemon|
     namespace daemon do
       [:start, :stop].freeze.each do |action|
         desc "#{action} #{daemon}"
@@ -11,12 +11,12 @@ namespace :tomato do
       end
 
       desc "restart #{daemon}"
-      task restart: [:stop, :start]
+      task restart: ['config:lint', :stop, :start]
     end
   end
 end
 
-[:start, :stop, :restart].each do |action|
+[:start, :stop, :restart].freeze.each do |action|
   desc "#{action} all"
   multitask action => ["tomato:scheduler:#{action}"]
 end
