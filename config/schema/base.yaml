@@ -1,137 +1,136 @@
 $schema: http://json-schema.org/draft-04/hyper-schema
-title: Local config
-type: object
-required:
-  - sources
-  - environment
 properties:
   environment:
-    type: string
     enum:
       - development
       - production
+    type: string
   slack:
-    type: object
-    required:
-      - hooks
     properties:
       hooks:
-        type: array
         items:
-          type: string
           format: url
+          type: string
+        type: array
+    required:
+      - hooks
+    type: object
   sources:
-    type: array
     items:
-      type: object
-      required:
-        - source
-        - dest
       properties:
-        source:
-          type: hash
-          properties:
-            text:
-              type: string
-            command:
-              type:
-                - array
-                - string
-              item:
-                type: string
-            env:
-              type: hash
-            delimiter:
-              type: string
-            url:
-              type: string
-              format: url
-            title:
-              type: hash
-              properties:
-                unique:
-                  type: boolean
         dest:
-          type: hash
           properties:
             dest:
-              prefix:
-                type: string
               account:
-                type: hash
                 properties:
                   bot:
                     type: boolean
-              template:
-                type: string
-              mastodon:
                 type: hash
-                required:
-                  - url
-                  - token
-                properties:
-                  url:
-                    type: string
-                    format: url
-                  token:
-                    type: string
-              misskey:
-                type: hash
-                required:
-                  - url
-                  - token
-                properties:
-                  url:
-                    type: string
-                    format: url
-                  token:
-                    type: string
               hooks:
-                type: array
                 items:
-                  type: string
                   format: url
-              line:
-                type: hash
-                required:
-                  - user_id
-                  - token
+                  type: string
+                type: array
+              lemmy:
                 properties:
+                  community_id:
+                    type: integer
+                  host:
+                    type: string
+                  password:
+                    type: string
                   user_id:
                     type: string
-                  token:
-                    type: string
-              lemmy:
-                type: hash
                 required:
                   - host
                   - user_id
                   - password
                   - comunity_id
+                type: hash
+              line:
                 properties:
-                  host:
+                  token:
                     type: string
                   user_id:
                     type: string
-                  password:
-                    type: string
-                  community_id:
-                    type: integer
-              mulukhiya:
-                type: hash
                 required:
-                  - enable
+                  - user_id
+                  - token
+                type: hash
+              mastodon:
+                properties:
+                  token:
+                    type: string
+                  url:
+                    format: url
+                    type: string
+                required:
+                  - url
+                  - token
+                type: hash
+              misskey:
+                properties:
+                  token:
+                    type: string
+                  url:
+                    format: url
+                    type: string
+                required:
+                  - url
+                  - token
+                type: hash
+              mulukhiya:
                 properties:
                   enable: boolean
-        schedule:
+                required:
+                  - enable
+                type: hash
+              prefix:
+                type: string
+              template:
+                type: string
           type: hash
+        id:
+          type: string
+        schedule:
           properties:
             at:
               type: string
-            every:
-              type: string
             cron:
               type: string
-        id:
-          type: string
-
+            every:
+              type: string
+          type: hash
+        source:
+          properties:
+            command:
+              item:
+                type: string
+              type:
+                - array
+                - string
+            delimiter:
+              type: string
+            env:
+              type: hash
+            text:
+              type: string
+            title:
+              properties:
+                unique:
+                  type: boolean
+              type: hash
+            url:
+              format: url
+              type: string
+          type: hash
+      required:
+        - source
+        - dest
+      type: object
+    type: array
+required:
+  - sources
+  - environment
+title: Local config
+type: object
