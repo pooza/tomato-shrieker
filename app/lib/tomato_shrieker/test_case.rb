@@ -1,7 +1,12 @@
 module TomatoShrieker
   class TestCase < Ginseng::TestCase
+
+    def teardown
+      config.reload
+    end
+
     def self.load(cases = nil)
-      ENV['TEST'] = Package.name
+      ENV['TEST'] = Package.full_name
       names(cases).each do |name|
         puts "+ case: #{name}" if Environment.test?
         require File.join(dir, "#{name}.rb")
@@ -12,15 +17,14 @@ module TomatoShrieker
 
     def self.names(cases = nil)
       if cases
-        names = []
-        cases.split(',').each do |name|
-          names.push(name) if File.exist?(File.join(dir, "#{name}.rb"))
-          names.push("#{name}_test") if File.exist?(File.join(dir, "#{name}_test.rb"))
-        end
+        names = cases.split(',')
+          .map {|v| [v, "#{v}Test", v.underscore, "#{v.underscore}_test"]}.flatten
+          .select {|v| File.exist?(File.join(dir, "#{v}.rb"))}.compact.uniq
+      else
+        names = Dir.glob(File.join(dir, '*.rb')).map {|v| File.basename(v, '.rb')}
       end
-      names ||= Dir.glob(File.join(dir, '*.rb')).map {|v| File.basename(v, '.rb')}
       TestCaseFilter.all.select(&:active?).each {|v| v.exec(names)}
-      return names.uniq.sort
+      return Set.new(names.sort)
     end
 
     def self.dir
