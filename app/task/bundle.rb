@@ -1,14 +1,18 @@
-namespace :bundle do
-  desc 'update gems'
-  task :update do
-    sh 'bundle update'
-  end
+module TomatoShrieker
+  extend Rake::DSL
 
-  desc 'check gems'
-  task :check do
-    unless TomatoShrieker::Environment.gem_fresh?
-      warn 'gems is not fresh.'
-      exit 1
+  namespace :bundle do
+    desc 'update gems'
+    task :update do
+      sh 'bundle update'
+    end
+
+    desc 'check gems'
+    task :check do
+      unless Environment.gem_fresh?
+        warn 'gems is not fresh.'
+        exit 1
+      end
     end
   end
 end

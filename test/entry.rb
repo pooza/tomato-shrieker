@@ -4,8 +4,12 @@ module TomatoShrieker
       @entries = Entry.dataset.all.select(&:feed)
     end
 
+    test '1レコード以上のエントリが存在するか' do
+      assert(@entries.present?)
+    end
+
     def test_feed
-      assert_kind_of(FeedSource, @entries.sample.feed)
+      assert_kind_of(FeedSource, @entries.sample.feed) if @entries.present?
     end
 
     def test_template

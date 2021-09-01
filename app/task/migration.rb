@@ -1,14 +1,18 @@
-namespace :migration do
-  desc 'migrate database'
-  task run: [:db] do
-    path = File.join(TomatoShrieker::Environment.dir, 'app/migration')
-    sh "bundle exec sequel -m #{path} '#{TomatoShrieker::Environment.dsn}' -E"
+module TomatoShrieker
+  extend Rake::DSL
+
+  namespace :migration do
+    desc 'migrate database'
+    task run: [:db] do
+      path = File.join(Environment.dir, 'app/migration')
+      sh "bundle exec sequel -m #{path} '#{Environment.dsn}' -E"
+    end
+
+    file :db do
+      FileUtils.touch(Environment.db)
+    end
   end
 
-  file :db do
-    FileUtils.touch(TomatoShrieker::Environment.db)
-  end
+  desc 'alias of migration:run'
+  task migrate: 'migration:run'
 end
-
-desc 'alias of migration:run'
-task migrate: 'migration:run'

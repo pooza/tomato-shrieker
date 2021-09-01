@@ -1,16 +1,16 @@
 filters:
-  - name: ci
-    cases: []
-  - name: google_news
-    cases:
+  - cases: []
+    name: ci
+  - cases:
       - google_news_source
       - news_entry
-  - name: line
-    cases:
+    name: google_news
+  - cases:
       - line_shrieker
-  - name: lemmy
-    cases:
+    name: line
+  - cases:
       - lemmy_shrieker
-  - name: entry
-    cases:
+    name: lemmy
+  - cases:
       - entry
+    name: entry

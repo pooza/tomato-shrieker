@@ -1,29 +1,29 @@
-package:
-  version: 3.2.20
-  url: https://github.com/pooza/tomato-shrieker
-  authors:
-    - Tatsuya Koishi
-  email:
-    - tkoishi@b-shock.co.jp
-  description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse、Slack互換webhook、LINE、Lemmyに投稿する。
-  license: MIT
+crypt:
+  encoder: base64
+  password: null
 environment: development
-sqlite3:
-  db: db.sqlite3
-slack:
-  hooks: []
 http:
   retry:
     limit: 3
     seconds: 1
-websocket:
-  keepalive: 15
-crypt:
-  password: null
-  encoder: base64
-line:
-  urls:
-    api: https://api.line.me
 lemmy:
   urls:
     api: /api/v3/ws
+line:
+  urls:
+    api: https://api.line.me
+package:
+  authors:
+    - Tatsuya Koishi
+  description: ボット作成支援ツール。 新着記事やコマンドの実行結果を、fediverse、Slack互換webhook、LINE、Lemmyに投稿する。
+  email:
+    - tkoishi@b-shock.co.jp
+  license: MIT
+  url: https://github.com/pooza/tomato-shrieker
+  version: 3.2.21
+slack:
+  hooks: []
+sqlite3:
+  db: db.sqlite3
+websocket:
+  keepalive: 15
