@@ -27,6 +27,8 @@ module TomatoShrieker
     def test_feedjira
       FeedSource.all do |source|
         assert(source.feedjira.present?)
+        assert_kind_of(Array, source.feedjira.entries)
+        assert(source.feedjira.entries.count.positive?)
       end
     end
 
@@ -55,8 +57,8 @@ module TomatoShrieker
     end
 
     def test_multi_entries_template
-      FeedSource.all do |source|
-        assert_kind_of([Template, NilClass], source.multi_entries_template)
+      FeedSource.all.select(&:multi_entries?).each do |source|
+        assert_kind_of(Template, source.multi_entries_template)
       end
     end
 
