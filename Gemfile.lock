@@ -157,7 +157,6 @@ GEM
     test-unit (3.4.4)
       power_assert
     time (0.1.0)
-      date
     timeout (0.1.1)
     tzinfo (2.0.4)
       concurrent-ruby (~> 1.0)
