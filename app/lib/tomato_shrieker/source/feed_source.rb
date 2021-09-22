@@ -122,6 +122,8 @@ module TomatoShrieker
         next if negative_keyword && negative_entry?(entry)
         next unless record = Entry.create(entry, self)
         yield record
+      rescue => e
+        logger.error(error: e)
       end
     end
 

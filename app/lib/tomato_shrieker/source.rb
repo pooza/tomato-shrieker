@@ -195,7 +195,9 @@ module TomatoShrieker
         yield FeedSource.new(entry) if values['/source/url']
         yield CommandSource.new(entry) if values['/source/command']
         yield TextSource.new(entry) if values['/source/text']
+        yield GoogleNewsSource.new(entry) if values['/source/news']
         yield GoogleNewsSource.new(entry) if values['/source/google_news']
+        yield TweetTimelineSource.new(entry) if values['/source/tweet/account']
       end
     end
 
