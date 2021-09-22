@@ -180,10 +180,9 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  bootsnap (>= 1.7.0)
+  bootsnap (>= 1.9.0)
   faye-websocket
   feedjira (~> 3.0)
-  find
   ginseng-core!
   ginseng-fediverse!
   optparse
