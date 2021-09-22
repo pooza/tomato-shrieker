@@ -25,5 +25,8 @@ slack:
   hooks: []
 sqlite3:
   db: db.sqlite3
+tweet:
+  urls:
+    root: https://nitter.net
 websocket:
   keepalive: 15
