@@ -19,6 +19,10 @@ module TomatoShrieker
       return template
     end
 
+    def bundler?
+      return self['/source/bundler'] == true
+    end
+
     def delimiter
       return Regexp.new("#{self['/source/delimiter'] || '====='}\n?")
     end

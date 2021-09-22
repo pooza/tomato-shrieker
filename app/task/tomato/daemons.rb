@@ -14,7 +14,7 @@ module TomatoShrieker
         end
 
         desc "restart #{daemon}"
-        task restart: ['config:lint', :stop, :start]
+        task restart: ['config:lint', 'migration:run', :stop, :start]
       end
     end
   end
