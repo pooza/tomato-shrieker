@@ -38,10 +38,11 @@ module TomatoShrieker
   end
 
   def self.load_tasks
-    Find.find(File.join(dir, 'app/task')).each do |f|
-      next unless File.extname(f) == '.rb'
-      require f
-    end
+    finder = Ginseng::FileFinder.new
+    finder.dir = ::File.join(dir, 'app/task')
+    finder.patterns.push('*.rb')
+    finder.patterns.push('*.rake')
+    finder.exec.each {|f| require f}
   end
 
   Bundler.require
