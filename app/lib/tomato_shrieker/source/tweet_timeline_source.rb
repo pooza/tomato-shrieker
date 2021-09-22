@@ -6,21 +6,13 @@ module TomatoShrieker
       return uri
     end
 
-    def fetch
-      return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        next if keyword && !hot_entry?(entry)
-        next if negative_keyword && negative_entry?(entry)
-        values = entry.clone
-        uri = Ginseng::URI.parse(values['url'])
-        uri.host = 'twitter.com'
-        uri.fragment = nil
-        entry['url'] = uri.to_s
-        next unless record = Entry.create(values, self)
-        yield record
-      rescue => e
-        logger.error(error: e)
-      end
+    def create_record(entry)
+      values = entry.clone
+      uri = Ginseng::URI.parse(values['url'])
+      uri.host = 'twitter.com'
+      uri.fragment = nil
+      entry['url'] = uri.to_s
+      return super(entry)
     end
 
     def self.all(&block)
