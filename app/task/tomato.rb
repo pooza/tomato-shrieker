@@ -4,12 +4,12 @@ module TomatoShrieker
   namespace :tomato do
     desc 'crawl'
     task :crawl do
-      sh File.join(Environment.dir, 'bin/crawl.rb').to_s
+      sh ::File.join(Environment.dir, 'bin/crawl.rb').to_s
     end
 
     desc 'update timestamps'
     task :touch do
-      sh "#{File.join(Environment.dir, 'bin/crawl.rb')} --silence"
+      sh "#{::File.join(Environment.dir, 'bin/crawl.rb')} --silence"
     end
 
     desc 'clear entries'

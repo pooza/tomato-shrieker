@@ -5,14 +5,13 @@ module TomatoShrieker
   namespace :config do
     desc 'lint local config'
     task :lint do
-      puts 'schema:'
-      puts config.schema.to_yaml
+      puts "environment: #{Environment.type}"
       if config.errors.present?
-        puts 'result:'
+        puts 'config:'
         puts config.errors.to_yaml
         exit 1
       else
-        puts 'result: OK'
+        puts 'config: OK'
       end
     end
   end

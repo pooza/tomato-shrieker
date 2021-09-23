@@ -7,14 +7,14 @@ module TomatoShrieker
         [:start, :stop].freeze.each do |action|
           desc "#{action} #{daemon}"
           task action do
-            sh "#{File.join(Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
+            sh "#{::File.join(Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
           rescue => e
             warn "#{e.class} #{daemon}:#{action} #{e.message}"
           end
         end
 
         desc "restart #{daemon}"
-        task restart: ['config:lint', :stop, :start]
+        task restart: ['config:lint', 'migration:run', :stop, :start]
       end
     end
   end

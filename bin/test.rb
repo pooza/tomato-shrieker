@@ -5,9 +5,9 @@ ENV['BUNDLE_GEMFILE'] = File.join(dir, 'Gemfile')
 
 require 'tomato_shrieker'
 module TomatoShrieker
-  puts Package.full_name
-  puts 'テストローダー'
-  puts ''
+  warn Package.full_name
+  warn 'テストローダー'
+  warn ''
   TestCase.load(ARGV.getopts('', 'cases:')['cases'])
 rescue => e
   warn e.message

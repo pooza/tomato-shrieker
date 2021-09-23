@@ -1,7 +1,8 @@
 module TomatoShrieker
   class GoogleNewsSource < FeedSource
     def uri
-      uri = Ginseng::URI.parse(self['/source/google_news'])
+      uri = Ginseng::URI.parse(self['/source/news'])
+      uri ||= Ginseng::URI.parse(self['/source/google_news'])
       return nil unless uri&.absolute?
       return uri
     end
@@ -14,13 +15,13 @@ module TomatoShrieker
       return 'title'
     end
 
-    def fetch
-      return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |v|
-        next if Entry.first(feed: id, title: NewsEntry.create_title(v['title'], self))
-        next unless entry = NewsEntry.create(v, self)
-        yield entry
-      end
+    def ignore_entry?(entry)
+      return true if Entry.first(feed: id, title: NewsEntry.create_title(entry['title'], self))
+      return super
+    end
+
+    def create_record(entry)
+      return NewsEntry.create(entry, self)
     end
 
     def self.all(&block)
