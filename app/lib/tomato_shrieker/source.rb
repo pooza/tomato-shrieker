@@ -200,11 +200,5 @@ module TomatoShrieker
     def self.create(id)
       return all.find {|v| v.id == id}
     end
-
-    def self.exec_all
-      Sequel.connect(Environment.dsn).transaction do
-        all.map {|v| Thread.new {v.exec}}.map(&:join)
-      end
-    end
   end
 end
