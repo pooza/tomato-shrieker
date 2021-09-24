@@ -10,6 +10,7 @@ module TomatoShrieker
           Feedjira::Parser::Atom,
           Feedjira::Parser::RSS,
           Feedjira::Parser::AtomYoutube,
+          Feedjira::Parser::ITunesRSS,
         ]
         assert_kind_of(classes, source.feedjira)
       end
@@ -76,8 +77,8 @@ module TomatoShrieker
         source.entries.first(5).each do |entry|
           classes = [
             Feedjira::Parser::AtomEntry,
-            Feedjira::Parser::AtomYoutubeEntry,
             Feedjira::Parser::RSSEntry,
+            Feedjira::Parser::AtomYoutubeEntry,
             Feedjira::Parser::ITunesRSSItem,
           ]
           assert_kind_of(classes, entry)
