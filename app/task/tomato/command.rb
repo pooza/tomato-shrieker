@@ -5,9 +5,11 @@ module TomatoShrieker
     namespace :command do
       CommandSource.all do |source|
         namespace source.id do
-          desc 'bundle install'
-          task :bundler do
-            source.command.bundle_install
+          if source.bundler?
+            desc 'bundle install'
+            task :bundler do
+              source.command.bundle_install
+            end
           end
 
           desc "execute '#{source.command}'"

@@ -15,13 +15,13 @@ module TomatoShrieker
             source.exec
           end
 
-          desc 'clear records'
+          desc 'clear all records'
           task :clear do
             source.clear
           end
 
-          if source.keep_years
-            desc "purge (#{source.keep_years} years)"
+          if source.purge?
+            desc "clear records (< #{source.keep_years.years.ago.strftime('%Y/%m/%d')})"
             task :purge do
               source.purge
             end

@@ -24,21 +24,21 @@ module TomatoShrieker
       return self['/keep/years']
     end
 
+    def purge?
+      return keep_years.present?
+    end
+
     def purge
-      return unless keep_years
+      return unless purge?
       dataset = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
-      cnt = dataset.count
       dataset.destroy
-      puts "delete #{cnt.commaize} records"
     end
 
     def clear
       dataset = Entry.dataset.where(feed: hash)
-      cnt = dataset.count
       dataset.destroy
-      puts "delete #{cnt.commaize} records"
     end
 
     def unique_title?
