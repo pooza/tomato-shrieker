@@ -57,7 +57,7 @@ module TomatoShrieker
     end
 
     def template
-      template = Template.new(feed.template_name)
+      template = feed.template
       template[:feed] = feed
       template[:entry] = self
       return template

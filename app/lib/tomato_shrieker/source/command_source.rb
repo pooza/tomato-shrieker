@@ -12,7 +12,7 @@ module TomatoShrieker
 
     def create_template(status)
       return nil unless status.present?
-      template = Template.new(template_name)
+      template = template.clone
       template[:source] = self
       template[:status] = status
       return template

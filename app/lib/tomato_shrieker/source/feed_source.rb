@@ -10,7 +10,7 @@ module TomatoShrieker
 
     def exec
       if multi_entries?
-        template = Template.new(template_name)
+        template = template.clone
         template[:entries] = multi_entries
         shriek(template: template, visibility: visibility)
       elsif touched?

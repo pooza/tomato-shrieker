@@ -4,7 +4,6 @@ module TomatoShrieker
       assert_kind_of(Enumerator, TweetTimelineSource.all)
     end
 
-
     def test_account
       TweetTimelineSource.all do |source|
         assert_kind_of(String, source.account)
