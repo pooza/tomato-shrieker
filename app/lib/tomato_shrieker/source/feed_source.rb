@@ -98,6 +98,11 @@ module TomatoShrieker
       return time.present?
     end
 
+    def touch
+      Entry.create(entries.max_by(&:published), self)
+      logger.info(source: id, message: 'touch')
+    end
+
     def entries
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
