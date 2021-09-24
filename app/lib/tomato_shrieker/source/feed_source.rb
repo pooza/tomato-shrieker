@@ -24,20 +24,20 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def keep_years
-      return self['/keep/years']
-    end
-
-    def purge?
-      return keep_years.present?
-    end
-
     def purge
       return unless purge?
       dataset = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
       dataset.destroy
+    end
+
+    def purge?
+      return keep_years.present?
+    end
+
+    def keep_years
+      return self['/keep/years']
     end
 
     def clear
