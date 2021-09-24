@@ -24,7 +24,7 @@ module TomatoShrieker
     def initialize
       @scheduler = Rufus::Scheduler.new
       @scheduler.cron('@hourly', 'purge') do
-        FeedSource.all.select(&:purge?).each(&:purge)
+        FeedSource.purge_all
       end
     end
   end
