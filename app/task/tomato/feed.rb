@@ -3,17 +3,12 @@ module TomatoShrieker
 
   namespace :tomato do
     namespace :feed do
-      desc 'entry summary (for "multi_entries" feed source)'
-      task :summary do
-        FeedSource.all.select(&:multi_entries?).each do |source|
-          summary = {
-            id: source.id,
-            category: source.category,
-            entries: source.multi_entries.map do |entry|
-              {published: entry.published, title: entry.title}
-            end,
-          }.to_yaml
-          puts summary
+      FeedSource.all do |source|
+        namespace source.id do
+          desc "fetch entries of #{source.id} (#{source.uri})"
+          task :fetch do
+            puts JSON.pretty_generate(source.summary)
+          end
         end
       end
     end

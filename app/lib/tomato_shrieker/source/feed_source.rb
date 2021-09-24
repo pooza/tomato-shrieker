@@ -156,6 +156,14 @@ module TomatoShrieker
       return uri
     end
 
+    def summary
+      values = {id: id, category: category, multi: multi_entries?}
+      values[:entries] = entries.map do |entry|
+        {date: entry.published.strftime('%Y/%m/%d %R'), title: entry.title, link: entry.url}
+      end
+      return values
+    end
+
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(FeedSource)}.each(&block)

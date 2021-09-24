@@ -6,7 +6,7 @@ module TomatoShrieker
       desc 'source list'
       task :list do
         Source.all do |source|
-          puts YAML.dump(source.to_h)
+          puts JSON.pretty_generate(source.to_h)
         end
       end
     end

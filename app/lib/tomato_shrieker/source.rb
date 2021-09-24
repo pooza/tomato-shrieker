@@ -18,11 +18,7 @@ module TomatoShrieker
     end
 
     def id
-      unless @id
-        @id = self['/id']
-        @id ||= self['/hash']
-        @id ||= Digest::SHA1.hexdigest(@params.to_json)
-      end
+      @id ||= self['/id'] || Digest::SHA1.hexdigest(@params.to_json)
       return @id
     end
 
