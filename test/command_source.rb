@@ -3,7 +3,6 @@ module TomatoShrieker
     def test_command
       CommandSource.all do |source|
         assert_kind_of(Ginseng::CommandLine, source.command)
-        source.command.bundle_install if source.bundler?
         source.command.exec
         assert(source.command.status.zero?)
       end
