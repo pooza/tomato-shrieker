@@ -5,7 +5,7 @@ module TomatoShrieker
     end
 
     test '1レコード以上のエントリが存在するか' do
-      assert(@entries.present?) unless Environment.ci?
+      assert(@entries.present?)
     end
 
     def test_feed

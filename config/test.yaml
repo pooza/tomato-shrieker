@@ -2,10 +2,6 @@ filters:
   - cases: []
     name: ci
   - cases:
-      - google_news_source
-      - news_entry
-    name: google_news
-  - cases:
       - line_shrieker
     name: line
   - cases:
