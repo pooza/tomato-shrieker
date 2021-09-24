@@ -10,7 +10,9 @@ module TomatoShrieker
 
     def exec
       if multi_entries?
-        shriek(template: multi_entries_template, visibility: visibility)
+        template = Template.new(template_name)
+        template[:entries] = multi_entries
+        shriek(template: template, visibility: visibility)
       elsif touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
@@ -65,19 +67,12 @@ module TomatoShrieker
     end
 
     def multi_entries
-      records = feedjira.entries
+      records = entries
         .select {|v| v.categories.member?(category)}
         .sort_by {|v| v.published.to_f}
         .reverse
         .first(limit)
       return records
-    end
-
-    def multi_entries_template
-      return nil unless multi_entries?
-      template = Template.new(template_name)
-      template[:entries] = multi_entries
-      return template
     end
 
     def time
@@ -136,7 +131,7 @@ module TomatoShrieker
     end
 
     def present?
-      return feedjira.entries.present?
+      return entries.present?
     end
 
     def uri
