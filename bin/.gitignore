@@ -1,5 +1,4 @@
 *.rb
-!crawl.rb
 !crypt.rb
 !decrypt.rb
 !scheduler_daemon.rb

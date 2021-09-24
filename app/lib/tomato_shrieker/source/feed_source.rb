@@ -15,7 +15,6 @@ module TomatoShrieker
         touch
       elsif touched? || options['all']
         fetch(&:shriek)
-        logger.info(source: id, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.shriek
       end
