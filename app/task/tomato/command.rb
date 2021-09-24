@@ -2,7 +2,7 @@ module TomatoShrieker
   extend Rake::DSL
 
   namespace :tomato do
-    namespace :command do
+    namespace :source do
       CommandSource.all do |source|
         namespace source.id do
           if source.bundler?

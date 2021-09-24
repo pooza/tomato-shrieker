@@ -2,7 +2,7 @@ module TomatoShrieker
   extend Rake::DSL
 
   namespace :tomato do
-    namespace :feed do
+    namespace :source do
       FeedSource.all do |source|
         namespace source.id do
           desc "fetch <#{source.uri}>"
