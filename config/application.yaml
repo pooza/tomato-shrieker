@@ -27,6 +27,7 @@ package:
   version: 3.3.0
 slack:
   hooks: []
+sources: []
 sqlite3:
   db: db.sqlite3
 tweet:
