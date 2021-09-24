@@ -24,6 +24,13 @@ module TomatoShrieker
       end
     end
 
+    def test_phrase
+      GoogleNewsSource.all do |source|
+        assert_kind_of(String, source.phrase)
+        assert(source.phrase.present?)
+      end
+    end
+
     def test_feedjira
       GoogleNewsSource.all do |source|
         assert(source.feedjira.present?)

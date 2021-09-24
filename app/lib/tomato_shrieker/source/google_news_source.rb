@@ -1,10 +1,18 @@
 module TomatoShrieker
   class GoogleNewsSource < FeedSource
     def uri
-      uri = Ginseng::URI.parse(self['/source/news'])
-      uri ||= Ginseng::URI.parse(self['/source/google_news'])
-      return nil unless uri&.absolute?
-      return uri
+      if self['/source/news/phrase']
+        uri = Ginseng::URI.parse(config['/google/news/urls/root'])
+        uri.query_values['q'] = self['/source/news/phrase']
+      else
+        uri = Ginseng::URI.parse(self['/source/news/url'])
+      end
+      return uri.normalize if uri&.absolute?
+    end
+
+    def phrase
+      return self['/source/news/phrase'] if self['/source/news/phrase']
+      return uri.query_values['q']
     end
 
     def unique_title?
