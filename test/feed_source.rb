@@ -69,7 +69,7 @@ module TomatoShrieker
         assert_kind_of(Enumerator, source.entries)
         assert(source.entries.count.positive?)
         source.entries.first(5).each do |entry|
-          assert_kind_of([Feedjira::Parser::AtomEntry, Feedjira::Parser::RSSEntry], entry)
+          assert_kind_of([Feedjira::Parser::AtomEntry, Feedjira::Parser::AtomYoutubeEntry, Feedjira::Parser::RSSEntry], entry)
         end
       end
     end
