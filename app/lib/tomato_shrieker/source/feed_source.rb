@@ -78,12 +78,12 @@ module TomatoShrieker
     end
 
     def multi_entries
-      entries = feedjira.entries
+      records = feedjira.entries
         .select {|v| v.categories.member?(category)}
         .sort_by {|v| v.published.to_f}
         .reverse
         .first(limit)
-      return entries
+      return records
     end
 
     def multi_entries_template
@@ -114,10 +114,18 @@ module TomatoShrieker
       logger.info(source: id, message: 'touch')
     end
 
-    def fetch
+    def entries
       return enum_for(__method__) unless block_given?
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        next if ignore_entry?(entry)
+        yield entry
+      rescue => e
+        logger.error(error: e)
+      end
+    end
+
+    def fetch
+      return enum_for(__method__) unless block_given?
+      entries.reject {|v| ignore_entry?(v)}.each do |entry|
         next unless record = create_record(entry)
         yield record
       rescue => e
@@ -151,15 +159,14 @@ module TomatoShrieker
 
     def uri
       uri = Ginseng::URI.parse(self['/source/feed'])
-      uri ||= Ginseng::URI.parse(self['/source/url'])
       return nil unless uri&.absolute?
       return uri
     end
 
     def feedjira
       return Feedjira.parse(@http.get(uri).body)
-    rescue Feedjira::NoParserAvailable => e
-      raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
+    rescue => e
+      raise Ginseng::GatewayError, "Invalid feed #{id} (#{uri}) #{e.message}"
     end
 
     def prefix
