@@ -56,13 +56,6 @@ module TomatoShrieker
       end
     end
 
-    def test_purge
-      FeedSource.all do |source|
-        next unless time = source.purge(dryrun: true)
-        assert_kind_of(Time, time)
-      end
-    end
-
     def test_all
       assert_kind_of(Enumerator, FeedSource.all)
     end

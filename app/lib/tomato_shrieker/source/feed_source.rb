@@ -18,8 +18,7 @@ module TomatoShrieker
       end
     end
 
-    def purge(params = {})
-      return unless purge?
+    def purge
       records = Entry.dataset
         .select(:published)
         .where(feed: hash)
@@ -29,13 +28,8 @@ module TomatoShrieker
       records = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{date.strftime('%Y-%m-%d %H:%M:%S %z')}'"),
       )
-      records.destroy unless params[:dryrun]
+      records.destroy
       return date
-    end
-
-    def purge?
-      return self['/source/purge'] unless self['/source/purge'].nil?
-      return true
     end
 
     def unique_title?
@@ -170,18 +164,6 @@ module TomatoShrieker
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(FeedSource)}.each(&block)
-    end
-
-    def self.purge_all(params = {})
-      logger = Logger.new
-      FeedSource.all do |source|
-        next unless date = source.purge(params)
-        logger.info(source: source.id, message: 'purge', date: date, params: params)
-        puts "#{source.id}: #{message} #{date} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
-      rescue => e
-        logger.error(error: e, source: source.id, params: params)
-        warn "#{source.id}: #{e.message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
-      end
     end
   end
 end

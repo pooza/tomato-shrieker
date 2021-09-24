@@ -63,13 +63,6 @@ module TomatoShrieker
       end
     end
 
-    def test_purge
-      GoogleNewsSource.all do |source|
-        next unless time = source.purge(dryrun: true)
-        assert_kind_of(Time, time)
-      end
-    end
-
     def test_all
       assert_kind_of(Enumerator, GoogleNewsSource.all)
     end
