@@ -5,7 +5,7 @@ module TomatoShrieker
     namespace :source do
       TextSource.all do |source|
         namespace source.id do
-          desc "shriek #{source.text.ellipsize(40).to_json}"
+          desc "shriek #{source.text.ellipsize(100).to_json}"
           task :shriek do
             source.exec
           end
