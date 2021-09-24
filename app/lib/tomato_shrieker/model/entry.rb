@@ -57,7 +57,7 @@ module TomatoShrieker
     end
 
     def template
-      template = feed.template
+      template = feed.template.clone
       template[:feed] = feed
       template[:entry] = self
       return template
