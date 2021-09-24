@@ -7,9 +7,13 @@ module TomatoShrieker
 
     def template
       template = super
-      template[:status] = self['/source/text']
+      template[:status] = text
       template[:source] = self
       return template
+    end
+
+    def text
+      return self['/source/text']
     end
 
     def self.all(&block)
