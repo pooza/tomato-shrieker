@@ -6,7 +6,12 @@ module TomatoShrieker
 
     def test_feedjira
       FeedSource.all do |source|
-        assert_kind_of([Feedjira::Parser::Atom, Feedjira::Parser::RSS], source.feedjira)
+        classes = [
+          Feedjira::Parser::Atom,
+          Feedjira::Parser::RSS,
+          Feedjira::Parser::AtomYoutube,
+        ]
+        assert_kind_of(classes, source.feedjira)
       end
     end
 
@@ -69,7 +74,13 @@ module TomatoShrieker
         assert_kind_of(Enumerator, source.entries)
         assert(source.entries.count.positive?)
         source.entries.first(5).each do |entry|
-          assert_kind_of([Feedjira::Parser::AtomEntry, Feedjira::Parser::AtomYoutubeEntry, Feedjira::Parser::RSSEntry], entry)
+          classes = [
+            Feedjira::Parser::AtomEntry,
+            Feedjira::Parser::AtomYoutubeEntry,
+            Feedjira::Parser::RSSEntry,
+            Feedjira::Parser::ITunesRSSItem,
+          ]
+          assert_kind_of(classes, entry)
         end
       end
     end
