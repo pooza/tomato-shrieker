@@ -63,8 +63,8 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
-    def template_name
-      return self['/dest/template'] || 'title'
+    def template
+      return Template.new(self['/dest/template'] || 'title')
     end
 
     def keyword

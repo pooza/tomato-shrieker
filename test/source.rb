@@ -31,12 +31,6 @@ module TomatoShrieker
       end
     end
 
-    def test_template_name
-      Source.all do |source|
-        assert_kind_of(String, source.template_name)
-      end
-    end
-
     def test_mastodon
       Source.all do |source|
         assert_boolean(source.mastodon?)
