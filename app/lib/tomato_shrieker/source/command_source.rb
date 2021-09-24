@@ -3,7 +3,7 @@ module TomatoShrieker
     def exec
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
-      command.stdout.split(delimiter).each do |status|
+      command.stdout.split(delimiter).select(&:present?).each do |status|
         shriek(template: create_template(status), visibility: visibility)
       rescue => e
         logger.error(source: id, error: e, status: status)
