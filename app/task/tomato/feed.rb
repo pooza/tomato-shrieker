@@ -5,12 +5,12 @@ module TomatoShrieker
     namespace :source do
       FeedSource.all do |source|
         namespace source.id do
-          desc "fetch <#{source.uri.to_s}>"
+          desc "fetch <#{source.uri}>"
           task :fetch do
             puts JSON.pretty_generate(source.summary)
           end
 
-          desc "shriek <#{source.uri.to_s}>"
+          desc "shriek <#{source.uri}>"
           task :shriek do
             source.exec
           end
