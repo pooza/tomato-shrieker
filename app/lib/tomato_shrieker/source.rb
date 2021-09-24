@@ -204,5 +204,20 @@ module TomatoShrieker
     def self.create(id)
       return all.find {|v| v.id == id}
     end
+
+    def self.exec_all
+      threads = []
+      Sequel.connect(Environment.dsn).transaction do
+        all do |source|
+          threads.push(Thread.new {source.exec})
+        rescue => e
+          e = Ginseng::Error.create(e)
+          e.package = Package.full_name
+          Slack.broadcast(e)
+          logger.error(e)
+        end
+        threads.map(&:join)
+      end
+    end
   end
 end
