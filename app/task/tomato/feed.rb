@@ -7,7 +7,7 @@ module TomatoShrieker
         namespace source.id do
           desc "fetch <#{source.uri}>"
           task :fetch do
-            puts JSON.pretty_generate(source.summary)
+            puts source.summary.deep_stringify_keys.to_yaml
           end
 
           desc "shriek <#{source.uri}>"
