@@ -32,7 +32,7 @@ module TomatoShrieker
       shriekers do |shrieker|
         shrieker.exec(params)
       rescue => e
-        logger.error(error: e)
+        logger.error(source: id, error: e)
       end
     end
 
@@ -75,7 +75,7 @@ module TomatoShrieker
       end
       return @mastodon
     rescue => e
-      logger.error(error: e, url: self['/dest/mastodon/url'])
+      logger.error(source: id, error: e, url: self['/dest/mastodon/url'])
       return nil
     end
 
@@ -92,7 +92,7 @@ module TomatoShrieker
       end
       return @misskey
     rescue => e
-      logger.error(error: e, url: self['/dest/misskey/url'])
+      logger.error(source: id, error: e, url: self['/dest/misskey/url'])
       return nil
     end
 
@@ -108,7 +108,7 @@ module TomatoShrieker
       end
       return @line
     rescue => e
-      logger.error(error: e, user_id: self['/dest/line/user_id'])
+      logger.error(source: id, error: e, user_id: self['/dest/line/user_id'])
       return nil
     end
 
@@ -136,7 +136,7 @@ module TomatoShrieker
       @mulukhiya ||= MulukhiyaService.new(uri)
       return @mulukhiya
     rescue => e
-      logger.error(error: e, url: self['/dest/mulukhiya/url'])
+      logger.error(source: id, error: e, url: self['/dest/mulukhiya/url'])
       return nil
     end
 
@@ -206,17 +206,8 @@ module TomatoShrieker
     end
 
     def self.exec_all
-      threads = []
       Sequel.connect(Environment.dsn).transaction do
-        all do |source|
-          threads.push(Thread.new {source.exec})
-        rescue => e
-          e = Ginseng::Error.create(e)
-          e.package = Package.full_name
-          Slack.broadcast(e)
-          logger.error(e)
-        end
-        threads.map(&:join)
+        all.map {|v| Thread.new {v.exec}}.map(&:join)
       end
     end
   end

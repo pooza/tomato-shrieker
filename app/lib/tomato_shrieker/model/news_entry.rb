@@ -20,7 +20,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      logger.error(error: e, entry: entry)
+      logger.error(source: feed&.id, error: e, entry: entry)
       return nil
     end
 
@@ -30,7 +30,7 @@ module TomatoShrieker
       dest.gsub!(pattern, '') while dest.match?(pattern)
       return dest
     rescue => e
-      logger.error(error: e)
+      logger.error(source: feed&.id, error: e)
       return title
     end
   end

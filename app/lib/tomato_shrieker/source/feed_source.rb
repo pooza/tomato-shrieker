@@ -18,6 +18,10 @@ module TomatoShrieker
       elsif entry = fetch.to_a.last
         entry.shriek
       end
+    rescue => e
+      e.package = Package.full_name
+      WebhookShrieker.broadcast(e)
+      logger.error(source: id, error: e)
     end
 
     def keep_years
@@ -108,7 +112,7 @@ module TomatoShrieker
       feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
         yield entry
       rescue => e
-        logger.error(error: e)
+        logger.error(source: id, error: e)
       end
     end
 
@@ -118,7 +122,7 @@ module TomatoShrieker
         next unless record = create_record(entry)
         yield record
       rescue => e
-        logger.error(error: e)
+        logger.error(source: id, error: e)
       end
     end
 

@@ -2,7 +2,10 @@ module TomatoShrieker
   class TextSource < Source
     def exec
       shriek(template: template, visibility: visibility)
-      logger.info(source: id, message: 'post')
+    rescue => e
+      e.package = Package.full_name
+      WebhookShrieker.broadcast(e)
+      logger.error(source: id, error: e)
     end
 
     def template

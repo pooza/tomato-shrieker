@@ -8,7 +8,10 @@ module TomatoShrieker
       rescue => e
         logger.error(source: id, error: e, status: status)
       end
-      logger.info(source: id, message: 'post')
+    rescue => e
+      e.package = Package.full_name
+      WebhookShrieker.broadcast(e)
+      logger.error(source: id, error: e)
     end
 
     def create_template(status)
