@@ -1,7 +1,6 @@
 module TomatoShrieker
   class CommandSource < Source
-    def exec(options = {})
-      return if options['silence']
+    def exec
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       command.stdout.split(delimiter).each do |status|

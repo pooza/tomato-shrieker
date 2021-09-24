@@ -8,12 +8,10 @@ module TomatoShrieker
       @http.base_uri = uri
     end
 
-    def exec(options = {})
+    def exec
       if multi_entries?
         shriek(template: multi_entries_template, visibility: visibility)
-      elsif options['silence']
-        touch
-      elsif touched? || options['all']
+      elsif touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
         entry.shriek
@@ -107,11 +105,6 @@ module TomatoShrieker
 
     def touched?
       return time.present?
-    end
-
-    def touch
-      Entry.create(feedjira.entries.max_by(&:published), self)
-      logger.info(source: id, message: 'touch')
     end
 
     def entries

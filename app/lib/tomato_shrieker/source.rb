@@ -28,7 +28,7 @@ module TomatoShrieker
 
     alias hash id
 
-    def exec(options = {})
+    def exec
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 

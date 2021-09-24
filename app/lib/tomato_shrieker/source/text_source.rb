@@ -1,6 +1,6 @@
 module TomatoShrieker
   class TextSource < Source
-    def exec(options = {})
+    def exec
       shriek(template: template, visibility: visibility)
       logger.info(source: id, message: 'post')
     end
