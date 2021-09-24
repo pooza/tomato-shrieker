@@ -113,6 +113,17 @@ properties:
               type: string
             env:
               type: hash
+            feed:
+              format: url
+              type: string
+            news:
+              format: hash
+              properties:
+                phrase:
+                  type: string
+                url:
+                  format: url
+                  type: string
             text:
               type: string
             title:
@@ -120,6 +131,13 @@ properties:
                 unique:
                   type: boolean
               type: hash
+            tweet:
+              format: hash
+              properties:
+                account:
+                  type: string
+                required:
+                  - account
             url:
               format: url
               type: string
