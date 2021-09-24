@@ -25,7 +25,6 @@ module TomatoShrieker
         .where(feed: hash)
         .order {published.desc}
         .limit(1)
-        .offset(feedjira.entries.count * expire)
       return unless date = records.first&.published
       records = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{date.strftime('%Y-%m-%d %H:%M:%S %z')}'"),
@@ -37,10 +36,6 @@ module TomatoShrieker
     def purge?
       return self['/source/purge'] unless self['/source/purge'].nil?
       return true
-    end
-
-    def expire
-      return self['/source/expire'] || 2
     end
 
     def unique_title?

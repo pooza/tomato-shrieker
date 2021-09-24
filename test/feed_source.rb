@@ -38,12 +38,6 @@ module TomatoShrieker
       end
     end
 
-    def test_expire
-      FeedSource.all do |source|
-        assert_kind_of(Integer, source.expire)
-      end
-    end
-
     def test_keyword
       FeedSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)

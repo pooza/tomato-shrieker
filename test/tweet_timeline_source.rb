@@ -38,12 +38,6 @@ module TomatoShrieker
       end
     end
 
-    def test_expire
-      TweetTimelineSource.all do |source|
-        assert_kind_of(Integer, source.expire)
-      end
-    end
-
     def test_keyword
       TweetTimelineSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)
