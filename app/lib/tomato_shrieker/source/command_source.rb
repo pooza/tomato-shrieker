@@ -1,26 +1,28 @@
 module TomatoShrieker
   class CommandSource < Source
-    def exec(options = {})
-      return if options['silence']
+    def exec
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
-      command.stdout.split(delimiter).each do |status|
-        next unless template = create_template(status)
-        shriek(template: template, visibility: visibility)
+      command.stdout.split(delimiter).select(&:present?).each do |status|
+        shriek(template: create_template(status), visibility: visibility)
+      rescue => e
+        logger.error(source: id, error: e, status: status)
       end
-      logger.info(source: id, message: 'post')
+    rescue => e
+      e.package = Package.full_name
+      WebhookShrieker.broadcast(e)
+      logger.error(source: id, error: e)
     end
 
     def create_template(status)
-      return nil unless status.present?
-      template = Template.new(template_name)
+      template = self.template.clone
       template[:source] = self
       template[:status] = status
       return template
     end
 
     def bundler?
-      return self['/source/bundler'] == true
+      return command.to_s.match?(/^bundler? /)
     end
 
     def delimiter

@@ -25,9 +25,9 @@ module TomatoShrieker
       end
     end
 
-    def test_template_name
+    def test_template
       Source.all do |source|
-        assert_kind_of(String, source.template_name)
+        assert_kind_of(Template, source.template)
       end
     end
 

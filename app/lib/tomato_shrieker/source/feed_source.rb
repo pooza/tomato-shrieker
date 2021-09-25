@@ -8,42 +8,41 @@ module TomatoShrieker
       @http.base_uri = uri
     end
 
-    def exec(options = {})
+    def exec
       if multi_entries?
-        shriek(template: multi_entries_template, visibility: visibility)
-      elsif options['silence']
-        touch
-      elsif touched? || options['all']
+        template = self.template.clone
+        template[:entries] = multi_entries
+        shriek(template: template, visibility: visibility)
+      elsif touched?
         fetch(&:shriek)
-        logger.info(source: id, message: 'crawl')
       elsif entry = fetch.to_a.last
         entry.shriek
       end
+    rescue => e
+      e.package = Package.full_name
+      WebhookShrieker.broadcast(e)
+      logger.error(source: id, error: e)
     end
 
-    def purge(params = {})
+    def purge
       return unless purge?
-      records = Entry.dataset
-        .select(:published)
-        .where(feed: hash)
-        .order {published.desc}
-        .limit(1)
-        .offset(feedjira.entries.count * expire)
-      return unless date = records.first&.published
-      records = Entry.dataset.where(feed: hash).where(
-        Sequel.lit("published < '#{date.strftime('%Y-%m-%d %H:%M:%S %z')}'"),
+      dataset = Entry.dataset.where(feed: hash).where(
+        Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
-      records.destroy unless params[:dryrun]
-      return date
+      dataset.destroy
     end
 
     def purge?
-      return self['/source/purge'] unless self['/source/purge'].nil?
-      return true
+      return keep_years.present?
     end
 
-    def expire
-      return self['/source/expire'] || 2
+    def keep_years
+      return self['/keep/years']
+    end
+
+    def clear
+      dataset = Entry.dataset.where(feed: hash)
+      dataset.destroy
     end
 
     def unique_title?
@@ -64,8 +63,8 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
-    def template_name
-      return self['/dest/template'] || 'title'
+    def template
+      return Template.new(self['/dest/template'] || 'title')
     end
 
     def keyword
@@ -79,19 +78,12 @@ module TomatoShrieker
     end
 
     def multi_entries
-      entries = feedjira.entries
+      records = entries
         .select {|v| v.categories.member?(category)}
         .sort_by {|v| v.published.to_f}
         .reverse
         .first(limit)
-      return entries
-    end
-
-    def multi_entries_template
-      return nil unless multi_entries?
-      template = Template.new(template_name)
-      template[:entries] = multi_entries
-      return template
+      return records
     end
 
     def time
@@ -111,18 +103,26 @@ module TomatoShrieker
     end
 
     def touch
-      Entry.create(feedjira.entries.max_by(&:published), self)
+      Entry.create(entries.max_by(&:published), self)
       logger.info(source: id, message: 'touch')
+    end
+
+    def entries
+      return enum_for(__method__) unless block_given?
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
+        yield entry
+      rescue => e
+        logger.error(source: id, error: e)
+      end
     end
 
     def fetch
       return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        next if ignore_entry?(entry)
+      entries.reject {|v| ignore_entry?(v)}.each do |entry|
         next unless record = create_record(entry)
         yield record
       rescue => e
-        logger.error(error: e)
+        logger.error(source: id, error: e)
       end
     end
 
@@ -147,7 +147,7 @@ module TomatoShrieker
     end
 
     def present?
-      return feedjira.entries.present?
+      return entries.present?
     end
 
     def uri
@@ -159,8 +159,8 @@ module TomatoShrieker
 
     def feedjira
       return Feedjira.parse(@http.get(uri).body)
-    rescue Feedjira::NoParserAvailable => e
-      raise Ginseng::GatewayError, "Invalid feed #{uri} #{e.message}"
+    rescue => e
+      raise Ginseng::GatewayError, "Invalid feed #{id} (#{uri}) #{e.message}"
     end
 
     def prefix
@@ -173,21 +173,21 @@ module TomatoShrieker
       return uri
     end
 
+    def summary
+      values = {id: id, category: category, multi: multi_entries?}
+      values[:entries] = entries.map do |entry|
+        {date: entry.published.strftime('%Y/%m/%d %R'), title: entry.title, link: entry.url}
+      end
+      return values
+    end
+
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(FeedSource)}.each(&block)
     end
 
-    def self.purge_all(params = {})
-      logger = Logger.new
-      FeedSource.all do |source|
-        next unless date = source.purge(params)
-        logger.info(source: source.id, message: 'purge', date: date, params: params)
-        puts "#{source.id}: #{message} #{date} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
-      rescue => e
-        logger.error(error: e, source: source.id, params: params)
-        warn "#{source.id}: #{e.message} #{params[:dryrun] ? 'dryrun' : ''}" if params[:echo]
-      end
+    def self.purge_all
+      all.select(&:purge?).each(&:purge)
     end
   end
 end

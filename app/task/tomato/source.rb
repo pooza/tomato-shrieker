@@ -6,7 +6,7 @@ module TomatoShrieker
       desc 'source list'
       task :list do
         Source.all do |source|
-          puts YAML.dump(source.to_h)
+          puts source.to_h.deep_stringify_keys.to_yaml
         end
       end
     end

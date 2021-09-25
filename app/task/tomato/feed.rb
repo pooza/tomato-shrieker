@@ -2,18 +2,35 @@ module TomatoShrieker
   extend Rake::DSL
 
   namespace :tomato do
-    namespace :feed do
-      desc 'entry summary (for "multi_entries" feed source)'
-      task :summary do
-        FeedSource.all.select(&:multi_entries?).each do |source|
-          summary = {
-            id: source.id,
-            category: source.category,
-            entries: source.multi_entries.map do |entry|
-              {published: entry.published, title: entry.title}
-            end,
-          }.to_yaml
-          puts summary
+    namespace :source do
+      FeedSource.all do |source|
+        namespace source.id do
+          desc "fetch <#{source.uri}>"
+          task :fetch do
+            puts source.summary.deep_stringify_keys.to_yaml
+          end
+
+          desc "shriek <#{source.uri}>"
+          task :shriek do
+            source.exec
+          end
+
+          desc 'touch'
+          task :touch do
+            source.touch
+          end
+
+          desc 'delete all records'
+          task :clear do
+            source.clear
+          end
+
+          if source.purge?
+            desc "delete records (< #{source.keep_years.years.ago.strftime('%Y/%m/%d')})"
+            task :purge do
+              source.purge
+            end
+          end
         end
       end
     end

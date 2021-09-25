@@ -18,17 +18,13 @@ module TomatoShrieker
     end
 
     def id
-      unless @id
-        @id = self['/id']
-        @id ||= self['/hash']
-        @id ||= Digest::SHA1.hexdigest(@params.to_json)
-      end
+      @id ||= self['/id'] || Digest::SHA1.hexdigest(@params.to_json)
       return @id
     end
 
     alias hash id
 
-    def exec(options = {})
+    def exec
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 
@@ -36,7 +32,7 @@ module TomatoShrieker
       shriekers do |shrieker|
         shrieker.exec(params)
       rescue => e
-        logger.error(error: e)
+        logger.error(source: id, error: e)
       end
     end
 
@@ -51,8 +47,8 @@ module TomatoShrieker
 
     alias bot? bot_account?
 
-    def template_name
-      return 'common'
+    def template
+      return Template.new('common')
     end
 
     def shriekers
@@ -75,7 +71,7 @@ module TomatoShrieker
       end
       return @mastodon
     rescue => e
-      logger.error(error: e, url: self['/dest/mastodon/url'])
+      logger.error(source: id, error: e, url: self['/dest/mastodon/url'])
       return nil
     end
 
@@ -92,7 +88,7 @@ module TomatoShrieker
       end
       return @misskey
     rescue => e
-      logger.error(error: e, url: self['/dest/misskey/url'])
+      logger.error(source: id, error: e, url: self['/dest/misskey/url'])
       return nil
     end
 
@@ -108,7 +104,7 @@ module TomatoShrieker
       end
       return @line
     rescue => e
-      logger.error(error: e, user_id: self['/dest/line/user_id'])
+      logger.error(source: id, error: e, user_id: self['/dest/line/user_id'])
       return nil
     end
 
@@ -136,7 +132,7 @@ module TomatoShrieker
       @mulukhiya ||= MulukhiyaService.new(uri)
       return @mulukhiya
     rescue => e
-      logger.error(error: e, url: self['/dest/mulukhiya/url'])
+      logger.error(source: id, error: e, url: self['/dest/mulukhiya/url'])
       return nil
     end
 
@@ -195,30 +191,14 @@ module TomatoShrieker
         yield FeedSource.new(entry) if values['/source/url']
         yield CommandSource.new(entry) if values['/source/command']
         yield TextSource.new(entry) if values['/source/text']
-        yield GoogleNewsSource.new(entry) if values['/source/news']
-        yield GoogleNewsSource.new(entry) if values['/source/google_news']
+        yield GoogleNewsSource.new(entry) if values['/source/news/url']
+        yield GoogleNewsSource.new(entry) if values['/source/news/phrase']
         yield TweetTimelineSource.new(entry) if values['/source/tweet/account']
       end
     end
 
     def self.create(id)
       return all.find {|v| v.id == id}
-    end
-
-    def self.exec_all
-      options = ARGV.getopts('', 'silence', 'all')
-      threads = []
-      Sequel.connect(Environment.dsn).transaction do
-        all do |source|
-          threads.push(Thread.new {source.exec(options)})
-        rescue => e
-          e = Ginseng::Error.create(e)
-          e.package = Package.full_name
-          Slack.broadcast(e)
-          logger.error(e)
-        end
-        threads.map(&:join)
-      end
     end
   end
 end

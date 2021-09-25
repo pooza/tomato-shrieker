@@ -2,8 +2,12 @@ module TomatoShrieker
   class TweetTimelineSource < FeedSource
     def uri
       uri = Ginseng::URI.parse(config['/tweet/urls/root'])
-      uri.path = File.join('/', self['/source/tweet/account'], 'rss')
+      uri.path = File.join('/', account, 'rss')
       return uri
+    end
+
+    def account
+      return self['/source/tweet/account']
     end
 
     def create_record(entry)

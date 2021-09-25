@@ -4,7 +4,7 @@ module TomatoShrieker
     include Package
 
     def exec
-      logger.info(scheduler: {message: 'start'})
+      logger.info(scheduler: {message: 'initialize'})
       Source.all do |source|
         logger.info(source: source.to_h)
         if source.post_at

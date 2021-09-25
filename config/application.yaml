@@ -2,6 +2,10 @@ crypt:
   encoder: base64
   password: null
 environment: development
+google:
+  news:
+    urls:
+      root: https://news.google.com/rss/search?hl=ja&gl=JP&ceid=JP%3Aja
 http:
   retry:
     limit: 3
@@ -20,9 +24,10 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.2.22
+  version: 3.3.0
 slack:
   hooks: []
+sources: []
 sqlite3:
   db: db.sqlite3
 tweet:
