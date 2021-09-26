@@ -360,4 +360,5 @@ Rake:
     - '*'
   Include:
     - 'Rakefile'
+    - '*.rake'
     - 'app/task/**/*.rb'
