@@ -156,5 +156,6 @@ properties:
 required:
   - sources
   - environment
+  - crypt
 title: Local config
 type: object
