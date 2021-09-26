@@ -177,6 +177,7 @@ GEM
 PLATFORMS
   ruby
   x86_64-freebsd-12
+  x86_64-freebsd-13
   x86_64-linux
 
 DEPENDENCIES
