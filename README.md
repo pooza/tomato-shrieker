@@ -3,23 +3,20 @@
 ![release](https://img.shields.io/github/v/release/pooza/tomato-shrieker.svg)
 ![test](https://github.com/pooza/tomato-shrieker/workflows/test/badge.svg)
 
-ボット作成支援ツール。詳細は[wiki](https://github.com/pooza/tomato-shrieker/wiki)にて。
-
 ## tomato-shriekerにできること
 
-### 投稿できるテキスト
+- 会話をしない単純なつぶやきボットを作成するツールです。
+- 投稿のソース・投稿先・スケジュールの3要素を組み合わせて、定義ファイル（YAML形式）に記述します。
+- 定義ファイルに複数のボットを定義し、まとめて管理することが出来ます。
+- 詳細は[wiki](https://github.com/pooza/tomato-shrieker/wiki)にて。
+
+### 投稿のソース
 
 - 定型文
 - RSS/Atomフィードの新着エントリー
 - Google News
 - Twitterタイムライン
 - コマンドの実行結果（標準出力）
-
-### 投稿できるタイミング
-
-- 定期的に（デフォルトは5分ごと）
-- 指定時刻
-- cron形式の指定
 
 ### 投稿先
 
@@ -31,6 +28,12 @@
   - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む。
 - [Lemmy](https://github.com/LemmyNet/lemmy/)
 - LINE
+
+### スケジュール
+
+- 定期的に（デフォルトは5分ごと）
+- 指定時刻
+- cron形式の指定
 
 ## 由来
 
