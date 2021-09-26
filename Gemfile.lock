@@ -158,6 +158,7 @@ GEM
     test-unit (3.4.7)
       power_assert
     time (0.1.0)
+      date
     timeout (0.1.1)
     tzinfo (2.0.4)
       concurrent-ruby (~> 1.0)
@@ -176,6 +177,7 @@ GEM
 PLATFORMS
   ruby
   x86_64-freebsd-12
+  x86_64-freebsd-13
   x86_64-linux
 
 DEPENDENCIES
@@ -184,7 +186,6 @@ DEPENDENCIES
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!
-  optparse
   ricecream
   rubocop
   rubocop-performance

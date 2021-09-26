@@ -4,7 +4,7 @@ module TomatoShrieker
       shriek(template: template, visibility: visibility)
     rescue => e
       e.package = Package.full_name
-      WebhookShrieker.broadcast(e)
+      SlackService.broadcast(e)
       logger.error(source: id, error: e)
     end
 

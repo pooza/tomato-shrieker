@@ -1,5 +1,6 @@
 filters:
-  - cases: []
+  - cases:
+      - crypt
     name: ci
   - cases:
       - line_shrieker

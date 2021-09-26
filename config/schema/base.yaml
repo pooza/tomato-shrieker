@@ -1,5 +1,11 @@
 $schema: http://json-schema.org/draft-04/hyper-schema
 properties:
+  crypt:
+    properties:
+      password:
+        type: string
+    required:
+      - password
   environment:
     enum:
       - development
@@ -150,5 +156,6 @@ properties:
 required:
   - sources
   - environment
+  - crypt
 title: Local config
 type: object

@@ -1,5 +1,7 @@
 module TomatoShrieker
   class Environment < Ginseng::Environment
+    include Package
+
     def self.name
       return File.basename(dir)
     end
@@ -12,8 +14,16 @@ module TomatoShrieker
       return "sqlite://#{db}"
     end
 
+    def self.rake?
+      return ENV['RAKE'].present? && !test? rescue false
+    end
+
+    def self.test?
+      return ENV['TEST'].present? rescue false
+    end
+
     def self.type
-      return Config.instance['/environment'] || 'development'
+      return config['/environment'] || 'development'
     end
 
     def self.development?
@@ -28,7 +38,7 @@ module TomatoShrieker
       return File.join(
         dir,
         'tmp/db',
-        Config.instance['/sqlite3/db'],
+        config['/sqlite3/db'],
       )
     end
   end

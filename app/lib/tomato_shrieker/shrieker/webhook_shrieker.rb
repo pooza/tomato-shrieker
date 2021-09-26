@@ -1,5 +1,5 @@
 module TomatoShrieker
-  class WebhookShrieker < Ginseng::Slack
+  class WebhookShrieker < SlackService
     include Package
 
     def exec(body)
