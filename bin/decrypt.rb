@@ -9,6 +9,7 @@ module TomatoShrieker
   warn '復号化ユーティリティ'
   warn ''
 
+  raise '/crypt/password が未設定です。' unless Crypt.config?
   password = ARGV.first
   raise '文字列を指定してください。' unless password.present?
   puts password.decrypt
