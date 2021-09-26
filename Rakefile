@@ -3,7 +3,7 @@ $LOAD_PATH.unshift(File.join(dir, 'app/lib'))
 ENV['BUNDLE_GEMFILE'] = File.join(dir, 'Gemfile')
 
 require 'tomato_shrieker'
-module Mulukhiya
+module TomatoShrieker
   ENV['RAKE'] = Package.full_name
   load_tasks
 end
