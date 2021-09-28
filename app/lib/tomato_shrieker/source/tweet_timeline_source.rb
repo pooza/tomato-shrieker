@@ -10,6 +10,11 @@ module TomatoShrieker
       return self['/source/tweet/account']
     end
 
+    def ignore_entry?(entry)
+      return true if entry.title&.match?(/^RT by /)
+      return super
+    end
+
     def create_record(entry)
       values = entry.clone
       uri = Ginseng::URI.parse(values['url'])
