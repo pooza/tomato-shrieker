@@ -45,6 +45,11 @@ module TomatoShrieker
       return @command
     end
 
+    def load
+      command.bundle_install if bundler?
+      return super
+    end
+
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(CommandSource)}.each(&block)

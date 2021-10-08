@@ -126,5 +126,11 @@ module TomatoShrieker
         assert(Rufus::Scheduler.parse(source.every).present?)
       end
     end
+
+    def test_load
+      Source.all.select(&:cron).each do |source|
+        assert(source.load)
+      end
+    end
   end
 end
