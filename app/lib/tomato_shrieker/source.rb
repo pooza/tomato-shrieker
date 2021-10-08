@@ -183,6 +183,10 @@ module TomatoShrieker
 
     alias every period
 
+    def load
+      return true
+    end
+
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|

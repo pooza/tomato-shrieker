@@ -7,6 +7,7 @@ module TomatoShrieker
       logger.info(scheduler: {message: 'initialize'})
       Source.all do |source|
         logger.info(source: source.to_h)
+        source.load
         if source.post_at
           @scheduler.at(source.post_at, {tag: source.id}) {source.exec}
         elsif source.cron
