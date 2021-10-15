@@ -43,17 +43,14 @@
 ## 宣伝
 
 - 以下のボットのパーツとして使われています。
-  - [「東映アニメーション プリキュア公式」の新着情報ボット](https://precure.ml/@toei_bot)
-  - [「ABC毎日放送 プリキュア公式」の新着情報ボット](https://precure.ml/@abc_bot)
-  - [「プリキュアガーデン」の新着情報ボット](https://precure.ml/@garden_bot)
-  - [「プリキュア公式YouTubeチャンネル」の新着情報ボット](https://precure.ml/@youtube_precure_bot)
+  - [増子](https://precure.ml/@mikabot) （[紹介記事](https://blog.precure.ml/articles/%E5%A2%97%E5%AD%90/)）
+  - [あくまのめだまニュース](https://mstdn.delmulin.com/@news) （[紹介記事](https://blog.delmulin.com/articles/%E3%81%82%E3%81%8F%E3%81%BE%E3%81%AE%E3%82%81%E3%81%A0%E3%81%BE/)）
   - [「シュビドゥビ☆スイーツタイム」の再生回数を淡々と喋るボット](https://mstdn.b-shock.org/@shooby_do_bop_bot)
   - [「レッツ・ラ・クッキン☆ショータイム」の再生回数ボット](https://mstdn.b-shock.org/@lets_la_bot)
   - [「エビバディ☆ヒーリングッデイ！」再生数ボット](https://precure.ml/@healingoodday)
-  - [増子](https://precure.ml/@mikabot)
-  - [あくまのめだまニュース](https://mstdn.delmulin.com/@news)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
+  - [ぷーざの録画状況ボット](https://reco.shrieker.net/@pooza_recorder_bot)
   - [キュアスタ！お知らせボット](https://precure.ml/@infomation)
   - [デルムリン丼お知らせボット](https://mstdn.delmulin.com/@info)
 
