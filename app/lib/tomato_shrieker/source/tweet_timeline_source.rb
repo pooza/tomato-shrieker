@@ -11,7 +11,7 @@ module TomatoShrieker
     end
 
     def ignore_entry?(entry)
-      return true if entry.title&.match?(/^RT by /)
+      return true if entry.title&.match?(/^(RT by|R to)\s/)
       return super
     end
 
