@@ -1,7 +1,5 @@
 module TomatoShrieker
   class NewsEntry < Entry
-    include Package
-
     def self.create(entry, feed = nil)
       values = entry.clone
       values = values.to_h unless values.is_a?(Hash)
@@ -26,7 +24,7 @@ module TomatoShrieker
 
     def self.create_title(title, feed)
       pattern = / [|-] .+$/
-      dest = title.dup
+      dest = title.sanitize
       dest.gsub!(pattern, '') while dest.match?(pattern)
       return dest
     rescue => e
