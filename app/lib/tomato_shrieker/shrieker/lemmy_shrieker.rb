@@ -10,8 +10,11 @@ module TomatoShrieker
     end
 
     def client
-      @client ||= Faye::WebSocket::Client.new(uri.to_s, nil, {
-        ping: config['/websocket/keepalive'],
+      @client ||= Faye::WebSocket::Client.new(uri.to_s, [], {
+        tls: {
+          verify_peer: verify_peer?,
+        },
+        ping: keepalive,
       })
       return @client
     end
@@ -22,6 +25,14 @@ module TomatoShrieker
         @uri.path = config['/lemmy/urls/api']
       end
       return @uri
+    end
+
+    def keepalive
+      return config['/websocket/keepalive']
+    end
+
+    def verify_peer?
+      return config['/lemmy/verify_peer']
     end
 
     def handle_login(payload, body)
@@ -37,13 +48,8 @@ module TomatoShrieker
       EM.run do
         login
 
-        client.on(:close) do |e|
-          EM.stop_event_loop
-        end
-
         client.on(:error) do |e|
-          logger.error(error: e.message)
-          EM.stop_event_loop
+          raise e.message
         end
 
         client.on(:message) do |message|
@@ -51,10 +57,10 @@ module TomatoShrieker
           raise payload['error'] if payload['error']
           method = "handle_#{payload['op']}".underscore.to_sym
           EM.stop_event_loop if send(method, payload['data'], body) == :stop
-        rescue => e
-          logger.error(error: e)
-          EM.stop_event_loop
         end
+      rescue => e
+        logger.error(error: e)
+        EM.stop_event_loop
       end
     end
 

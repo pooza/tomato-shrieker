@@ -97,7 +97,7 @@ module TomatoShrieker
 
     def self.create_title(title, published, feed)
       dest = title.sanitize if feed.unique_title?
-      dest ||= "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{dest}"
+      dest ||= "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title.sanitize}"
       return dest
     rescue => e
       logger.error(source: feed&.id, error: e, title: title)

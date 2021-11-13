@@ -16,12 +16,12 @@ module TomatoShrieker
     end
 
     def create_record(entry)
-      values = entry.clone
+      values = entry.to_h
       uri = Ginseng::URI.parse(values['url'])
       uri.host = 'twitter.com'
       uri.fragment = nil
-      entry['url'] = uri.to_s
-      return super(entry)
+      values['url'] = uri.to_s
+      return super(values)
     end
 
     def self.all(&block)
