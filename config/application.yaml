@@ -13,6 +13,7 @@ http:
 lemmy:
   urls:
     api: /api/v3/ws
+  verify_peer: true
 line:
   urls:
     api: https://api.line.me
