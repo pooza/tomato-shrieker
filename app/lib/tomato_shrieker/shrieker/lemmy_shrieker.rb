@@ -69,7 +69,7 @@ module TomatoShrieker
     def login
       client.send({op: 'Login', data: {
         username_or_email: @params[:user_id],
-        password: @params[:password].decrypt,
+        password: (@params[:password].decrypt rescue @params[:password]),
       }}.to_json)
     end
 
