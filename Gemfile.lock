@@ -83,7 +83,7 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.8.11)
       concurrent-ruby (~> 1.0)
-    io-wait (0.2.0)
+    io-wait (0.2.1)
     json-schema (2.8.1)
       addressable (>= 2.4)
     loofah (2.12.0)
