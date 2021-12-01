@@ -75,12 +75,12 @@ module TomatoShrieker
 
     def post(body)
       template = body[:template]
-      title = template.entry&.title || template[:status]
-      title = "[#{template.source.prefix}] #{title}" unless template.source.bot?
+      uri = (template.entry || template.source).uri rescue nil
+      uri ||= Ginseng::URI.scan(template.to_s).first
       client.send({op: 'CreatePost', data: {
         nsfw: false,
-        name: title,
-        url: (template.entry || template.source).uri.to_s,
+        name: template.to_s.gsub(/\s+/, ' ').ellipsize(config['/lemmy/subject/max_length']),
+        url: uri.to_s,
         community_id: template.source['/dest/lemmy/community_id'],
         auth: @jwt,
       }}.to_json)

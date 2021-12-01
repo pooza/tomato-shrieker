@@ -14,6 +14,8 @@ lemmy:
   urls:
     api: /api/v3/ws
   verify_peer: true
+  subject:
+    max_length: 50
 line:
   urls:
     api: https://api.line.me
