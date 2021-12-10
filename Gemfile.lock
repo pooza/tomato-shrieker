@@ -157,7 +157,7 @@ GEM
     sequel (5.50.0)
     set (1.0.2)
     sqlite3 (1.4.2)
-    test-unit (3.5.1)
+    test-unit (3.5.2)
       power_assert
     time (0.2.0)
       date
