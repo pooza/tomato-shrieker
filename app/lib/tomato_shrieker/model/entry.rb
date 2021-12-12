@@ -56,15 +56,14 @@ module TomatoShrieker
       return @nokogiri
     end
 
-    def template
-      template = feed.template.clone
-      template[:feed] = feed
+    def create_template(type = :default)
+      template = feed.create_template(type)
       template[:entry] = self
       return template
     end
 
     def shriek
-      params = {template: template, visibility: feed.visibility, attachments: []}
+      params = {template: create_template, visibility: feed.visibility, attachments: []}
       params[:attachments].push(image_url: enclosure.to_s) if enclosure
       feed.shriek(params)
       logger.info(source: feed.id, entry: to_h, message: 'post')

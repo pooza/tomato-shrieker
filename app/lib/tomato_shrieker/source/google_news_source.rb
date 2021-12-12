@@ -21,8 +21,12 @@ module TomatoShrieker
       return true
     end
 
-    def template
-      return Template.new('title')
+    def templates
+      @templates ||= {
+        default: Template.new(self['/dest/template'] || 'title'),
+        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
+      }
+      return @templates
     end
 
     def ignore_entry?(entry)

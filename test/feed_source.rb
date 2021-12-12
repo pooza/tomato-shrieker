@@ -55,6 +55,7 @@ module TomatoShrieker
     def test_multi_entries
       FeedSource.all.select(&:multi_entries?).each do |source|
         assert_kind_of(Array, source.multi_entries)
+        assert_kind_of(Template, source.templates[:multi])
       end
     end
 

@@ -15,7 +15,7 @@ lemmy:
     api: /api/v3/ws
   verify_peer: true
   subject:
-    max_length: 50
+    max_length: 200
 line:
   urls:
     api: https://api.line.me
@@ -27,7 +27,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.3.8
+  version: 3.3.9
 slack:
   hooks: []
 sources: []

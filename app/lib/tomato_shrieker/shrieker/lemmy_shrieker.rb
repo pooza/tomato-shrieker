@@ -74,9 +74,8 @@ module TomatoShrieker
     end
 
     def post(body)
-      template = body[:template]
-      uri = (template.entry || template.source).uri rescue nil
-      uri ||= Ginseng::URI.scan(template.to_s).first
+      template = search_template(body)
+      uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
       client.send({op: 'CreatePost', data: {
         nsfw: false,
         name: template.to_s.gsub(/\s+/, ' ').ellipsize(config['/lemmy/subject/max_length']),
@@ -84,6 +83,13 @@ module TomatoShrieker
         community_id: template.source['/dest/lemmy/community_id'],
         auth: @jwt,
       }}.to_json)
+    end
+
+    def search_template(body)
+      return body[:template].source.create_template(:lemmy) unless entry = body[:template].entry
+      return entry.create_template(:lemmy)
+    rescue
+      return body[:template]
     end
   end
 end

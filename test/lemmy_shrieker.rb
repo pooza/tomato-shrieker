@@ -1,11 +1,8 @@
 module TomatoShrieker
   class LemmyShriekerTest < TestCase
     def setup
-      source = Source.all.find(&:lemmy?)
-      @shrieker = source.lemmy
-      @template = Template.new('common')
-      @template[:status] = Time.now.to_s
-      @template[:source] = source
+      @source = Source.all.find {|v| v.id == 'lemmy_test'}
+      @shrieker = @source.lemmy
     end
 
     def test_client
@@ -13,7 +10,8 @@ module TomatoShrieker
     end
 
     def test_exec
-      @template[:source].lemmy.exec(template: @template)
+      @source.clear
+      @source.exec
     end
   end
 end

@@ -10,9 +10,7 @@ module TomatoShrieker
 
     def exec
       if multi_entries?
-        template = self.template.clone
-        template[:entries] = multi_entries
-        shriek(template: template, visibility: visibility)
+        shriek(template: create_template(:multi), visibility: visibility)
       elsif touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
@@ -63,8 +61,20 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
-    def template
-      return Template.new(self['/dest/template'] || 'title')
+    def templates
+      @templates ||= {
+        default: Template.new(self['/dest/template'] || 'title'),
+        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
+        multi: Template.new(self['/dest/template'] || 'multi_entries'),
+      }
+      return @templates
+    end
+
+    def create_template(type = :default)
+      template = super
+      template[:feed] = self
+      template[:entries] = multi_entries if type == :multi
+      return template
     end
 
     def keyword
@@ -107,13 +117,9 @@ module TomatoShrieker
       logger.info(source: id, message: 'touch')
     end
 
-    def entries
-      return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        yield entry
-      rescue => e
-        logger.error(source: id, error: e)
-      end
+    def entries(&block)
+      return enum_for(__method__) unless block
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each(&block)
     end
 
     def fetch
