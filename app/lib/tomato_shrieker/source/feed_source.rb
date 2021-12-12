@@ -10,9 +10,7 @@ module TomatoShrieker
 
     def exec
       if multi_entries?
-        template = self.template.clone
-        template[:entries] = multi_entries
-        shriek(template: template, visibility: visibility)
+        shriek(template: template(:multi), visibility: visibility)
       elsif touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
@@ -63,8 +61,15 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
-    def template
-      return Template.new(self['/dest/template'] || 'title')
+    def templates
+      unless @templates
+        @templates = {
+          default: Template.new(self['/dest/template'] || 'title'),
+          multi: Template.new(self['/dest/template'] || 'multi_entries'),
+        }
+        @templates[:multi][:entries] = multi_entries
+      end
+      return @templates
     end
 
     def keyword

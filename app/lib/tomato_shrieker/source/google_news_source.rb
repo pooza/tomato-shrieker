@@ -21,8 +21,9 @@ module TomatoShrieker
       return true
     end
 
-    def template
-      return Template.new('title')
+    def templates
+      @templates ||= {default: Template.new('title')}
+      return @templates
     end
 
     def ignore_entry?(entry)

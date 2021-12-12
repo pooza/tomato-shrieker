@@ -25,6 +25,13 @@ module TomatoShrieker
       end
     end
 
+    def test_templates
+      Source.all do |source|
+        assert_kind_of(Hash, source.templates)
+        assert_kind_of(Template, source.templates[:default])
+      end
+    end
+
     def test_template
       Source.all do |source|
         assert_kind_of(Template, source.template)

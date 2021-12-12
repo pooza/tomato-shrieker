@@ -47,8 +47,13 @@ module TomatoShrieker
 
     alias bot? bot_account?
 
-    def template
-      return Template.new(self['/dest/template'] || 'common')
+    def templates
+      @templates ||= {default: Template.new(self['/dest/template'] || 'common')}
+      return @templates
+    end
+
+    def template(type = :default)
+      return templates[type]
     end
 
     def shriekers
