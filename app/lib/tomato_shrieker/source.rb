@@ -56,7 +56,12 @@ module TomatoShrieker
     end
 
     def template(type = :default)
-      return templates[type]
+      template = templates[type]
+      template[:source] = self
+      return template
+    end
+
+    def clear
     end
 
     def shriekers

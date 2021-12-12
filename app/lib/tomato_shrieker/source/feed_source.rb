@@ -68,9 +68,15 @@ module TomatoShrieker
           lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
           multi: Template.new(self['/dest/template'] || 'multi_entries'),
         }
-        @templates[:multi][:entries] = multi_entries
       end
       return @templates
+    end
+
+    def template(type = :default)
+      template = super
+      template[:feed] = self
+      template[:entries] = multi_entries if type == :multi
+      return template
     end
 
     def keyword

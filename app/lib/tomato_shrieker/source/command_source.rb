@@ -4,7 +4,9 @@ module TomatoShrieker
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       command.stdout.split(delimiter).select(&:present?).each do |status|
-        shriek(template: create_template(status), visibility: visibility)
+        template = self.template
+        template[:status] = status
+        shriek(template: template, visibility: visibility)
       rescue => e
         logger.error(source: id, error: e, status: status)
       end
@@ -12,13 +14,6 @@ module TomatoShrieker
       e.package = Package.full_name
       SlackService.broadcast(e)
       logger.error(source: id, error: e)
-    end
-
-    def create_template(status)
-      template = self.template.clone
-      template[:source] = self
-      template[:status] = status
-      return template
     end
 
     def bundler?
