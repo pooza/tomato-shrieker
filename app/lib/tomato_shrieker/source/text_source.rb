@@ -8,9 +8,10 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def templates
-      @templates ||= super.transform_values {|v| v.merge(status: text, source: self)}
-      return @templates
+    def create_template(type = :default)
+      template = super
+      template[:status] = text
+      return template
     end
 
     def text

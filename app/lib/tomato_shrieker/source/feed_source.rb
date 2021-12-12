@@ -10,7 +10,7 @@ module TomatoShrieker
 
     def exec
       if multi_entries?
-        shriek(template: template(:multi), visibility: visibility)
+        shriek(template: create_template(:multi), visibility: visibility)
       elsif touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
