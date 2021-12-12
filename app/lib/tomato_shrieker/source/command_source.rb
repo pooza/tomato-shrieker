@@ -4,7 +4,7 @@ module TomatoShrieker
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       command.stdout.split(delimiter).select(&:present?).each do |status|
-        template = self.template
+        template = create_template
         template[:status] = status
         shriek(template: template, visibility: visibility)
       end

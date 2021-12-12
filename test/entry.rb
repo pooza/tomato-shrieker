@@ -12,9 +12,9 @@ module TomatoShrieker
       assert_kind_of(FeedSource, @entries.sample.feed) if @entries.present?
     end
 
-    def test_template
-      return unless entry = @entries.find(&:template)
-      assert_kind_of(Template, entry.template)
+    def test_create_template
+      return unless entry = @entries.find(&:create_template)
+      assert_kind_of(Template, entry.create_template)
     end
 
     def test_uri
