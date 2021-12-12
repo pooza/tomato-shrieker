@@ -107,13 +107,9 @@ module TomatoShrieker
       logger.info(source: id, message: 'touch')
     end
 
-    def entries
-      return enum_for(__method__) unless block_given?
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each do |entry|
-        yield entry
-      rescue => e
-        logger.error(source: id, error: e)
-      end
+    def entries(&block)
+      return enum_for(__method__) unless block
+      feedjira.entries.sort_by {|entry| entry.published.to_f}.each(&block)
     end
 
     def fetch
