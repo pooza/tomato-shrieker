@@ -9,11 +9,7 @@ module TomatoShrieker
     end
 
     def templates
-      unless @templates
-        @templates = super
-        @templates[:default][:status] = text
-        @templates[:default][:source] = self
-      end
+      @templates ||= super.transform_values {|v| v.merge(status: text, source: self)}
       return @templates
     end
 
