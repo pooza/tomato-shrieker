@@ -56,8 +56,8 @@ module TomatoShrieker
       return @nokogiri
     end
 
-    def template
-      template = feed.template.clone
+    def template(type = :default)
+      template = feed.template(type).clone
       template[:feed] = feed
       template[:entry] = self
       return template
