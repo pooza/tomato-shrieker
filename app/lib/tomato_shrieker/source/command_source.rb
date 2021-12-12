@@ -7,8 +7,6 @@ module TomatoShrieker
         template = self.template
         template[:status] = status
         shriek(template: template, visibility: visibility)
-      rescue => e
-        logger.error(source: id, error: e, status: status)
       end
     rescue => e
       e.package = Package.full_name

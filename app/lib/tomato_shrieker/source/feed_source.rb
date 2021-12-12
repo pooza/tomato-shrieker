@@ -62,13 +62,11 @@ module TomatoShrieker
     end
 
     def templates
-      unless @templates
-        @templates = {
-          default: Template.new(self['/dest/template'] || 'title'),
-          lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
-          multi: Template.new(self['/dest/template'] || 'multi_entries'),
-        }
-      end
+      @templates ||= {
+        default: Template.new(self['/dest/template'] || 'title'),
+        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
+        multi: Template.new(self['/dest/template'] || 'multi_entries'),
+      }
       return @templates
     end
 

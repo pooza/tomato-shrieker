@@ -6,9 +6,7 @@ module TomatoShrieker
     def initialize(name)
       @path = name if name.start_with?('/') && File.exist?(name)
       @path ||= File.join(environment_class.dir, dir, "#{name.sub(/\.erb$/, '')}.erb")
-      raise RenderError, "Template file #{name} not found" unless File.exist?(@path)
-      @erb = ERB.new(File.read(@path), **{trim_mode: '-'})
-      self.params = {}
+      super(@path)
     end
 
     def source

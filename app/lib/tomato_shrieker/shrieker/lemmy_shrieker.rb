@@ -74,7 +74,7 @@ module TomatoShrieker
     end
 
     def post(body)
-      template = create_template(body)
+      template = search_template(body)
       uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
       client.send({op: 'CreatePost', data: {
         nsfw: false,
@@ -85,9 +85,9 @@ module TomatoShrieker
       }}.to_json)
     end
 
-    def create_template(body)
+    def search_template(body)
       return body[:template].source.template(:lemmy) unless entry = body[:template].entry
-      return template = entry.template(:lemmy)
+      return entry.template(:lemmy)
     rescue
       return body[:template]
     end
