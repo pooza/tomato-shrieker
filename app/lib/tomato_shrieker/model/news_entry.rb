@@ -18,7 +18,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      logger.error(source: feed&.id, error: e, entry: entry)
+      logger.error(source: feed&.id, error: e, entry:)
       return nil
     end
 

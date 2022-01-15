@@ -10,7 +10,7 @@ module TomatoShrieker
 
     def exec
       if multi_entries?
-        shriek(template: create_template(:multi), visibility: visibility)
+        shriek(template: create_template(:multi), visibility:)
       elsif touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
@@ -180,7 +180,7 @@ module TomatoShrieker
     end
 
     def summary
-      values = {id: id, category: category, multi: multi_entries?}
+      values = {id:, category:, multi: multi_entries?}
       values[:entries] = entries.map do |entry|
         {
           date: entry.published.strftime('%Y/%m/%d %R'),

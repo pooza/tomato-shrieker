@@ -1,7 +1,7 @@
 module TomatoShrieker
   class TextSource < Source
     def exec
-      shriek(template: create_template, visibility: visibility)
+      shriek(template: create_template, visibility:)
     rescue => e
       e.package = Package.full_name
       SlackService.broadcast(e)
