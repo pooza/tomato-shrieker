@@ -6,7 +6,7 @@ module TomatoShrieker
       command.stdout.split(delimiter).select(&:present?).each do |status|
         template = create_template
         template[:status] = status
-        shriek(template: template, visibility: visibility)
+        shriek(template:, visibility:)
       end
     rescue => e
       e.package = Package.full_name

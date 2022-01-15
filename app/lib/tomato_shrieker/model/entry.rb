@@ -90,7 +90,7 @@ module TomatoShrieker
     rescue Sequel::UniqueConstraintViolation
       return nil
     rescue => e
-      logger.error(source: feed&.id, error: e, entry: entry)
+      logger.error(source: feed&.id, error: e, entry:)
       return nil
     end
 
@@ -99,7 +99,7 @@ module TomatoShrieker
       dest ||= "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title.sanitize}"
       return dest
     rescue => e
-      logger.error(source: feed&.id, error: e, title: title)
+      logger.error(source: feed&.id, error: e, title:)
       return title
     end
   end

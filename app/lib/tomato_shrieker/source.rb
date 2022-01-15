@@ -113,7 +113,7 @@ module TomatoShrieker
       unless @line
         return nil unless user_id = self['/dest/line/user_id']
         return nil unless token = self['/dest/line/token']
-        @line = LineShrieker.new(id: user_id, token: token)
+        @line = LineShrieker.new(id: user_id, token:)
       end
       return @line
     rescue => e
