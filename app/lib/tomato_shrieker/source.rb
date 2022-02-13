@@ -191,7 +191,11 @@ module TomatoShrieker
     def period
       return nil if post_at
       return nil if cron
-      return self['/schedule/every'] || '5m'
+      return self['/schedule/every'] || default_period
+    end
+
+    def default_period
+      return '5m'
     end
 
     alias every period

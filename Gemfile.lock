@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 35b1af5ab03a6511387e1a78c09962c5aa68f895
+  revision: 6837a07582945fca8e0df1ce1c06f3da3e224fee
   specs:
-    ginseng-core (1.11.17)
+    ginseng-core (1.11.20)
       activesupport (>= 6.1.3.2)
       addressable (>= 2.8.0)
       bundler (~> 2.0)
@@ -34,14 +34,14 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 7c15ad66e553071ffc3519d4cf4da283d7937ed1
+  revision: 876be5f2d4a71b4b763b4ea631d110a3e52d99ce
   specs:
-    ginseng-fediverse (1.6.5)
+    ginseng-fediverse (1.7.7)
 
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (7.0.1)
+    activesupport (7.0.2.2)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
@@ -49,8 +49,8 @@ GEM
     addressable (2.8.0)
       public_suffix (>= 2.0.2, < 5.0)
     ast (2.4.2)
-    bootsnap (1.9.4)
-      msgpack (~> 1.0)
+    bootsnap (1.10.3)
+      msgpack (~> 1.2)
     cgi (0.3.1)
     concurrent-ruby (1.1.9)
     crass (1.0.6)
@@ -83,12 +83,12 @@ GEM
     httparty (0.20.0)
       mime-types (~> 3.0)
       multi_xml (>= 0.5.2)
-    i18n (1.8.11)
+    i18n (1.9.1)
       concurrent-ruby (~> 1.0)
     io-wait (0.2.1)
     json-schema (2.8.1)
       addressable (>= 2.4)
-    loofah (2.13.0)
+    loofah (2.14.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
     mail (2.7.1)
@@ -99,7 +99,7 @@ GEM
     mini_mime (1.1.2)
     mini_portile2 (2.7.1)
     minitest (5.15.0)
-    msgpack (1.4.2)
+    msgpack (1.4.4)
     multi_json (1.15.0)
     multi_xml (0.6.0)
     net-protocol (0.1.2)
@@ -125,7 +125,7 @@ GEM
     racc (1.6.0)
     rainbow (3.1.1)
     rake (13.0.6)
-    regexp_parser (2.2.0)
+    regexp_parser (2.2.1)
     rest-client (2.1.0)
       http-accept (>= 1.7.0, < 2.0)
       http-cookie (>= 1.0.2, < 2.0)
@@ -133,18 +133,18 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.5)
     ricecream (0.2.1)
-    rubocop (1.24.1)
+    rubocop (1.25.1)
       parallel (~> 1.10)
-      parser (>= 3.0.0.0)
+      parser (>= 3.1.0.0)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 1.8, < 3.0)
       rexml
       rubocop-ast (>= 1.15.1, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 1.4.0, < 3.0)
-    rubocop-ast (1.15.1)
+    rubocop-ast (1.15.2)
       parser (>= 3.0.1.1)
-    rubocop-performance (1.13.1)
+    rubocop-performance (1.13.2)
       rubocop (>= 1.7.0, < 2.0)
       rubocop-ast (>= 0.4.0)
     rubocop-rake (0.6.0)
@@ -159,7 +159,7 @@ GEM
       nokogiri (>= 1.12.0)
     sax-machine (1.3.2)
     securerandom (0.1.1)
-    sequel (5.52.0)
+    sequel (5.53.0)
     set (1.0.2)
     sqlite3 (1.4.2)
     test-unit (3.5.3)
@@ -177,7 +177,7 @@ GEM
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
     yajl-ruby (1.4.1)
-    zeitwerk (2.5.3)
+    zeitwerk (2.5.4)
     zlib (2.1.1)
 
 PLATFORMS
