@@ -72,7 +72,7 @@ module TomatoShrieker
     alias post shriek
 
     def self.create(entry, feed = nil)
-      values = values.is_a?(Hash) ? entry.clone : values.to_h unless values.is_a?(Hash)
+      values = entry.is_a?(Hash) ? entry.clone : entry.to_h
       feed ||= Source.create(values['feed'])
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
