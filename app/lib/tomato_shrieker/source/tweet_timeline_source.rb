@@ -10,6 +10,14 @@ module TomatoShrieker
       return self['/source/tweet/account']
     end
 
+    def period
+      return nil if post_at
+      return nil if cron
+      return self['/schedule/every'] || '10m'
+    end
+
+    alias every period
+
     def ignore_entry?(entry)
       return true if entry.title&.match?(/^(RT by|R to)\s/)
       return super
