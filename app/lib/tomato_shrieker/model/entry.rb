@@ -72,8 +72,7 @@ module TomatoShrieker
     alias post shriek
 
     def self.create(entry, feed = nil)
-      values = entry.clone
-      values = values.to_h unless values.is_a?(Hash)
+      values = values.is_a?(Hash) ? entry.clone : values.to_h unless values.is_a?(Hash)
       feed ||= Source.create(values['feed'])
       return if feed.touched? && entry['published'] <= feed.time
       id = insert(
@@ -86,6 +85,7 @@ module TomatoShrieker
       )
       return Entry[id]
     rescue SQLite3::BusyException
+      sleep(1)
       retry
     rescue Sequel::UniqueConstraintViolation
       return nil
