@@ -10,10 +10,8 @@ module TomatoShrieker
       return self['/source/tweet/account']
     end
 
-    def period
-      return nil if post_at
-      return nil if cron
-      return self['/schedule/every'] || '10m'
+    def default_period
+      return '10m'
     end
 
     alias every period
