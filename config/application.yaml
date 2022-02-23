@@ -11,11 +11,11 @@ http:
     limit: 3
     seconds: 1
 lemmy:
+  subject:
+    max_length: 200
   urls:
     api: /api/v3/ws
   verify_peer: true
-  subject:
-    max_length: 200
 line:
   urls:
     api: https://api.line.me
