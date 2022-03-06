@@ -34,9 +34,9 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 598096b0d107c2043570781ed6d98f180df53cea
+  revision: 7c7c4cca81eb0672dffe457bb9f3acc43a14ead8
   specs:
-    ginseng-fediverse (1.7.9)
+    ginseng-fediverse (1.7.10)
 
 GEM
   remote: https://rubygems.org/
@@ -51,7 +51,7 @@ GEM
     ast (2.4.2)
     bootsnap (1.10.3)
       msgpack (~> 1.2)
-    cgi (0.3.1)
+    cgi (0.3.2)
     concurrent-ruby (1.1.9)
     crass (1.0.6)
     daemon-spawn (0.4.2)
@@ -144,7 +144,7 @@ GEM
       unicode-display_width (>= 1.4.0, < 3.0)
     rubocop-ast (1.16.0)
       parser (>= 3.1.1.0)
-    rubocop-performance (1.13.2)
+    rubocop-performance (1.13.3)
       rubocop (>= 1.7.0, < 2.0)
       rubocop-ast (>= 0.4.0)
     rubocop-rake (0.6.0)
