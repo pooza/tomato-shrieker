@@ -15,6 +15,9 @@ module TomatoShrieker
       body[:text] = body[:template].to_s.strip
       body.delete(:template)
       body[:visibility] = Ginseng::Fediverse::NoteParser.visibility_name(body[:visibility])
+      if spoiler_text = body[:template].source.spoiler_text
+        body[:cw] = spoiler_text
+      end
       return note(body)
     end
   end
