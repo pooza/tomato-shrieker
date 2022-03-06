@@ -13,6 +13,7 @@ module TomatoShrieker
       @client ||= Faye::WebSocket::Client.new(uri.to_s, [], {
         tls: {
           verify_peer: verify_peer?,
+          root_cert_file:,
         },
         ping: keepalive,
       })
@@ -33,6 +34,12 @@ module TomatoShrieker
 
     def verify_peer?
       return config['/lemmy/verify_peer']
+    end
+
+    def root_cert_file
+      return config["/#{Environment.controller_name}/lemmy/root_cert_file"]
+    rescue
+      return ENV['SSL_CERT_FILE']
     end
 
     def handle_login(payload, body)

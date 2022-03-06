@@ -61,6 +61,11 @@ module TomatoShrieker
       return template
     end
 
+    def spoiler_text
+      @spoiler_text ||= self['/dest/spoiler_text']
+      return @spoiler_text
+    end
+
     def clear
     end
 

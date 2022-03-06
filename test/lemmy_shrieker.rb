@@ -9,6 +9,14 @@ module TomatoShrieker
       assert_kind_of(Faye::WebSocket::Client, @shrieker.client)
     end
 
+    def test_verify_peer?
+      assert_boolean(@shrieker.verify_peer?)
+    end
+
+    def test_root_cert_file
+      assert(File.exist?(@shrieker.root_cert_file))
+    end
+
     def test_exec
       @source.clear
       @source.exec

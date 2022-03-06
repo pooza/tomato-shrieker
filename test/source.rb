@@ -39,6 +39,12 @@ module TomatoShrieker
       end
     end
 
+    def test_spoiler_text
+      Source.all do |source|
+        assert_kind_of([String, NilClass], source.spoiler_text)
+      end
+    end
+
     def test_mastodon
       Source.all do |source|
         assert_boolean(source.mastodon?)

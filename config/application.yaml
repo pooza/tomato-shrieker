@@ -12,7 +12,7 @@ http:
     seconds: 1
 lemmy:
   subject:
-    max_length: 200
+    max_length: 100
   urls:
     api: /api/v3/ws
   verify_peer: true
@@ -27,7 +27,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.3.13
+  version: 3.3.14
 slack:
   hooks: []
 sources: []
