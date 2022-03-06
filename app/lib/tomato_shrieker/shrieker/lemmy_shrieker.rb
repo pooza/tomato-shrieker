@@ -37,7 +37,7 @@ module TomatoShrieker
     end
 
     def root_cert_file
-      return config["/lemmy/root_cert_file"]
+      return config['/lemmy/root_cert_file']
     rescue
       return ENV['SSL_CERT_FILE']
     end
