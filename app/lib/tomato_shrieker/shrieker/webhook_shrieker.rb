@@ -10,7 +10,6 @@ module TomatoShrieker
         body[:spoiler_text] = spoiler_text
       end
       body.delete(:template)
-      body.delete(:visibility)
       return say(body, :hash)
     end
   end
