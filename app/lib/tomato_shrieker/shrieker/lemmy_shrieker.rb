@@ -1,4 +1,3 @@
-require 'eventmachine'
 require 'faye/websocket'
 
 module TomatoShrieker
@@ -14,6 +13,7 @@ module TomatoShrieker
         tls: {
           verify_peer: verify_peer?,
           root_cert_file:,
+          logger:,
         },
         ping: keepalive,
       })
