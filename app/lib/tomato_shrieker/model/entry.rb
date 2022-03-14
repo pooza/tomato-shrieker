@@ -91,7 +91,7 @@ module TomatoShrieker
       values[:summary] = values[:summary].sanitize if values[:summary]
       values[:title] = values[:title].sanitize.gsub(/ [|-] .+$/, '') if values[:title]
       values[:published] = values[:published].getlocal
-      values.except!(:entry_id, :author)
+      values.slice!(:feed, :title, :summary, :url, :enclosure_url, :published)
       tags = Set.new
       [:summary, :title].each do |field|
         next unless values[field]
