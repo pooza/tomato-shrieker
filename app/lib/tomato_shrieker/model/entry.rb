@@ -27,6 +27,7 @@ module TomatoShrieker
       unless @tags
         tags = Ginseng::Fediverse::TagContainer.new
         tags.concat(feed.tags.clone)
+        tags.concat(JSON.parse(extra_tags))
         tags.concat(fetch_remote_tags) if feed.remote_tagging?
         tags.select! {|v| feed.tag_min_length < v.to_s.length}
         @tags = tags.create_tags
@@ -59,34 +60,24 @@ module TomatoShrieker
     def create_template(type = :default)
       template = feed.create_template(type)
       template[:entry] = self
-
-      ic values
-
       return template
     end
 
     def shriek
       params = {template: create_template, visibility: feed.visibility, attachments: []}
       params[:attachments].push(image_url: enclosure.to_s) if enclosure
-      # feed.shriek(params)
+      feed.shriek(params)
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
 
     def self.create(entry, feed = nil)
-      values = entry.is_a?(Hash) ? entry.clone : entry.to_h
-      feed ||= Source.create(values['feed'])
-      return if feed.touched? && entry['published'] <= feed.time
-      id = insert(
-        feed: feed.id,
-        title: create_title(values['title'], values['published'], feed),
-        summary: values['summary']&.sanitize,
-        url: values['url'],
-        enclosure_url: values['enclosure_url'],
-        published: values['published'].getlocal,
-      )
-      return Entry[id]
+      values = create_values(entry.is_a?(Hash) ? entry.clone : entry.to_h)
+      feed ||= Source.create(values[:feed])
+      return if feed.touched? && values[:published] <= feed.time
+      values[:feed] = feed.id
+      return self[insert(values)]
     rescue SQLite3::BusyException
       sleep(1)
       retry
@@ -97,13 +88,23 @@ module TomatoShrieker
       return nil
     end
 
-    def self.create_title(title, published, feed)
-      dest = title.sanitize if feed.unique_title?
-      dest ||= "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title.sanitize}"
-      return dest
-    rescue => e
-      logger.error(source: feed&.id, error: e, title:)
-      return title
+    def self.create_values(values) # rubocop:disable Metrics/AbcSize
+      values = values.deep_symbolize_keys
+      values[:summary] = values[:summary].sanitize
+      values[:title] = values[:title].sanitize.gsub(/ [|-] .+$/, '')
+      values[:published] = values[:published].getlocal
+      values.except!(:entry_id, :author)
+      tags = Set.new
+      [:summary, :title].each do |field|
+        lines = values[field].tr('＃', '#').strip.each_line.to_a
+        lines.reverse_each do |line|
+          break unless line.match?(/^\s*(#[^\s]+\s?)+\s*$/)
+          tags.merge(lines.pop.strip.split(/\s+/))
+        end
+        values[field] = lines.join("\n").strip
+      end
+      values[:extra_tags] = tags.to_a.to_json
+      return values
     end
   end
 end

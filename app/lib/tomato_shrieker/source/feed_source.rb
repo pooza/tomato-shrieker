@@ -43,11 +43,6 @@ module TomatoShrieker
       dataset.destroy
     end
 
-    def unique_title?
-      return self['/source/title/unique'] unless self['/source/title/unique'].nil?
-      return true
-    end
-
     def multi_entries?
       return self['/dest/multi_entries'] unless self['/dest/multi_entries'].nil?
       return false

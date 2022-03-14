@@ -17,25 +17,12 @@ module TomatoShrieker
       return uri.query_values['q']
     end
 
-    def unique_title?
-      return true
-    end
-
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
         lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
       }
       return @templates
-    end
-
-    def ignore_entry?(entry)
-      return true if Entry.first(feed: id, title: NewsEntry.create_title(entry['title'], self))
-      return super
-    end
-
-    def create_record(entry)
-      return NewsEntry.create(entry, self)
     end
 
     def self.all(&block)
