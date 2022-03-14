@@ -60,9 +60,7 @@ module TomatoShrieker
       template = feed.create_template(type)
       template[:entry] = self
 
-
-      ic self.values
-
+      ic values
 
       return template
     end
@@ -70,7 +68,7 @@ module TomatoShrieker
     def shriek
       params = {template: create_template, visibility: feed.visibility, attachments: []}
       params[:attachments].push(image_url: enclosure.to_s) if enclosure
-      #feed.shriek(params)
+      # feed.shriek(params)
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
