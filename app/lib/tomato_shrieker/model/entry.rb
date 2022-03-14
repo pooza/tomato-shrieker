@@ -75,8 +75,8 @@ module TomatoShrieker
     def self.create(entry, feed = nil)
       values = create_values(entry.is_a?(Hash) ? entry.clone : entry.to_h)
       feed ||= Source.create(values[:feed])
-      return if feed.touched? && values[:published] <= feed.time
-      values[:feed] = feed.id
+      return if feed.touched? && (values[:published] <= feed.time)
+      values[:feed] ||= feed.id
       return self[insert(values)]
     rescue SQLite3::BusyException
       sleep(1)
