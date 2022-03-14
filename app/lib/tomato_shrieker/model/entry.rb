@@ -90,8 +90,8 @@ module TomatoShrieker
 
     def self.create_values(values) # rubocop:disable Metrics/AbcSize
       values = values.deep_symbolize_keys
-      values[:summary] = values[:summary].sanitize
-      values[:title] = values[:title].sanitize.gsub(/ [|-] .+$/, '')
+      values[:summary] = values[:summary].to_s.sanitize
+      values[:title] = values[:title].to_s.sanitize.gsub(/ [|-] .+$/, '')
       values[:published] = values[:published].getlocal
       values.except!(:entry_id, :author)
       tags = Set.new
