@@ -40,7 +40,7 @@ module TomatoShrieker
 
     def fetch_remote_tags
       contents = []
-      ['h1', 'h2', 'title', 'meta'].map do |v|
+      ['h1', 'h2', 'h3', 'title', 'meta'].map do |v|
         contents.push(nokogiri.xpath("//#{v}").inner_text)
       end
       return feed.mulukhiya.search_hashtags(contents.join(' '))
@@ -59,13 +59,18 @@ module TomatoShrieker
     def create_template(type = :default)
       template = feed.create_template(type)
       template[:entry] = self
+
+
+      ic self.values
+
+
       return template
     end
 
     def shriek
       params = {template: create_template, visibility: feed.visibility, attachments: []}
       params[:attachments].push(image_url: enclosure.to_s) if enclosure
-      feed.shriek(params)
+      #feed.shriek(params)
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
