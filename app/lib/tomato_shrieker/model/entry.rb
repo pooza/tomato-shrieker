@@ -81,8 +81,6 @@ module TomatoShrieker
     rescue SQLite3::BusyException
       sleep(1)
       retry
-    rescue Sequel::UniqueConstraintViolation
-      return nil
     rescue => e
       logger.error(source: feed&.id, error: e, entry:)
       return nil
