@@ -94,6 +94,7 @@ module TomatoShrieker
       values.except!(:entry_id, :author)
       tags = Set.new
       [:summary, :title].each do |field|
+        next unless values[field]
         lines = values[field].tr('＃', '#').strip.each_line.to_a
         lines.reverse_each do |line|
           break unless line.match?(/^\s*(#[^\s]+\s?)+\s*$/)
