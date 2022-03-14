@@ -87,7 +87,7 @@ module TomatoShrieker
     end
 
     def self.create_values(values) # rubocop:disable Metrics/AbcSize
-      values = values.deep_symbolize_keys
+      values.deep_symbolize_keys!
       values[:summary] = values[:summary].sanitize if values[:summary]
       values[:title] = values[:title].sanitize.gsub(/ [|-] .+$/, '') if values[:title]
       values[:published] = values[:published].getlocal
