@@ -56,10 +56,6 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
-    def enclosure?
-      return self['/dest/enclosure'] == true
-    end
-
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
@@ -77,13 +73,22 @@ module TomatoShrieker
     end
 
     def keyword
-      return nil unless self['/source/keyword']
-      return Regexp.new(self['/source/keyword'])
+      return nil unless keyword = self['/source/keyword']
+      return Regexp.new(keyword)
     end
 
     def negative_keyword
-      return nil unless self['/source/negative_keyword']
-      return Regexp.new(self['/source/negative_keyword'])
+      return nil unless keyword = self['/source/negative_keyword']
+      return Regexp.new(keyword)
+    end
+
+    def enclosure?
+      return self['/dest/enclosure'] == true
+    end
+
+    def enclosure_negative_keyword
+      return nil unless keyword = self['/source/enclosure/negative_keyword']
+      return Regexp.new(keyword)
     end
 
     def multi_entries

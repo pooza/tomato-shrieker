@@ -27,15 +27,26 @@ module TomatoShrieker
     def enclosures
       enclosures = values[:enclosure_url]
       enclosures = [enclosures] unless enclosures.is_a?(Array)
-      if feed.enclosure? && values[:summary]
+      if enclosure?
         uris = values[:summary].nokogiri
-          .xpath('//img').map(&:to_h)
+          .xpath('//img')
+          .map(&:to_h)
           .map {|values| values['src']}
           .map {|src| Ginseng::URI.parse(src)}
+          .select {|uri| uri.path.start_with?('/pic/media/')}
           .map(&:normalize)
         enclosures.concat(uris)
       end
       return enclosures.compact
+    end
+
+    def enclosure?
+      return false unless feed.enclosure?
+      return false if summary = values[:summary].nil?
+      if keyword = feed.enclosure_negative_keyword
+        return false if summary.match?(keyword)
+      end
+      return true
     end
 
     private
@@ -43,7 +54,7 @@ module TomatoShrieker
     def search_tags
       [:summary, :title].select {|k| values[k]}.each do |field|
         lines = values[field].tr('＃', '#').strip.each_line.to_a
-        lines.reverse_each do |line|
+        lines.clone.reverse_each do |line|
           break unless line.match?(/^\s*(#[^\s]+\s?)+\s*$/)
           tags.merge(lines.pop.strip.split(/\s+/))
         end
