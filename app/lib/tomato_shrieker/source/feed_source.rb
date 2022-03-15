@@ -56,6 +56,10 @@ module TomatoShrieker
       return self['/dest/limit'] || 5
     end
 
+    def enclosure?
+      return self['/dest/enclosure'] == true
+    end
+
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),

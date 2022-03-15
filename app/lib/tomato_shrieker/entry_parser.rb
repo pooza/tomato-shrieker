@@ -13,7 +13,7 @@ module TomatoShrieker
     end
 
     def parse
-      searth_tags
+      search_tags
       dest = values.slice(:feed, :title, :summary, :url, :enclosure_url, :published)
       dest[:feed] ||= feed.id
       dest[:enclosure_url] ||= enclosures.map(&:to_s).to_json
@@ -40,7 +40,7 @@ module TomatoShrieker
 
     private
 
-    def searth_tags
+    def search_tags
       [:summary, :title].select {|k| values[k]}.each do |field|
         lines = values[field].tr('＃', '#').strip.each_line.to_a
         lines.reverse_each do |line|
