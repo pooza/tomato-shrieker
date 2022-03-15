@@ -33,8 +33,8 @@ module TomatoShrieker
           .map(&:to_h)
           .map {|values| values['src']}
           .map {|src| Ginseng::URI.parse(src)}
-          .select {|uri| uri.path.start_with?('/pic/media/')}
           .map(&:normalize)
+          .select {|uri| uri.path.start_with?('/pic/media/')}
         enclosures.concat(uris)
       end
       return enclosures.compact
@@ -42,7 +42,7 @@ module TomatoShrieker
 
     def enclosure?
       return false unless feed.enclosure?
-      return false if summary = values[:summary].nil?
+      return false unless summary = values[:summary]
       if keyword = feed.enclosure_negative_keyword
         return false if summary.match?(keyword)
       end
