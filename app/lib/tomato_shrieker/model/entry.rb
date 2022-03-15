@@ -78,7 +78,7 @@ module TomatoShrieker
       parser.feed = feed if feed
       entry = Entry[Entry.insert(parser.parse)]
       return nil unless feed&.touched?
-      return nil if entry.published <= feed.time
+      return nil if entry.published < feed.time
       return entry
     rescue SQLite3::BusyException
       sleep(1)
