@@ -27,12 +27,14 @@ module TomatoShrieker
     def enclosures
       enclosures = values[:enclosure_url]
       enclosures = [enclosures] unless enclosures.is_a?(Array)
-      uris = values[:summary].nokogiri
-        .xpath('//img').map(&:to_h)
-        .map {|values| values['src']}
-        .map {|src| Ginseng::URI.parse(src)}
-        .map(&:normalize)
-      enclosures.concat(uris)
+      if values[:summary]
+        uris = values[:summary].nokogiri
+          .xpath('//img').map(&:to_h)
+          .map {|values| values['src']}
+          .map {|src| Ginseng::URI.parse(src)}
+          .map(&:normalize)
+        enclosures.concat(uris)
+      end
       return enclosures.compact
     end
 
