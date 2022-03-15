@@ -11,17 +11,16 @@ module TomatoShrieker
       return @feed
     end
 
-    def enclosure
-      unless @enclosure
-        return nil unless @enclosure ||= Ginseng::URI.parse(enclosure_url)
-        return nil unless @enclosure.absolute?
+    def enclosures
+      unless @enclosures
+        uris = JSON.parse(enclosure_url)
+        uris = [uris] unless uris.is_a?(Array)
+        @enclosures = uris.map {|uri| Ginseng::URI.parse(uri)}.select(&:absolute?)
       end
-      return @enclosure
+      return @enclosures
     rescue
-      return nil
+      return []
     end
-
-    alias enclosure_uri enclosure
 
     def tags
       unless @tags
@@ -64,46 +63,31 @@ module TomatoShrieker
     end
 
     def shriek
-      params = {template: create_template, visibility: feed.visibility, attachments: []}
-      params[:attachments].push(image_url: enclosure.to_s) if enclosure
-      feed.shriek(params)
+      feed.shriek(
+        template: create_template,
+        visibility: feed.visibility,
+        attachments: enclosures.map {|v| {image_url: v.to_s}}.first(4),
+      )
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
 
     def self.create(entry, feed = nil)
-      values = create_values(entry.is_a?(Hash) ? entry.clone : entry.to_h)
-      feed ||= Source.create(values[:feed])
-      return if feed.touched? && (values[:published] <= feed.time)
-      values[:feed] ||= feed.id
-      return self[insert(values)]
+      parser = EntryParser.new(entry)
+      parser.feed = feed if feed
+      entry = Entry[Entry.insert(parser.parse)]
+      return nil unless feed&.touched?
+      return nil if entry.published <= feed.time
+      return entry
     rescue SQLite3::BusyException
       sleep(1)
       retry
+    rescue Sequel::UniqueConstraintViolation
+      return nil
     rescue => e
       logger.error(source: feed&.id, error: e, entry:)
       return nil
-    end
-
-    def self.create_values(values) # rubocop:disable Metrics/AbcSize
-      values.deep_symbolize_keys!
-      values[:summary] = values[:summary].sanitize if values[:summary]
-      values[:title] = values[:title].sanitize.gsub(/ [|-] .+$/, '') if values[:title]
-      values[:published] = values[:published].getlocal
-      values.slice!(:feed, :title, :summary, :url, :enclosure_url, :published)
-      tags = Set.new
-      [:summary, :title].each do |field|
-        next unless values[field]
-        lines = values[field].tr('＃', '#').strip.each_line.to_a
-        lines.reverse_each do |line|
-          break unless line.match?(/^\s*(#[^\s]+\s?)+\s*$/)
-          tags.merge(lines.pop.strip.split(/\s+/))
-        end
-        values[field] = lines.join("\n").strip
-      end
-      values[:extra_tags] = tags.to_a.to_json
-      return values
     end
   end
 end
