@@ -27,7 +27,7 @@ module TomatoShrieker
     def enclosures
       enclosures = values[:enclosure_url]
       enclosures = [enclosures] unless enclosures.is_a?(Array)
-      if feed.enclosure? values[:summary]
+      if feed.enclosure? && values[:summary]
         uris = values[:summary].nokogiri
           .xpath('//img').map(&:to_h)
           .map {|values| values['src']}
