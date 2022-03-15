@@ -43,8 +43,8 @@ module TomatoShrieker
     def enclosure?
       return false unless feed.enclosure?
       return false unless summary = values[:summary]
-      if keyword = feed.enclosure_negative_keyword
-        return false if summary.match?(keyword)
+      if (keyword = feed.enclosure_negative_keyword) && summary.match?(keyword)
+        return false
       end
       return true
     end
