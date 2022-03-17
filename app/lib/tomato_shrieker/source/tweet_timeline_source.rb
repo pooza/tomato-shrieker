@@ -10,10 +10,6 @@ module TomatoShrieker
       return self['/source/tweet/account']
     end
 
-    def default_period
-      return '10m'
-    end
-
     alias every period
 
     def ignore_entry?(entry)
