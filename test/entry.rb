@@ -23,9 +23,12 @@ module TomatoShrieker
       assert_kind_of(Ginseng::URI, entry.uri)
     end
 
-    def test_enclosure
-      return unless entry = @entries.find(&:enclosure)
-      assert_kind_of(Ginseng::URI, entry.enclosure)
+    def test_enclosures
+      return unless entry = @entries.find(&:enclosures)
+      assert_kind_of(Array, entry.enclosures)
+      entry.enclosures.each do |uri|
+        assert_kind_of(Ginseng::URI, uri)
+      end
     end
 
     def test_tags

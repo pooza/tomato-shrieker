@@ -11,22 +11,22 @@ module TomatoShrieker
       return @feed
     end
 
-    def enclosure
-      unless @enclosure
-        return nil unless @enclosure ||= Ginseng::URI.parse(enclosure_url)
-        return nil unless @enclosure.absolute?
+    def enclosures
+      unless @enclosures
+        uris = JSON.parse(enclosure_url)
+        uris = [uris] unless uris.is_a?(Array)
+        @enclosures = uris.map {|uri| Ginseng::URI.parse(uri)}.select(&:absolute?)
       end
-      return @enclosure
+      return @enclosures
     rescue
-      return nil
+      return []
     end
-
-    alias enclosure_uri enclosure
 
     def tags
       unless @tags
         tags = Ginseng::Fediverse::TagContainer.new
         tags.concat(feed.tags.clone)
+        tags.concat(JSON.parse(extra_tags))
         tags.concat(fetch_remote_tags) if feed.remote_tagging?
         tags.select! {|v| feed.tag_min_length < v.to_s.length}
         @tags = tags.create_tags
@@ -40,7 +40,7 @@ module TomatoShrieker
 
     def fetch_remote_tags
       contents = []
-      ['h1', 'h2', 'title', 'meta'].map do |v|
+      ['h1', 'h2', 'h3', 'title', 'meta'].map do |v|
         contents.push(nokogiri.xpath("//#{v}").inner_text)
       end
       return feed.mulukhiya.search_hashtags(contents.join(' '))
@@ -63,27 +63,23 @@ module TomatoShrieker
     end
 
     def shriek
-      params = {template: create_template, visibility: feed.visibility, attachments: []}
-      params[:attachments].push(image_url: enclosure.to_s) if enclosure
-      feed.shriek(params)
+      feed.shriek(
+        template: create_template,
+        visibility: feed.visibility,
+        attachments: enclosures.map {|v| {image_url: v.to_s}}.first(4),
+      )
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
 
     def self.create(entry, feed = nil)
-      values = entry.is_a?(Hash) ? entry.clone : entry.to_h
-      feed ||= Source.create(values['feed'])
-      return if feed.touched? && entry['published'] <= feed.time
-      id = insert(
-        feed: feed.id,
-        title: create_title(values['title'], values['published'], feed),
-        summary: values['summary']&.sanitize,
-        url: values['url'],
-        enclosure_url: values['enclosure_url'],
-        published: values['published'].getlocal,
-      )
-      return Entry[id]
+      parser = EntryParser.new(entry)
+      parser.feed = feed if feed
+      entry = Entry[Entry.insert(parser.parse)]
+      return nil unless feed&.touched?
+      return nil if entry.published < feed.time
+      return entry
     rescue SQLite3::BusyException
       sleep(1)
       retry
@@ -92,15 +88,6 @@ module TomatoShrieker
     rescue => e
       logger.error(source: feed&.id, error: e, entry:)
       return nil
-    end
-
-    def self.create_title(title, published, feed)
-      dest = title.sanitize if feed.unique_title?
-      dest ||= "#{published.getlocal.strftime('%Y/%m/%d %H:%M')} #{title.sanitize}"
-      return dest
-    rescue => e
-      logger.error(source: feed&.id, error: e, title:)
-      return title
     end
   end
 end

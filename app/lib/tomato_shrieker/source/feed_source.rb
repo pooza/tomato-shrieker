@@ -43,11 +43,6 @@ module TomatoShrieker
       dataset.destroy
     end
 
-    def unique_title?
-      return self['/source/title/unique'] unless self['/source/title/unique'].nil?
-      return true
-    end
-
     def multi_entries?
       return self['/dest/multi_entries'] unless self['/dest/multi_entries'].nil?
       return false
@@ -78,13 +73,22 @@ module TomatoShrieker
     end
 
     def keyword
-      return nil unless self['/source/keyword']
-      return Regexp.new(self['/source/keyword'])
+      return nil unless keyword = self['/source/keyword']
+      return Regexp.new(keyword)
     end
 
     def negative_keyword
-      return nil unless self['/source/negative_keyword']
-      return Regexp.new(self['/source/negative_keyword'])
+      return nil unless keyword = self['/source/negative_keyword']
+      return Regexp.new(keyword)
+    end
+
+    def enclosure?
+      return self['/enclosure/enable'] == true
+    end
+
+    def enclosure_negative_keyword
+      return nil unless keyword = self['/enclosure/negative_keyword']
+      return Regexp.new(keyword)
     end
 
     def multi_entries

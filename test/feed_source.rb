@@ -16,15 +16,15 @@ module TomatoShrieker
       end
     end
 
-    def test_unique_title?
-      FeedSource.all do |source|
-        assert_boolean(source.unique_title?)
-      end
-    end
-
     def test_multi_entries?
       FeedSource.all do |source|
         assert_boolean(source.multi_entries?)
+      end
+    end
+
+    def test_enclosure?
+      FeedSource.all do |source|
+        assert_boolean(source.enclosure?)
       end
     end
 
