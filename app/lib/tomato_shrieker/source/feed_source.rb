@@ -83,11 +83,11 @@ module TomatoShrieker
     end
 
     def enclosure?
-      return self['/dest/enclosure'] == true
+      return self['/enclosure/enable'] == true
     end
 
     def enclosure_negative_keyword
-      return nil unless keyword = self['/source/enclosure/negative_keyword']
+      return nil unless keyword = self['/enclosure/negative_keyword']
       return Regexp.new(keyword)
     end
 
