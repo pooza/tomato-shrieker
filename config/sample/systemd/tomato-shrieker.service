@@ -1,0 +1,15 @@
+[Unit]
+Description=tomato-shrieker
+After=network.target
+
+[Service]
+Type=forking
+User=__username__
+WorkingDirectory=/home/__username__/path/to/tomato-shrieker
+ExecStart=/bin/bash -lc 'bundle exec rake start'
+ExecStop=/bin/bash -lc 'bundle exec rake stop'
+TimeoutSec=15
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
