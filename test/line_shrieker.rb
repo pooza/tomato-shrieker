@@ -3,7 +3,7 @@ module TomatoShrieker
     def setup
       @template = Template.new('common')
       @template[:status] = Time.now.to_s
-      @template[:source] = Source.all.find(&:line?)
+      @template[:source] = Source.all.find {|v| v.id == 'line_test'}
     end
 
     def test_exec
