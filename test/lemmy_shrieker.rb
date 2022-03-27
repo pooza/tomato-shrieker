@@ -14,7 +14,7 @@ module TomatoShrieker
     end
 
     def test_root_cert_file
-      assert(File.exist?(@shrieker.root_cert_file))
+      assert_path_exists(@shrieker.root_cert_file)
     end
 
     def test_exec

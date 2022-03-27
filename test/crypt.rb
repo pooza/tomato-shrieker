@@ -5,7 +5,7 @@ module TomatoShrieker
     end
 
     def test_config?
-      assert(Crypt.config?)
+      assert_predicate(Crypt, :config?)
     end
   end
 end

@@ -74,7 +74,7 @@ module TomatoShrieker
     def test_entries
       FeedSource.all do |source|
         assert_kind_of(Enumerator, source.entries)
-        assert(source.entries.count.positive?)
+        assert_predicate(source.entries.count, :positive?)
         source.entries.first(5).each do |entry|
           classes = [
             Feedjira::Parser::AtomEntry,

@@ -4,7 +4,7 @@ module TomatoShrieker
       CommandSource.all do |source|
         assert_kind_of(Ginseng::CommandLine, source.command)
         source.command.exec
-        assert(source.command.status.zero?)
+        assert_predicate(source.command.status, :zero?)
       end
     end
 
