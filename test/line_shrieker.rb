@@ -7,7 +7,7 @@ module TomatoShrieker
     end
 
     def test_exec
-      assert_equal(@template[:source].line.exec(template: @template).code, 200)
+      assert_equal(200, @template[:source].line.exec(template: @template).code)
     end
   end
 end

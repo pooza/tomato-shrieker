@@ -13,6 +13,7 @@ gem 'sqlite3'
 group :development do
   gem 'ricecream'
   gem 'rubocop'
+  gem 'rubocop-minitest'
   gem 'rubocop-performance'
   gem 'rubocop-rake'
   gem 'rubocop-sequel'

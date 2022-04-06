@@ -7,7 +7,7 @@ module TomatoShrieker
     def test_account
       TweetTimelineSource.all do |source|
         assert_kind_of(String, source.account)
-        assert(source.account.present?)
+        assert_predicate(source.account, :present?)
       end
     end
   end

@@ -122,14 +122,14 @@ module TomatoShrieker
       Source.all.select(&:post_at).each do |source|
         assert_kind_of(String, source.post_at)
         assert_kind_of(String, source.at)
-        assert(Rufus::Scheduler.parse(source.post_at).present?)
+        assert_predicate(Rufus::Scheduler.parse(source.post_at), :present?)
       end
     end
 
     def test_cron
       Source.all.select(&:cron).each do |source|
         assert_kind_of(String, source.cron)
-        assert(Rufus::Scheduler.parse(source.cron).present?)
+        assert_predicate(Rufus::Scheduler.parse(source.cron), :present?)
       end
     end
 
@@ -137,7 +137,7 @@ module TomatoShrieker
       Source.all.select(&:period).each do |source|
         assert_kind_of(String, source.period)
         assert_kind_of(String, source.every)
-        assert(Rufus::Scheduler.parse(source.every).present?)
+        assert_predicate(Rufus::Scheduler.parse(source.every), :present?)
       end
     end
 

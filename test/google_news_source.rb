@@ -7,7 +7,7 @@ module TomatoShrieker
     def test_phrase
       GoogleNewsSource.all do |source|
         assert_kind_of(String, source.phrase)
-        assert(source.phrase.present?)
+        assert_predicate(source.phrase, :present?)
       end
     end
   end
