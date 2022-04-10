@@ -1,8 +1,5 @@
 module TomatoShrieker
   class LemmyShriekerTest < TestCase
-    def setup
-    end
-
     def test_client
       Source.all.select(&:test?).select(&:lemmy).each do |source|
         assert_kind_of(Faye::WebSocket::Client, source.lemmy.client)

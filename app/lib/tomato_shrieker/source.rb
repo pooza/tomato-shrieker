@@ -85,6 +85,10 @@ module TomatoShrieker
       end
     end
 
+    def webhook?
+      return (self['/dest/hooks'] || []).present?
+    end
+
     def mastodon
       unless @mastodon
         return nil unless uri = self['/dest/mastodon/url']
