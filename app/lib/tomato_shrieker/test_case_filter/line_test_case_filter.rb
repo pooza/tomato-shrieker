@@ -1,7 +1,7 @@
 module TomatoShrieker
   class LineTestCaseFilter < TestCaseFilter
     def active?
-      return Source.all.none? {|s| s.line? && s.id == 'line_test'}
+      return Source.all.none? {|s| s.test? && s.line}
     end
   end
 end

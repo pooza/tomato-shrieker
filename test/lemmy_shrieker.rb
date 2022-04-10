@@ -1,25 +1,31 @@
 module TomatoShrieker
   class LemmyShriekerTest < TestCase
     def setup
-      @source = Source.all.find {|v| v.id == 'lemmy_test'}
-      @shrieker = @source.lemmy
     end
 
     def test_client
-      assert_kind_of(Faye::WebSocket::Client, @shrieker.client)
+      Source.all.select(&:test?).select(&:lemmy).each do |source|
+        assert_kind_of(Faye::WebSocket::Client, source.lemmy.client)
+      end
     end
 
     def test_verify_peer?
-      assert_boolean(@shrieker.verify_peer?)
+      Source.all.select(&:test?).select(&:lemmy).each do |source|
+        assert_boolean(source.lemmy.verify_peer?)
+      end
     end
 
     def test_root_cert_file
-      assert_path_exist(@shrieker.root_cert_file)
+      Source.all.select(&:test?).select(&:lemmy).each do |source|
+        assert_path_exist(source.lemmy.root_cert_file)
+      end
     end
 
     def test_exec
-      @source.clear
-      @source.exec
+      Source.all.select(&:test?).select(&:lemmy).each do |source|
+        source.clear
+        source.exec
+      end
     end
   end
 end

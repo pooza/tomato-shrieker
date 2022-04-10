@@ -40,6 +40,10 @@ module TomatoShrieker
       return self['/dest/mulukhiya/enable'] == true
     end
 
+    def test?
+      return Environment.development? || self['/test'] == true
+    end
+
     def bot_account?
       return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
       return false
