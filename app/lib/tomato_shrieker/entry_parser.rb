@@ -55,8 +55,8 @@ module TomatoShrieker
       [:summary, :title].select {|k| values[k]}.each do |field|
         lines = values[field].tr('＃', '#').strip.each_line.to_a
         lines.clone.reverse_each do |line|
-          break unless line.match?(/^\s*(#[^\s]+\s?)+\s*$/)
-          tags.merge(lines.pop.strip.split(/\s+/))
+          break unless line.match?(/^[[:blank:]]*(#[^[:blank:]]+[[:blank:]]?)+[[:blank:]]*$/)
+          tags.merge(lines.pop.strip.split(/[[:blank:]]+/))
         end
         values[field] = lines.join("\n").strip
       end

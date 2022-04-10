@@ -84,7 +84,7 @@ module TomatoShrieker
     def post(body)
       template = search_template(body)
       data = {
-        name: template.to_s.gsub(/\s+/, ' ').ellipsize(config['/lemmy/subject/max_length']),
+        name: template.to_s.gsub(/[[:blank:]]+/, ' ').ellipsize(config['/lemmy/subject/max_length']),
         community_id: template.source['/dest/lemmy/community_id'],
         auth: @jwt,
       }
