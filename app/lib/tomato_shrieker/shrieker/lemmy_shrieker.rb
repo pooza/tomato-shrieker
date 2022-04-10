@@ -93,7 +93,9 @@ module TomatoShrieker
     end
 
     def search_template(body)
-      return body[:template] unless entry = body[:template].entry
+      unless entry = body[:template].entry
+        return body[:template].source.create_template(:lemmy, body[:template].to_s)
+      end
       return entry.create_template(:lemmy)
     end
   end

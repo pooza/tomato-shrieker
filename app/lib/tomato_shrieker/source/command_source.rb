@@ -4,8 +4,7 @@ module TomatoShrieker
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
       command.stdout.split(delimiter).select(&:present?).each do |status|
-        template = create_template
-        template[:status] = status
+        template = create_template(:default, status)
         shriek(template:, visibility:)
       end
     rescue => e
@@ -20,6 +19,13 @@ module TomatoShrieker
 
     def delimiter
       return Regexp.new("#{self['/source/delimiter'] || '====='}\n?")
+    end
+
+    def create_template(type = :default, status = '')
+      template = templates[type]
+      template[:source] = self
+      template[:status] = status
+      return template
     end
 
     def command
