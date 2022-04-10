@@ -61,6 +61,7 @@ module TomatoShrieker
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
+          raise 'Empty message (rate limit?)' unless payload
           method = "handle_#{payload['op']}".underscore.to_sym
           EM.stop_event_loop if send(method, payload['data'], body) == :stop
         end
@@ -87,7 +88,7 @@ module TomatoShrieker
         auth: @jwt,
       }
       uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
-      data[:uri] = uri.to_s if uri
+      data[:url] = uri.to_s if uri
       client.send(op: 'CreatePost', data:)
     end
 
