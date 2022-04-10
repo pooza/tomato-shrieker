@@ -97,6 +97,8 @@ module TomatoShrieker
         return body[:template].source.create_template(:lemmy, body[:template].to_s)
       end
       return entry.create_template(:lemmy)
+    rescue
+      return body[:template]
     end
   end
 end
