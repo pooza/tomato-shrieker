@@ -8,9 +8,9 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def create_template(type = :default)
+    def create_template(type = :default, status = nil)
       template = super
-      template[:status] = text
+      template[:status] ||= text
       return template
     end
 

@@ -56,7 +56,7 @@ module TomatoShrieker
       return @nokogiri
     end
 
-    def create_template(type = :default)
+    def create_template(type = :default, status = nil)
       template = feed.create_template(type)
       template[:entry] = self
       return template

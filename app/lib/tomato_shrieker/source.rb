@@ -40,6 +40,10 @@ module TomatoShrieker
       return self['/dest/mulukhiya/enable'] == true
     end
 
+    def test?
+      return Environment.development? || self['/test'] == true
+    end
+
     def bot_account?
       return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
       return false
@@ -55,9 +59,10 @@ module TomatoShrieker
       return @templates
     end
 
-    def create_template(type = :default)
+    def create_template(type = :default, status = nil)
       template = templates[type]
       template[:source] = self
+      template[:status] = status
       return template
     end
 
@@ -78,6 +83,10 @@ module TomatoShrieker
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
+    end
+
+    def webhook?
+      return (self['/dest/hooks'] || []).present?
     end
 
     def mastodon

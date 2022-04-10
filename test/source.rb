@@ -18,6 +18,12 @@ module TomatoShrieker
       end
     end
 
+    def test_test?
+      Source.all do |source|
+        assert_boolean(source.test?)
+      end
+    end
+
     def test_bot_account?
       Source.all do |source|
         assert_boolean(source.bot_account?)

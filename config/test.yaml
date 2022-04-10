@@ -3,6 +3,15 @@ filters:
       - crypt
     name: ci
   - cases:
+      - webhook_shrieker
+    name: webhook
+  - cases:
+      - mastodon_shrieker
+    name: mastodon
+  - cases:
+      - misskey_shrieker
+    name: misskey
+  - cases:
       - line_shrieker
     name: line
   - cases:

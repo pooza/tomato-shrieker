@@ -61,6 +61,7 @@ module TomatoShrieker
 
         client.on(:message) do |message|
           payload = JSON.parse(message.data)
+          raise 'Empty message (rate limit?)' unless payload
           raise payload['error'] if payload['error']
           method = "handle_#{payload['op']}".underscore.to_sym
           EM.stop_event_loop if send(method, payload['data'], body) == :stop
@@ -74,26 +75,28 @@ module TomatoShrieker
     private
 
     def login
-      client.send({op: 'Login', data: {
+      client.send(op: 'Login', data: {
         username_or_email: @params[:user_id],
         password: (@params[:password].decrypt rescue @params[:password]),
-      }}.to_json)
+      })
     end
 
     def post(body)
       template = search_template(body)
-      uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
-      client.send({op: 'CreatePost', data: {
-        nsfw: false,
+      data = {
         name: template.to_s.gsub(/\s+/, ' ').ellipsize(config['/lemmy/subject/max_length']),
-        url: uri.to_s,
         community_id: template.source['/dest/lemmy/community_id'],
         auth: @jwt,
-      }}.to_json)
+      }
+      uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
+      data[:url] = uri.to_s if uri
+      client.send(op: 'CreatePost', data:)
     end
 
     def search_template(body)
-      return body[:template].source.create_template(:lemmy) unless entry = body[:template].entry
+      unless entry = body[:template].entry
+        return body[:template].source.create_template(:lemmy, body[:template].to_s)
+      end
       return entry.create_template(:lemmy)
     rescue
       return body[:template]

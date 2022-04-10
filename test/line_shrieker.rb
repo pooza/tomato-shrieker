@@ -7,7 +7,10 @@ module TomatoShrieker
     end
 
     def test_exec
-      assert_equal(200, @template[:source].line.exec(template: @template).code)
+      Source.all.select(&:test?).select(&:line).each do |source|
+        source.clear
+        source.exec
+      end
     end
   end
 end

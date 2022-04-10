@@ -65,7 +65,7 @@ module TomatoShrieker
       return @templates
     end
 
-    def create_template(type = :default)
+    def create_template(type = :default, status = nil)
       template = super
       template[:feed] = self
       template[:entries] = multi_entries if type == :multi
