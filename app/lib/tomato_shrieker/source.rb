@@ -59,7 +59,7 @@ module TomatoShrieker
       return @templates
     end
 
-    def create_template(type = :default)
+    def create_template(type = :default, status = nil)
       template = templates[type]
       template[:source] = self
       return template
