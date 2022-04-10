@@ -21,13 +21,6 @@ module TomatoShrieker
       return Regexp.new("#{self['/source/delimiter'] || '====='}\n?")
     end
 
-    def create_template(type = :default, status = nil)
-      template = templates[type]
-      template[:source] = self
-      template[:status] = status
-      return template
-    end
-
     def command
       unless @command
         @command = Ginseng::CommandLine.new

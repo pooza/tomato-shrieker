@@ -10,7 +10,7 @@ module TomatoShrieker
 
     def create_template(type = :default, status = nil)
       template = super
-      template[:status] = status || text
+      template[:status] ||= text
       return template
     end
 
