@@ -25,6 +25,7 @@ module TomatoShrieker
     def tags
       unless @tags
         tags = Ginseng::Fediverse::TagContainer.new
+        tags.concat(config['/feed/default_tags'])
         tags.concat(feed.tags.clone)
         tags.concat(JSON.parse(extra_tags))
         tags.concat(fetch_remote_tags) if feed.remote_tagging?

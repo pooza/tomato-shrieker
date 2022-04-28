@@ -1,8 +1,5 @@
 filters:
   - cases:
-      - crypt
-    name: ci
-  - cases:
       - webhook_shrieker
     name: webhook
   - cases:

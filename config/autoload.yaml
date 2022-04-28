@@ -1,3 +1,2 @@
 inflections:
-  ci_test_case_filter: CITestCaseFilter
   http: HTTP

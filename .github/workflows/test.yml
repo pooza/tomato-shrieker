@@ -24,4 +24,3 @@ jobs:
           bundle exec rake bundle:check
       - run: bundle exec rake migration:run
       - run: bundle exec rubocop
-      - run: bundle exec rake test
