@@ -11,6 +11,13 @@ properties:
       - development
       - production
     type: string
+  feed:
+    properties:
+      default_tags:
+        items:
+          type: string
+        type: array
+    type: object
   slack:
     properties:
       hooks:

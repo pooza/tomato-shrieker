@@ -2,6 +2,9 @@ crypt:
   encoder: base64
   password: null
 environment: development
+feed:
+  default_tags:
+    - rssfeed
 google:
   news:
     urls:
