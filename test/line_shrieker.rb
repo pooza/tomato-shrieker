@@ -1,5 +1,10 @@
 module TomatoShrieker
   class LineShriekerTest < TestCase
+    def disable?
+      return true if Source.all.none? {|s| s.test? && s.line?}
+      return super
+    end
+
     def setup
       @template = Template.new('common')
       @template[:status] = Time.now.to_s

@@ -1,5 +1,10 @@
 module TomatoShrieker
   class EntryTest < TestCase
+    def disable?
+      return true if Entry.dataset.empty?
+      return super
+    end
+
     def setup
       @entries = Entry.dataset.all.select(&:feed)
     end
