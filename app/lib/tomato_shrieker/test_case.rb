@@ -27,7 +27,6 @@ module TomatoShrieker
         finder.patterns.push('*.rb')
         names = finder.exec.map {|v| File.basename(v, '.rb')}
       end
-      TestCaseFilter.all.select(&:active?).each {|v| v.exec(names)}
       return names.to_set
     end
 
