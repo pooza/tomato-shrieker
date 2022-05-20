@@ -22,6 +22,10 @@ lemmy:
 line:
   urls:
     api: https://api.line.me
+logger:
+  mask_fields:
+    - password
+    - secret
 package:
   authors:
     - Tatsuya Koishi
