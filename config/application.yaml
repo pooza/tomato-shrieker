@@ -26,6 +26,7 @@ logger:
   mask_fields:
     - password
     - secret
+    - auth
 package:
   authors:
     - Tatsuya Koishi
