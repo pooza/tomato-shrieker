@@ -22,6 +22,11 @@ lemmy:
 line:
   urls:
     api: https://api.line.me
+logger:
+  mask_fields:
+    - password
+    - secret
+    - auth
 package:
   authors:
     - Tatsuya Koishi
@@ -30,7 +35,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.4.8
+  version: 3.4.9
 slack:
   hooks: []
 sources: []
