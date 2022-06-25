@@ -6,9 +6,11 @@ module TomatoShrieker
       return uri
     end
 
-    def repos
+    def repository
       return self['/source/github/repository']
     end
+
+    alias repos repository
 
     alias every period
 
