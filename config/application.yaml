@@ -5,6 +5,9 @@ environment: development
 feed:
   default_tags:
     - rssfeed
+github:
+  urls:
+    root: https://github.com
 google:
   news:
     urls:
@@ -35,9 +38,29 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.4.10
+  version: 3.4.11
 slack:
   hooks: []
+source:
+  classes:
+    - class: FeedSource
+      config: /source/feed
+    - class: FeedSource
+      config: /source/url
+    - class: CommandSource
+      config: /source/command
+    - class: TextSource
+      config: /source/text
+    - class: GoogleNewsSource
+      config: /source/news/url
+    - class: GoogleNewsSource
+      config: /source/news/phrase
+    - class: TweetTimelineSource
+      config: /source/tweet/account
+    - class: GitHubRepositorySource
+      config: /source/github/repository
+    - class: GitHubRepositorySource
+      config: /source/github/repos
 sources: []
 sqlite3:
   db: db.sqlite3

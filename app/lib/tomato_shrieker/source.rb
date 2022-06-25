@@ -221,14 +221,18 @@ module TomatoShrieker
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|
-        values = entry.key_flatten
-        yield FeedSource.new(entry) if values['/source/feed']
-        yield FeedSource.new(entry) if values['/source/url']
-        yield CommandSource.new(entry) if values['/source/command']
-        yield TextSource.new(entry) if values['/source/text']
-        yield GoogleNewsSource.new(entry) if values['/source/news/url']
-        yield GoogleNewsSource.new(entry) if values['/source/news/phrase']
-        yield TweetTimelineSource.new(entry) if values['/source/tweet/account']
+        source_entry = entry.key_flatten
+        classes.each do |source_class|
+          yield source_class[:class].new(entry) if source_entry[source_class[:config]]
+        end
+      end
+    end
+
+    def self.classes
+      return config['/source/classes'].map do |entry|
+        source_class = entry.deep_symbolize_keys
+        source_class[:class] = "TomatoShrieker::#{source_class[:class]}".constantize
+        source_class
       end
     end
 
