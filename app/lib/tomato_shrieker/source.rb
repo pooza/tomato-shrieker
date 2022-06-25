@@ -229,6 +229,7 @@ module TomatoShrieker
         yield GoogleNewsSource.new(entry) if values['/source/news/url']
         yield GoogleNewsSource.new(entry) if values['/source/news/phrase']
         yield TweetTimelineSource.new(entry) if values['/source/tweet/account']
+        yield GitHubRepositorySource.new(entry) if values['/source/github/repository']
       end
     end
 

@@ -1,34 +1,24 @@
 module TomatoShrieker
-  class TweetTimelineSource < FeedSource
+  class GitHubRepositorySource < FeedSource
     def uri
-      uri = Ginseng::URI.parse(config['/tweet/urls/root'])
-      uri.path = File.join('/', account, 'rss')
+      uri = Ginseng::URI.parse(config['/github/urls/root'])
+      uri.path = File.join('/', repos, 'releases.atom')
       return uri
     end
 
-    def account
-      return self['/source/tweet/account']
+    def repos
+      return self['/source/github/repository']
     end
 
     alias every period
 
-    def ignore_entry?(entry)
-      return true if entry.title&.match?(/^(RT by|R to)[[:blank:]]*/)
-      return super
-    end
-
-    def create_record(entry)
-      values = entry.to_h
-      uri = Ginseng::URI.parse(values['url'])
-      uri.host = 'twitter.com'
-      uri.fragment = nil
-      values['url'] = uri.to_s
-      return super(values)
+    def negative_keyword
+      return super || Regexp.new('Merge pull request')
     end
 
     def self.all(&block)
       return enum_for(__method__) unless block
-      Source.all.select {|s| s.is_a?(TweetTimelineSource)}.each(&block)
+      Source.all.select {|s| s.is_a?(GitHubRepositorySource)}.each(&block)
     end
   end
 end

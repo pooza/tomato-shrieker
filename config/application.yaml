@@ -5,6 +5,9 @@ environment: development
 feed:
   default_tags:
     - rssfeed
+github:
+  urls:
+    root: https://github.com
 google:
   news:
     urls:

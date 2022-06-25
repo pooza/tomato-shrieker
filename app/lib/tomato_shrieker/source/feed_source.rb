@@ -153,6 +153,7 @@ module TomatoShrieker
     def negative_entry?(entry)
       return true if entry.title&.match?(negative_keyword)
       return true if entry.summary&.match?(negative_keyword)
+      return true if entry.content&.match?(negative_keyword)
       return false
     end
 
