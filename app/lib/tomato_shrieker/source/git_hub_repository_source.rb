@@ -2,12 +2,16 @@ module TomatoShrieker
   class GitHubRepositorySource < FeedSource
     def uri
       uri = Ginseng::URI.parse(config['/github/urls/root'])
-      uri.path = File.join('/', repos, 'releases.atom')
+      uri.path = File.join('/', repos, "#{timeline}.atom")
       return uri
     end
 
     def repository
       return self['/source/github/repository'] || self['/source/github/repos']
+    end
+
+    def timeline
+      return self['/source/github/timeline'] || 'releases'
     end
 
     alias repos repository
