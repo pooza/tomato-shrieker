@@ -28,7 +28,7 @@ module TomatoShrieker
 
     def self.all(&block)
       return enum_for(__method__) unless block
-      Source.all.select {|s| s.is_a?(TweetTimelineSource)}.each(&block)
+      Source.all.select {|s| s.is_a?(self)}.each(&block)
     end
   end
 end
