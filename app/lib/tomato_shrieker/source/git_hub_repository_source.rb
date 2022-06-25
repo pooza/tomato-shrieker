@@ -7,7 +7,7 @@ module TomatoShrieker
     end
 
     def repository
-      return self['/source/github/repository']
+      return self['/source/github/repository'] || self['/source/github/repos']
     end
 
     alias repos repository
