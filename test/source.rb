@@ -152,5 +152,12 @@ module TomatoShrieker
         assert(source.load)
       end
     end
+
+    def test_classes
+      Source.classes.each do |source_class|
+        assert_kind_of(Class, source_class[:class])
+        assert_kind_of(String, source_class[:config])
+      end
+    end
   end
 end
