@@ -12,5 +12,11 @@ module TomatoShrieker
         assert_predicate(source.repos, :present?)
       end
     end
+
+    def test_timeline
+      GitHubRepositorySource.all do |source|
+        assert(['releases', 'commits'].member?(source.timeline))
+      end
+    end
   end
 end

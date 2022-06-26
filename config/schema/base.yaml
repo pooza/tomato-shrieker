@@ -129,6 +129,18 @@ properties:
             feed:
               format: url
               type: string
+            github:
+              format: hash
+              properties:
+                repos:
+                  type: string
+                repository:
+                  type: string
+                timeline:
+                  enum:
+                    - releases
+                    - commits
+                  type: string
             news:
               format: hash
               properties:
