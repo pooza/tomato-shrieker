@@ -79,7 +79,7 @@ GEM
       sax-machine (>= 1.0)
     fileutils (1.6.0)
     find (0.1.1)
-    fugit (1.5.3)
+    fugit (1.6.0)
       et-orbi (~> 1, >= 1.2.7)
       raabro (~> 1.4)
     http-accept (1.7.0)
@@ -104,7 +104,7 @@ GEM
     mini_mime (1.1.2)
     mini_portile2 (2.8.0)
     minitest (5.16.3)
-    msgpack (1.5.5)
+    msgpack (1.5.6)
     multi_json (1.15.0)
     multi_xml (0.6.0)
     net-protocol (0.1.3)
@@ -215,4 +215,4 @@ RUBY VERSION
    ruby 3.1.2p20
 
 BUNDLED WITH
-   2.3.20
+   2.3.21
