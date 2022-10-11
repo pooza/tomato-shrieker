@@ -166,7 +166,9 @@ GEM
     securerandom (0.2.0)
     sequel (5.57.0)
     set (1.0.2)
-    sqlite3 (1.4.4)
+    sqlite3 (1.5.3)
+      mini_portile2 (~> 2.8.0)
+    sqlite3 (1.5.3-x86_64-linux)
     test-unit (3.5.3)
       power_assert
     time (0.2.0)
