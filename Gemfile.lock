@@ -59,27 +59,26 @@ GEM
     ast (2.4.2)
     bootsnap (1.13.0)
       msgpack (~> 1.2)
-    cgi (0.3.2)
+    cgi (0.3.3)
     concurrent-ruby (1.1.10)
     crass (1.0.6)
     daemon-spawn (0.4.2)
     date (3.2.2)
-    digest (3.1.0)
     domain_name (0.5.20190701)
       unf (>= 0.0.5, < 1.0.0)
-    erb (2.2.3)
-      cgi
+    erb (3.0.0)
+      cgi (>= 0.3.3)
     et-orbi (1.2.7)
       tzinfo
     etc (1.3.0)
     eventmachine (1.2.7)
     facets (3.1.0)
-    feedjira (3.2.1)
+    feedjira (3.2.2)
       loofah (>= 2.3.1)
       sax-machine (>= 1.0)
     fileutils (1.6.0)
     find (0.1.1)
-    fugit (1.6.0)
+    fugit (1.7.1)
       et-orbi (~> 1, >= 1.2.7)
       raabro (~> 1.4)
     http-accept (1.7.0)
@@ -93,7 +92,7 @@ GEM
     json (2.6.2)
     json-schema (3.0.0)
       addressable (>= 2.8)
-    loofah (2.18.0)
+    loofah (2.19.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
     mail (2.7.1)
@@ -104,15 +103,13 @@ GEM
     mini_mime (1.1.2)
     mini_portile2 (2.8.0)
     minitest (5.16.3)
-    msgpack (1.5.6)
+    msgpack (1.6.0)
     multi_json (1.15.0)
     multi_xml (0.6.0)
     net-protocol (0.1.3)
       timeout
-    net-smtp (0.3.1)
-      digest
+    net-smtp (0.3.2)
       net-protocol
-      timeout
     netrc (0.11.0)
     nokogiri (1.13.9)
       mini_portile2 (~> 2.8.0)
@@ -123,7 +120,7 @@ GEM
     parallel (1.22.1)
     parser (3.1.2.1)
       ast (~> 2.4.1)
-    power_assert (2.0.1)
+    power_assert (2.0.2)
     public_suffix (5.0.0)
     raabro (1.4.0)
     racc (1.6.0)
@@ -167,9 +164,11 @@ GEM
     sax-machine (1.3.2)
     securerandom (0.2.0)
     sequel (5.61.0)
-    set (1.0.2)
-    sqlite3 (1.4.4)
-    test-unit (3.5.3)
+    set (1.0.3)
+    sqlite3 (1.5.3)
+      mini_portile2 (~> 2.8.0)
+    sqlite3 (1.5.3-x86_64-linux)
+    test-unit (3.5.5)
       power_assert
     time (0.2.0)
       date
@@ -184,7 +183,7 @@ GEM
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
     yajl-ruby (1.4.3)
-    zeitwerk (2.6.0)
+    zeitwerk (2.6.1)
     zlib (2.1.1)
 
 PLATFORMS
@@ -215,4 +214,4 @@ RUBY VERSION
    ruby 3.1.2p20
 
 BUNDLED WITH
-   2.3.22
+   2.3.24
