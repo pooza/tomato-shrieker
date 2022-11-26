@@ -66,6 +66,15 @@ sqlite3:
   db: db.sqlite3
 tweet:
   urls:
-    root: https://nitter.net
+    - https://nitter.net/
+    - https://nitter.lacontrevoie.fr/
+    - https://nitter.pussthecat.org/
+    - https://nitter.fdn.fr/
+    - https://nitter.1d4.us/
+    - https://nitter.kavin.rocks/
+    - https://nitter.unixfox.eu/
+    - https://nitter.domain.glass/
+    - https://nitter.namazso.eu/
+    - https://birdsite.xanny.family/
 websocket:
   keepalive: 15
