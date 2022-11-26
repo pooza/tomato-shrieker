@@ -55,6 +55,7 @@ module TomatoShrieker
       Source.all do |source|
         assert_boolean(source.mastodon?)
         next unless source.mastodon?
+
         assert_kind_of(MastodonShrieker, source.mastodon)
       end
     end
@@ -63,6 +64,7 @@ module TomatoShrieker
       Source.all do |source|
         assert_boolean(source.misskey?)
         next unless source.misskey?
+
         assert_kind_of(MisskeyShrieker, source.misskey)
       end
     end
@@ -71,6 +73,7 @@ module TomatoShrieker
       Source.all do |source|
         assert_boolean(source.line?)
         next unless source.line?
+
         assert_kind_of(LineShrieker, source.line)
       end
     end
@@ -79,6 +82,7 @@ module TomatoShrieker
       Source.all do |source|
         assert_boolean(source.lemmy?)
         next unless source.lemmy?
+
         assert_kind_of(LemmyShrieker, source.lemmy)
       end
     end
@@ -94,6 +98,7 @@ module TomatoShrieker
     def test_mulukhiya
       Source.all do |source|
         next unless source.mulukhiya
+
         assert_kind_of(MulukhiyaService, source.mulukhiya)
       end
     end
