@@ -12,6 +12,7 @@ module TomatoShrieker
           Feedjira::Parser::AtomYoutube,
           Feedjira::Parser::ITunesRSS,
         ]
+
         assert_kind_of(classes, source.feedjira)
       end
     end
@@ -82,6 +83,7 @@ module TomatoShrieker
             Feedjira::Parser::AtomYoutubeEntry,
             Feedjira::Parser::ITunesRSSItem,
           ]
+
           assert_kind_of(classes, entry)
         end
       end
