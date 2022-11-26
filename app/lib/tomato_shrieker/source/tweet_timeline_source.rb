@@ -1,9 +1,23 @@
 module TomatoShrieker
   class TweetTimelineSource < FeedSource
+    def uris
+      return config['/tweet/urls/root'].map do |href|
+        uri = Ginseng::URI.parse(href)
+        uri.path = File.join('/', account, 'rss')
+        uri
+      end
+    end
+
     def uri
-      uri = Ginseng::URI.parse(config['/tweet/urls/root'])
-      uri.path = File.join('/', account, 'rss')
-      return uri
+      return uris.first
+    end
+
+    def feedjira
+      uris.each do |uri|
+        return super(uri)
+      rescue => e
+        raise Ginseng::GatewayError, "invalid nitter instance (#{uri}) #{e.message}"
+      end
     end
 
     def account
