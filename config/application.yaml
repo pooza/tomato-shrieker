@@ -65,7 +65,7 @@ sources: []
 sqlite3:
   db: db.sqlite3
 tweet:
-  urls:
+  urls: # @see https://github.com/xnaas/nitter-instances
     - https://nitter.net/
     - https://nitter.lacontrevoie.fr/
     - https://nitter.pussthecat.org/
