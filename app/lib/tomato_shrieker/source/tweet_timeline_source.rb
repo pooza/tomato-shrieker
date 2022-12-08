@@ -5,10 +5,10 @@ module TomatoShrieker
     end
 
     def feedjira
-      uris do |uri|
+      uris.to_a.shuffle.each do |uri|
         return Feedjira.parse(@http.get(uri).body)
       rescue => e
-        raise Ginseng::GatewayError, "invalid nitter instance (#{uri}) #{e.message}"
+        logger.error("invalid nitter instance (#{uri}) #{e.message}")
       end
     end
 
