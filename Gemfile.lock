@@ -78,7 +78,7 @@ GEM
     concurrent-ruby (1.1.10)
     crass (1.0.6)
     daemon-spawn (0.4.2)
-    date (3.3.0)
+    date (3.3.1)
     domain_name (0.5.20190701)
       unf (>= 0.0.5, < 1.0.0)
     erb (4.0.2)
@@ -86,7 +86,7 @@ GEM
     erubi (1.11.0)
     et-orbi (1.2.7)
       tzinfo
-    etc (1.4.1)
+    etc (1.4.2)
     eventmachine (1.2.7)
     facets (3.1.0)
     feedjira (3.2.2)
@@ -125,7 +125,8 @@ GEM
     msgpack (1.6.0)
     multi_json (1.15.0)
     multi_xml (0.6.0)
-    net-imap (0.3.1)
+    net-imap (0.3.2)
+      date
       net-protocol
     net-pop (0.1.2)
       net-protocol
