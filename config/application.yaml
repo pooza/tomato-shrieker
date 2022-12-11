@@ -73,8 +73,8 @@ tweet:
     - https://nitter.1d4.us/
     - https://nitter.kavin.rocks/
     - https://nitter.unixfox.eu/
-    - https://nitter.domain.glass/
-    - https://nitter.namazso.eu/
     - https://birdsite.xanny.family/
+    - https://twitter.censors.us
+    - https://twitter.076.ne.jp
 websocket:
   keepalive: 15
