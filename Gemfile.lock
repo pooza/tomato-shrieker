@@ -200,7 +200,7 @@ GEM
     sqlite3 (1.5.4)
       mini_portile2 (~> 2.8.0)
     sqlite3 (1.5.4-x86_64-linux)
-    test-unit (3.5.5)
+    test-unit (3.5.7)
       power_assert
     time (0.2.0)
       date
