@@ -228,6 +228,7 @@ DEPENDENCIES
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!
+  loofah (>= 2.19.1)
   optparse
   ricecream
   rubocop

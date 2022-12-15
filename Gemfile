@@ -10,6 +10,8 @@ gem 'rufus-scheduler'
 gem 'sequel'
 gem 'sqlite3'
 
+gem 'loofah', '>=2.19.1' # CVE-2022-23514 CVE-2022-23515 CVE-2022-23516
+
 group :development do
   gem 'ricecream'
   gem 'rubocop'
