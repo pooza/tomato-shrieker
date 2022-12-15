@@ -11,6 +11,7 @@ gem 'sequel'
 gem 'sqlite3'
 
 gem 'loofah', '>=2.19.1' # CVE-2022-23514 CVE-2022-23515 CVE-2022-23516
+gem 'rails-html-sanitizer', '>=1.4.4' # CVE-2022-23517 CVE-2022-23518 CVE-2022-23519 CVE-2022-23520
 
 group :development do
   gem 'ricecream'
