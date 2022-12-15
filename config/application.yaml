@@ -72,9 +72,9 @@ tweet:
     - https://nitter.fdn.fr/
     - https://nitter.1d4.us/
     - https://nitter.kavin.rocks/
-    - https://nitter.unixfox.eu/
     - https://birdsite.xanny.family/
-    - https://twitter.censors.us
-    - https://twitter.076.ne.jp
+    - https://twitter.censors.us/
+    - https://twitter.076.ne.jp/
+    - https://nitter.fly.dev/
 websocket:
   keepalive: 15
