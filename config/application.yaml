@@ -38,7 +38,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.4.15
+  version: 3.4.16
 slack:
   hooks: []
 source:
@@ -72,9 +72,9 @@ tweet:
     - https://nitter.fdn.fr/
     - https://nitter.1d4.us/
     - https://nitter.kavin.rocks/
-    - https://nitter.unixfox.eu/
     - https://birdsite.xanny.family/
-    - https://twitter.censors.us
-    - https://twitter.076.ne.jp
+    - https://twitter.censors.us/
+    - https://twitter.076.ne.jp/
+    - https://nitter.fly.dev/
 websocket:
   keepalive: 15
