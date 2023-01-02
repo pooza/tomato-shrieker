@@ -7,6 +7,7 @@ module TomatoShrieker
         [:start, :stop].freeze.each do |action|
           desc "#{action} #{daemon}"
           task action do
+            ENV['RUBY_YJIT_ENABLE'] = '1' if config['/ruby/jit']
             sh "#{File.join(Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
           rescue => e
             warn "#{e.class} #{daemon}:#{action} #{e.message}"
