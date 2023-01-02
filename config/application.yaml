@@ -39,6 +39,8 @@ package:
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
   version: 3.4.17
+ruby:
+  jit: false
 slack:
   hooks: []
 source:
