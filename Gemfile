@@ -10,8 +10,6 @@ gem 'rufus-scheduler'
 gem 'sequel'
 gem 'sqlite3'
 
-gem 'nokogiri', github: 'sparklemotion/nokogiri'
-
 group :development do
   gem 'ricecream'
   gem 'rubocop'
