@@ -33,6 +33,9 @@ module TomatoShrieker
         end
         @command.dir = self['/source/dir']
         @command.env = @params.dig('source', 'env') || {}
+        @command.env['RUBY_YJIT_ENABLE'] = 'yes' if config['/ruby/jit']
+        @command.env['BUNDLE_GEMFILE'] = File.join(Environment.dir, 'Gemfile')
+        @command.env['RACK_ENV'] ||= Environment.type
       end
       return @command
     end
