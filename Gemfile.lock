@@ -8,10 +8,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: beb0f140a35b3fa90047c394c38f795dcb9d3c09
+  revision: ee32d1f3f01268bcf60759e0375893a0e2ab7f13
   specs:
-    ginseng-core (1.13.15)
-      actionpack (>= 7.0.4)
+    ginseng-core (1.13.16)
+      actionpack (>= 7.0.4.1)
       activesupport (>= 6.1.3.2)
       addressable (>= 2.8.0)
       bundler (~> 2.0)
@@ -32,6 +32,7 @@ GIT
       net-smtp
       nokogiri (>= 1.13.10)
       optparse
+      rack (>= 2.2.6.2)
       rails-html-sanitizer (>= 1.4.4)
       rake
       rest-client
@@ -52,20 +53,20 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    actionpack (7.0.4)
-      actionview (= 7.0.4)
-      activesupport (= 7.0.4)
+    actionpack (7.0.4.1)
+      actionview (= 7.0.4.1)
+      activesupport (= 7.0.4.1)
       rack (~> 2.0, >= 2.2.0)
       rack-test (>= 0.6.3)
       rails-dom-testing (~> 2.0)
       rails-html-sanitizer (~> 1.0, >= 1.2.0)
-    actionview (7.0.4)
-      activesupport (= 7.0.4)
+    actionview (7.0.4.1)
+      activesupport (= 7.0.4.1)
       builder (~> 3.1)
       erubi (~> 1.4)
       rails-dom-testing (~> 2.0)
       rails-html-sanitizer (~> 1.1, >= 1.2.0)
-    activesupport (7.0.4)
+    activesupport (7.0.4.1)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
@@ -113,7 +114,7 @@ GEM
     loofah (2.19.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
-    mail (2.8.0)
+    mail (2.8.0.1)
       mini_mime (>= 0.1.1)
       net-imap
       net-pop
@@ -137,10 +138,10 @@ GEM
     net-smtp (0.3.3)
       net-protocol
     netrc (0.11.0)
-    nokogiri (1.14.0.rc1)
+    nokogiri (1.14.0)
       mini_portile2 (~> 2.8.0)
       racc (~> 1.4)
-    nokogiri (1.14.0.rc1-x86_64-linux)
+    nokogiri (1.14.0-x86_64-linux)
       racc (~> 1.4)
     optparse (0.3.1)
     parallel (1.22.1)
