@@ -3,9 +3,13 @@ module TomatoShrieker
     include Package
 
     def command
-      return Ginseng::CommandLine.new([
+      command = Ginseng::CommandLine.new([
         File.join(Environment.dir, 'bin/scheduler_worker.rb'),
       ])
+      command.env['RUBY_YJIT_ENABLE'] = 'yes' if config['/ruby/jit']
+      command.env['BUNDLE_GEMFILE'] = File.join(Environment.dir, 'Gemfile')
+      command.env['RACK_ENV'] ||= Environment.type
+      return command
     end
 
     def motd

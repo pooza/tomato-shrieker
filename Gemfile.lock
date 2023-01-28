@@ -8,10 +8,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: daf7c8f93557eec6afb7f523d309e8e28e565203
+  revision: 5b05b42bf31ae8ab7b37f254bb9fd0a51fe461fd
   specs:
-    ginseng-core (1.13.14)
-      actionpack (>= 7.0.4)
+    ginseng-core (1.13.18)
+      actionpack (>= 7.0.4.1)
       activesupport (>= 6.1.3.2)
       addressable (>= 2.8.0)
       bundler (~> 2.0)
@@ -23,7 +23,7 @@ GIT
       facets
       fileutils (~> 1.7.0)
       find
-      httparty
+      httparty (>= 0.21.0)
       json-schema
       loofah (>= 2.19.1)
       mail
@@ -32,10 +32,11 @@ GIT
       net-smtp
       nokogiri (>= 1.13.10)
       optparse
+      rack (>= 2.2.6.2)
       rails-html-sanitizer (>= 1.4.4)
       rake
       rest-client
-      sanitize
+      sanitize (>= 6.0.1)
       securerandom
       set
       time
@@ -52,20 +53,20 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    actionpack (7.0.4)
-      actionview (= 7.0.4)
-      activesupport (= 7.0.4)
+    actionpack (7.0.4.2)
+      actionview (= 7.0.4.2)
+      activesupport (= 7.0.4.2)
       rack (~> 2.0, >= 2.2.0)
       rack-test (>= 0.6.3)
       rails-dom-testing (~> 2.0)
       rails-html-sanitizer (~> 1.0, >= 1.2.0)
-    actionview (7.0.4)
-      activesupport (= 7.0.4)
+    actionview (7.0.4.2)
+      activesupport (= 7.0.4.2)
       builder (~> 3.1)
       erubi (~> 1.4)
       rails-dom-testing (~> 2.0)
       rails-html-sanitizer (~> 1.1, >= 1.2.0)
-    activesupport (7.0.4)
+    activesupport (7.0.4.2)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
@@ -73,11 +74,9 @@ GEM
     addressable (2.8.1)
       public_suffix (>= 2.0.2, < 6.0)
     ast (2.4.2)
-    bootsnap (1.15.0)
-      msgpack (~> 1.2)
     builder (3.2.4)
     cgi (0.3.6)
-    concurrent-ruby (1.1.10)
+    concurrent-ruby (1.2.0)
     crass (1.0.6)
     daemon-spawn (0.4.2)
     date (3.3.3)
@@ -96,7 +95,7 @@ GEM
       sax-machine (>= 1.0)
     fileutils (1.7.0)
     find (0.1.1)
-    fugit (1.8.0)
+    fugit (1.8.1)
       et-orbi (~> 1, >= 1.2.7)
       raabro (~> 1.4)
     http-accept (1.7.0)
@@ -113,7 +112,7 @@ GEM
     loofah (2.19.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
-    mail (2.8.0)
+    mail (2.8.0.1)
       mini_mime (>= 0.1.1)
       net-imap
       net-pop
@@ -124,7 +123,6 @@ GEM
     mini_mime (1.1.2)
     mini_portile2 (2.8.1)
     minitest (5.17.0)
-    msgpack (1.6.0)
     multi_json (1.15.0)
     multi_xml (0.6.0)
     net-imap (0.3.4)
@@ -137,30 +135,30 @@ GEM
     net-smtp (0.3.3)
       net-protocol
     netrc (0.11.0)
-    nokogiri (1.14.0.rc1)
+    nokogiri (1.14.0)
       mini_portile2 (~> 2.8.0)
       racc (~> 1.4)
-    nokogiri (1.14.0.rc1-x86_64-linux)
+    nokogiri (1.14.0-x86_64-linux)
       racc (~> 1.4)
     optparse (0.3.1)
     parallel (1.22.1)
-    parser (3.1.3.0)
+    parser (3.2.0.0)
       ast (~> 2.4.1)
     power_assert (2.0.3)
     public_suffix (5.0.1)
     raabro (1.4.0)
     racc (1.6.2)
-    rack (2.2.5)
+    rack (2.2.6.2)
     rack-test (2.0.2)
       rack (>= 1.3)
     rails-dom-testing (2.0.3)
       activesupport (>= 4.2.0)
       nokogiri (>= 1.6)
-    rails-html-sanitizer (1.4.4)
+    rails-html-sanitizer (1.5.0)
       loofah (~> 2.19, >= 2.19.1)
     rainbow (3.1.1)
     rake (13.0.6)
-    regexp_parser (2.6.1)
+    regexp_parser (2.6.2)
     rest-client (2.1.0)
       http-accept (>= 1.7.0, < 2.0)
       http-cookie (>= 1.0.2, < 2.0)
@@ -168,19 +166,19 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.5)
     ricecream (0.2.1)
-    rubocop (1.42.0)
+    rubocop (1.44.1)
       json (~> 2.3)
       parallel (~> 1.10)
-      parser (>= 3.1.2.1)
+      parser (>= 3.2.0.0)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 1.8, < 3.0)
       rexml (>= 3.2.5, < 4.0)
       rubocop-ast (>= 1.24.1, < 2.0)
       ruby-progressbar (~> 1.7)
-      unicode-display_width (>= 1.4.0, < 3.0)
+      unicode-display_width (>= 2.4.0, < 3.0)
     rubocop-ast (1.24.1)
       parser (>= 3.1.1.0)
-    rubocop-minitest (0.25.1)
+    rubocop-minitest (0.26.1)
       rubocop (>= 0.90, < 2.0)
     rubocop-performance (1.15.2)
       rubocop (>= 1.7.0, < 2.0)
@@ -192,15 +190,16 @@ GEM
     ruby-progressbar (1.11.0)
     rufus-scheduler (3.8.2)
       fugit (~> 1.1, >= 1.1.6)
-    sanitize (6.0.0)
+    sanitize (6.0.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     sax-machine (1.3.2)
     securerandom (0.2.2)
     sequel (5.64.0)
     set (1.0.3)
-    sqlite3 (1.5.4)
+    sqlite3 (1.6.0)
       mini_portile2 (~> 2.8.0)
+    sqlite3 (1.6.0-x86_64-linux)
     test-unit (3.5.7)
       power_assert
     time (0.2.1)
@@ -211,7 +210,7 @@ GEM
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.8.2)
-    unicode-display_width (2.3.0)
+    unicode-display_width (2.4.2)
     websocket-driver (0.7.5)
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
@@ -224,7 +223,6 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  bootsnap (>= 1.9.0)
   faye-websocket!
   feedjira (~> 3.0)
   ginseng-core!
@@ -245,4 +243,4 @@ RUBY VERSION
    ruby 3.2.0p0
 
 BUNDLED WITH
-   2.4.1
+   2.4.5
