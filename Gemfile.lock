@@ -166,7 +166,7 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.5)
     ricecream (0.2.1)
-    rubocop (1.44.1)
+    rubocop (1.45.0)
       json (~> 2.3)
       parallel (~> 1.10)
       parser (>= 3.2.0.0)
