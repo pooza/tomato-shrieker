@@ -201,6 +201,7 @@ GEM
     set (1.0.3)
     sqlite3 (1.6.1)
       mini_portile2 (~> 2.8.0)
+    sqlite3 (1.6.1-aarch64-linux)
     sqlite3 (1.6.1-x86_64-linux)
     test-unit (3.5.7)
       power_assert
