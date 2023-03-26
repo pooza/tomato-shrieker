@@ -70,13 +70,13 @@ tweet:
   urls: # @see https://github.com/xnaas/nitter-instances
     - https://nitter.net/
     - https://nitter.lacontrevoie.fr/
-    - https://nitter.pussthecat.org/
     - https://nitter.fdn.fr/
     - https://nitter.1d4.us/
     - https://nitter.kavin.rocks/
     - https://birdsite.xanny.family/
-    - https://twitter.censors.us/
     - https://twitter.076.ne.jp/
     - https://nitter.fly.dev/
+    - https://notabird.site/
+    - https://nitter.sethforprivacy.com/
 websocket:
   keepalive: 15
