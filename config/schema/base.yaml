@@ -173,7 +173,6 @@ properties:
       type: object
     type: array
 required:
-  - sources
   - environment
   - crypt
 title: Local config

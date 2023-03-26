@@ -123,7 +123,10 @@ module TomatoShrieker
 
     def entries(&block)
       return enum_for(__method__) unless block
-      feedjira.entries.sort_by {|entry| entry.published.to_f}.each(&block)
+      feedjira.entries
+        .sort_by {|entry| entry.published.to_f}
+        .each {|entry| entry.title = entry.title&.escape_status}
+        .each(&block)
     end
 
     def fetch
