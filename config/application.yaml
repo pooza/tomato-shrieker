@@ -77,7 +77,6 @@ tweet:
     - https://nitter.fly.dev/
     - https://notabird.site/
     - https://nitter.sethforprivacy.com/
-    - https://ddnitter.sethforprivacy.com/
     - https://nitter.cutelab.space/
 websocket:
   keepalive: 15
