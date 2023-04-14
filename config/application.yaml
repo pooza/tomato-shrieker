@@ -3,8 +3,7 @@ crypt:
   password: null
 environment: development
 feed:
-  default_tags:
-    - rssfeed
+  default_tags: []
 github:
   urls:
     root: https://github.com
@@ -38,7 +37,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.4.23
+  version: 3.4.24
 ruby:
   jit: false
 slack:
