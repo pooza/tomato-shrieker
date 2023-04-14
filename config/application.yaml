@@ -3,8 +3,7 @@ crypt:
   password: null
 environment: development
 feed:
-  default_tags:
-    - rssfeed
+  default_tags: []
 github:
   urls:
     root: https://github.com
