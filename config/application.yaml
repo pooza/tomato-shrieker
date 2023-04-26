@@ -37,7 +37,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.4.24
+  version: 3.4.25
 ruby:
   jit: false
 slack:

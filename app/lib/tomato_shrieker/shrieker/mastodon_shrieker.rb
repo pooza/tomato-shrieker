@@ -13,11 +13,11 @@ module TomatoShrieker
       end
       body[:template][:tag] = true
       body[:status] = body[:template].to_s.strip
-      body.delete(:template)
       body[:visibility] = Ginseng::Fediverse::TootParser.visibility_name(body[:visibility])
       if spoiler_text = body[:template].source.spoiler_text
         body[:spoiler_text] = spoiler_text
       end
+      body.delete(:template)
       return toot(body)
     end
   end
