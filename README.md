@@ -49,6 +49,7 @@
   - [「シュビドゥビ☆スイーツタイム」の再生回数を淡々と喋るボット](https://mstdn.b-shock.org/@shooby_do_bop_bot)
   - [「レッツ・ラ・クッキン☆ショータイム」の再生回数ボット](https://mstdn.b-shock.org/@lets_la_bot)
   - [「エビバディ☆ヒーリングッデイ！」再生数ボット](https://precure.ml/@healingoodday)
+  - [「勇気の刃」キュアソードラブリンクBot](https://mk.precure.fun/@cureswordlovelinkbot)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
   - [ぷーざの録画状況ボット](https://reco.shrieker.net/@pooza_recorder_bot)
@@ -61,4 +62,5 @@
   - プリキュアシリーズ専用Misskeyサーバー「[きゅあすきー](https://mk.precure.fun/)」
   - 「ドラゴンクエスト ダイの大冒険」専用Mastodonサーバー「[デルムリン丼](https://mstdn.delmulin.com/)」
   - 「ドラゴンクエスト ダイの大冒険」専用Misskeyサーバー「[ダイスキー](https://misskey.delmulin.com/)」
+- きゅあすきーだけ自鯖ではないです。
 - プリキュアかダイ大に興味ある人は、遊びに来てください。
