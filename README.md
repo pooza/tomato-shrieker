@@ -56,7 +56,9 @@
   - [デルムリン丼お知らせボット](https://mstdn.delmulin.com/@info)
 
 - 中の人は普段、以下のいずれかに居ます。
-  - 個人インスタンス「[美食丼](https://mstdn.b-shock.org/)」
-  - プリキュアシリーズ専用インスタンス「[キュアスタ！](https://precure.ml/)」
-  - 「ドラゴンクエスト ダイの大冒険」専用インスタンス「[デルムリン丼](https://mstdn.delmulin.com/)」
+  - 個人サーバー「[美食丼](https://mstdn.b-shock.org/)」
+  - プリキュアシリーズ専用Mastodonサーバー「[キュアスタ！](https://precure.ml/)」
+  - プリキュアシリーズ専用Misskeyサーバー「[きゅあすきー](https://mk.precure.fun/)」
+  - 「ドラゴンクエスト ダイの大冒険」専用Mastodonサーバー「[デルムリン丼](https://mstdn.delmulin.com/)」
+  - 「ドラゴンクエスト ダイの大冒険」専用Misskeyサーバー「[ダイスキー](https://misskey.delmulin.com/)」
 - プリキュアかダイ大に興味ある人は、遊びに来てください。
