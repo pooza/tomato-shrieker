@@ -191,7 +191,7 @@ GEM
     rubocop-sequel (0.3.4)
       rubocop (~> 1.0)
     ruby-progressbar (1.13.0)
-    rufus-scheduler (3.9.0)
+    rufus-scheduler (3.9.1)
       fugit (~> 1.1, >= 1.1.6)
     sanitize (6.0.1)
       crass (~> 1.0.2)
