@@ -1,12 +1,4 @@
 GIT
-  remote: https://github.com/pooza/faye-websocket-ruby.git
-  revision: 81931516cf877e90a60ffd7f04912911ad31e322
-  specs:
-    faye-websocket (0.11.2)
-      eventmachine (>= 0.12.0)
-      websocket-driver (>= 0.5.1)
-
-GIT
   remote: https://github.com/pooza/ginseng-core.git
   revision: 1d7038e73f3f42a4f2345d1739fa6936f357e284
   specs:
@@ -88,7 +80,6 @@ GEM
     et-orbi (1.2.7)
       tzinfo
     etc (1.4.2)
-    eventmachine (1.2.7)
     facets (3.1.0)
     feedjira (3.2.2)
       loofah (>= 2.3.1)
@@ -218,9 +209,6 @@ GEM
       unf_ext
     unf_ext (0.0.8.2)
     unicode-display_width (2.4.2)
-    websocket-driver (0.7.5)
-      websocket-extensions (>= 0.1.0)
-    websocket-extensions (0.1.5)
     yajl-ruby (1.4.3)
     zeitwerk (2.6.8)
     zlib (3.0.0)
@@ -231,7 +219,6 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  faye-websocket!
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!

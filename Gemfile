@@ -1,6 +1,5 @@
 source 'https://rubygems.org'
 ruby '~>3.2.0'
-gem 'faye-websocket', github: 'pooza/faye-websocket-ruby'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core', require: 'ginseng'
 gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', require: 'ginseng/fediverse'
