@@ -11,7 +11,7 @@ module TomatoShrieker
     end
 
     def uri
-      @uri ||= Ginseng::URI.parse("https://#{Ginseng::URI.parse(@params[:url]).host}")
+      @uri ||= Ginseng::URI.parse("https://#{@params[:host]}")
       return @uri
     end
 
