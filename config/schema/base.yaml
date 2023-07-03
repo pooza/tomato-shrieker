@@ -156,13 +156,6 @@ properties:
                 unique:
                   type: boolean
               type: hash
-            tweet:
-              format: hash
-              properties:
-                account:
-                  type: string
-                required:
-                  - account
             url:
               format: url
               type: string
