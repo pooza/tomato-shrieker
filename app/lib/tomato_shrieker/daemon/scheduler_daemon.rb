@@ -18,5 +18,10 @@ module TomatoShrieker
         ('Ruby YJIT: Ready' if jit_ready?),
       ].compact.join("\n")
     end
+
+    def save_config
+      puts config.secure_dump.to_yaml if config['/scheduler/verbose']
+      super
+    end
   end
 end

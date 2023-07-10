@@ -40,6 +40,8 @@ package:
   version: 3.5.1
 ruby:
   jit: false
+scheduler:
+  verbose: false
 slack:
   hooks: []
 source:
@@ -63,5 +65,3 @@ source:
 sources: []
 sqlite3:
   db: db.sqlite3
-websocket:
-  keepalive: 15
