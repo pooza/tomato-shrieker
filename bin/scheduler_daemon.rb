@@ -7,5 +7,4 @@ require 'tomato_shrieker'
 module TomatoShrieker
   include Package
   SchedulerDaemon.spawn!
-  # puts config.secure_dump.to_yaml
 end

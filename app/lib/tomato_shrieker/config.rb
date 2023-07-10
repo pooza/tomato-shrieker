@@ -14,7 +14,7 @@ module TomatoShrieker
     end
 
     def secure_dump
-      return filter(raw.dig('application', 'sources'))
+      return filter(self['/sources'])
     end
 
     private

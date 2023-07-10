@@ -37,9 +37,11 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.5.0
+  version: 3.5.1
 ruby:
   jit: false
+scheduler:
+  verbose: false
 slack:
   hooks: []
 source:
@@ -63,5 +65,3 @@ source:
 sources: []
 sqlite3:
   db: db.sqlite3
-websocket:
-  keepalive: 15
