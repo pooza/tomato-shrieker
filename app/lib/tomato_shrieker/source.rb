@@ -36,6 +36,10 @@ module TomatoShrieker
       end
     end
 
+    def disable?
+      return self['/disable'] == true
+    end
+
     def mulukhiya?
       return self['/dest/mulukhiya/enable'] == true
     end

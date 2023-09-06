@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: d5728118deca6238cd97f932270acbcf2b71657e
+  revision: 42b39accaffd53217ddc431891488cabe879ee8a
   specs:
-    ginseng-core (1.13.24)
+    ginseng-core (1.13.25)
       actionpack (>= 7.0.5.1)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.8.0)
@@ -22,7 +22,7 @@ GIT
       multi_json
       net-protocol
       net-smtp
-      nokogiri (>= 1.14.3)
+      nokogiri (>= 1.15.4)
       optparse
       rack (>= 2.2.6.2)
       rails-html-sanitizer (>= 1.4.4)
@@ -67,6 +67,7 @@ GEM
       public_suffix (>= 2.0.2, < 6.0)
     ast (2.4.2)
     base64 (0.1.1)
+    bigdecimal (3.1.4)
     builder (3.2.4)
     cgi (0.3.6)
     concurrent-ruby (1.2.2)
@@ -164,7 +165,7 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.6)
     ricecream (0.2.1)
-    rubocop (1.56.1)
+    rubocop (1.56.2)
       base64 (~> 0.1.1)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
@@ -178,7 +179,7 @@ GEM
       unicode-display_width (>= 2.4.0, < 3.0)
     rubocop-ast (1.29.0)
       parser (>= 3.2.1.0)
-    rubocop-minitest (0.31.0)
+    rubocop-minitest (0.31.1)
       rubocop (>= 1.39, < 2.0)
     rubocop-performance (1.19.0)
       rubocop (>= 1.7.0, < 2.0)
@@ -195,12 +196,13 @@ GEM
       nokogiri (>= 1.12.0)
     sax-machine (1.3.2)
     securerandom (0.2.2)
-    sequel (5.71.0)
+    sequel (5.72.0)
+      bigdecimal
     set (1.0.3)
-    sqlite3 (1.6.3)
+    sqlite3 (1.6.4)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (1.6.3-aarch64-linux)
-    sqlite3 (1.6.3-x86_64-linux)
+    sqlite3 (1.6.4-aarch64-linux)
+    sqlite3 (1.6.4-x86_64-linux)
     test-unit (3.6.1)
       power_assert
     time (0.2.2)
