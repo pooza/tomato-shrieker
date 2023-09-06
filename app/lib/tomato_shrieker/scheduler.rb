@@ -5,7 +5,7 @@ module TomatoShrieker
 
     def exec
       logger.info(scheduler: {message: 'initialize'})
-      Source.all do |source|
+      Source.all.reject(&:disable?).each do |source|
         logger.info(source: source.to_h)
         source.load
         if source.post_at

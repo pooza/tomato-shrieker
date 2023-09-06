@@ -12,6 +12,12 @@ module TomatoShrieker
       end
     end
 
+    def test_disable?
+      Source.all do |source|
+        assert_boolean(source.disable?)
+      end
+    end
+
     def test_mulukhiya?
       Source.all do |source|
         assert_boolean(source.mulukhiya?)
