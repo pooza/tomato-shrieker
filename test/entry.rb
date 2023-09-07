@@ -40,7 +40,7 @@ module TomatoShrieker
     end
 
     def test_shriekable?
-      return unless entry = @entries.first
+      return false unless entry = @entries.first
 
       assert_boolean(entry.shriekable?)
     end
