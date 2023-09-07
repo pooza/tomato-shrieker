@@ -25,7 +25,7 @@ module TomatoShrieker
             source.clear
           end
 
-          if source.purge?
+          if source.purgeable?
             desc "delete records (< #{source.keep_years.years.ago.strftime('%Y/%m/%d')})"
             task :purge do
               source.purge

@@ -23,16 +23,18 @@ module TomatoShrieker
     end
 
     def purge
-      return unless purge?
+      return unless purgeable?
       dataset = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
       dataset.destroy
     end
 
-    def purge?
+    def purgeable?
       return keep_years.present?
     end
+
+    alias purge? purgeable?
 
     def keep_years
       return self['/keep/years']
@@ -206,7 +208,7 @@ module TomatoShrieker
     end
 
     def self.purge_all
-      all.select(&:purge?).each(&:purge)
+      all.select(&:purgeable?).each(&:purge)
     end
   end
 end

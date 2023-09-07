@@ -39,6 +39,12 @@ module TomatoShrieker
       end
     end
 
+    def test_shriekable?
+      return false unless entry = @entries.first
+
+      assert_boolean(entry.shriekable?)
+    end
+
     def test_tags
       return unless entry = @entries.find {|v| v.tags.count.positive?}
 
