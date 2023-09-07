@@ -79,7 +79,7 @@ module TomatoShrieker
     alias post shriek
 
     def shriekable?
-      return false if feed.purge? && (published < Time.current.ago(feed.keep_years.years))
+      return false if feed.purgeable? && (published < Time.current.ago(feed.keep_years.years))
       return true
     end
 
