@@ -109,11 +109,7 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.14.1)
       concurrent-ruby (~> 1.0)
-<<<<<<< HEAD
     json (2.7.1)
-=======
-    json (2.6.3)
->>>>>>> origin/dependabot/bundler/master/ginseng-core-fd1927d
     json-schema (4.1.1)
       addressable (>= 2.8)
     language_server-protocol (3.17.0.3)
