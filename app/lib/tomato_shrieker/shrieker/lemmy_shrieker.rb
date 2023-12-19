@@ -32,13 +32,15 @@ module TomatoShrieker
         name: template.to_s.gsub(/[\r\n[:blank:]]+/, ' '),
         body: template.to_s,
         community_id: template.source['/dest/lemmy/community_id'],
-        auth: @jwt,
       }
       Ginseng::URI.scan(data[:body]).each {|uri| data[:name].gsub!(uri.to_s, '')}
       data[:name].ellipsize!(config['/lemmy/subject/max_length'])
       uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
       data[:url] = uri.to_s if uri
-      return http.post('/api/v3/post', {body: data})
+      return http.post('/api/v3/post', {
+        body: data,
+        headers: {'Authorization' => "Bearer #{@jwt}"},
+      })
     end
 
     def search_template(body)
