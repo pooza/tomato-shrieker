@@ -213,10 +213,10 @@ GEM
     sequel (5.75.0)
       bigdecimal
     set (1.0.4)
-    sqlite3 (1.6.9)
+    sqlite3 (1.7.0)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (1.6.9-aarch64-linux)
-    sqlite3 (1.6.9-x86_64-linux)
+    sqlite3 (1.7.0-aarch64-linux)
+    sqlite3 (1.7.0-x86_64-linux)
     test-unit (3.6.1)
       power_assert
     time (0.3.0)
