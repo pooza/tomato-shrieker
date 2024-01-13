@@ -17,7 +17,7 @@ http:
     seconds: 1
 lemmy:
   subject:
-    max_length: 100
+    max_length: 50
   urls:
     api: /api/v3/ws
   verify_peer: true
