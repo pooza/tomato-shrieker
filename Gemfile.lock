@@ -215,8 +215,6 @@ GEM
     set (1.0.4)
     sqlite3 (1.6.9)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (1.6.9-aarch64-linux)
-    sqlite3 (1.6.9-x86_64-linux)
     test-unit (3.6.1)
       power_assert
     time (0.3.0)
@@ -251,7 +249,7 @@ DEPENDENCIES
   test-unit
 
 RUBY VERSION
-   ruby 3.2.2p53
+   ruby 3.3.0p0
 
 BUNDLED WITH
    2.5.1
