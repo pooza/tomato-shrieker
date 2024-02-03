@@ -47,9 +47,9 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    actionpack (7.1.2)
-      actionview (= 7.1.2)
-      activesupport (= 7.1.2)
+    actionpack (7.1.3)
+      actionview (= 7.1.3)
+      activesupport (= 7.1.3)
       nokogiri (>= 1.8.5)
       racc
       rack (>= 2.2.4)
@@ -57,13 +57,13 @@ GEM
       rack-test (>= 0.6.3)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    actionview (7.1.2)
-      activesupport (= 7.1.2)
+    actionview (7.1.3)
+      activesupport (= 7.1.3)
       builder (~> 3.1)
       erubi (~> 1.11)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    activesupport (7.1.2)
+    activesupport (7.1.3)
       base64
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
@@ -80,7 +80,7 @@ GEM
     bigdecimal (3.1.6)
     builder (3.2.4)
     cgi (0.4.1)
-    concurrent-ruby (1.2.2)
+    concurrent-ruby (1.2.3)
     connection_pool (2.4.1)
     crass (1.0.6)
     csv (3.2.8)
@@ -129,7 +129,7 @@ GEM
     mime-types-data (3.2023.1205)
     mini_mime (1.1.5)
     mini_portile2 (2.8.5)
-    minitest (5.21.1)
+    minitest (5.21.2)
     multi_json (1.15.0)
     multi_xml (0.6.0)
     mutex_m (0.2.0)
@@ -159,7 +159,7 @@ GEM
     public_suffix (5.0.4)
     raabro (1.4.0)
     racc (1.7.3)
-    rack (3.0.8)
+    rack (3.0.9)
     rack-session (2.0.0)
       rack (>= 3.0.0)
     rack-test (2.1.0)
@@ -216,10 +216,10 @@ GEM
     sequel (5.77.0)
       bigdecimal
     set (1.1.0)
-    sqlite3 (1.7.0)
+    sqlite3 (1.7.2)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (1.7.0-aarch64-linux)
-    sqlite3 (1.7.0-x86_64-linux)
+    sqlite3 (1.7.2-aarch64-linux)
+    sqlite3 (1.7.2-x86_64-linux)
     syslog (0.1.2)
     test-unit (3.6.1)
       power_assert
@@ -258,4 +258,4 @@ RUBY VERSION
    ruby 3.3.0p0
 
 BUNDLED WITH
-   2.5.4
+   2.5.5
