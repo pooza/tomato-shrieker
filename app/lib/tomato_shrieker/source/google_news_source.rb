@@ -26,13 +26,13 @@ module TomatoShrieker
     end
 
     def create_uri(href)
-      uri = super
-      while domains.member?(uri.host)
-        response = http.get(uri, {follow_redirects: false})
+      dest = super(href)
+      while domains.member?(dest.host)
+        response = @http.get(dest, {follow_redirects: false, headers: {'User-Agent' => 'curl'}})
         break unless location = response.headers['location']
-        uri = Ginseng::URI.parse(location)
+        dest = Ginseng::URI.parse(location)
       end
-      return uri
+      return dest
     end
 
     def domains
