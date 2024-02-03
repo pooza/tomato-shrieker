@@ -11,6 +11,9 @@ google:
   news:
     urls:
       root: https://news.google.com/rss/search?hl=ja&gl=JP&ceid=JP%3Aja
+    domains:
+      - news.google.com
+    useragent: curl
 http:
   retry:
     limit: 3

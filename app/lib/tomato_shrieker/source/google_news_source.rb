@@ -28,7 +28,10 @@ module TomatoShrieker
     def create_uri(href)
       dest = super(href)
       while domains.member?(dest.host)
-        response = @http.get(dest, {follow_redirects: false, headers: {'User-Agent' => 'curl'}})
+        response = @http.get(dest, {
+          follow_redirects: false,
+          headers: {'User-Agent' => config['/google/news/useragent']},
+        })
         break unless location = response.headers['location']
         dest = Ginseng::URI.parse(location)
       end
@@ -36,7 +39,7 @@ module TomatoShrieker
     end
 
     def domains
-      return ['news.google.com']
+      return config['/google/news/domains']
     end
 
     def self.all(&block)
