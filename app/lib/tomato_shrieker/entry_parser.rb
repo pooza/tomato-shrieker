@@ -17,7 +17,7 @@ module TomatoShrieker
       dest = values.slice(:feed, :title, :summary, :url, :enclosure_url, :published)
       dest[:feed] ||= feed.id
       dest[:enclosure_url] ||= enclosures.map(&:to_s).to_json
-      dest[:title] = dest[:title].sanitize.gsub(/ [|-] .+$/, '') if dest[:title]
+      dest[:title] = dest[:title].sanitize if dest[:title]
       dest[:summary] = dest[:summary].sanitize if dest[:summary]
       dest[:published] = dest[:published].getlocal
       dest[:extra_tags] ||= tags.to_a.to_json
