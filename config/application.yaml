@@ -11,13 +11,16 @@ google:
   news:
     urls:
       root: https://news.google.com/rss/search?hl=ja&gl=JP&ceid=JP%3Aja
+    domains:
+      - news.google.com
+    useragent: curl
 http:
   retry:
     limit: 3
     seconds: 1
 lemmy:
   subject:
-    max_length: 100
+    max_length: 50
   urls:
     api: /api/v3/ws
   verify_peer: true
@@ -37,7 +40,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.5.5
+  version: 3.5.6
 ruby:
   jit: false
 scheduler:
