@@ -8,9 +8,9 @@
 <%= entry[:start_date].strftime('%Y-%m-%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%Y-%m-%d %H:%M') %>
 <% end -%>
 
-<% if entry[:title] -%><%= entry[:title] %><% end %>
-<% if entry[:body] -%><%= entry[:body] %><% end %>
-<% if entry[:location] -%><%= entry[:location] %><% end %>
+<% if entry[:title] -%><%= entry[:title].sanitize %><% end %>
+<% if entry[:body] -%><%= entry[:body].sanitize %><% end %>
+<% if entry[:location] -%><%= entry[:location].sanitize %><% end %>
 
 <% if @params[:source] -%>
 <%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
