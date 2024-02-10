@@ -51,7 +51,7 @@ module TomatoShrieker
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
       case entry.dtstart
-      when Date
+      when Icalendar::Values::Date
         return true unless ((entry.dtstart - days)..entry.dtend).cover?(Date.today)
       when Time
         return true unless ((entry.dtstart - days.days)..entry.dtend).cover?(Time.now)
@@ -70,14 +70,22 @@ module TomatoShrieker
     end
 
     def create_entry(entry)
-      return {
-        start_date: entry.dtstart.is_a?(Date) ? entry.dtstart : entry.dtstart.getlocal,
-        end_date: entry.dtend.is_a?(Date) ? entry.dtend : entry.dtend.getlocal,
+      entry = {
+        start_date: entry.dtstart,
+        end_date: entry.dtend,
         title: entry.summary&.escape_status,
         body: entry.description&.escape_status,
         location: entry.location&.escape_status,
-        all_day: entry.dtstart.is_a?(Date),
+        all_day: false,
       }
+      if entry.dtstart.is_a?(Icalendar::Values::Date)
+        entry.merge!(
+          start_date: entry[:start_date].getlocal,
+          end_date: entry[:end_date].getlocal,
+          all_day: true,
+        )
+      end
+      return entry
     end
 
     def templates
