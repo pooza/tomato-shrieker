@@ -10,6 +10,14 @@ module TomatoShrieker
       @ical = Icalendar::Calendar.parse(@http.get(uri)).first
     end
 
+    def default_cron
+      return '0 0 * * *'
+    end
+
+    def default_period
+      return nil
+    end
+
     def exec
       entries do |entry|
         template = create_template

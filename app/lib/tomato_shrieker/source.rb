@@ -203,7 +203,11 @@ module TomatoShrieker
 
     def cron
       return nil if post_at
-      return self['/schedule/cron']
+      return self['/schedule/cron'] || default_cron
+    end
+
+    def default_cron
+      return nil
     end
 
     def period
