@@ -50,7 +50,7 @@ module TomatoShrieker
       return true if negative_keyword && negative_event?(entry)
       start_date = Time.parse(entry.dtstart.to_s)
       end_date = Time.parse(entry.dtend.to_s)
-      return true unless ((start_date - days)..end_date).cover?(Time.now)
+      return true unless ((start_date - days.days)..end_date).cover?(Time.now)
       return false
     end
 
