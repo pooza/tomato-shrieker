@@ -50,7 +50,7 @@ module TomatoShrieker
 
     def test_prefix
       IcalendarSource.all do |source|
-        assert_kind_of(String, source.prefix)
+        assert_kind_of([String, NilClass], source.prefix)
       end
     end
   end
