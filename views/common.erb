@@ -1,6 +1,6 @@
 <% if @params[:source].prefix -%>[<%= @params[:source].prefix -%>] <% end -%>
 <%= @params[:status] -%>
 
-<% if @params[:source] -%>
+<% if @params[:tag] && @params[:source] -%>
 <%= @params[:source].create_tags(@params[:status]).join(' ') %>
 <% end -%>

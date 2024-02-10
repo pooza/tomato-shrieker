@@ -16,6 +16,6 @@
 <% if entry[:location] -%><%= entry[:location].sanitize %><% end %>
 <% if entry[:body] -%><%= entry[:body].sanitize %><% end %>
 
-<% if @params[:source] -%>
+<% if @params[:tag] && @params[:source] -%>
 <%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
 <% end -%>
