@@ -23,12 +23,12 @@ module TomatoShrieker
       return Regexp.new(keyword)
     end
 
-    def properties
-      return ical.custom_properties
+    def days
+      return self['/source/days'] || 3
     end
 
     def prefix
-      return super || properties['x_wr_calname'].first.to_s rescue nil
+      return super || ical.custom_properties['x_wr_calname'].first.to_s rescue nil
     end
 
     def entries(&block)
@@ -42,6 +42,8 @@ module TomatoShrieker
     def ignore_entry?(entry)
       return true if keyword && !hot_entry?(entry)
       return true if negative_keyword && negative_entry?(entry)
+      return true if entry.dtstart.days.days.future?
+      return true if entry.dtend.ago?
       return false
     end
 

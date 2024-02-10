@@ -26,7 +26,12 @@ module TomatoShrieker
       IcalendarSource.all do |source|
         assert_kind_of(Enumerator, source.entries)
         source.entries.first(5).each do |entry|
-          assert_kind_of(Icalendar::Event, entry)
+          assert_kind_of(Hash, entry)
+          assert_kind_of(Time, entry[:start_date])
+          assert_kind_of(Time, entry[:end_date])
+          assert_kind_of([String, NilClass], entry[:title])
+          assert_kind_of([String, NilClass], entry[:body])
+          assert_kind_of([String, NilClass], entry[:description])
         end
       end
     end
