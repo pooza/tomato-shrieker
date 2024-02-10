@@ -112,6 +112,9 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.14.1)
       concurrent-ruby (~> 1.0)
+    icalendar (2.10.1)
+      ice_cube (~> 0.16)
+    ice_cube (0.16.4)
     json (2.7.1)
     json-schema (4.1.1)
       addressable (>= 2.8)
@@ -242,6 +245,7 @@ DEPENDENCIES
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!
+  icalendar
   optparse
   ricecream
   rubocop
