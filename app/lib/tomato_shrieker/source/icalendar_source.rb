@@ -56,6 +56,7 @@ module TomatoShrieker
     end
 
     def create_entry(entry)
+      entry = entry.to_h
       entry.start_date = entry.dtstart.getlocal
       entry.end_date = entry.dtend.getlocal
       entry.title = entry.summary&.escape_status
