@@ -11,17 +11,15 @@ module TomatoShrieker
     end
 
     def exec
-      shriek(template: create_template, visibility:)
+      entries do |entry|
+        template = create_template
+        template[:entry] = entry
+        shriek(template:, visibility:)
+      end
     rescue => e
       e.package = Package.full_name
       SlackService.broadcast(e)
       logger.error(source: id, error: e)
-    end
-
-    def create_template(type = :default, status = nil)
-      template = super
-      template[:entries] = entries
-      return template
     end
 
     def keyword
