@@ -7,7 +7,7 @@ module TomatoShrieker
     def initialize(params)
       super
       @http = HTTP.new
-      @ical = Icalendar.parse(@http.get(uri), true)
+      @ical = Icalendar::Calendar.parse(@http.get(uri)).first
     end
 
     def exec
@@ -23,13 +23,22 @@ module TomatoShrieker
       return Regexp.new(keyword)
     end
 
+    def properties
+      return ical.custom_properties
+    end
+
+    def prefix
+      return super || properties['x_wr_calname'].first.to_s rescue nil
+    end
+
     def entries(&block)
       return enum_for(__method__) unless block
-      feedjira.entries
-        .sort_by {|entry| entry.published.to_f}
-        .each {|entry| entry.title = entry.title&.escape_status}
+      ical.events
+        .sort_by {|entry| entry.dtstart.to_f}
         .each(&block)
     end
+
+    alias events entries
 
     def templates
       @templates ||= {
