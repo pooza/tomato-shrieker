@@ -12,4 +12,6 @@
 <% if entry[:body] -%><%= entry[:body] %><% end %>
 <% if entry[:location] -%><%= entry[:location] %><% end %>
 
+<% if @params[:source] -%>
 <%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
+<% end -%>

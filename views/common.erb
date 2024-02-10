@@ -1,4 +1,6 @@
 <% if @params[:source].prefix -%>[<%= @params[:source].prefix -%>] <% end -%>
 <%= @params[:status] -%>
 
+<% if @params[:source] -%>
 <%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
+<% end -%>
