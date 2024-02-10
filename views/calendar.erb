@@ -11,8 +11,8 @@
 <%= entry[:start_date].strftime('%m/%d %H:%M') %>〜<%= entry[:end_date].strftime('%m/%d %H:%M') %>
 <% end -%>
 <% end -%>
-
 <% if entry[:title] -%><%= entry[:title].sanitize %><% end %>
+
 <% if entry[:location] -%><%= entry[:location].sanitize %><% end %>
 <% if entry[:body] -%><%= entry[:body].sanitize %><% end %>
 
