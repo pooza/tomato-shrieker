@@ -50,9 +50,9 @@ module TomatoShrieker
     def ignore_event?(entry)
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
-      start_date = Date.parse(entry.dtstart.to_s)
-      end_date = Date.parse(entry.dtend.to_s)
-      return true unless ((start_date - days)..end_date).cover?(Date.today)
+      start_date = Time.parse(entry.dtstart.to_s)
+      end_date = Time.parse(entry.dtend.to_s)
+      return true unless ((start_date - days)..end_date).cover?(Time.now)
       return false
     end
 
