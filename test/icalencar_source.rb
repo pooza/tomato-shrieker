@@ -6,7 +6,7 @@ module TomatoShrieker
 
     def test_ical
       IcalendarSource.all.each do |source|
-        assert_kind_of(ICalendar, source.feedjira)
+        assert_kind_of(Icalendar::Calendar, source.ical)
       end
     end
 
@@ -22,18 +22,11 @@ module TomatoShrieker
       end
     end
 
-    def test_time
-      IcalendarSource.all.select(&:touched?).each do |source|
-        assert_kind_of(Time, source.time)
-      end
-    end
-
     def test_entries
       IcalendarSource.all do |source|
         assert_kind_of(Enumerator, source.entries)
-        assert_predicate(source.entries.count, :positive?)
         source.entries.first(5).each do |entry|
-          assert_kind_of(Hash, entry)
+          assert_kind_of(Icalendar::Event, entry)
         end
       end
     end

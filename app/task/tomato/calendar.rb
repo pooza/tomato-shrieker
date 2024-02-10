@@ -3,7 +3,7 @@ module TomatoShrieker
 
   namespace :tomato do
     namespace :source do
-      Icalendar.all do |source|
+      IcalendarSource.all do |source|
         namespace source.id do
           desc "fetch <#{source.uri}>"
           task :fetch do

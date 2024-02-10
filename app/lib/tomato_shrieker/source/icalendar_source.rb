@@ -7,7 +7,7 @@ module TomatoShrieker
     def initialize(params)
       super
       @http = HTTP.new
-      @ical = Icalendar.parse(@http.get(uri), true)
+      @ical = Icalendar::Calendar.parse(@http.get(uri)).first
     end
 
     def exec
@@ -21,6 +21,14 @@ module TomatoShrieker
     def negative_keyword
       return nil unless keyword = self['/source/negative_keyword']
       return Regexp.new(keyword)
+    end
+
+    def properties
+      return ical.custom_properties
+    end
+
+    def prefix
+      return super || properties['x_wr_calname'].first.to_s rescue nil
     end
 
     def entries(&block)
@@ -54,6 +62,8 @@ module TomatoShrieker
       entry.body = entry.summary&.description
       return entry
     end
+
+    alias events entries
 
     def templates
       @templates ||= {

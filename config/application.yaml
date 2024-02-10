@@ -65,6 +65,10 @@ source:
       config: /source/github/repository
     - class: GitHubRepositorySource
       config: /source/github/repos
+    - class: IcalendarSource
+      config: /source/calendar
+    - class: IcalendarSource
+      config: /source/ical
 sources: []
 sqlite3:
   db: db.sqlite3
