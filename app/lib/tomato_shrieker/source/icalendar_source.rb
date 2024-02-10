@@ -71,8 +71,8 @@ module TomatoShrieker
 
     def create_entry(entry)
       return {
-        start_date: entry.dtstart.getlocal,
-        end_date: entry.dtend.getlocal,
+        start_date: entry.dtstart.is_a?(Date) ? entry.dtstart : entry.dtstart.getlocal,
+        end_date: entry.dtend.is_a?(Date) ? entry.dtend : entry.dtend.getlocal,
         title: entry.summary&.escape_status,
         body: entry.description&.escape_status,
         location: entry.location&.escape_status,
