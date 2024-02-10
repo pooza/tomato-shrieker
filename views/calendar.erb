@@ -1,11 +1,15 @@
 <% if entry[:all_day] -%>
 <% if entry[:start_date] == entry[:end_date] -%>
-<%= entry[:start_date].strftime('%Y-%m-%d') %> 〜 <%= entry[:end_date].strftime('%Y-%m-%d') %>
+<%= entry[:start_date].strftime('%m/%d') %>
 <% else -%>
-<%= entry[:start_date].strftime('%Y-%m-%d') %>
+<%= entry[:start_date].strftime('%m/%d') %> 〜 <%= entry[:end_date].strftime('%m/%d') %>
 <% end -%>
 <% else -%>
-<%= entry[:start_date].strftime('%Y-%m-%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%Y-%m-%d %H:%M') %>
+<% if try[:start_date].strftime('%m/%d') %> == <%= entry[:end_date].strftime('%m/%d') -%>
+<%= entry[:start_date].strftime('%m/%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%H:%M') %>
+<% else -%>
+<%= entry[:start_date].strftime('%m/%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%m/%d %H:%M') %>
+<% end -%>
 <% end -%>
 
 <% if entry[:title] -%><%= entry[:title].sanitize %><% end %>
