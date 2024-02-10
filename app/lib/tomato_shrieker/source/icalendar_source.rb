@@ -34,12 +34,13 @@ module TomatoShrieker
     def entries(&block)
       return enum_for(__method__) unless block
       ical.events
-        .sort_by {|entry| entry.dtstart.to_f}
+        .reject {|event| ignore_event?(event)}
+        .sort_by {|event| event.dtstart.to_f}
         .map {|event| create_entry(event)}
         .each(&block)
     end
 
-    def ignore_entry?(entry)
+    def ignore_event?(entry)
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
       return true if entry.dtstart.days.days.future?
