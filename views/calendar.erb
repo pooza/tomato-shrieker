@@ -2,19 +2,19 @@
 <% if entry[:start_date] == entry[:end_date] -%>
 <%= entry[:start_date].strftime('%m/%d') %>
 <% else -%>
-<%= entry[:start_date].strftime('%m/%d') %> 〜 <%= entry[:end_date].strftime('%m/%d') %>
+<%= entry[:start_date].strftime('%m/%d') %>〜<%= entry[:end_date].strftime('%m/%d') %>
 <% end -%>
 <% else -%>
-<% if try[:start_date].strftime('%m/%d') %> == <%= entry[:end_date].strftime('%m/%d') -%>
-<%= entry[:start_date].strftime('%m/%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%H:%M') %>
+<% if entry[:start_date].strftime('%m/%d') == entry[:end_date].strftime('%m/%d') -%>
+<%= entry[:start_date].strftime('%m/%d %H:%M') %>〜<%= entry[:end_date].strftime('%H:%M') %>
 <% else -%>
-<%= entry[:start_date].strftime('%m/%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%m/%d %H:%M') %>
+<%= entry[:start_date].strftime('%m/%d %H:%M') %>〜<%= entry[:end_date].strftime('%m/%d %H:%M') %>
 <% end -%>
 <% end -%>
 
 <% if entry[:title] -%><%= entry[:title].sanitize %><% end %>
-<% if entry[:body] -%><%= entry[:body].sanitize %><% end %>
 <% if entry[:location] -%><%= entry[:location].sanitize %><% end %>
+<% if entry[:body] -%><%= entry[:body].sanitize %><% end %>
 
 <% if @params[:source] -%>
 <%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
