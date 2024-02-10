@@ -42,7 +42,7 @@ module TomatoShrieker
       return enum_for(__method__) unless block
       ical.events
         .reject {|event| ignore_event?(event)}
-        .sort_by {|event| event.dtstart.to_f}
+        .sort_by {|event| event.dtstart.strftime('%Y/%m/%d %R')}
         .map {|event| create_entry(event)}
         .each(&block)
     end
