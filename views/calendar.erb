@@ -1,16 +1,15 @@
 <% if entry[:all_day] -%>
 <% if entry[:start_date] == entry[:end_date] -%>
-<%= entry[:start_date].strftime('%Y-%m-%d') %>〜<%= entry[:end_date].strftime('%Y-%m-%d') %>
+<%= entry[:start_date].strftime('%Y-%m-%d') %> 〜 <%= entry[:end_date].strftime('%Y-%m-%d') %>
 <% else -%>
 <%= entry[:start_date].strftime('%Y-%m-%d') %>
 <% end -%>
 <% else -%>
-<%= entry[:start_date].strftime('%Y-%m-%d %H:%M') %>〜<%= entry[:end_date].strftime('%Y-%m-%d %H:%M') %>
+<%= entry[:start_date].strftime('%Y-%m-%d %H:%M') %> 〜 <%= entry[:end_date].strftime('%Y-%m-%d %H:%M') %>
 <% end -%>
+
 <% if entry[:title] -%><%= entry[:title] %><% end %>
 <% if entry[:body] -%><%= entry[:body] %><% end %>
 <% if entry[:location] -%><%= entry[:location] %><% end %>
-<% if @params[:tag] && @params[:source] -%>
 
-<%= @params[:source].create_tags(@params[:status]).join(' ') %>
-<% end -%>
+<%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
