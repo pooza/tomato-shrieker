@@ -16,6 +16,10 @@
 - RSS/Atomフィードの新着エントリー
 - Google News
 - GitHubリポジトリのリリース履歴
+- iCalendar形式のカレンダー
+  - Googleカレンダー
+  - iCloudカレンダー
+  - 等々
 - コマンドの実行結果（標準出力）
 
 ### 投稿先
@@ -51,7 +55,6 @@
   - [「勇気の刃」キュアソードラブリンクBot](https://mk.precure.fun/@cureswordlovelinkbot)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
   - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
-  - [ぷーざの録画状況ボット](https://reco.shrieker.net/@pooza_recorder_bot)
   - [キュアスタ！お知らせボット](https://precure.ml/@infomation)
   - [デルムリン丼お知らせボット](https://mstdn.delmulin.com/@info)
 
