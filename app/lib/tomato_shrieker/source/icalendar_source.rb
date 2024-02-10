@@ -51,9 +51,9 @@ module TomatoShrieker
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
       case entry.dtstart
-      in Date
+      when Date
         return true unless ((entry.dtstart - days)..entry.dtend).cover?(Date.today)
-      in Time
+      when Time
         return true unless ((entry.dtstart - days.days)..entry.dtend).cover?(Time.now)
       end
       return false
