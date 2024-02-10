@@ -2,5 +2,5 @@
 <%= @params[:status] -%>
 
 <% if @params[:source] -%>
-<%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
+<%= @params[:source].create_tags(@params[:status]).join(' ') %>
 <% end -%>
