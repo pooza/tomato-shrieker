@@ -18,7 +18,7 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def create_template(type = :calendar, status = nil)
+    def create_template(type = :default, status = nil)
       template = super
       template[:entries] = entries
       return template
