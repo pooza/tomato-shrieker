@@ -43,8 +43,7 @@ module TomatoShrieker
     def ignore_event?(entry)
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
-      return true if Time.now < entry.dtstart + days.days
-      return true if entry.dtend < Time.now
+      return true unless ((entry.dtstart - days.days)..entry.dtend).cover?(Time.now)
       return false
     end
 
