@@ -56,12 +56,13 @@ module TomatoShrieker
     end
 
     def create_entry(entry)
-      entry = entry.to_h
-      entry.start_date = entry.dtstart.getlocal
-      entry.end_date = entry.dtend.getlocal
-      entry.title = entry.summary&.escape_status
-      entry.body = entry.summary&.description
-      return entry
+      return {
+        start_date: entry.dtstart.getlocal,
+        end_date: entry.dtend.getlocal,
+        title: entry.summary&.escape_status,
+        body: entry.description&.escape_status,
+        location: entry.location&.escape_status,
+      }
     end
 
     alias events entries
