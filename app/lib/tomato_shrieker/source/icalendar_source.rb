@@ -11,6 +11,17 @@ module TomatoShrieker
     end
 
     def exec
+      shriek(template: create_template, visibility:)
+    rescue => e
+      e.package = Package.full_name
+      SlackService.broadcast(e)
+      logger.error(source: id, error: e)
+    end
+
+    def create_template(type = :calendar, status = nil)
+      template = super
+      template[:entries] = entries
+      return template
     end
 
     def keyword
@@ -27,10 +38,6 @@ module TomatoShrieker
       return self['/source/days'] || 3
     end
 
-    def prefix
-      return super || ical.custom_properties['x_wr_calname'].first.to_s rescue nil
-    end
-
     def entries(&block)
       return enum_for(__method__) unless block
       ical.events
@@ -43,7 +50,12 @@ module TomatoShrieker
     def ignore_event?(entry)
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
-      return true unless ((entry.dtstart - days.days)..entry.dtend).cover?(Time.now)
+      case event.dtstart
+      in Date
+        return true unless ((entry.dtstart - days)..entry.dtend).cover?(Date.today)
+      in Time
+        return true unless ((entry.dtstart - days.days)..entry.dtend).cover?(Time.now)
+      end
       return false
     end
 
@@ -64,10 +76,9 @@ module TomatoShrieker
         title: entry.summary&.escape_status,
         body: entry.description&.escape_status,
         location: entry.location&.escape_status,
+        all_day: entry.dtstart.is_a?(Date),
       }
     end
-
-    alias events entries
 
     def templates
       @templates ||= {
