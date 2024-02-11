@@ -11,6 +11,8 @@ properties:
       - development
       - production
     type: string
+  disable:
+    type: boolean
   feed:
     properties:
       default_tags:
@@ -34,6 +36,8 @@ properties:
         dest:
           properties:
             dest:
+              spoiler_text:
+                type: string
               account:
                 properties:
                   bot:
@@ -53,6 +57,8 @@ properties:
                   password:
                     type: string
                   user_id:
+                    type: string
+                  template:
                     type: string
                 required:
                   - host
@@ -100,8 +106,17 @@ properties:
                 type: hash
               prefix:
                 type: string
+              category:
+                type: string
+              multi_entries:
+                type: boolean
               template:
                 type: string
+              tags:
+                type: array
+                items:
+                  type: string
+              visibility: string
           type: hash
         id:
           type: string
@@ -117,11 +132,10 @@ properties:
         source:
           properties:
             command:
-              item:
+              items:
                 type: string
               type:
                 - array
-                - string
             delimiter:
               type: string
             env:
@@ -129,6 +143,20 @@ properties:
             feed:
               format: url
               type: string
+            calendar:
+              format: url
+              type: string
+            ical:
+              format: url
+              type: string
+            keyword:
+              type: string
+            negative_keyword:
+              type: string
+            dir:
+              type: string
+            days:
+              type: integer
             github:
               format: hash
               properties:
