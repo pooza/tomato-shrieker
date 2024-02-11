@@ -1,3 +1,4 @@
+---
 $schema: http://json-schema.org/draft-04/hyper-schema
 properties:
   crypt:
@@ -6,13 +7,13 @@ properties:
         type: string
     required:
       - password
+  disable:
+    type: boolean
   environment:
     enum:
       - development
       - production
     type: string
-  disable:
-    type: boolean
   feed:
     properties:
       default_tags:
@@ -36,13 +37,13 @@ properties:
         dest:
           properties:
             dest:
-              spoiler_text:
-                type: string
               account:
                 properties:
                   bot:
                     type: boolean
                 type: hash
+              category:
+                type: string
               hooks:
                 items:
                   format: url
@@ -56,9 +57,9 @@ properties:
                     type: string
                   password:
                     type: string
-                  user_id:
-                    type: string
                   template:
+                    type: string
+                  user_id:
                     type: string
                 required:
                   - host
@@ -98,6 +99,8 @@ properties:
                   - url
                   - token
                 type: hash
+              multi_entries:
+                type: boolean
               mulukhiya:
                 properties:
                   enable: boolean
@@ -106,16 +109,14 @@ properties:
                 type: hash
               prefix:
                 type: string
-              category:
-                type: string
-              multi_entries:
-                type: boolean
-              template:
+              spoiler_text:
                 type: string
               tags:
-                type: array
                 items:
                   type: string
+                type: array
+              template:
+                type: string
               visibility: string
           type: hash
         id:
@@ -131,32 +132,25 @@ properties:
           type: hash
         source:
           properties:
+            calendar:
+              format: url
+              type: string
             command:
               items:
                 type: string
               type:
                 - array
+            days:
+              type: integer
             delimiter:
+              type: string
+            dir:
               type: string
             env:
               type: hash
             feed:
               format: url
               type: string
-            calendar:
-              format: url
-              type: string
-            ical:
-              format: url
-              type: string
-            keyword:
-              type: string
-            negative_keyword:
-              type: string
-            dir:
-              type: string
-            days:
-              type: integer
             github:
               format: hash
               properties:
@@ -169,6 +163,13 @@ properties:
                     - releases
                     - commits
                   type: string
+            ical:
+              format: url
+              type: string
+            keyword:
+              type: string
+            negative_keyword:
+              type: string
             news:
               format: hash
               properties:
