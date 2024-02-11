@@ -48,12 +48,10 @@ module TomatoShrieker
       return Environment.development? || self['/test'] == true
     end
 
-    def bot_account?
+    def bot?
       return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
       return false
     end
-
-    alias bot? bot_account?
 
     def templates
       @templates ||= {
@@ -203,7 +201,11 @@ module TomatoShrieker
 
     def cron
       return nil if post_at
-      return self['/schedule/cron']
+      return self['/schedule/cron'] || default_cron
+    end
+
+    def default_cron
+      return nil
     end
 
     def period

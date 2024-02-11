@@ -30,9 +30,8 @@ module TomatoShrieker
       end
     end
 
-    def test_bot_account?
+    def test_bot?
       Source.all do |source|
-        assert_boolean(source.bot_account?)
         assert_boolean(source.bot?)
       end
     end
