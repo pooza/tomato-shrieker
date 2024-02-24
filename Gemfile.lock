@@ -47,9 +47,9 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    actionpack (7.1.3)
-      actionview (= 7.1.3)
-      activesupport (= 7.1.3)
+    actionpack (7.1.3.2)
+      actionview (= 7.1.3.2)
+      activesupport (= 7.1.3.2)
       nokogiri (>= 1.8.5)
       racc
       rack (>= 2.2.4)
@@ -57,13 +57,13 @@ GEM
       rack-test (>= 0.6.3)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    actionview (7.1.3)
-      activesupport (= 7.1.3)
+    actionview (7.1.3.2)
+      activesupport (= 7.1.3.2)
       builder (~> 3.1)
       erubi (~> 1.11)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    activesupport (7.1.3)
+    activesupport (7.1.3.2)
       base64
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
@@ -96,12 +96,12 @@ GEM
       tzinfo
     etc (1.4.3)
     facets (3.1.0)
-    feedjira (3.2.2)
-      loofah (>= 2.3.1)
-      sax-machine (>= 1.0)
+    feedjira (3.2.3)
+      loofah (>= 2.3.1, < 3)
+      sax-machine (>= 1.0, < 2)
     fileutils (1.7.2)
     find (0.2.0)
-    fugit (1.9.0)
+    fugit (1.10.0)
       et-orbi (~> 1, >= 1.2.7)
       raabro (~> 1.4)
     http-accept (1.7.0)
@@ -162,7 +162,7 @@ GEM
     public_suffix (5.0.4)
     raabro (1.4.0)
     racc (1.7.3)
-    rack (3.0.9)
+    rack (3.0.9.1)
     rack-session (2.0.0)
       rack (>= 3.0.0)
     rack-test (2.1.0)
