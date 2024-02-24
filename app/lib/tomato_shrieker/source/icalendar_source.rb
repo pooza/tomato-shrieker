@@ -30,6 +30,10 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
+    def summary
+      return {id:, entries: entries.to_a}
+    end
+
     def keyword
       return nil unless keyword = self['/source/keyword']
       return Regexp.new(keyword)
