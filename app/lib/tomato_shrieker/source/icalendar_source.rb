@@ -55,43 +55,29 @@ module TomatoShrieker
       ical.events
         .map {|event| create_entry(event)}
         .sort_by {|entry| entry[:start_date]}
-        .reject {|entry| ignore_event?(entry)}
+        .reject {|entry| ignore_entry?(entry)}
         .each(&block)
     end
 
-    def ignore_event?(entry)
-      return true if keyword && !hot_event?(entry)
-      return true if negative_keyword && negative_event?(entry)
+    def ignore_entry?(entry)
+      return true if keyword && !hot_entry?(entry)
+      return true if negative_keyword && negative_entry?(entry)
       return true unless ((entry[:start_date] - days.days)..entry[:end_date]).cover?(Time.now)
       return false
     end
 
-    def hot_event?(entry)
+    def hot_entry?(entry)
       return entry[:title].match?(keyword) || entry[:body].match?(keyword)
     end
 
-    def negative_event?(entry)
+    def negative_entry?(entry)
       return true if entry[:title].match?(negative_keyword)
       return true if entry[:body].match?(negative_keyword)
       return false
     end
 
     def create_entry(event)
-      if event.rrule
-        calendar = Icalendar::Calendar.new
-        calendar.event do |e|
-          e.dtstart = event.dtstart
-          e.dtend = event.dtend
-          e.summary = event.summary
-          e.description = event.description
-          e.location = event.location
-          e.rrule = event.rrule.first
-        end
-        if e = calendar.scan(Date.today, Date.today + days.days).first
-          event.dtstart = e.start_time
-          event.dtend = e.end_time
-        end
-      end
+      event = scan_rrule(event) if event.rrule
       return {
         start_date: Time.parse(event.dtstart.to_s).getlocal,
         end_date: Time.parse(event.dtend.to_s).getlocal,
@@ -124,6 +110,25 @@ module TomatoShrieker
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(self)}.each(&block)
+    end
+
+    private
+
+    def scan_rrule(event)
+      calendar = Icalendar::Calendar.new
+      calendar.event do |e|
+        e.dtstart = event.dtstart
+        e.dtend = event.dtend
+        e.summary = event.summary
+        e.description = event.description
+        e.location = event.location
+        e.rrule = event.rrule.first
+      end
+      if e = calendar.scan(Date.today, Date.today + days.days).first
+        event.dtstart = e.start_time
+        event.dtend = e.end_time
+      end
+      return event
     end
   end
 end
