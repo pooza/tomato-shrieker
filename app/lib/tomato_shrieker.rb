@@ -20,6 +20,7 @@ module TomatoShrieker
   def self.setup_debug
     Ricecream.disable
     return unless Environment.development?
+    require 'pp'
     Ricecream.enable
     Ricecream.include_context = true
     Ricecream.colorize = true

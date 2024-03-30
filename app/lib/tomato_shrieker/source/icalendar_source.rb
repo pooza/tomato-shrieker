@@ -1,7 +1,9 @@
-require 'icalendar'
+require 'icalendar-rrule'
 
 module TomatoShrieker
   class IcalendarSource < Source
+    using Icalendar::Scannable
+
     attr_reader :ical
 
     def initialize(params)
@@ -51,32 +53,45 @@ module TomatoShrieker
     def entries(&block)
       return enum_for(__method__) unless block
       ical.events
-        .reject {|event| ignore_event?(event)}
-        .sort_by {|event| event.dtstart.strftime('%Y/%m/%d %R')}
         .map {|event| create_entry(event)}
+        .sort_by {|entry| entry[:start_date]}
+        .reject {|entry| ignore_event?(entry)}
         .each(&block)
     end
 
     def ignore_event?(entry)
       return true if keyword && !hot_event?(entry)
       return true if negative_keyword && negative_event?(entry)
-      start_date = Time.parse(entry.dtstart.to_s)
-      end_date = Time.parse(entry.dtend.to_s)
-      return true unless ((start_date - days.days)..end_date).cover?(Time.now)
+      return true unless ((entry[:start_date] - days.days)..entry[:end_date]).cover?(Time.now)
       return false
     end
 
     def hot_event?(entry)
-      return entry.summary&.match?(keyword) || entry.description&.match?(keyword)
+      return entry[:title].match?(keyword) || entry[:body].match?(keyword)
     end
 
     def negative_event?(entry)
-      return true if entry.summary&.match?(negative_keyword)
-      return true if entry.description&.match?(negative_keyword)
+      return true if entry[:title].match?(negative_keyword)
+      return true if entry[:body].match?(negative_keyword)
       return false
     end
 
     def create_entry(event)
+      if event.rrule
+        calendar = Icalendar::Calendar.new
+        calendar.event do |e|
+          e.dtstart = event.dtstart
+          e.dtend = event.dtend
+          e.summary = event.summary
+          e.description = event.description
+          e.location = event.location
+          e.rrule = event.rrule.first
+        end
+        if e = calendar.scan(Date.today, Date.today + days.days).first
+          event.dtstart = e.start_time
+          event.dtend = e.end_time
+        end
+      end
       return {
         start_date: Time.parse(event.dtstart.to_s).getlocal,
         end_date: Time.parse(event.dtend.to_s).getlocal,
