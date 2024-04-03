@@ -81,7 +81,7 @@ module TomatoShrieker
       return {
         start_date: Time.parse(event.dtstart.to_s).getlocal,
         end_date: Time.parse(event.dtend.to_s).getlocal,
-        title: event.summary&.sanitize_status,
+        title: event.summary,
         body: event.description,
         location: event.location&.sanitize_status,
         all_day: event.dtstart.is_a?(Icalendar::Values::Date),
