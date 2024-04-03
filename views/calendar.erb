@@ -6,7 +6,11 @@
 <% end -%>
 <% else -%>
 <% if entry[:start_date].strftime('%m/%d') == entry[:end_date].strftime('%m/%d') -%>
+<% if entry[:start_date].strftime('%H/%M') == entry[:end_date].strftime('%H/%M') -%>
+<%= entry[:start_date].strftime('%m/%d %H:%M') %>
+<% else -%>
 <%= entry[:start_date].strftime('%m/%d %H:%M') %>〜<%= entry[:end_date].strftime('%H:%M') %>
+<% end -%>
 <% else -%>
 <%= entry[:start_date].strftime('%m/%d %H:%M') %>〜<%= entry[:end_date].strftime('%m/%d %H:%M') %>
 <% end -%>
