@@ -100,8 +100,8 @@ GEM
       sax-machine (>= 1.0, < 2)
     fileutils (1.7.2)
     find (0.2.0)
-    fugit (1.10.1)
-      et-orbi (~> 1, >= 1.2.7)
+    fugit (1.11.0)
+      et-orbi (~> 1, >= 1.2.11)
       raabro (~> 1.4)
     http-accept (1.7.0)
     http-cookie (1.0.5)
@@ -158,7 +158,7 @@ GEM
       racc (~> 1.4)
     optparse (0.5.0)
     parallel (1.24.0)
-    parser (3.3.0.5)
+    parser (3.3.1.0)
       ast (~> 2.4.1)
       racc
     power_assert (2.0.3)
@@ -187,7 +187,7 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.6)
     ricecream (0.2.1)
-    rubocop (1.63.3)
+    rubocop (1.63.4)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
       parallel (~> 1.10)
@@ -265,4 +265,4 @@ RUBY VERSION
    ruby 3.3.0p0
 
 BUNDLED WITH
-   2.5.6
+   2.5.9
