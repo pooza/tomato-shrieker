@@ -77,7 +77,7 @@ GEM
       public_suffix (>= 2.0.2, < 6.0)
     ast (2.4.2)
     base64 (0.2.0)
-    bigdecimal (3.1.7)
+    bigdecimal (3.1.8)
     builder (3.2.4)
     cgi (0.4.1)
     concurrent-ruby (1.2.3)
@@ -110,7 +110,7 @@ GEM
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
-    i18n (1.14.4)
+    i18n (1.14.5)
       concurrent-ruby (~> 1.0)
     icalendar (2.10.1)
       ice_cube (~> 0.16)
@@ -133,7 +133,7 @@ GEM
       net-smtp
     mime-types (3.5.2)
       mime-types-data (~> 3.2015)
-    mime-types-data (3.2024.0305)
+    mime-types-data (3.2024.0507)
     mini_mime (1.1.5)
     mini_portile2 (2.8.6)
     minitest (5.22.3)
@@ -141,7 +141,7 @@ GEM
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
     mutex_m (0.2.0)
-    net-imap (0.4.10)
+    net-imap (0.4.11)
       date
       net-protocol
     net-pop (0.1.2)
@@ -189,7 +189,7 @@ GEM
       netrc (~> 0.8)
     rexml (3.2.6)
     ricecream (0.2.1)
-    rubocop (1.63.4)
+    rubocop (1.63.5)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
       parallel (~> 1.10)
@@ -267,4 +267,4 @@ RUBY VERSION
    ruby 3.3.1p55
 
 BUNDLED WITH
-   2.5.9
+   2.5.10
