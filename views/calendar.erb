@@ -1,6 +1,3 @@
-<% if entry[:is_today] -%>
-❗️本日❗️
-<% end -%>
 <% if entry[:all_day] -%>
 <% if entry[:start_date] == entry[:end_date] -%>
 <%= entry[:start_date].strftime('%m/%d') %>
@@ -17,6 +14,9 @@
 <% else -%>
 <%= entry[:start_date].strftime('%m/%d %H:%M') %>〜<%= entry[:end_date].strftime('%m/%d %H:%M') %>
 <% end -%>
+<% end -%>
+<% if entry[:is_today] -%>
+❗️本日❗️
 <% end -%>
 <% if entry[:title] -%><%= entry[:title] %><% end %>
 
