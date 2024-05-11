@@ -84,7 +84,7 @@ module TomatoShrieker
       return {
         start_date:,
         end_date:,
-        is_today: (start_date..end_date).cover?(Time.now),
+        is_today: today?(start_date, end_date),
         title: event.summary&.sanitize,
         body: event.description&.sanitize,
         location: event.location&.sanitize_status,
@@ -118,6 +118,13 @@ module TomatoShrieker
     end
 
     private
+
+    def today?(start_date, end_date)
+      start_date = Time.parse(start_date.strftime('%Y/%m/%d 00:00:00'))
+      end_date = Time.parse(end_date.strftime('%Y/%m/%d 23:59:59'))
+      now_date = Time.parse(Time.now.strftime('%Y/%m/%d 00:00:00'))
+      return (start_date..end_date).cover?(now_date)
+    end
 
     def scan_rrule(event)
       calendar = Icalendar::Calendar.new
