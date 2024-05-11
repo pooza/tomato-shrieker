@@ -62,7 +62,7 @@ module TomatoShrieker
     def ignore_entry?(entry)
       return true if keyword && !hot_entry?(entry)
       return true if negative_keyword && negative_entry?(entry)
-      return true unless ((entry[:start_date] - days.days)..entry[:end_date]).cover?(Time.now)
+      return true unless shriekable?(entry[:start_date], entry[:end_date])
       return false
     end
 
@@ -119,11 +119,20 @@ module TomatoShrieker
 
     private
 
+    def start_time_today
+      return Time.parse(Time.now.strftime('%Y/%m/%d 00:00:00'))
+    end
+
     def today?(start_date, end_date)
       start_date = Time.parse(start_date.strftime('%Y/%m/%d 00:00:00'))
       end_date = Time.parse(end_date.strftime('%Y/%m/%d 23:59:59'))
-      now_date = Time.parse(Time.now.strftime('%Y/%m/%d 00:00:00'))
-      return (start_date..end_date).cover?(now_date)
+      return (start_date..end_date).cover?(start_time_today)
+    end
+
+    def shriekable?(start_date, end_date)
+      start_date = Time.parse((start_date - days.days).strftime('%Y/%m/%d 00:00:00'))
+      end_date = Time.parse(end_date.strftime('%Y/%m/%d 23:59:59'))
+      return (start_date..end_date).cover?(start_time_today)
     end
 
     def scan_rrule(event)
