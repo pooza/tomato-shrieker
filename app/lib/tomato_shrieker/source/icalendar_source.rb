@@ -62,7 +62,7 @@ module TomatoShrieker
     def ignore_entry?(entry)
       return true if keyword && !hot_entry?(entry)
       return true if negative_keyword && negative_entry?(entry)
-      return true unless ((entry[:start_date] - days.days)..entry[:end_date]).cover?(Time.now)
+      return true unless shriekable?(entry[:start_date], entry[:end_date])
       return false
     end
 
@@ -79,9 +79,12 @@ module TomatoShrieker
     def create_entry(event)
       event = scan_rrule(event) if event.rrule
       event.dtend ||= event.dtstart
+      start_date = Time.parse(event.dtstart.to_s).getlocal
+      end_date = Time.parse(event.dtend.to_s).getlocal
       return {
-        start_date: Time.parse(event.dtstart.to_s).getlocal,
-        end_date: Time.parse(event.dtend.to_s).getlocal,
+        start_date:,
+        end_date:,
+        is_today: today?(start_date, end_date),
         title: event.summary&.sanitize,
         body: event.description&.sanitize,
         location: event.location&.sanitize_status,
@@ -105,6 +108,7 @@ module TomatoShrieker
       uri = Ginseng::URI.parse(self['/source/calendar'])
       uri ||= Ginseng::URI.parse(self['/source/ical'])
       return nil unless uri&.absolute?
+      uri.query_values = {t: Time.now.to_f.to_s}
       return uri
     end
 
@@ -114,6 +118,22 @@ module TomatoShrieker
     end
 
     private
+
+    def start_time_today
+      return Time.parse(Time.now.strftime('%Y/%m/%d 00:00:00'))
+    end
+
+    def today?(start_date, end_date)
+      start_date = Time.parse(start_date.strftime('%Y/%m/%d 00:00:00'))
+      end_date = Time.parse(end_date.strftime('%Y/%m/%d 23:59:59'))
+      return (start_date..end_date).cover?(start_time_today)
+    end
+
+    def shriekable?(start_date, end_date)
+      start_date = Time.parse((start_date - days.days).strftime('%Y/%m/%d 00:00:00'))
+      end_date = Time.parse(end_date.strftime('%Y/%m/%d 23:59:59'))
+      return (start_date..end_date).cover?(start_time_today)
+    end
 
     def scan_rrule(event)
       calendar = Icalendar::Calendar.new

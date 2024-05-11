@@ -1,3 +1,6 @@
+<% if entry[:is_today] -%>
+❗️本日❗️
+<% end -%>
 <% if entry[:all_day] -%>
 <% if entry[:start_date] == entry[:end_date] -%>
 <%= entry[:start_date].strftime('%m/%d') %>
@@ -18,8 +21,7 @@
 <% if entry[:title] -%><%= entry[:title] %><% end %>
 
 <% if entry[:location] -%><%= entry[:location] %><% end %>
-<% if entry[:body] -%><%= entry[:body] %><% end %>
-
+<% if entry[:body] -%><%= entry[:body].chomp %><% end %>
 <% if @params[:tag] && @params[:source] -%>
 <%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
 <% end -%>
