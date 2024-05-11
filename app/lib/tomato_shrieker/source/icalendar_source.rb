@@ -106,6 +106,7 @@ module TomatoShrieker
       uri = Ginseng::URI.parse(self['/source/calendar'])
       uri ||= Ginseng::URI.parse(self['/source/ical'])
       return nil unless uri&.absolute?
+      uri.query_values = {t: rand(1000..9999)}
       return uri
     end
 
