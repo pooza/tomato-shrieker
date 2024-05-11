@@ -82,7 +82,7 @@ module TomatoShrieker
       return {
         start_date: Time.parse(event.dtstart.to_s).getlocal,
         end_date: Time.parse(event.dtend.to_s).getlocal,
-        is_today: Time.parse(event.dtstart.to_s).today?
+        is_today: Time.parse(event.dtstart.to_s).today?,
         title: event.summary&.sanitize,
         body: event.description&.sanitize,
         location: event.location&.sanitize_status,
