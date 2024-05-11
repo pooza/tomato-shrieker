@@ -79,10 +79,12 @@ module TomatoShrieker
     def create_entry(event)
       event = scan_rrule(event) if event.rrule
       event.dtend ||= event.dtstart
+      start_date = Time.parse(event.dtstart.to_s).getlocal
+      end_date = Time.parse(event.dtend.to_s).getlocal
       return {
-        start_date: Time.parse(event.dtstart.to_s).getlocal,
-        end_date: Time.parse(event.dtend.to_s).getlocal,
-        is_today: Time.parse(event.dtstart.to_s).today?,
+        start_date:,
+        end_date:,
+        is_today: (start_date..end_date).cover?(Time.now),
         title: event.summary&.sanitize,
         body: event.description&.sanitize,
         location: event.location&.sanitize_status,
