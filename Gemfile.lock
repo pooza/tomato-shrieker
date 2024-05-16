@@ -187,7 +187,8 @@ GEM
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
-    rexml (3.2.6)
+    rexml (3.2.8)
+      strscan (>= 3.0.9)
     ricecream (0.2.1)
     rubocop (1.63.5)
       json (~> 2.3)
@@ -227,6 +228,7 @@ GEM
       mini_portile2 (~> 2.8.0)
     sqlite3 (2.0.1-aarch64-linux-gnu)
     sqlite3 (2.0.1-x86_64-linux-gnu)
+    strscan (3.1.0)
     syslog (0.1.2)
     test-unit (3.6.2)
       power_assert
