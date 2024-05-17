@@ -4,12 +4,9 @@ module TomatoShrieker
   class IcalendarSource < Source
     using Icalendar::Scannable
 
-    attr_reader :ical
-
     def initialize(params)
       super
       @http = HTTP.new
-      @ical = Icalendar::Calendar.parse(@http.get(uri)).first
     end
 
     def default_cron
@@ -18,6 +15,10 @@ module TomatoShrieker
 
     def default_period
       return nil
+    end
+
+    def ical
+      return Icalendar::Calendar.parse(@http.get(uri)).first
     end
 
     def exec
