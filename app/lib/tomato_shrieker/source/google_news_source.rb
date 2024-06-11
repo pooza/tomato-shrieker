@@ -26,7 +26,7 @@ module TomatoShrieker
     end
 
     def create_uri(href)
-      dest = super(href)
+      dest = super
       while domains.member?(dest.host)
         response = @http.get(dest, {
           follow_redirects: false,
