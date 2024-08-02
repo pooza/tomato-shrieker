@@ -25,23 +25,6 @@ module TomatoShrieker
       return @templates
     end
 
-    def create_uri(href)
-      dest = super(href)
-      while domains.member?(dest.host)
-        response = @http.get(dest, {
-          follow_redirects: false,
-          headers: {'User-Agent' => config['/google/news/useragent']},
-        })
-        break unless location = response.headers['location']
-        dest = Ginseng::URI.parse(location)
-      end
-      return dest
-    end
-
-    def domains
-      return config['/google/news/domains']
-    end
-
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(self)}.each(&block)
