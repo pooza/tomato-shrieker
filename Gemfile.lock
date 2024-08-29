@@ -190,10 +190,10 @@ GEM
     sequel (5.83.1)
       bigdecimal
     set (1.1.0)
-    sqlite3 (2.0.3)
+    sqlite3 (2.0.4)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (2.0.3-aarch64-linux-gnu)
-    sqlite3 (2.0.3-x86_64-linux-gnu)
+    sqlite3 (2.0.4-aarch64-linux-gnu)
+    sqlite3 (2.0.4-x86_64-linux-gnu)
     strscan (3.1.0)
     syslog (0.1.2)
     test-unit (3.6.2)
