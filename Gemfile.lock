@@ -207,7 +207,6 @@ GEM
 
 PLATFORMS
   aarch64-linux
-  x86_64-freebsd-13
   x86_64-freebsd-14
   x86_64-linux
 
