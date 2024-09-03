@@ -154,18 +154,15 @@ GEM
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
-    rexml (3.3.6)
-      strscan
     ricecream (0.2.1)
-    rubocop (1.65.1)
+    rubocop (1.66.0)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
       parallel (~> 1.10)
       parser (>= 3.3.0.2)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 2.4, < 3.0)
-      rexml (>= 3.2.5, < 4.0)
-      rubocop-ast (>= 1.31.1, < 2.0)
+      rubocop-ast (>= 1.32.1, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 3.0)
     rubocop-ast (1.32.1)
@@ -193,9 +190,8 @@ GEM
     set (1.1.0)
     sqlite3 (2.0.4)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (2.0.4-aarch64-linux-gnu)
-    sqlite3 (2.0.4-x86_64-linux-gnu)
-    strscan (3.1.0)
+    sqlite3 (2.0.3-aarch64-linux-gnu)
+    sqlite3 (2.0.3-x86_64-linux-gnu)
     syslog (0.1.2)
     test-unit (3.6.2)
       power_assert
@@ -236,5 +232,3 @@ DEPENDENCIES
 RUBY VERSION
    ruby 3.3.4p94
 
-BUNDLED WITH
-   2.5.18
