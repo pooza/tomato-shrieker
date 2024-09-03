@@ -1,7 +1,7 @@
 require 'digest/sha1'
 
 module TomatoShrieker
-  class Source
+  class Source # rubocop:disable Metrics/ClassLength
     include Package
 
     def initialize(params)
@@ -38,6 +38,15 @@ module TomatoShrieker
 
     def disable?
       return self['/disable'] == true
+    end
+
+    def sanitize_mode
+      return :fedi if self['/dest/sanitize'].nil?
+      return self['/dest/sanitize'].to_sym
+    end
+
+    def fedi_sanitize?
+      return sanitize_mode == :fedi
     end
 
     def mulukhiya?
@@ -244,6 +253,10 @@ module TomatoShrieker
 
     def self.create(id)
       return all.find {|v| v.id == id}
+    end
+
+    def fedi_sanitize(message)
+      return fedi_sanitize? ? message.to_s.sanitize_status : message.to_s.sanitize
     end
   end
 end

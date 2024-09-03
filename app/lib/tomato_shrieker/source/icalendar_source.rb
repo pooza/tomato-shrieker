@@ -86,9 +86,9 @@ module TomatoShrieker
         start_date:,
         end_date:,
         is_today: today?(start_date, end_date),
-        title: event.summary&.sanitize,
-        body: event.description&.sanitize,
-        location: event.location&.sanitize_status,
+        title: fedi_sanitize(event.summary),
+        body: fedi_sanitize(event.description),
+        location: fedi_sanitize(event.location),
         all_day: event.dtstart.is_a?(Icalendar::Values::Date),
       }
     end

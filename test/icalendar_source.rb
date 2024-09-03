@@ -22,6 +22,18 @@ module TomatoShrieker
       end
     end
 
+    def test_sanitize_mode
+      IcalendarSource.all.each do |source|
+        assert(source.sanitize_mode == :fedi || source.sanitize_mode == :html)
+      end
+    end
+
+    def test_fedi_sanitize?
+      IcalendarSource.all.each do |source|
+        assert_kind_of([TrueClass, FalseClass], source.fedi_sanitize?)
+      end
+    end
+
     def test_create_entry
       source = %{<a href="https://shonenjumpplus.com/episode/17106371859967525169">https://shonenjumpplus.com/episode/17106371859967525169</a><br>感想には是非、以下のタグをどうぞ！<br>#勇者アバン_42話<br>#勇者アバン_11巻 (11巻2話目にあたります)<br><br>#delmulin #更新}
       sanitized = %{https://shonenjumpplus.com/episode/17106371859967525169\n感想には是非、以下のタグをどうぞ！\n#勇者アバン_42話\n#勇者アバン_11巻 (11巻2話目にあたります)\n\n#delmulin #更新}
