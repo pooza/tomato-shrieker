@@ -24,7 +24,7 @@ module TomatoShrieker
 
     def test_sanitize_mode
       IcalendarSource.all.each do |source|
-        assert(source.test_sanitize_mode == :fedi || source.test_sanitize_mode == :html)
+        assert(source.sanitize_mode == :fedi || source.sanitize_mode == :html)
       end
     end
 
