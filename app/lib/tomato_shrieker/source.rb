@@ -1,6 +1,6 @@
 require 'digest/sha1'
 
-module TomatoShrieker
+module TomatoShrieker # rubocop:disable Metrics/ClassLength
   class Source
     include Package
 
