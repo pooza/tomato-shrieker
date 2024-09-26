@@ -89,7 +89,7 @@ GEM
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
-    i18n (1.14.5)
+    i18n (1.14.6)
       concurrent-ruby (~> 1.0)
     icalendar (2.10.3)
       ice_cube (~> 0.16)
@@ -114,14 +114,14 @@ GEM
       net-smtp
     mime-types (3.5.2)
       mime-types-data (~> 3.2015)
-    mime-types-data (3.2024.0820)
+    mime-types-data (3.2024.0903)
     mini_mime (1.1.5)
     mini_portile2 (2.8.7)
     minitest (5.25.1)
     multi_json (1.15.0)
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
-    net-imap (0.4.15)
+    net-imap (0.4.16)
       date
       net-protocol
     net-pop (0.1.2)
@@ -197,7 +197,7 @@ GEM
     syslog (0.1.2)
     test-unit (3.6.2)
       power_assert
-    time (0.3.0)
+    time (0.4.0)
       date
     timeout (0.4.1)
     tzinfo (2.0.6)
@@ -231,7 +231,7 @@ DEPENDENCIES
   test-unit
 
 RUBY VERSION
-   ruby 3.3.4p94
+   ruby 3.3.5p100
 
 BUNDLED WITH
-   2.5.18
+   2.5.20
