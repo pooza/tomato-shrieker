@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: f480c0d282ccd5a941b4dae7bc9625bde58c1e18
+  revision: bb33644b31340e82ab1816ead7690b7c6f5cad66
   specs:
-    ginseng-core (1.14.4)
+    ginseng-core (1.14.5)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.8.0)
       bundler (~> 2.0)
@@ -43,8 +43,9 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (7.2.1)
+    activesupport (8.0.0)
       base64
+      benchmark (>= 0.3)
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.3.1)
       connection_pool (>= 2.2.5)
@@ -54,10 +55,12 @@ GEM
       minitest (>= 5.1)
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
+      uri (>= 0.13.1)
     addressable (2.8.7)
       public_suffix (>= 2.0.2, < 7.0)
     ast (2.4.2)
     base64 (0.2.0)
+    benchmark (0.4.0)
     bigdecimal (3.1.8)
     cgi (0.4.1)
     concurrent-ruby (1.3.4)
@@ -65,19 +68,19 @@ GEM
     crass (1.0.6)
     csv (3.3.0)
     daemon-spawn (0.4.2)
-    date (3.3.4)
+    date (3.4.0)
     domain_name (0.6.20240107)
     drb (2.2.1)
     erb (4.0.4)
       cgi (>= 0.3.3)
     et-orbi (1.2.11)
       tzinfo
-    etc (1.4.3)
+    etc (1.4.4)
     facets (3.1.0)
     feedjira (3.2.3)
       loofah (>= 2.3.1, < 3)
       sax-machine (>= 1.0, < 2)
-    fileutils (1.7.2)
+    fileutils (1.7.3)
     find (0.2.0)
     fugit (1.11.1)
       et-orbi (~> 1, >= 1.2.11)
@@ -115,14 +118,14 @@ GEM
     mime-types (3.6.0)
       logger
       mime-types-data (~> 3.2015)
-    mime-types-data (3.2024.1001)
+    mime-types-data (3.2024.1105)
     mini_mime (1.1.5)
     mini_portile2 (2.8.7)
     minitest (5.25.1)
     multi_json (1.15.0)
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
-    net-imap (0.4.16)
+    net-imap (0.5.1)
       date
       net-protocol
     net-pop (0.1.2)
@@ -198,14 +201,15 @@ GEM
     syslog (0.1.2)
     test-unit (3.6.2)
       power_assert
-    time (0.4.0)
+    time (0.4.1)
       date
-    timeout (0.4.1)
+    timeout (0.4.2)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unicode-display_width (2.6.0)
+    uri (1.0.1)
     yajl-ruby (1.4.3)
-    zeitwerk (2.6.18)
+    zeitwerk (2.7.1)
     zlib (3.1.1)
 
 PLATFORMS
