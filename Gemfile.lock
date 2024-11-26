@@ -115,7 +115,7 @@ GEM
       mime-types-data (~> 3.2015)
     mime-types-data (3.2024.0820)
     mini_mime (1.1.5)
-    mini_portile2 (2.8.7)
+    mini_portile2 (2.8.8)
     minitest (5.25.1)
     multi_json (1.15.0)
     multi_xml (0.7.1)
@@ -188,10 +188,10 @@ GEM
     sequel (5.84.0)
       bigdecimal
     set (1.1.0)
-    sqlite3 (2.0.4)
+    sqlite3 (2.3.1)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (2.0.4-aarch64-linux-gnu)
-    sqlite3 (2.0.4-x86_64-linux-gnu)
+    sqlite3 (2.3.1-aarch64-linux-gnu)
+    sqlite3 (2.3.1-x86_64-linux-gnu)
     syslog (0.1.2)
     test-unit (3.6.2)
       power_assert
