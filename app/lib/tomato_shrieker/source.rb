@@ -59,7 +59,7 @@ module TomatoShrieker
 
     def bot?
       return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
-      return false
+      return true
     end
 
     def templates
