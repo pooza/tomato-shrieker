@@ -120,6 +120,8 @@ Sequel:
     - app/migration/**/*.rb
 Sequel/ConcurrentIndex:
   Enabled: false
+Sequel/IrreversibleMigration:
+  Enabled: false
 Style/AsciiComments:
   Enabled: false
 Style/ConditionalAssignment:
