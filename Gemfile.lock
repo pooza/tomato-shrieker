@@ -140,6 +140,8 @@ GEM
     nokogiri (1.18.2)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
+    nokogiri (1.18.2-x86_64-linux-gnu)
+      racc (~> 1.4)
     optparse (0.6.0)
     ostruct (0.6.1)
     parallel (1.26.3)
@@ -195,6 +197,7 @@ GEM
     set (1.1.1)
     sqlite3 (2.5.0)
       mini_portile2 (~> 2.8.0)
+    sqlite3 (2.5.0-x86_64-linux-gnu)
     syslog (0.2.0)
     test-unit (3.6.7)
       power_assert
@@ -213,6 +216,7 @@ GEM
 
 PLATFORMS
   x86_64-freebsd-14
+  x86_64-linux
 
 DEPENDENCIES
   feedjira (~> 3.0)
