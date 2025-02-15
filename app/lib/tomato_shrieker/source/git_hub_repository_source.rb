@@ -14,6 +14,11 @@ module TomatoShrieker
       return self['/source/github/timeline'] || 'releases'
     end
 
+    def bot?
+      return self['/dest/account/bot'] unless self['/dest/account/bot'].nil?
+      return false
+    end
+
     alias repos repository
 
     alias every period
