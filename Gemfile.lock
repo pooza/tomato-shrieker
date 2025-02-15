@@ -140,6 +140,8 @@ GEM
     nokogiri (1.18.2)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
+    nokogiri (1.18.2-aarch64-linux-gnu)
+      racc (~> 1.4)
     nokogiri (1.18.2-x86_64-linux-gnu)
       racc (~> 1.4)
     optparse (0.6.0)
