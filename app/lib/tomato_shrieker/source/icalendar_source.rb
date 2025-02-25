@@ -91,8 +91,9 @@ module TomatoShrieker
         location: fedi_sanitize(event.location),
         all_day: event.dtstart.is_a?(Icalendar::Values::Date),
       }
-      # Google Calendarで、終日予定の終了日が1日ずれる。
-      data[:end_date] -= 1.days if data[:all_day] && (data[:start_date] < data[:end_date])
+      data = fix_duration(data)
+      data = fix_body(data)
+      data = fix_location(data)
       return data
     end
 
@@ -122,6 +123,20 @@ module TomatoShrieker
     end
 
     private
+
+    def fix_duration(data)
+      # Google Calendarで、終日予定の終了日が1日ずれる。
+      data[:end_date] -= 1.days if data[:all_day] && (data[:start_date] < data[:end_date])
+      return data
+    end
+
+    def fix_body(data)
+      return data
+    end
+
+    def fix_location(data)
+      return data
+    end
 
     def start_time_today
       return Time.parse(Time.now.strftime('%Y/%m/%d 00:00:00'))
