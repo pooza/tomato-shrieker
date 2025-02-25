@@ -131,6 +131,10 @@ module TomatoShrieker
     end
 
     def fix_body(data)
+      lines = data[:body].split(/\r?\n/)
+      lines.reject! {|line| line.match?(/^Google Meet に参加:/)}
+      lines.reject! {|line| line.match?(/^Meet の詳細:/)}
+      data[:body] = lines.join("\n")
       return data
     end
 

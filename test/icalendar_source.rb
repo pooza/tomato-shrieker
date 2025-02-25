@@ -42,7 +42,6 @@ module TomatoShrieker
     end
 
     def test_create_entry_googlemeet
-      ic 111
       source = %(無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限\n\nGoogle Meet に参加: https://meet.google.com/aaa-bbbc-ccc\n\nMeet の詳細: https://support.google.com/a/users/ans)
       sanitized = %(無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限)
 
@@ -50,7 +49,6 @@ module TomatoShrieker
     end
 
     def test_create_entry_location
-      ic 222
     end
 
     def test_entries
