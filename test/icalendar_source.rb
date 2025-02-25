@@ -34,11 +34,23 @@ module TomatoShrieker
       end
     end
 
-    def test_create_entry
+    def test_create_entry_normal
       source = %{<a href="https://shonenjumpplus.com/episode/17106371859967525169">https://shonenjumpplus.com/episode/17106371859967525169</a><br>感想には是非、以下のタグをどうぞ！<br>#勇者アバン_42話<br>#勇者アバン_11巻 (11巻2話目にあたります)<br><br>#delmulin #更新}
       sanitized = %{https://shonenjumpplus.com/episode/17106371859967525169\n感想には是非、以下のタグをどうぞ！\n#勇者アバン_42話\n#勇者アバン_11巻 (11巻2話目にあたります)\n\n#delmulin #更新}
 
       assert_equal(sanitized, source.sanitize)
+    end
+
+    def test_create_entry_googlemeet
+      ic 111
+      source = %(無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限\n\nGoogle Meet に参加: https://meet.google.com/aaa-bbbc-ccc\n\nMeet の詳細: https://support.google.com/a/users/ans)
+      sanitized = %(無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限)
+
+      assert_equal(sanitized, source.sanitize)
+    end
+
+    def test_create_entry_location
+      ic 222
     end
 
     def test_entries
