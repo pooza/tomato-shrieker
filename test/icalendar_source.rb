@@ -50,12 +50,12 @@ module TomatoShrieker
     def test_fix_google_calendar_entry
       source = IcalendarSource.new({})
       entry = source.fix_google_calendar_entry(
-        body: %(無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限\n\nGoogle Meet に参加: https://meet.google.com/aaa-bbbc-ccc\n\nMeet の詳細: https://support.google.com/a/users/ans),
+        body: "無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限\n\nGoogle Meet に参加: https://meet.google.com/aaa-bbbc-ccc\n\nMeet の詳細: https://support.google.com/a/users/ans",
         location: '渋谷WOMBLOUNGE, 日本、〒150-0044 東京都渋谷区円山町２−１６',
       )
 
-      assert_equal(%(無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限), entry[:body])
-      assert_equal(%(渋谷WOMBLOUNGE), entry[:location])
+      assert_equal("無理はせず、スコアのある、蓄積開始後ほこらに備えましょう #頑張りましたで称号\n\n#DQW期限", entry[:body])
+      assert_equal('渋谷WOMBLOUNGE', entry[:location])
     end
 
     def test_entries
