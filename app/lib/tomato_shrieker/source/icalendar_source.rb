@@ -107,7 +107,7 @@ module TomatoShrieker
       lines = data[:body].split(/\r?\n/)
       lines.reject! {|line| line.match?(/^Google Meet に参加:/)}
       lines.reject! {|line| line.match?(/^Meet の詳細:/)}
-      data[:body] = lines.join("\n")
+      data[:body] = lines.join("\n").strip
       return data
     end
 
