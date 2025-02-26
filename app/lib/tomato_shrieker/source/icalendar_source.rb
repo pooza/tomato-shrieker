@@ -104,10 +104,14 @@ module TomatoShrieker
       # Google Calendarで、終日予定の終了日が1日ずれる。
       data[:end_date] -= 1.days if data[:all_day] && (data[:start_date] < data[:end_date])
 
+      # Google Meet
       lines = data[:body].split(/\r?\n/)
       lines.reject! {|line| line.match?(/^Google Meet に参加:/)}
       lines.reject! {|line| line.match?(/^Meet の詳細:/)}
       data[:body] = lines.join("\n").strip
+
+      # 場所
+      data[:location] = data[:location].split(',').first
       return data
     end
 
