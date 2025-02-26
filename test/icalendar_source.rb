@@ -36,7 +36,7 @@ module TomatoShrieker
 
     def test_google?
       IcalendarSource.all.each do |source|
-        assert_kind_of([TrueClass, FalseClass], source.google)
+        assert_kind_of([TrueClass, FalseClass], source.google?)
       end
     end
 
