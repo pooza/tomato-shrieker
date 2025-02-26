@@ -51,6 +51,11 @@ module TomatoShrieker
       return self['/source/days'] || 3
     end
 
+    def google?
+      return true if self['/source/google'].nil?
+      return self['/source/google']
+    end
+
     def entries(&block)
       return enum_for(__method__) unless block
       ical.events
@@ -91,8 +96,22 @@ module TomatoShrieker
         location: fedi_sanitize(event.location),
         all_day: event.dtstart.is_a?(Icalendar::Values::Date),
       }
+      data = fix_google_calendar_entry(data) if google?
+      return data
+    end
+
+    def fix_google_calendar_entry(data)
       # Google Calendarで、終日予定の終了日が1日ずれる。
       data[:end_date] -= 1.days if data[:all_day] && (data[:start_date] < data[:end_date])
+
+      # Google Meet
+      lines = data[:body].split(/\r?\n/)
+      lines.reject! {|line| line.match?(/^Google Meet に参加:/)}
+      lines.reject! {|line| line.match?(/^Meet の詳細:/)}
+      data[:body] = lines.join("\n").strip
+
+      # 場所
+      data[:location] = data[:location].split(',').first
       return data
     end
 
