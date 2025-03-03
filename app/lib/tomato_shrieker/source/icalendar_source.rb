@@ -52,7 +52,8 @@ module TomatoShrieker
     end
 
     def google?
-      return uri.host.split('.').member?('google')
+      return uri.host.split('.').member?('google') if self['/source/google'].nil?
+      return self['/source/google']
     end
 
     def entries(&block)
