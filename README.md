@@ -1,7 +1,6 @@
 # tomato-shrieker
 
 ![release](https://img.shields.io/github/v/release/pooza/tomato-shrieker.svg)
-![test](https://github.com/pooza/tomato-shrieker/workflows/test/badge.svg)
 
 ## できること
 
