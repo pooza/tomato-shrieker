@@ -5,6 +5,7 @@ Thumbs.db
 Desktop.ini
 .fuse*
 *.log
+*.swp
 .sass-cache
 dist
 *.code-workspace
