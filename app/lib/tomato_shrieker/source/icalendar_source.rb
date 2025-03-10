@@ -154,7 +154,7 @@ module TomatoShrieker
 
     def all_day?(date)
       return true if date.is_a?(Icalendar::Values::Date)
-      return true if date.to_s.match?(/00:00:00/)
+      return true if date.to_s.include?('00:00:00')
       return false
     end
 
