@@ -191,7 +191,7 @@ module TomatoShrieker
 
     def summary
       values = {id:, category:, multi: multi_entries?}
-      values[:entries] = entries.map do |entry|
+      values[:entries] = entries.reject {|v| ignore_entry?(v)}.map do |entry|
         {
           date: entry.published.strftime('%Y/%m/%d %R'),
           title: entry.title,
