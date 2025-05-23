@@ -34,7 +34,7 @@ module TomatoShrieker
     end
 
     def summary
-      return {id:, entries: entries.to_a}
+      return {id:, entries: entries.reject {|v| ignore_entry?(v)}.to_a}
     end
 
     def keyword
