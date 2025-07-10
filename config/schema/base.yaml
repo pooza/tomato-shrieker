@@ -107,6 +107,24 @@ properties:
                 required:
                   - enable
                 type: hash
+              piefed:
+                properties:
+                  community_id:
+                    type: integer
+                  host:
+                    type: string
+                  password:
+                    type: string
+                  template:
+                    type: string
+                  user_id:
+                    type: string
+                required:
+                  - host
+                  - user_id
+                  - password
+                  - comunity_id
+                type: hash
               prefix:
                 type: string
               spoiler_text:

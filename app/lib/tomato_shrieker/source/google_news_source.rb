@@ -17,14 +17,6 @@ module TomatoShrieker
       return uri.query_values['q']
     end
 
-    def templates
-      @templates ||= {
-        default: Template.new(self['/dest/template'] || 'title'),
-        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
-      }
-      return @templates
-    end
-
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(self)}.each(&block)

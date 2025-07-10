@@ -66,6 +66,7 @@ module TomatoShrieker
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'common'),
         lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'common'),
+        piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'common'),
       }
       return @templates
     end
@@ -91,6 +92,7 @@ module TomatoShrieker
       yield misskey if misskey?
       yield line if line?
       yield lemmy if lemmy?
+      yield piefed if piefed?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
@@ -163,6 +165,21 @@ module TomatoShrieker
 
     def lemmy?
       return lemmy.present?
+    end
+
+    def piefed
+      unless @piefed
+        return nil unless self['/dest/piefed/host']
+        return nil unless self['/dest/piefed/user_id']
+        return nil unless self['/dest/piefed/password']
+        return nil unless self['/dest/piefed/community_id']
+        @piefed = PiefedShrieker.new(@params.dig('dest', 'piefed'))
+      end
+      return @piefed
+    end
+
+    def piefed?
+      return piefed.present?
     end
 
     def mulukhiya

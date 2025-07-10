@@ -38,6 +38,12 @@ package:
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
   version: 3.8.0
+piefed:
+  subject:
+    max_length: 50
+  urls:
+    api: /api/v3/ws
+  verify_peer: true
 ruby:
   jit: false
 scheduler:
