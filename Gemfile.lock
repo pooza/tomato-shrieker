@@ -59,7 +59,7 @@ GEM
     addressable (2.8.7)
       public_suffix (>= 2.0.2, < 7.0)
     ast (2.4.3)
-    base64 (0.2.0)
+    base64 (0.3.0)
     benchmark (0.4.0)
     bigdecimal (3.1.9)
     cgi (0.4.2)
@@ -93,7 +93,7 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
-    icalendar (2.11.0)
+    icalendar (2.11.2)
       base64
       ice_cube (~> 0.16)
       logger
@@ -146,7 +146,7 @@ GEM
     nokogiri (1.18.8-x86_64-linux-gnu)
       racc (~> 1.4)
     optparse (0.6.0)
-    ostruct (0.6.1)
+    ostruct (0.6.2)
     parallel (1.27.0)
     parser (3.3.8.0)
       ast (~> 2.4.1)
