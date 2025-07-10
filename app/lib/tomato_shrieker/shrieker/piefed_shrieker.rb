@@ -1,9 +1,9 @@
 module TomatoShrieker
   class PiefedShrieker < LemmyShrieker
     def login
-      response = http.post('/api/v3/user/login', {
+      response = http.post('/api/alpha/user/login', {
         body: {
-          username_or_email: @params[:user_id],
+          username: @params[:user_id],
           password: (@params[:password].decrypt rescue @params[:password]),
         },
       })
