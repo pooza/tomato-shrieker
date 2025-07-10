@@ -92,6 +92,15 @@ module TomatoShrieker
       end
     end
 
+    def test_piefed
+      Source.all do |source|
+        assert_boolean(source.piefed?)
+        next unless source.piefed?
+
+        assert_kind_of(PiefedShrieker, source.piefed)
+      end
+    end
+
     def test_shriekers
       Source.all do |source|
         source.shriekers do |shrieker|

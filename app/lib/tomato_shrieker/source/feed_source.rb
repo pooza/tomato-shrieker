@@ -62,6 +62,7 @@ module TomatoShrieker
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
         lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
+        piefed: Template.new(self['/dest/piefed/template'] || self['/piefed/template'] || 'title'),
         multi: Template.new(self['/dest/template'] || 'multi_entries'),
       }
       return @templates
