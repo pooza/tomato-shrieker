@@ -46,7 +46,7 @@ module TomatoShrieker
     end
 
     def test_tags
-      return unless entry = @entries.find {|v| v.tags.count.positive?}
+      return unless entry = @entries.find {|v| v.tags.any?}
 
       entry.tags.each do |tag|
         assert_kind_of(String, tag)

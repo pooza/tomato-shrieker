@@ -230,7 +230,7 @@ module TomatoShrieker
     alias every period
 
     def load
-      return true
+      return nil
     end
 
     def self.all
