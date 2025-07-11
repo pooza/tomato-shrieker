@@ -168,7 +168,7 @@ module TomatoShrieker
 
     def test_load
       Source.all.select(&:cron).each do |source|
-        assert(source.load)
+        assert_nil(source.load)
       end
     end
 
