@@ -14,15 +14,15 @@ module TomatoShrieker
     def exec(body)
       template = search_template(body)
       data = {
-        name: template.to_s.gsub(/[\r\n[:blank:]]+/, ' '),
+        title: template.to_s.gsub(/[\r\n[:blank:]]+/, ' '),
         body: template.to_s,
-        community_id: template.source['/dest/lemmy/community_id'],
+        community_id: template.source['/dest/piefed/community_id'],
       }
-      Ginseng::URI.scan(data[:body]).each {|uri| data[:name].gsub!(uri.to_s, '')}
-      data[:name].ellipsize!(config['/lemmy/subject/max_length'])
+      Ginseng::URI.scan(data[:body]).each {|uri| data[:body].gsub!(uri.to_s, '')}
+      data[:title].ellipsize!(config['/piefed/subject/max_length'])
       uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
       data[:url] = uri.to_s if uri
-      return http.post('/api/v3/post', {
+      return http.post('/api/alpha/post', {
         body: data,
         headers: {'Authorization' => "Bearer #{@jwt}"},
       })

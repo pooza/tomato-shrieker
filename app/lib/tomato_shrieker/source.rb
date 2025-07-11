@@ -161,6 +161,9 @@ module TomatoShrieker
         @lemmy = LemmyShrieker.new(@params.dig('dest', 'lemmy'))
       end
       return @lemmy
+    rescue => e
+      logger.error(source: id, error: e, lemmy: self['/dest/lemmy/host'])
+      return nil
     end
 
     def lemmy?
@@ -176,6 +179,9 @@ module TomatoShrieker
         @piefed = PiefedShrieker.new(@params.dig('dest', 'piefed'))
       end
       return @piefed
+    rescue => e
+      logger.error(source: id, error: e, lemmy: self['/dest/piefed/host'])
+      return nil
     end
 
     def piefed?
