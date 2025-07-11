@@ -27,5 +27,14 @@ module TomatoShrieker
         headers: {'Authorization' => "Bearer #{@jwt}"},
       })
     end
+
+    def search_template(body)
+      unless entry = body[:template].entry
+        return body[:template].source.create_template(:piefed, body[:template].to_s)
+      end
+      return entry.create_template(:piefed)
+    rescue
+      return body[:template]
+    end
   end
 end
