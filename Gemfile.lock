@@ -204,10 +204,10 @@ GEM
     sequel (5.94.0)
       bigdecimal
     set (1.1.2)
-    sqlite3 (2.7.2)
+    sqlite3 (2.7.3)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (2.7.2-aarch64-linux-gnu)
-    sqlite3 (2.7.2-x86_64-linux-gnu)
+    sqlite3 (2.7.3-aarch64-linux-gnu)
+    sqlite3 (2.7.3-x86_64-linux-gnu)
     syslog (0.3.0)
       logger
     test-unit (3.7.0)
