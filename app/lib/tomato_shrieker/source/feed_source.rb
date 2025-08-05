@@ -9,8 +9,7 @@ module TomatoShrieker
     end
 
     def exec
-      db = Sequel.connect(Environment.dsn)
-      Sequel::Model.db = db
+      Environment.setup_database
       if multi_entries?
         shriek(template: create_template(:multi), visibility:)
       elsif touched?
