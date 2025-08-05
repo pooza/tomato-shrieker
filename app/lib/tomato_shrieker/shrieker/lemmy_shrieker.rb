@@ -1,6 +1,7 @@
 module TomatoShrieker
   class LemmyShrieker
     include Package
+
     attr_reader :http
 
     def initialize(params = {})
