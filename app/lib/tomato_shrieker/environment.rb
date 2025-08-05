@@ -41,5 +41,10 @@ module TomatoShrieker
         config['/sqlite3/db'],
       )
     end
+
+    def self.setup_database
+      return if Sequel::Model.db
+      Sequel::Model.db = Sequel.connect(dsn)
+    end
   end
 end

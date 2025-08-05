@@ -9,6 +9,7 @@ module TomatoShrieker
     end
 
     def exec
+      Environment.setup_database
       if multi_entries?
         shriek(template: create_template(:multi), visibility:)
       elsif touched?
@@ -20,6 +21,8 @@ module TomatoShrieker
       e.package = Package.full_name
       SlackService.broadcast(e)
       logger.error(source: id, error: e)
+    ensure
+      db&.disconnect
     end
 
     def purge
