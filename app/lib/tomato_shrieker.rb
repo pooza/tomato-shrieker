@@ -42,4 +42,5 @@ module TomatoShrieker
   loader.setup
   setup_debug
   ENV['RACK_ENV'] ||= Environment.type
+  Sequel.connect(Environment.dsn)
 end

@@ -9,7 +9,7 @@ module TomatoShrieker
     end
 
     def exec
-      Environment.setup_database
+      #Environment.setup_database
       if multi_entries?
         shriek(template: create_template(:multi), visibility:)
       elsif touched?
@@ -22,7 +22,7 @@ module TomatoShrieker
       SlackService.broadcast(e)
       logger.error(source: id, error: e)
     ensure
-      db&.disconnect
+      #db&.disconnect
     end
 
     def purge
