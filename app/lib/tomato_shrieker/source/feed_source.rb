@@ -18,9 +18,8 @@ module TomatoShrieker
         entry.shriek
       end
     rescue => e
-      e.package = Package.full_name
-      SlackService.broadcast(e)
       logger.error(source: id, error: e)
+    ensure
       db&.disconnect
     end
 
