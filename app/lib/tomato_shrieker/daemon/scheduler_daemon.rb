@@ -13,11 +13,6 @@ module TomatoShrieker
       ].compact.join("\n")
     end
 
-    def save_config
-      puts config.secure_dump.to_yaml if config['/scheduler/verbose']
-      super
-    end
-
     def start(args)
       save_config
       logger.info(daemon: app_name, version: Package.version, message: 'start')
