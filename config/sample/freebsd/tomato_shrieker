@@ -1,37 +1,34 @@
 #!/bin/sh
 
-# PROVIDE: tomato-shrieker
+# PROVIDE: tomato_shrieker
 # REQUIRE: LOGIN
+# KEYWORD: shutdown
 
 # Add the following line to /etc/rc.conf to enable `tomato-shrieker':
 #
-#tomato_shrieker_enable="YES"
+# tomato_shrieker_enable="YES"
+# tomato_shrieker_user="pooza"
+# tomato_shrieker_path="/usr/home/pooza/repos/tomato-shrieker"
 
 . /etc/rc.subr
 
 name="tomato_shrieker"
 rcvar="${name}_enable"
 
-load_rc_config "$name"
-: ${tomato_shrieker_enable="NO"}
-: ${tomato_shrieker_path=""}
-: ${tomato_shrieker_user=""}
+: ${tomato_shrieker_enable:="NO"}
+: ${tomato_shrieker_user:="pooza"}
+: ${tomato_shrieker_path:="/usr/home/${tomato_shrieker_user}/repos/tomato-shrieker"}
 
-export PATH=${PATH}:/usr/local/bin:/usr/local/sbin
-export LANG=ja_JP.UTF-8
-export LC_ALL=ja_JP.UTF-8
-
-start_cmd=${name}_start
-stop_cmd=${name}_stop
+pidfile="${tomato_shrieker_path}/tmp/pids/${name}.pid"
+wrapper="${tomato_shrieker_path}/bin/wrapper.sh"
+start_cmd="${name}_start"
+stop_cmd=":"
 
 tomato_shrieker_start() {
-  cd $tomato_shrieker_path
-  sudo -u $tomato_shrieker_user /bin/bash -lc 'bundle exec rake start'
+  export tomato_shrieker_user="$tomato_shrieker_user"
+  export tomato_shrieker_path="$tomato_shrieker_path"
+  daemon -u "$tomato_shrieker_user" -f -r -P "$pidfile" -- "$wrapper"
 }
 
-tomato_shrieker_stop() {
-  cd $tomato_shrieker_path
-  sudo -u $tomato_shrieker_user /bin/bash -lc 'bundle exec rake stop'
-}
-
+load_rc_config $name
 run_rc_command "$1"
