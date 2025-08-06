@@ -1,6 +1,7 @@
 module TomatoShrieker
   class Config < Ginseng::Config
     include Package
+
     def load
       super
       suffixes.each do |suffix|

@@ -3,8 +3,6 @@ module TomatoShrieker
     def exec
       shriek(template: create_template, visibility:)
     rescue => e
-      e.package = Package.full_name
-      SlackService.broadcast(e)
       logger.error(source: id, error: e)
     end
 

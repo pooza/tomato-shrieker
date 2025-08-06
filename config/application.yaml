@@ -35,15 +35,14 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.8.0
+  version: 3.8.1
 piefed:
   subject:
     max_length: 50
   verify_peer: true
 ruby:
   jit: false
-scheduler:
-  verbose: false
+scheduler: {}
 slack:
   hooks: []
 source:

@@ -17,8 +17,6 @@ module TomatoShrieker
         entry.shriek
       end
     rescue => e
-      e.package = Package.full_name
-      SlackService.broadcast(e)
       logger.error(source: id, error: e)
     end
 
@@ -28,6 +26,8 @@ module TomatoShrieker
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
       dataset.destroy
+    rescue => e
+      logger.error(source: id, error: e)
     end
 
     def purgeable?
@@ -43,6 +43,8 @@ module TomatoShrieker
     def clear
       dataset = Entry.dataset.where(feed: hash)
       dataset.destroy
+    rescue => e
+      logger.error(source: id, error: e)
     end
 
     def multi_entries?

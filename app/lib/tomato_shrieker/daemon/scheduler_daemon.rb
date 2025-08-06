@@ -3,13 +3,7 @@ module TomatoShrieker
     include Package
 
     def command
-      command = Ginseng::CommandLine.new([
-        File.join(Environment.dir, 'bin/scheduler_worker.rb'),
-      ])
-      command.env['RUBY_YJIT_ENABLE'] = 'yes' if config['/ruby/jit']
-      command.env['BUNDLE_GEMFILE'] = File.join(Environment.dir, 'Gemfile')
-      command.env['RACK_ENV'] ||= Environment.type
-      return command
+      return nil
     end
 
     def motd
@@ -19,9 +13,14 @@ module TomatoShrieker
       ].compact.join("\n")
     end
 
-    def save_config
-      puts config.secure_dump.to_yaml if config['/scheduler/verbose']
-      super
+    def start(args)
+      logger.info(daemon: app_name, version: Package.version, message: 'start')
+      Sequel::Model.db = Sequel.connect(Environment.dsn)
+      TomatoShrieker::Scheduler.instance.exec
+      sleep
+    rescue => e
+      logger.error(daemon: app_name, error: e)
+      raise
     end
   end
 end
