@@ -42,6 +42,8 @@ piefed:
   verify_peer: true
 ruby:
   jit: false
+scheduler:
+  verbose: false
 slack:
   hooks: []
 source:
