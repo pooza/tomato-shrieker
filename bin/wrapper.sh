@@ -1,7 +1,6 @@
 #!/bin/sh
 
-# tomato_shrieker_user, tomato_shrieker_path は rcスクリプトから export される前提
-
+# rcスクリプトから export される前提
 : "${tomato_shrieker_user:=$(whoami)}"
 : "${tomato_shrieker_path:="/usr/home/${tomato_shrieker_user}/repos/tomato-shrieker"}"
 
