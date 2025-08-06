@@ -8,7 +8,7 @@
 #
 # tomato_shrieker_enable="YES"
 # tomato_shrieker_user="pooza"
-# tomato_shrieker_path="/usr/home/pooza/repos/tomato-shrieker"
+# tomato_shrieker_path="/home/pooza/repos/tomato-shrieker"
 
 . /etc/rc.subr
 
@@ -17,7 +17,7 @@ rcvar="${name}_enable"
 
 : ${tomato_shrieker_enable:="NO"}
 : ${tomato_shrieker_user:="pooza"}
-: ${tomato_shrieker_path:="/usr/home/${tomato_shrieker_user}/repos/tomato-shrieker"}
+: ${tomato_shrieker_path:="/home/${tomato_shrieker_user}/repos/tomato-shrieker"}
 
 pidfile="${tomato_shrieker_path}/tmp/pids/${name}.pid"
 wrapper="${tomato_shrieker_path}/bin/wrapper.sh"
