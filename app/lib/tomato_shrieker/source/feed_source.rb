@@ -9,7 +9,6 @@ module TomatoShrieker
     end
 
     def exec
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       if multi_entries?
         shriek(template: create_template(:multi), visibility:)
       elsif touched?
@@ -22,9 +21,7 @@ module TomatoShrieker
     end
 
     def purge
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       return unless purgeable?
-      Sequel::Model.db = Sequel.connect(Environment.dsn)
       dataset = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
@@ -44,7 +41,6 @@ module TomatoShrieker
     end
 
     def clear
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       dataset = Entry.dataset.where(feed: hash)
       dataset.destroy
     rescue => e
@@ -126,7 +122,6 @@ module TomatoShrieker
     end
 
     def touch
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       Entry.create(entries.max_by(&:published), self)
       logger.info(source: id, message: 'touch')
     end
@@ -156,7 +151,6 @@ module TomatoShrieker
     end
 
     def create_record(entry)
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       return Entry.create(entry, self)
     end
 

@@ -84,7 +84,6 @@ module TomatoShrieker
     end
 
     def self.create(entry, feed = nil)
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       parser = EntryParser.new(entry)
       parser.feed = feed if feed
       entry = Entry[Entry.insert(parser.parse)]

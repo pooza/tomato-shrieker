@@ -39,10 +39,7 @@ module TomatoShrieker
     def start(args)
       save_config
       logger.info(daemon: app_name, version: Package.version, message: 'start')
-
-      # TomatoShrieker.setup_database
-      # TomatoShrieker.loader.eager_load
-
+      Sequel::Model.db = Sequel.connect(Environment.dsn)
       TomatoShrieker::Scheduler.instance.exec
       sleep
     rescue => e
