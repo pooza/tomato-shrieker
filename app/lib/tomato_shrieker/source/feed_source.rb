@@ -9,7 +9,7 @@ module TomatoShrieker
     end
 
     def exec
-      Environment.setup_database
+      Sequel::Model.db = Sequel.connect(Environment.dsn)
       if multi_entries?
         shriek(template: create_template(:multi), visibility:)
       elsif touched?
@@ -20,7 +20,7 @@ module TomatoShrieker
     rescue => e
       logger.error(source: id, error: e)
     ensure
-      db&.disconnect
+      Sequel::Model.db&.close
     end
 
     def purge
