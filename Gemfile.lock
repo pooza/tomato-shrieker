@@ -1,8 +1,8 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: f0d720f28882836ca009648f5897465c54167a82
+  revision: 340799deedd990b1126a8b69bdfd3401475572b8
   specs:
-    ginseng-core (1.15.5)
+    ginseng-core (1.15.6)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.8.0)
       bundler (~> 2.0)
@@ -121,7 +121,7 @@ GEM
     mime-types (3.7.0)
       logger
       mime-types-data (~> 3.2025, >= 3.2025.0507)
-    mime-types-data (3.2025.0729)
+    mime-types-data (3.2025.0805)
     mini_mime (1.1.5)
     mini_portile2 (2.8.9)
     minitest (5.25.5)
