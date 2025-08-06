@@ -12,6 +12,8 @@ module TomatoShrieker
             logger.info(source: source.id, class: source.class.to_s, action: 'exec start', at: source.post_at)
             source.exec
             logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
+          rescue => e
+            logger.error(source: source.id, error: e)
           end
           logger.info(source: source.id, job:, class: source.class.to_s, at: source.post_at)
         elsif source.cron
@@ -19,6 +21,8 @@ module TomatoShrieker
             logger.info(source: source.id, class: source.class.to_s, action: 'exec start', cron: source.cron)
             source.exec
             logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
+          rescue => e
+            logger.error(source: source.id, error: e)
           end
           logger.info(source: source.id, job:, class: source.class.to_s, cron: source.cron)
         else
@@ -26,6 +30,8 @@ module TomatoShrieker
             logger.info(source: source.id, class: source.class.to_s, action: 'exec start', every: source.every)
             source.exec
             logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
+          rescue => e
+            logger.error(source: source.id, error: e)
           end
           logger.info(source: source.id, job:, class: source.class.to_s, every: source.every)
         end
