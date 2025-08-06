@@ -4,7 +4,6 @@ module TomatoShrieker
     include Package
 
     def exec
-      logger.info(scheduler: {message: 'initialize'})
       Source.all.reject(&:disable?).each do |source|
         source.load
         job = register(source)
@@ -16,7 +15,6 @@ module TomatoShrieker
           logger.info(source: source.id, job:, class: source.class.to_s, every: source.every)
         end
       end
-      logger.info(scheduler: {message: 'initialized'})
       @scheduler.join
     rescue => e
       logger.error(scheduler: {error: e})
