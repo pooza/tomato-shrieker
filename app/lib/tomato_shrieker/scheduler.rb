@@ -7,15 +7,14 @@ module TomatoShrieker
       logger.info(scheduler: {message: 'initialize'})
       Source.all.reject(&:disable?).each do |source|
         source.load
+        job = register(source)
         if source.post_at
-          job = register(source)
           logger.info(source: source.id, job:, class: source.class.to_s, at: source.post_at)
         elsif source.cron
-          job = register(source)
           logger.info(source: source.id, job:, class: source.class.to_s, cron: source.cron)
         else
-          job = register(source)
-          logger.info(source: source.id, job:, class: source.class.to_s, every: source.every)
+          logger.info(source: source.id, job:, class: source.class.to_s,
+            every: source.every)
         end
       end
       logger.info(scheduler: {message: 'initialized'})
