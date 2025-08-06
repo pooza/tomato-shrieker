@@ -25,10 +25,13 @@ module TomatoShrieker
 
     def purge
       return unless purgeable?
+      Sequel::Model.db = Sequel.connect(Environment.dsn)
       dataset = Entry.dataset.where(feed: hash).where(
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
       dataset.destroy
+    ensure
+      Sequel::Model.db&.close
     end
 
     def purgeable?
@@ -42,8 +45,11 @@ module TomatoShrieker
     end
 
     def clear
+      Sequel::Model.db = Sequel.connect(Environment.dsn)
       dataset = Entry.dataset.where(feed: hash)
       dataset.destroy
+    ensure
+      Sequel::Model.db&.close
     end
 
     def multi_entries?
