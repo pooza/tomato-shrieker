@@ -6,14 +6,16 @@ module TomatoShrieker
     def exec
       logger.info(scheduler: {message: 'initialize'})
       Source.all.reject(&:disable?).each do |source|
-        logger.info(source: source.to_h)
         source.load
         if source.post_at
-          @scheduler.at(source.post_at, {tag: source.id}) {source.exec}
+          job = @scheduler.at(source.post_at, {tag: source.id}) {source.exec}
+          logger.info(source: source.id, job:, class: source.class.to_s, at: source.post_at )
         elsif source.cron
-          @scheduler.cron(source.cron, {tag: source.id}) {source.exec}
+          job = @scheduler.cron(source.cron, {tag: source.id}) {source.exec}
+          logger.info(source: source.id, job:, class: source.class.to_s, cron: source.cron)
         else
-          @scheduler.every(source.period, {tag: source.id}) {source.exec}
+          job = @scheduler.every(source.period, {tag: source.id}) {source.exec}
+          logger.info(source: source.id, job:, class: source.class.to_s, every: source.every)
         end
       end
       logger.info(scheduler: {message: 'initialized'})
