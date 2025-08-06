@@ -19,15 +19,18 @@ rcvar="${name}_enable"
 : ${tomato_shrieker_user:="pooza"}
 : ${tomato_shrieker_path:="/home/${tomato_shrieker_user}/repos/tomato-shrieker"}
 
-pidfile="${tomato_shrieker_path}/tmp/pids/${name}.pid"
-wrapper="${tomato_shrieker_path}/bin/wrapper.sh"
 start_cmd="${name}_start"
-stop_cmd=":"
+start_cmd="${name}_stop"
 
 tomato_shrieker_start() {
   export tomato_shrieker_user="$tomato_shrieker_user"
   export tomato_shrieker_path="$tomato_shrieker_path"
-  daemon -u "$tomato_shrieker_user" -f -r -P "$pidfile" -- "$wrapper"
+  daemon -u "$tomato_shrieker_user" -f -r -- ${tomato_shrieker_path}/bin/start.sh
+}
+
+tomato_shrieker_stop() {
+  cd $tomato_shrieker_path
+  ${tomato_shrieker_path}/bin/stop.sh
 }
 
 load_rc_config $name
