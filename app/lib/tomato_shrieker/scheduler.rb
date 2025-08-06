@@ -13,8 +13,7 @@ module TomatoShrieker
         elsif source.cron
           logger.info(source: source.id, job:, class: source.class.to_s, cron: source.cron)
         else
-          logger.info(source: source.id, job:, class: source.class.to_s,
-            every: source.every)
+          logger.info(source: source.id, job:, class: source.class.to_s, every: source.every)
         end
       end
       logger.info(scheduler: {message: 'initialized'})
