@@ -6,7 +6,6 @@ module TomatoShrieker
 
     def initialize(params)
       @params = params
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
     end
 
     def [](name)
