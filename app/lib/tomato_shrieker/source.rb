@@ -247,7 +247,7 @@ module TomatoShrieker
     end
 
     def default_period
-      return '5m'
+      return '1m'
     end
 
     alias every period

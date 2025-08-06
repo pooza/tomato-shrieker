@@ -9,7 +9,8 @@ module TomatoShrieker
         source.load
         if source.post_at
           job = @scheduler.at(source.post_at, {tag: source.id}) do
-            logger.info(source: source.id, class: source.class.to_s, action: 'exec start', at: source.post_at)
+            logger.info(source: source.id, class: source.class.to_s, action: 'exec start',
+              at: source.post_at)
             source.exec
             logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
           rescue => e
@@ -18,7 +19,8 @@ module TomatoShrieker
           logger.info(source: source.id, job:, class: source.class.to_s, at: source.post_at)
         elsif source.cron
           job = @scheduler.cron(source.cron, {tag: source.id}) do
-            logger.info(source: source.id, class: source.class.to_s, action: 'exec start', cron: source.cron)
+            logger.info(source: source.id, class: source.class.to_s, action: 'exec start',
+              cron: source.cron)
             source.exec
             logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
           rescue => e
@@ -27,7 +29,8 @@ module TomatoShrieker
           logger.info(source: source.id, job:, class: source.class.to_s, cron: source.cron)
         else
           job = @scheduler.every(source.period, {tag: source.id}) do
-            logger.info(source: source.id, class: source.class.to_s, action: 'exec start', every: source.every)
+            logger.info(source: source.id, class: source.class.to_s, action: 'exec start',
+              every: source.every)
             source.exec
             logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
           rescue => e

@@ -24,8 +24,8 @@ module TomatoShrieker
       File.write(pid_file, Process.pid.to_s)
       Dir.chdir(working_dir)
 
-      $stdout.reopen('/dev/null', 'w')
-      $stderr.reopen('/dev/null', 'w')
+      $stdout.reopen(File::NULL, 'w')
+      $stderr.reopen(File::NULL, 'w')
       $stdout.sync = true
       $stderr.sync = true
 
@@ -40,8 +40,8 @@ module TomatoShrieker
       save_config
       logger.info(daemon: app_name, version: Package.version, message: 'start')
 
-      #TomatoShrieker.setup_database
-      #TomatoShrieker.loader.eager_load
+      # TomatoShrieker.setup_database
+      # TomatoShrieker.loader.eager_load
 
       TomatoShrieker::Scheduler.instance.exec
       sleep
