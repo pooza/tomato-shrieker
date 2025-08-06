@@ -4,12 +4,12 @@ module TomatoShrieker
   class FeedSource < Source
     def initialize(params)
       super
+      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       @http = HTTP.new
       @http.base_uri = uri
     end
 
     def exec
-      Sequel::Model.db = Sequel.connect(Environment.dsn)
       if multi_entries?
         shriek(template: create_template(:multi), visibility:)
       elsif touched?
@@ -19,8 +19,6 @@ module TomatoShrieker
       end
     rescue => e
       logger.error(source: id, error: e)
-    ensure
-      Sequel::Model.db&.close
     end
 
     def purge
@@ -30,8 +28,8 @@ module TomatoShrieker
         Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
       )
       dataset.destroy
-    ensure
-      Sequel::Model.db&.close
+    rescue => e
+      logger.error(source: id, error: e)
     end
 
     def purgeable?
@@ -48,8 +46,8 @@ module TomatoShrieker
       Sequel::Model.db = Sequel.connect(Environment.dsn)
       dataset = Entry.dataset.where(feed: hash)
       dataset.destroy
-    ensure
-      Sequel::Model.db&.close
+    rescue => e
+      logger.error(source: id, error: e)
     end
 
     def multi_entries?
