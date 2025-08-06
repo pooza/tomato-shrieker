@@ -4,7 +4,6 @@ module TomatoShrieker
   class FeedSource < Source
     def initialize(params)
       super
-      Sequel::Model.db ||= Sequel.connect(Environment.dsn)
       @http = HTTP.new
       @http.base_uri = uri
     end
