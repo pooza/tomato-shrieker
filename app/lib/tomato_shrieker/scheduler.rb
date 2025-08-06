@@ -29,39 +29,26 @@ module TomatoShrieker
     end
 
     def register_at(source)
-      job = @scheduler.at(source.post_at, {tag: source.id}) do
-        logger.info(source: source.id, class: source.class.to_s, action: 'exec start',
-          at: source.post_at)
-        source.exec
-        logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
-      rescue => e
-        logger.error(source: source.id, error: e)
-      end
-      logger.info(source: source.id, job:, class: source.class.to_s, at: source.post_at)
+      schedule(source, :at, source.post_at, at: source.post_at)
     end
 
     def register_cron(source)
-      job = @scheduler.cron(source.cron, {tag: source.id}) do
-        logger.info(source: source.id, class: source.class.to_s, action: 'exec start',
-          cron: source.cron)
-        source.exec
-        logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
-      rescue => e
-        logger.error(source: source.id, error: e)
-      end
-      logger.info(source: source.id, job:, class: source.class.to_s, cron: source.cron)
+      schedule(source, :cron, source.cron, cron: source.cron)
     end
 
     def register_every(source)
-      job = @scheduler.every(source.period, {tag: source.id}) do
-        logger.info(source: source.id, class: source.class.to_s, action: 'exec start',
-          every: source.every)
+      schedule(source, :every, source.period, every: source.every)
+    end
+
+    def schedule(source, method, time_spec, log_info)
+      job = @scheduler.send(method, time_spec, {tag: source.id}) do
+        logger.info(source: source.id, class: source.class.to_s, action: 'exec start', **log_info)
         source.exec
         logger.info(source: source.id, class: source.class.to_s, action: 'exec end')
       rescue => e
         logger.error(source: source.id, error: e)
       end
-      logger.info(source: source.id, job:, class: source.class.to_s, every: source.every)
+      logger.info(source: source.id, job:, class: source.class.to_s, **log_info)
     end
   end
 end
