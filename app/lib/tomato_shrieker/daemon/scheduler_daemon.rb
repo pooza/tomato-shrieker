@@ -16,7 +16,7 @@ module TomatoShrieker
     def start(args)
       logger.info(daemon: app_name, version: Package.version, message: 'start')
       Sequel.connect(Environment.dsn)
-      TomatoShrieker::Scheduler.instance.exec
+      Scheduler.instance.exec
       sleep
     rescue => e
       logger.error(daemon: app_name, error: e)
