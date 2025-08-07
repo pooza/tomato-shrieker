@@ -5,7 +5,5 @@ ENV['RAKE'] = nil
 
 require 'tomato_shrieker'
 module TomatoShrieker
-  include Package
-
   SchedulerDaemon.spawn!
 end
