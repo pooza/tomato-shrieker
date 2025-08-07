@@ -19,15 +19,6 @@ module TomatoShrieker
       logger.error(scheduler: {error: e})
     end
 
-    private
-
-    def initialize
-      @scheduler = Rufus::Scheduler.new
-      @scheduler.cron('@hourly', 'purge') do
-        FeedSource.purge_all
-      end
-    end
-
     def register_at(source)
       schedule(source, :at, source.post_at, at: source.post_at)
     end
@@ -38,6 +29,15 @@ module TomatoShrieker
 
     def register_every(source)
       schedule(source, :every, source.period, every: source.every)
+    end
+
+    private
+
+    def initialize
+      @scheduler = Rufus::Scheduler.new
+      @scheduler.cron('@hourly', 'purge') do
+        FeedSource.purge_all
+      end
     end
 
     def schedule(source, method, time_spec, log_info)
