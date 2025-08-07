@@ -15,7 +15,7 @@ module TomatoShrieker
 
     def start(args)
       logger.info(daemon: app_name, version: Package.version, message: 'start')
-      Sequel::Model.db = Sequel.connect(Environment.dsn)
+      Sequel.connect(Environment.dsn)
       TomatoShrieker::Scheduler.instance.exec
       sleep
     rescue => e

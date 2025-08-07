@@ -3,6 +3,6 @@ ENV['RAKE'] = 'yes'
 
 require 'tomato_shrieker'
 module TomatoShrieker
-  Sequel::Model.db = Sequel.connect(Environment.dsn)
+  Sequel.connect(Environment.dsn)
   load_tasks
 end
