@@ -6,6 +6,7 @@ module TomatoShrieker
   warn Package.full_name
   warn File.basename(__FILE__)
   warn ''
+  Sequel::Model.db = Sequel.connect(Environment.dsn)
   TestCase.load(ARGV.getopts('', 'cases:')['cases'] || ARGV.first)
 rescue => e
   warn e.message
