@@ -67,6 +67,14 @@ source:
       config: /source/calendar
     - class: IcalendarSource
       config: /source/ical
+    - class: YouTubeChannelSource
+      config: /source/youtube/channel
+    - class: YouTubeChannelSource
+      config: /source/youtube/channel/id
 sources: []
 sqlite3:
   db: db.sqlite3
+youtube:
+  urls:
+    root: https://www.youtube.com
+    feed: https://www.youtube.com/feeds/videos.xml
