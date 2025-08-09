@@ -49,10 +49,6 @@ module TomatoShrieker
       return self['/dest/category']
     end
 
-    def limit
-      return self['/dest/limit'] || 5
-    end
-
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
