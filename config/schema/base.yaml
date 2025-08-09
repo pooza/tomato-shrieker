@@ -81,8 +81,6 @@ properties:
                   - url
                   - token
                 type: hash
-              multi_entries:
-                type: boolean
               mulukhiya:
                 properties:
                   enable: boolean
