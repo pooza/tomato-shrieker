@@ -8,6 +8,8 @@ github:
   urls:
     root: https://github.com
 google:
+  api:
+    key: null
   news:
     urls:
       root: https://news.google.com/rss/search?hl=ja&gl=JP&ceid=JP%3Aja
@@ -64,9 +66,9 @@ source:
     - class: IcalendarSource
       config: /source/ical
     - class: YouTubeChannelSource
-      config: /source/youtube/channel
-    - class: YouTubeChannelSource
       config: /source/youtube/channel/id
+    - class: YouTubeChannelSource
+      config: /source/youtube/channel/url
 sources: []
 sqlite3:
   db: db.sqlite3

@@ -10,13 +10,16 @@ module TomatoShrieker
 
     def channel_uri
       if self['/source/youtube/channel/url']
-        Ginseng::URI.parse(config['/source/youtube/channel/url'])
-      else
+        return Ginseng::YouTube::ChannelURI.parse(config['/source/youtube/channel/url'])
+      elsif self['/source/youtube/channel/id']
+        uri = Ginseng::YouTube::ChannelURI.parse(config['/youtube/urls/root'])
+        uri.path = "/channel/#{channel_id}"
+        return uri
       end
     end
 
     def channel_id
-      return self['/source/youtube/channel/id']
+      return self['/source/youtube/channel/id'] || channel_uri.id
     end
 
     def self.all(&block)
