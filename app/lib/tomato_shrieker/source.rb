@@ -65,7 +65,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'common'),
-        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'common'),
         piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'common'),
       }
       return @templates
@@ -91,7 +90,6 @@ module TomatoShrieker
       yield mastodon if mastodon?
       yield misskey if misskey?
       yield line if line?
-      yield lemmy if lemmy?
       yield piefed if piefed?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
@@ -152,24 +150,6 @@ module TomatoShrieker
       return line.present?
     end
 
-    def lemmy
-      unless @lemmy
-        return nil unless self['/dest/lemmy/host']
-        return nil unless self['/dest/lemmy/user_id']
-        return nil unless self['/dest/lemmy/password']
-        return nil unless self['/dest/lemmy/community_id']
-        @lemmy = LemmyShrieker.new(@params.dig('dest', 'lemmy'))
-      end
-      return @lemmy
-    rescue => e
-      logger.error(source: id, error: e, lemmy: self['/dest/lemmy/host'])
-      return nil
-    end
-
-    def lemmy?
-      return lemmy.present?
-    end
-
     def piefed
       unless @piefed
         return nil unless self['/dest/piefed/host']
@@ -180,7 +160,7 @@ module TomatoShrieker
       end
       return @piefed
     rescue => e
-      logger.error(source: id, error: e, lemmy: self['/dest/piefed/host'])
+      logger.error(source: id, error: e, piefed: self['/dest/piefed/host'])
       return nil
     end
 

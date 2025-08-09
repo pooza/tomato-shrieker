@@ -83,15 +83,6 @@ module TomatoShrieker
       end
     end
 
-    def test_lemmy
-      Source.all do |source|
-        assert_boolean(source.lemmy?)
-        next unless source.lemmy?
-
-        assert_kind_of(LemmyShrieker, source.lemmy)
-      end
-    end
-
     def test_piefed
       Source.all do |source|
         assert_boolean(source.piefed?)
@@ -104,7 +95,7 @@ module TomatoShrieker
     def test_shriekers
       Source.all do |source|
         source.shriekers do |shrieker|
-          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker, LineShrieker, LemmyShrieker], shrieker)
+          assert_kind_of([MastodonShrieker, MisskeyShrieker, WebhookShrieker, LineShrieker, PiefedShrieker], shrieker)
         end
       end
     end

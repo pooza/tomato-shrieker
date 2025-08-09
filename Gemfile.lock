@@ -40,6 +40,12 @@ GIT
   specs:
     ginseng-fediverse (1.8.17)
 
+GIT
+  remote: https://github.com/pooza/ginseng-youtube.git
+  revision: 27d149637eb1cf43ef8e1a5e38d1a3cc0e479f2c
+  specs:
+    ginseng-youtube (2.0.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -234,6 +240,7 @@ DEPENDENCIES
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!
+  ginseng-youtube!
   icalendar
   icalendar-rrule
   optparse

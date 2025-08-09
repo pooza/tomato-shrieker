@@ -116,7 +116,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'calendar'),
-        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'calendar'),
         piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'calendar'),
       }
       return @templates
@@ -131,7 +130,7 @@ module TomatoShrieker
       uri ||= Ginseng::URI.parse(self['/source/ical'])
       return nil unless uri&.absolute?
       uri.query_values = {t: Time.now.to_f.to_s}
-      return uri
+      return uri.normalize if uri&.absolute?
     end
 
     def self.all(&block)

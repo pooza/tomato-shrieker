@@ -17,12 +17,6 @@ module TomatoShrieker
       end
     end
 
-    def test_multi_entries?
-      FeedSource.all do |source|
-        assert_boolean(source.multi_entries?)
-      end
-    end
-
     def test_enclosure?
       FeedSource.all do |source|
         assert_boolean(source.enclosure?)
@@ -35,12 +29,6 @@ module TomatoShrieker
       end
     end
 
-    def test_limit
-      FeedSource.all.select(&:multi_entries?).each do |source|
-        assert_kind_of(Integer, source.limit)
-      end
-    end
-
     def test_keyword
       FeedSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)
@@ -50,13 +38,6 @@ module TomatoShrieker
     def test_negative_keyword
       FeedSource.all.select(&:negative_keyword).each do |source|
         assert_kind_of(Regexp, source.negative_keyword)
-      end
-    end
-
-    def test_multi_entries
-      FeedSource.all.select(&:multi_entries?).each do |source|
-        assert_kind_of(Array, source.multi_entries)
-        assert_kind_of(Template, source.templates[:multi])
       end
     end
 

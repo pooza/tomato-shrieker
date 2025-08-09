@@ -1,5 +1,21 @@
 module TomatoShrieker
-  class PiefedShrieker < LemmyShrieker
+  class PiefedShrieker
+    include Package
+
+    attr_reader :http
+
+    def initialize(params = {})
+      @params = params.deep_symbolize_keys
+      @http = HTTP.new
+      @http.base_uri = uri
+      login
+    end
+
+    def uri
+      @uri ||= Ginseng::URI.parse("https://#{@params[:host]}")
+      return @uri if @uri&.absolute?
+    end
+
     def login
       response = http.post('/api/alpha/user/login', {
         body: {

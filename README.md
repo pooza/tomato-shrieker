@@ -29,7 +29,6 @@
 - Slack Incoming Webhooks
   - Discord等、webhookに互換性をもつサービスを含む。
   - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む。
-- [Lemmy](https://join-lemmy.org)
 - [PieFed](https://join.piefed.social)
 - LINE
 

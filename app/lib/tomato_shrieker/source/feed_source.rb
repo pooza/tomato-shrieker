@@ -9,9 +9,7 @@ module TomatoShrieker
     end
 
     def exec
-      if multi_entries?
-        shriek(template: create_template(:multi), visibility:)
-      elsif touched?
+      if touched?
         fetch(&:shriek)
       elsif entry = fetch.to_a.last
         entry.shriek
@@ -47,25 +45,14 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def multi_entries?
-      return self['/dest/multi_entries'] unless self['/dest/multi_entries'].nil?
-      return false
-    end
-
     def category
       return self['/dest/category']
-    end
-
-    def limit
-      return self['/dest/limit'] || 5
     end
 
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
-        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'title'),
         piefed: Template.new(self['/dest/piefed/template'] || self['/piefed/template'] || 'title'),
-        multi: Template.new(self['/dest/template'] || 'multi_entries'),
       }
       return @templates
     end
@@ -73,7 +60,6 @@ module TomatoShrieker
     def create_template(type = :default, status = nil)
       template = super
       template[:feed] = self
-      template[:entries] = multi_entries if type == :multi
       return template
     end
 
@@ -94,15 +80,6 @@ module TomatoShrieker
     def enclosure_negative_keyword
       return nil unless keyword = self['/enclosure/negative_keyword']
       return Regexp.new(keyword)
-    end
-
-    def multi_entries
-      records = entries
-        .select {|v| v.categories.member?(category)}
-        .sort_by {|v| v.published.to_f}
-        .reverse
-        .first(limit)
-      return records
     end
 
     def time
@@ -172,8 +149,7 @@ module TomatoShrieker
     def uri
       uri = Ginseng::URI.parse(self['/source/feed'])
       uri ||= Ginseng::URI.parse(self['/source/url'])
-      return nil unless uri&.absolute?
-      return uri
+      return uri.normalize if uri&.absolute?
     end
 
     def feedjira
@@ -189,11 +165,11 @@ module TomatoShrieker
     def create_uri(href)
       uri = @http.create_uri(href)
       uri.fragment ||= self.uri.fragment
-      return uri
+      return uri.normalize if uri&.absolute?
     end
 
     def summary
-      values = {id:, category:, multi: multi_entries?}
+      values = {id:, category:}
       values[:entries] = entries.reject {|v| ignore_entry?(v)}.map do |entry|
         {
           date: entry.published.strftime('%Y/%m/%d %R'),
