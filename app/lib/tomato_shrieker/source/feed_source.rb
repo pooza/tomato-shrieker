@@ -149,8 +149,7 @@ module TomatoShrieker
     def uri
       uri = Ginseng::URI.parse(self['/source/feed'])
       uri ||= Ginseng::URI.parse(self['/source/url'])
-      return nil unless uri&.absolute?
-      return uri
+      return uri.normalize if uri&.absolute?
     end
 
     def feedjira
@@ -166,7 +165,7 @@ module TomatoShrieker
     def create_uri(href)
       uri = @http.create_uri(href)
       uri.fragment ||= self.uri.fragment
-      return uri
+      return uri.normalize if uri&.absolute?
     end
 
     def summary

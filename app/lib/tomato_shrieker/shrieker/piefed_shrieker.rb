@@ -13,7 +13,7 @@ module TomatoShrieker
 
     def uri
       @uri ||= Ginseng::URI.parse("https://#{@params[:host]}")
-      return @uri
+      return @uri if @uri&.absolute?
     end
 
     def login
