@@ -15,10 +15,6 @@ http:
   retry:
     limit: 3
     seconds: 1
-lemmy:
-  subject:
-    max_length: 50
-  verify_peer: true
 line:
   urls:
     api: https://api.line.me
