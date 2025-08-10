@@ -1,7 +1,0 @@
-【新着お知らせ】
-
-<% params[:entries].each do |entry| -%>
-<%= entry.published.getlocal.strftime('%m/%d') -%> <%= entry.title %>
-<%= entry.url %>
-
-<% end -%>
