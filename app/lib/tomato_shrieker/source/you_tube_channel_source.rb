@@ -2,7 +2,9 @@ module TomatoShrieker
   class YouTubeChannelSource < FeedSource
     def feed_uri
       uri = Ginseng::URI.parse(config['/youtube/urls/feed'])
-      uri.query_values['channel_id'] = channel_id
+      values = uri.query_values || {}
+      values['channel_id'] = channel_id
+      uri.query_values = values
       return uri.normalize if uri&.absolute?
     end
 
