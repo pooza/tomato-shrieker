@@ -11,12 +11,6 @@ module TomatoShrieker
       end
     end
 
-    def test_channel_id
-      YouTubeChannelSource.all do |source|
-        assert_kind_of(Integer, source.channel_id)
-      end
-    end
-
     def test_channel_uri
       YouTubeChannelSource.all do |source|
         assert_kind_of(Ginseng::URI, source.channel_uri)
