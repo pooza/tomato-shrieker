@@ -154,7 +154,7 @@ module TomatoShrieker
     end
 
     def remind_every
-      return self['/schedule/remind/every'] || '5m'
+      return self['/schedule/remind/every'] || default_period
     end
 
     def self.all(&block)
@@ -204,7 +204,7 @@ module TomatoShrieker
     end
 
     def schedule_remind
-      job = Scheduler.instance.scheduler.send(:every, remind_every, {tag: id}) do
+      job = Scheduler.instance.scheduler.send(:period, remind_every, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
         remind
         logger.info(source: id, class: self.class.to_s, action: 'remind end')
