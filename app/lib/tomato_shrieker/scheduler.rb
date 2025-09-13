@@ -5,8 +5,6 @@ module TomatoShrieker
 
     def exec
       Source.all.reject(&:disable?).each do |source|
-        source.load
-        source.scheduler = @scheduler
         source.register
       end
       @scheduler.join

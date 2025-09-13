@@ -4,8 +4,6 @@ module TomatoShrieker
   class Source # rubocop:disable Metrics/ClassLength
     include Package
 
-    attr_accessor :scheduler
-
     def initialize(params)
       @params = params
     end
@@ -31,6 +29,7 @@ module TomatoShrieker
     end
 
     def register
+      return if disable?
       return schedule(:at) if post_at
       return schedule(:cron) if cron
       return schedule(:every)
@@ -240,10 +239,6 @@ module TomatoShrieker
 
     alias every period
 
-    def load
-      return nil
-    end
-
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|
@@ -273,7 +268,7 @@ module TomatoShrieker
     private
 
     def schedule(method, spec, log_info)
-      job = scheduler.send(method.to_sym, spec, {tag: id}) do
+      job = Scheduler.instance.send(method.to_sym, spec, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_s => spec)
         exec
         logger.info(source: id, class: self.class.to_s, action: 'exec end')
