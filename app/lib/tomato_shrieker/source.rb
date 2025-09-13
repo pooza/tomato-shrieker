@@ -30,9 +30,9 @@ module TomatoShrieker
 
     def register
       return if disable?
-      return schedule(:at) if post_at
-      return schedule(:cron) if cron
-      return schedule(:every)
+      return schedule(:at, post_at) if post_at
+      return schedule(:cron, cron) if cron
+      return schedule(:every, every)
     end
 
     def shriek(params = {})
@@ -267,7 +267,7 @@ module TomatoShrieker
 
     private
 
-    def schedule(method, spec, log_info)
+    def schedule(method, spec)
       job = Scheduler.instance.send(method.to_sym, spec, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_s => spec)
         exec
