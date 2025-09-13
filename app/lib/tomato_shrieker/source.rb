@@ -3,6 +3,7 @@ require 'digest/sha1'
 module TomatoShrieker
   class Source # rubocop:disable Metrics/ClassLength
     include Package
+    attr_accessor :scheduler
 
     def initialize(params)
       @params = params
@@ -26,6 +27,12 @@ module TomatoShrieker
 
     def exec
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
+    end
+
+    def register()
+      return schedule(:at) if post_at
+      return schedule(:cron) if cron
+      return schedule(:every)
     end
 
     def shriek(params = {})
@@ -260,6 +267,20 @@ module TomatoShrieker
 
     def fedi_sanitize(message)
       return fedi_sanitize? ? message.to_s.sanitize_status : message.to_s.sanitize
+    end
+
+    private
+
+    def schedule(source, spec, log_info)
+      job = scheduler.send(source.to_sym, spec, {tag: id}) do
+        logger.info(source: id, class: self.class.to_s, action: 'exec start', {source => spec})
+        exec
+        logger.info(source: id, class: self.class.to_s, action: 'exec end')
+      rescue => e
+        logger.error(source: id, error: e)
+      end
+      logger.info(source: id, job:, class: self.class.to_s, {source => spec})
+      return job
     end
   end
 end
