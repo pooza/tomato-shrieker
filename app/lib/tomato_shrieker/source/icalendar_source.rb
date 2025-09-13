@@ -31,6 +31,16 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
+    def remind
+      entries.select {|entry| remind_entry?(entry)}.each do |entry|
+        template = create_template
+        template[:entry] = entry
+        shriek(template:, visibility:)
+      end
+    rescue => e
+      logger.error(source: id, error: e)
+    end
+
     def summary
       return {id:, entries: entries.reject {|v| ignore_entry?(v)}.to_a}
     end
@@ -68,6 +78,10 @@ module TomatoShrieker
       return true if negative_keyword && negative_entry?(entry)
       return true unless shriekable?(entry[:start_date], entry[:end_date])
       return false
+    end
+
+    def remind_entry?(entry)
+      return ((Time.now)..(Time.now + 5.minutes)).cover?(entry.start_date)
     end
 
     def hot_entry?(entry)
@@ -133,6 +147,16 @@ module TomatoShrieker
       return uri.normalize if uri&.absolute?
     end
 
+    def register
+      return if disable?
+      schedule_remind if remind_every
+      return super
+    end
+
+    def remind_every
+      return self['/schedule/remind/every'] || '5m'
+    end
+
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(self)}.each(&block)
@@ -177,6 +201,20 @@ module TomatoShrieker
         event.dtend = e.end_time
       end
       return event
+    end
+
+    private
+
+    def schedule_remind
+      job = Scheduler.instance.scheduler.send(:every, remind_every, {tag: id}) do
+        logger.info(source: id, class: self.class.to_s, action: 'remind start')
+        remind
+        logger.info(source: id, class: self.class.to_s, action: 'remind end')
+      rescue => e
+        logger.error(source: id, error: e)
+      end
+      logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)
+      return job
     end
   end
 end
