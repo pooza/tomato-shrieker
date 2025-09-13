@@ -203,8 +203,6 @@ module TomatoShrieker
       return event
     end
 
-    private
-
     def schedule_remind
       job = Scheduler.instance.scheduler.send(:every, remind_every, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
