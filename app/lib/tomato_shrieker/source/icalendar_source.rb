@@ -149,12 +149,12 @@ module TomatoShrieker
 
     def register
       return if disable?
-      schedule_remind if remind_every
+      schedule_remind
       return super
     end
 
     def remind_every
-      return self['/schedule/remind/every'] || default_period
+      return self['/schedule/remind/every'] || '5m'
     end
 
     def self.all(&block)
@@ -204,14 +204,14 @@ module TomatoShrieker
     end
 
     def schedule_remind
-      job = Scheduler.instance.scheduler.send(:period, remind_every, {tag: id}) do
+      job = Scheduler.instance.scheduler.send(:every, remind_every, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
         remind
         logger.info(source: id, class: self.class.to_s, action: 'remind end')
       rescue => e
         logger.error(source: id, error: e)
       end
-      logger.info(source: id, job:, class: self.class.to_s, remind: true, method.to_sym => spec)
+      logger.info(source: id, job:, class: self.class.to_s, remind: true, every: remind_every)
       return job
     end
   end
