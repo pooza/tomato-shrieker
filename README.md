@@ -28,7 +28,7 @@
 - [Misskey](https://github.com/syuilo/misskey)
 - Slack Incoming Webhooks
   - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)
-  - [matrix-webhook](https://github.com/bshock-matrix/matrix-webhook)
+  <!-- - [matrix-webhook](https://github.com/bshock-matrix/matrix-webhook) -->
   - Discord等、webhookに互換性をもつサービス
 - [PieFed](https://join.piefed.social)
 - LINE
