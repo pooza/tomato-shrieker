@@ -6,9 +6,7 @@ module TomatoShrieker
     attr_reader :scheduler
 
     def exec
-      Source.all.reject(&:disable?).each do |source|
-        source.register
-      end
+      Source.all.reject(&:disable?).each(&:register)
       @scheduler.join
     rescue => e
       logger.error(scheduler: {error: e})
