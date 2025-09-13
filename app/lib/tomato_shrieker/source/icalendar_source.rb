@@ -211,7 +211,7 @@ module TomatoShrieker
       rescue => e
         logger.error(source: id, error: e)
       end
-      logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec, remind: true)
+      logger.info(source: id, job:, class: self.class.to_s, remind: true, method.to_sym => spec)
       return job
     end
   end
