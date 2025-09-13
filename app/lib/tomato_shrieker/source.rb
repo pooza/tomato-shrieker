@@ -271,15 +271,15 @@ module TomatoShrieker
 
     private
 
-    def schedule(source, spec, log_info)
-      job = scheduler.send(source.to_sym, spec, {tag: id}) do
-        logger.info(source: id, class: self.class.to_s, action: 'exec start', {source => spec})
+    def schedule(method, spec, log_info)
+      job = scheduler.send(method.to_sym, spec, {tag: id}) do
+        logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_s => spec)
         exec
         logger.info(source: id, class: self.class.to_s, action: 'exec end')
       rescue => e
         logger.error(source: id, error: e)
       end
-      logger.info(source: id, job:, class: self.class.to_s, {source => spec})
+      logger.info(source: id, job:, class: self.class.to_s, method.to_s => spec)
       return job
     end
   end
