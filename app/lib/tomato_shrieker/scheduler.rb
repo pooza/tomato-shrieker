@@ -3,6 +3,8 @@ module TomatoShrieker
     include Singleton
     include Package
 
+    attr_reader :scheduler
+
     def exec
       Source.all.reject(&:disable?).each do |source|
         source.register
