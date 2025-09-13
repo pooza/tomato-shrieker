@@ -3,6 +3,7 @@ require 'digest/sha1'
 module TomatoShrieker
   class Source # rubocop:disable Metrics/ClassLength
     include Package
+
     attr_accessor :scheduler
 
     def initialize(params)
@@ -29,7 +30,7 @@ module TomatoShrieker
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 
-    def register()
+    def register
       return schedule(:at) if post_at
       return schedule(:cron) if cron
       return schedule(:every)
