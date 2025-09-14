@@ -32,6 +32,7 @@ module TomatoShrieker
     end
 
     def remind
+      return unless remind?
       entries.select {|entry| remind_entry?(entry)}.each do |entry|
         template = create_template
         template[:entry] = entry
@@ -149,12 +150,16 @@ module TomatoShrieker
 
     def register
       return if disable?
-      schedule_remind
+      schedule_remind if remind?
       return super
     end
 
+    def remind?
+      return self['/schedule/remind/enable']
+    end
+
     def remind_every
-      return self['/schedule/remind/every'] || '5m'
+      return self['/schedule/remind/every'] if remind?
     end
 
     def self.all(&block)
