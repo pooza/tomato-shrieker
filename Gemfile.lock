@@ -159,7 +159,7 @@ GEM
       ast (~> 2.4.1)
       racc
     power_assert (2.0.5)
-    prism (1.5.0)
+    prism (1.5.1)
     public_suffix (6.0.2)
     raabro (1.4.0)
     racc (1.8.1)
