@@ -22,6 +22,7 @@ module TomatoShrieker
     end
 
     def exec
+      return unless enabled?
       entries do |entry|
         template = create_template
         template[:entry] = entry
@@ -32,6 +33,7 @@ module TomatoShrieker
     end
 
     def remind
+      return unless enabled?
       return unless remind?
       entries.select {|entry| remind_entry?(entry)}.each do |entry|
         template = create_template
