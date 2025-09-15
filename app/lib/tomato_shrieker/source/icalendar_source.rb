@@ -159,7 +159,7 @@ module TomatoShrieker
     end
 
     def remind?
-      return self['/schedule/remind/enable']
+      return self['/schedule/remind/enable'] == true
     end
 
     def remind_minutes
