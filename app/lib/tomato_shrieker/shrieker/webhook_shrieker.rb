@@ -19,11 +19,11 @@ module TomatoShrieker
     end
 
     def channel
-      return @params[:channel] # matrix-webhook で使用
+      return @params[:channel] rescue nil # matrix-webhook で使用
     end
 
     def room_id
-      return @params[:room_id] # matrix-webhook で使用
+      return @params[:room_id] rescue nil # matrix-webhook で使用
     end
 
     def post(body, type = :hash)
