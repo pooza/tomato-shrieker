@@ -22,7 +22,7 @@ module TomatoShrieker
     end
 
     def exec
-      return unless enabled?
+      return if disable?
       entries do |entry|
         template = create_template
         template[:entry] = entry
@@ -33,7 +33,7 @@ module TomatoShrieker
     end
 
     def remind
-      return unless enabled?
+      return if disable?
       return unless remind?
       entries.select {|entry| remind_entry?(entry)}.each do |entry|
         template = create_template
@@ -84,7 +84,9 @@ module TomatoShrieker
     end
 
     def remind_entry?(entry)
-      return ((Time.now)..(Time.now + 5.minutes)).cover?(entry.start_date)
+      time_start = Time.now
+      time_end = time_start + remind_minutes.minutes
+      return (time_start..time_end).cover?(entry[:start_date])
     end
 
     def hot_entry?(entry)
@@ -160,8 +162,9 @@ module TomatoShrieker
       return self['/schedule/remind/enable']
     end
 
-    def remind_every
-      return self['/schedule/remind/every'] if remind?
+    def remind_minutes
+      return nil unless remind?
+      return self['/schedule/remind/minutes'] || 5
     end
 
     def self.all(&block)
@@ -211,14 +214,14 @@ module TomatoShrieker
     end
 
     def schedule_remind
-      job = Scheduler.instance.scheduler.send(:every, remind_every, {tag: id}) do
+      job = Scheduler.instance.scheduler.send(:every, "#{remind_minutes}m", {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
         remind
         logger.info(source: id, class: self.class.to_s, action: 'remind end')
       rescue => e
         logger.error(source: id, error: e)
       end
-      logger.info(source: id, job:, class: self.class.to_s, remind: true, every: remind_every)
+      logger.info(source: id, job:, class: self.class.to_s, remind: true, every: "#{remind_minutes}m")
       return job
     end
   end
