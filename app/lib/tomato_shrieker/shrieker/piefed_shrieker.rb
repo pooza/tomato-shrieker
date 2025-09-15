@@ -17,7 +17,7 @@ module TomatoShrieker
     end
 
     def login
-      response = http.post('/api/alpha/user/login', {
+      response = http.post("/api/#{api_version}/user/login", {
         body: {
           username: @params[:user_id],
           password: (@params[:password].decrypt rescue @params[:password]),
@@ -38,10 +38,14 @@ module TomatoShrieker
       data[:title].ellipsize!(config['/piefed/subject/max_length'])
       uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
       data[:url] = uri.to_s if uri
-      return http.post('/api/alpha/post', {
+      return http.post("/api/#{api_version}/post", {
         body: data,
         headers: {'Authorization' => "Bearer #{@jwt}"},
       })
+    end
+
+    def api_version
+      return @params[:api_version] || 'alpha'
     end
 
     def search_template(body)
