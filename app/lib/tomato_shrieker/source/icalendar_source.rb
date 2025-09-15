@@ -149,7 +149,7 @@ module TomatoShrieker
       uri ||= Ginseng::URI.parse(self['/source/ical'])
       return nil unless uri&.absolute?
       uri.query_values = {t: Time.now.to_f.to_s}
-      return uri.normalize if uri&.absolute?
+      return uri.normalize
     end
 
     def register
