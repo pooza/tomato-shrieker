@@ -38,7 +38,7 @@ module TomatoShrieker
       return @command
     end
 
-    def load
+    def register
       command.bundle_install if bundler?
       return super
     end

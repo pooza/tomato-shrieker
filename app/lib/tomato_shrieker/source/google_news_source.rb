@@ -3,7 +3,7 @@ module TomatoShrieker
     def uri
       if self['/source/news/phrase']
         uri = Ginseng::URI.parse(config['/google/news/urls/root'])
-        values = uri.query_values
+        values = uri.query_values || {}
         values['q'] = self['/source/news/phrase']
         uri.query_values = values
       else
@@ -13,8 +13,7 @@ module TomatoShrieker
     end
 
     def phrase
-      return self['/source/news/phrase'] if self['/source/news/phrase']
-      return uri.query_values['q']
+      return self['/source/news/phrase'] || uri.query_values['q']
     end
 
     def self.all(&block)

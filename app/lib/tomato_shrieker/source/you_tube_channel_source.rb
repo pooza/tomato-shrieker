@@ -1,0 +1,37 @@
+module TomatoShrieker
+  class YouTubeChannelSource < FeedSource
+    def feed_uri
+      uri = Ginseng::URI.parse(config['/youtube/urls/feed'])
+      values = uri.query_values || {}
+      values['channel_id'] = channel_id
+      uri.query_values = values
+      return uri.normalize if uri&.absolute?
+    end
+
+    alias uri feed_uri
+
+    def channel_uri
+      if self['/source/youtube/channel/url']
+        uri = Ginseng::YouTube::ChannelURI.parse(self['/source/youtube/channel/url'])
+      elsif self['/source/youtube/channel/id']
+        uri = Ginseng::YouTube::ChannelURI.parse(config['/youtube/urls/root'])
+        uri.path = "/channel/#{channel_id}"
+      end
+      return uri.normalize if uri&.absolute?
+    end
+
+    def channel_id
+      if self['/source/youtube/channel/url']
+        uri = Ginseng::YouTube::ChannelURI.parse(self['/source/youtube/channel/url'])
+        return uri.id
+      elsif self['/source/youtube/channel/id']
+        return self['/source/youtube/channel/id']
+      end
+    end
+
+    def self.all(&block)
+      return enum_for(__method__) unless block
+      Source.all.select {|s| s.is_a?(self)}.each(&block)
+    end
+  end
+end

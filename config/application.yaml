@@ -8,6 +8,8 @@ github:
   urls:
     root: https://github.com
 google:
+  api:
+    key: null
   news:
     urls:
       root: https://news.google.com/rss/search?hl=ja&gl=JP&ceid=JP%3Aja
@@ -15,10 +17,6 @@ http:
   retry:
     limit: 3
     seconds: 1
-lemmy:
-  subject:
-    max_length: 50
-  verify_peer: true
 line:
   urls:
     api: https://api.line.me
@@ -35,7 +33,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.8.2
+  version: 3.9.0
 piefed:
   subject:
     max_length: 50
@@ -67,6 +65,14 @@ source:
       config: /source/calendar
     - class: IcalendarSource
       config: /source/ical
+    - class: YouTubeChannelSource
+      config: /source/youtube/channel/id
+    - class: YouTubeChannelSource
+      config: /source/youtube/channel/url
 sources: []
 sqlite3:
   db: db.sqlite3
+youtube:
+  urls:
+    root: https://www.youtube.com
+    feed: https://www.youtube.com/feeds/videos.xml

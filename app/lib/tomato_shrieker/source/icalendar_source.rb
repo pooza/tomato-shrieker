@@ -22,7 +22,20 @@ module TomatoShrieker
     end
 
     def exec
+      return if disable?
       entries do |entry|
+        template = create_template
+        template[:entry] = entry
+        shriek(template:, visibility:)
+      end
+    rescue => e
+      logger.error(source: id, error: e)
+    end
+
+    def remind
+      return if disable?
+      return unless remind?
+      entries.select {|entry| remind_entry?(entry)}.each do |entry|
         template = create_template
         template[:entry] = entry
         shriek(template:, visibility:)
@@ -68,6 +81,12 @@ module TomatoShrieker
       return true if negative_keyword && negative_entry?(entry)
       return true unless shriekable?(entry[:start_date], entry[:end_date])
       return false
+    end
+
+    def remind_entry?(entry)
+      time_start = Time.now
+      time_end = time_start + remind_every.minutes
+      return (time_start..time_end).cover?(entry[:start_date])
     end
 
     def hot_entry?(entry)
@@ -116,7 +135,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'calendar'),
-        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'calendar'),
         piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'calendar'),
       }
       return @templates
@@ -131,8 +149,25 @@ module TomatoShrieker
       uri ||= Ginseng::URI.parse(self['/source/ical'])
       return nil unless uri&.absolute?
       uri.query_values = {t: Time.now.to_f.to_s}
-      return uri
+      return uri.normalize if uri&.absolute?
     end
+
+    def register
+      return if disable?
+      schedule_remind if remind?
+      return super
+    end
+
+    def remind?
+      return self['/schedule/remind/enable'] == true
+    end
+
+    def remind_minutes
+      return nil unless remind?
+      return self['/schedule/remind/minutes'] || 5
+    end
+
+    alias remind_every remind_minutes
 
     def self.all(&block)
       return enum_for(__method__) unless block
@@ -178,6 +213,19 @@ module TomatoShrieker
         event.dtend = e.end_time
       end
       return event
+    end
+
+    def schedule_remind
+      every = "#{remind_every}m"
+      job = Scheduler.instance.scheduler.send(:every, every, {tag: id}) do
+        logger.info(source: id, class: self.class.to_s, action: 'remind start')
+        remind
+        logger.info(source: id, class: self.class.to_s, action: 'remind end')
+      rescue => e
+        logger.error(source: id, error: e)
+      end
+      logger.info(source: id, job:, class: self.class.to_s, remind: true, every:)
+      return job
     end
   end
 end

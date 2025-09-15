@@ -3,7 +3,7 @@ module TomatoShrieker
     def uri
       uri = Ginseng::URI.parse(config['/github/urls/root'])
       uri.path = File.join('/', repos, "#{timeline}.atom")
-      return uri
+      return uri.normalize if uri&.absolute?
     end
 
     def repository

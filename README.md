@@ -27,9 +27,9 @@
   - [Pleroma](https://git.pleroma.social/pleroma)等、互換APIをもつサービスを含む。
 - [Misskey](https://github.com/syuilo/misskey)
 - Slack Incoming Webhooks
-  - Discord等、webhookに互換性をもつサービスを含む。
-  - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)を含む。
-- [Lemmy](https://join-lemmy.org)
+  - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)
+  <!-- - [matrix-webhook](https://github.com/bshock-matrix/matrix-webhook) -->
+  - Discord等、webhookに互換性をもつサービス
 - [PieFed](https://join.piefed.social)
 - LINE
 

@@ -28,6 +28,13 @@ module TomatoShrieker
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 
+    def register
+      return if disable?
+      return schedule(:at, post_at) if post_at
+      return schedule(:cron, cron) if cron
+      return schedule(:every, every)
+    end
+
     def shriek(params = {})
       shriekers do |shrieker|
         shrieker.exec(params)
@@ -65,7 +72,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'common'),
-        lemmy: Template.new(self['/dest/lemmy/template'] || self['/dest/template'] || 'common'),
         piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'common'),
       }
       return @templates
@@ -91,7 +97,6 @@ module TomatoShrieker
       yield mastodon if mastodon?
       yield misskey if misskey?
       yield line if line?
-      yield lemmy if lemmy?
       yield piefed if piefed?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
@@ -152,24 +157,6 @@ module TomatoShrieker
       return line.present?
     end
 
-    def lemmy
-      unless @lemmy
-        return nil unless self['/dest/lemmy/host']
-        return nil unless self['/dest/lemmy/user_id']
-        return nil unless self['/dest/lemmy/password']
-        return nil unless self['/dest/lemmy/community_id']
-        @lemmy = LemmyShrieker.new(@params.dig('dest', 'lemmy'))
-      end
-      return @lemmy
-    rescue => e
-      logger.error(source: id, error: e, lemmy: self['/dest/lemmy/host'])
-      return nil
-    end
-
-    def lemmy?
-      return lemmy.present?
-    end
-
     def piefed
       unless @piefed
         return nil unless self['/dest/piefed/host']
@@ -180,7 +167,7 @@ module TomatoShrieker
       end
       return @piefed
     rescue => e
-      logger.error(source: id, error: e, lemmy: self['/dest/piefed/host'])
+      logger.error(source: id, error: e, piefed: self['/dest/piefed/host'])
       return nil
     end
 
@@ -252,10 +239,6 @@ module TomatoShrieker
 
     alias every period
 
-    def load
-      return nil
-    end
-
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|
@@ -280,6 +263,20 @@ module TomatoShrieker
 
     def fedi_sanitize(message)
       return fedi_sanitize? ? message.to_s.sanitize_status : message.to_s.sanitize
+    end
+
+    private
+
+    def schedule(method, spec)
+      job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id}) do
+        logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
+        exec
+        logger.info(source: id, class: self.class.to_s, action: 'exec end')
+      rescue => e
+        logger.error(source: id, error: e)
+      end
+      logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)
+      return job
     end
   end
 end
