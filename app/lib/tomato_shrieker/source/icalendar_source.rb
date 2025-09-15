@@ -85,7 +85,7 @@ module TomatoShrieker
 
     def remind_entry?(entry)
       time_start = Time.now
-      time_end = time_start + remind_minutes.minutes
+      time_end = time_start + remind_every.minutes
       return (time_start..time_end).cover?(entry[:start_date])
     end
 
@@ -167,6 +167,8 @@ module TomatoShrieker
       return self['/schedule/remind/minutes'] || 5
     end
 
+    alias remind_every remind_minutes
+
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(self)}.each(&block)
@@ -214,14 +216,15 @@ module TomatoShrieker
     end
 
     def schedule_remind
-      job = Scheduler.instance.scheduler.send(:every, "#{remind_minutes}m", {tag: id}) do
+      every = "#{remind_every}m"
+      job = Scheduler.instance.scheduler.send(:every, every, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
         remind
         logger.info(source: id, class: self.class.to_s, action: 'remind end')
       rescue => e
         logger.error(source: id, error: e)
       end
-      logger.info(source: id, job:, class: self.class.to_s, remind: true, every: "#{remind_minutes}m")
+      logger.info(source: id, job:, class: self.class.to_s, remind: true, every:)
       return job
     end
   end
