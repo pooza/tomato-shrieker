@@ -38,6 +38,7 @@ module TomatoShrieker
       entries.select {|entry| remind_entry?(entry)}.each do |entry|
         template = create_template
         template[:entry] = entry
+        template[:remind] = true
         shriek(template:, visibility:)
       end
     rescue => e
