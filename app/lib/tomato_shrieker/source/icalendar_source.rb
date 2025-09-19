@@ -85,6 +85,7 @@ module TomatoShrieker
     end
 
     def remind_entry?(entry)
+      return false if entry[:all_day]
       time_start = Time.now
       time_end = time_start + remind_every.minutes
       return (time_start..time_end).cover?(entry[:start_date])
