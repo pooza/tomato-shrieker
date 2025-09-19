@@ -11,21 +11,20 @@ module TomatoShrieker
     alias uri feed_uri
 
     def channel_uri
-      if self['/source/youtube/channel/url']
-        uri = Ginseng::YouTube::ChannelURI.parse(self['/source/youtube/channel/url'])
-      elsif self['/source/youtube/channel/id']
+      if url = self['/source/youtube/channel/url']
+        uri = Ginseng::YouTube::ChannelURI.parse(url)
+      elsif id = self['/source/youtube/channel/id']
         uri = Ginseng::YouTube::ChannelURI.parse(config['/youtube/urls/root'])
-        uri.path = "/channel/#{channel_id}"
+        uri.id = id
       end
       return uri.normalize if uri&.absolute?
     end
 
     def channel_id
-      if self['/source/youtube/channel/url']
-        uri = Ginseng::YouTube::ChannelURI.parse(self['/source/youtube/channel/url'])
-        return uri.id
-      elsif self['/source/youtube/channel/id']
-        return self['/source/youtube/channel/id']
+      if url = self['/source/youtube/channel/url']
+        return Ginseng::YouTube::ChannelURI.parse(url).id
+      elsif id = self['/source/youtube/channel/id']
+        return id
       end
     end
 

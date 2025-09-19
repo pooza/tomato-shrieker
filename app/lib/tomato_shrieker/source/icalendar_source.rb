@@ -38,6 +38,7 @@ module TomatoShrieker
       entries.select {|entry| remind_entry?(entry)}.each do |entry|
         template = create_template
         template[:entry] = entry
+        template[:remind] = true
         shriek(template:, visibility:)
       end
     rescue => e
@@ -84,6 +85,7 @@ module TomatoShrieker
     end
 
     def remind_entry?(entry)
+      return false if entry[:all_day]
       time_start = Time.now
       time_end = time_start + remind_every.minutes
       return (time_start..time_end).cover?(entry[:start_date])
@@ -149,7 +151,7 @@ module TomatoShrieker
       uri ||= Ginseng::URI.parse(self['/source/ical'])
       return nil unless uri&.absolute?
       uri.query_values = {t: Time.now.to_f.to_s}
-      return uri.normalize if uri&.absolute?
+      return uri.normalize
     end
 
     def register
