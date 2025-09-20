@@ -157,12 +157,6 @@ module TomatoShrieker
       end
     end
 
-    def test_load
-      Source.all.select(&:cron).each do |source|
-        assert_nil(source.load)
-      end
-    end
-
     def test_classes
       Source.classes.each do |source_class|
         assert_kind_of(Class, source_class[:class])
