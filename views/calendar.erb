@@ -1,4 +1,6 @@
-<% if entry[:is_today] -%>
+<% if @params[:remind] -%>
+❗️このあとすぐ❗️
+<% elsif entry[:is_today] -%>
 ❗️本日❗️
 <% end -%>
 <% if entry[:all_day] -%>
