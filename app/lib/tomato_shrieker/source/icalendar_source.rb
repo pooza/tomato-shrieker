@@ -26,6 +26,7 @@ module TomatoShrieker
       entries do |entry|
         template = create_template
         template[:entry] = entry
+        template[:remind] = false
         shriek(template:, visibility:)
       end
     rescue => e
