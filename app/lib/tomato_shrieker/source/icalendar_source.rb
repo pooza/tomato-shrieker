@@ -220,7 +220,7 @@ module TomatoShrieker
 
     def schedule_remind
       every = "#{remind_every}m"
-      job = Scheduler.instance.scheduler.send(:every, every, {tag: id}) do
+      job = Scheduler.instance.scheduler.every(every, {tag: id}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
         remind
         logger.info(source: id, class: self.class.to_s, action: 'remind end')

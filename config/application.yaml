@@ -33,7 +33,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.9.1
+  version: 3.9.2
 piefed:
   subject:
     max_length: 50
