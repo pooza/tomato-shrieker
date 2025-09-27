@@ -262,7 +262,8 @@ module TomatoShrieker
     end
 
     def fedi_sanitize(message)
-      return fedi_sanitize? ? message.to_s.sanitize_status : message.to_s.sanitize
+      return message.to_s.sanitize_status if fedi_sanitize?
+      return message.to_s.sanitize
     end
 
     private
