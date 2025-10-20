@@ -46,6 +46,16 @@ GIT
   specs:
     ginseng-youtube (2.0.1)
 
+GIT
+  remote: https://github.com/pooza/icalendar-rrule.git
+  revision: 396a2c3e6b5cf394c2416f39c05e948cccd4ea52
+  ref: 396a2c3e6b5cf394c2416f39c05e948cccd4ea52
+  specs:
+    icalendar-rrule (0.1.7)
+      activesupport (>= 5.1)
+      icalendar (>= 2.4)
+      ice_cube (>= 0.16)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -100,15 +110,11 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
-    icalendar (2.12.0)
+    icalendar (2.12.1)
       base64
       ice_cube (~> 0.16)
       logger
       ostruct
-    icalendar-rrule (0.1.7)
-      activesupport (>= 5.1)
-      icalendar (>= 2.4)
-      ice_cube (>= 0.16)
     ice_cube (0.17.0)
     json (2.15.1)
     json-schema (6.0.0)
@@ -242,8 +248,8 @@ DEPENDENCIES
   ginseng-core!
   ginseng-fediverse!
   ginseng-youtube!
-  icalendar (= 2.12.0)
-  icalendar-rrule
+  icalendar
+  icalendar-rrule!
   optparse
   ricecream
   rubocop
