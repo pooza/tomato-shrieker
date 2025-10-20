@@ -4,7 +4,7 @@ gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core', require: 'ginseng'
 gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', require: 'ginseng/fediverse'
 gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', require: 'ginseng/you_tube'
-gem 'icalendar'
+gem 'icalendar', '2.12.0' # icalendar-rrule 0.1.7との互換性
 gem 'icalendar-rrule'
 gem 'optparse'
 gem 'rufus-scheduler'
