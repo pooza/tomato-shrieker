@@ -46,6 +46,16 @@ GIT
   specs:
     ginseng-youtube (2.0.1)
 
+GIT
+  remote: https://github.com/pooza/icalendar-rrule.git
+  revision: 396a2c3e6b5cf394c2416f39c05e948cccd4ea52
+  ref: 396a2c3e6b5cf394c2416f39c05e948cccd4ea52
+  specs:
+    icalendar-rrule (0.1.7)
+      activesupport (>= 5.1)
+      icalendar (>= 2.4)
+      ice_cube (>= 0.16)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -66,8 +76,8 @@ GEM
       public_suffix (>= 2.0.2, < 7.0)
     ast (2.4.3)
     base64 (0.3.0)
-    benchmark (0.4.1)
-    bigdecimal (3.2.3)
+    benchmark (0.5.0)
+    bigdecimal (3.3.1)
     cgi (0.5.0)
     concurrent-ruby (1.3.5)
     connection_pool (2.5.4)
@@ -77,8 +87,8 @@ GEM
     date (3.4.1)
     domain_name (0.6.20240107)
     drb (2.2.3)
-    erb (5.0.2)
-    et-orbi (1.3.0)
+    erb (5.1.1)
+    et-orbi (1.4.0)
       tzinfo
     etc (1.4.6)
     facets (3.1.0)
@@ -88,29 +98,25 @@ GEM
       sax-machine (>= 1.0, < 2)
     fileutils (1.7.3)
     find (0.2.0)
-    fugit (1.11.2)
-      et-orbi (~> 1, >= 1.2.11)
+    fugit (1.12.1)
+      et-orbi (~> 1.4)
       raabro (~> 1.4)
     http-accept (1.7.0)
     http-cookie (1.1.0)
       domain_name (~> 0.5)
-    httparty (0.23.1)
+    httparty (0.23.2)
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
-    icalendar (2.12.0)
+    icalendar (2.12.1)
       base64
       ice_cube (~> 0.16)
       logger
       ostruct
-    icalendar-rrule (0.1.7)
-      activesupport (>= 5.1)
-      icalendar (>= 2.4)
-      ice_cube (>= 0.16)
     ice_cube (0.17.0)
-    json (2.15.0)
+    json (2.15.1)
     json-schema (6.0.0)
       addressable (~> 2.8)
       bigdecimal (~> 3.1)
@@ -131,11 +137,11 @@ GEM
     mime-types-data (3.2025.0924)
     mini_mime (1.1.5)
     mini_portile2 (2.8.9)
-    minitest (5.25.5)
+    minitest (5.26.0)
     multi_json (1.17.0)
     multi_xml (0.7.2)
       bigdecimal (~> 3.1)
-    net-imap (0.5.10)
+    net-imap (0.5.12)
       date
       net-protocol
     net-pop (0.1.2)
@@ -159,7 +165,7 @@ GEM
       ast (~> 2.4.1)
       racc
     power_assert (2.0.5)
-    prism (1.5.1)
+    prism (1.6.0)
     public_suffix (6.0.2)
     raabro (1.4.0)
     racc (1.8.1)
@@ -172,7 +178,7 @@ GEM
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
     ricecream (0.2.1)
-    rubocop (1.81.1)
+    rubocop (1.81.6)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
@@ -190,10 +196,10 @@ GEM
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
       rubocop-ast (>= 1.38.0, < 2.0)
-    rubocop-performance (1.26.0)
+    rubocop-performance (1.26.1)
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
-      rubocop-ast (>= 1.44.0, < 2.0)
+      rubocop-ast (>= 1.47.1, < 2.0)
     rubocop-rake (0.7.1)
       lint_roller (~> 1.1)
       rubocop (>= 1.72.1)
@@ -208,7 +214,7 @@ GEM
       nokogiri (>= 1.16.8)
     sax-machine (1.3.2)
     securerandom (0.4.1)
-    sequel (5.96.0)
+    sequel (5.97.0)
       bigdecimal
     set (1.1.2)
     sqlite3 (2.7.4)
@@ -227,7 +233,7 @@ GEM
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.1.0)
-    uri (1.0.3)
+    uri (1.0.4)
     yajl-ruby (1.4.3)
     zeitwerk (2.7.3)
     zlib (3.2.1)
@@ -243,7 +249,7 @@ DEPENDENCIES
   ginseng-fediverse!
   ginseng-youtube!
   icalendar
-  icalendar-rrule
+  icalendar-rrule!
   optparse
   ricecream
   rubocop
@@ -257,7 +263,7 @@ DEPENDENCIES
   test-unit
 
 RUBY VERSION
-   ruby 3.4.6p54
+   ruby 3.4.7p58
 
 BUNDLED WITH
    2.7.2
