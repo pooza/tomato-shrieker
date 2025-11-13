@@ -2,8 +2,8 @@
 ❗️このあとすぐ❗️
 <% elsif entry[:is_today] -%>
 ❗️本日❗️
-<% else -%>
-【予定】
+<% elsif entry[:countdown] -%>
+【予定】<%= entry[:countdown] %>日前
 <% end -%>
 <% if entry[:all_day] -%>
 <% if entry[:start_date] == entry[:end_date] -%>

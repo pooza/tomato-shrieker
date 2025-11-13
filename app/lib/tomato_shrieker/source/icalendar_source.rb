@@ -111,6 +111,7 @@ module TomatoShrieker
         start_date:,
         end_date:,
         is_today: today?(start_date, end_date),
+        countdown: countdown(start_date),
         title: fedi_sanitize(event.summary),
         body: fedi_sanitize(event.description),
         location: fedi_sanitize(event.location),
@@ -187,6 +188,11 @@ module TomatoShrieker
       start_date = Time.parse(start_date.strftime('%Y/%m/%d 00:00:00'))
       end_date = Time.parse(end_date.strftime('%Y/%m/%d 23:59:59'))
       return (start_date..end_date).cover?(start_time_today)
+    end
+
+    def countdown(start_date)
+      start_date = Time.parse(start_date.strftime('%Y/%m/%d 00:00:00')).to_date
+      return Date.today.upto(start_date).count - 1
     end
 
     def all_day?(date)
