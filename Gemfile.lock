@@ -223,7 +223,7 @@ GEM
     sqlite3 (2.8.0-x86_64-linux-gnu)
     syslog (0.3.0)
       logger
-    test-unit (3.7.1)
+    test-unit (3.7.3)
       power_assert
     time (0.4.1)
       date
