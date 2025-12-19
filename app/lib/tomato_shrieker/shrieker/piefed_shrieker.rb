@@ -24,7 +24,6 @@ module TomatoShrieker
         },
       })
       @jwt = response['jwt']
-      logger.info(clipper: self.class.to_s, method: __method__, url: uri.to_s)
     end
 
     def exec(body)
@@ -38,6 +37,7 @@ module TomatoShrieker
       data[:title].ellipsize!(config['/piefed/subject/max_length'])
       uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
       data[:url] = uri.to_s if uri
+      logger.info(shrieker: self.class.to_s, data:)
       return http.post("/api/#{api_version}/post", {
         body: data,
         headers: {'Authorization' => "Bearer #{@jwt}"},
