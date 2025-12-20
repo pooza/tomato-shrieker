@@ -18,22 +18,6 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def purge
-      return unless purgeable?
-      dataset = Entry.dataset.where(feed: hash).where(
-        Sequel.lit("published < '#{keep_years.years.ago.strftime('%Y-%m-%d %H:%M:%S.000000')}'"),
-      )
-      dataset.destroy
-    rescue => e
-      logger.error(source: id, error: e)
-    end
-
-    def purgeable?
-      return keep_years.present?
-    end
-
-    alias purge? purgeable?
-
     def keep_years
       return self['/keep/years']
     end
@@ -184,10 +168,6 @@ module TomatoShrieker
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.select {|s| s.is_a?(self)}.each(&block)
-    end
-
-    def self.purge_all
-      all.select(&:purgeable?).each(&:purge)
     end
   end
 end
