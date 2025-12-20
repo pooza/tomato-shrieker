@@ -64,10 +64,6 @@ module TomatoShrieker
     end
 
     def shriek
-      unless shriekable?
-        logger.info(source: feed.id, entry: to_h, message: 'old entry')
-        return
-      end
       feed.shriek(
         template: create_template,
         visibility: feed.visibility,
@@ -77,11 +73,6 @@ module TomatoShrieker
     end
 
     alias post shriek
-
-    def shriekable?
-      return false if feed.purgeable? && (published < Time.current.ago(feed.keep_years.years))
-      return true
-    end
 
     def self.create(entry, feed = nil)
       parser = EntryParser.new(entry)
