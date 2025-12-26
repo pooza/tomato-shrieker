@@ -38,8 +38,6 @@ piefed:
   subject:
     max_length: 50
   verify_peer: true
-ruby:
-  jit: false
 scheduler: {}
 slack:
   hooks: []
