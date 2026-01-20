@@ -6,7 +6,7 @@ module TomatoShrieker
       body = body.clone
       body[:media_ids] ||= []
       if (attachments = body.delete(:attachments))
-        in_threads = Environment.parallel_thread_count
+        in_threads = Parallel.processor_count * 2
         body[:media_ids] = Parallel.map(attachments, in_threads:) do |v|
           upload_remote_resource(v[:image_url], {response: :id})
         end

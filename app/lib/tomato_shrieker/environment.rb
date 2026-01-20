@@ -34,10 +34,6 @@ module TomatoShrieker
       return type == 'production'
     end
 
-    def self.parallel_thread_count
-      return Parallel.processor_count * 2
-    end
-
     def self.db
       return File.join(
         dir,
