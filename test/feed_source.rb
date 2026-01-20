@@ -76,18 +76,6 @@ module TomatoShrieker
       end
     end
 
-    def test_purgeable?
-      FeedSource.all do |source|
-        assert_boolean(source.purgeable?)
-      end
-    end
-
-    def test_keep_years
-      FeedSource.all.select(&:purgeable?).each do |source|
-        assert_kind_of(Integer, source.keep_years)
-      end
-    end
-
     def test_uri
       FeedSource.all do |source|
         assert_kind_of(Ginseng::URI, source.uri)

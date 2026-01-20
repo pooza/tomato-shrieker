@@ -9,7 +9,7 @@ module TomatoShrieker
     def motd
       return [
         "#{self.class} #{Package.version}",
-        ('Ruby YJIT: Ready' if jit_ready?),
+        ('Ruby YJIT: Ready' if Environment.jit?),
       ].compact.join("\n")
     end
 

@@ -6,7 +6,8 @@ module TomatoShrieker
     attr_reader :scheduler
 
     def exec
-      Source.all.reject(&:disable?).each(&:register)
+      in_threads = Parallel.processor_count * 2
+      Parallel.each(Source.all.reject(&:disable?), in_threads:, &:register)
       @scheduler.join
     rescue => e
       logger.error(scheduler: {error: e})
@@ -16,9 +17,6 @@ module TomatoShrieker
 
     def initialize
       @scheduler = Rufus::Scheduler.new
-      @scheduler.cron('@hourly', 'purge') do
-        FeedSource.purge_all
-      end
     end
   end
 end

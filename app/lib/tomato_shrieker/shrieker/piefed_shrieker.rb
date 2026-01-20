@@ -24,7 +24,6 @@ module TomatoShrieker
         },
       })
       @jwt = response['jwt']
-      logger.info(clipper: self.class.to_s, method: __method__, url: uri.to_s)
     end
 
     def exec(body)

@@ -33,13 +33,16 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.9.3
+  version: 3.9.4
+nostr:
+  relays:
+    - wss://relay.damus.io
+    - wss://nos.lol
+    - wss://relay.nostr.band
 piefed:
   subject:
     max_length: 50
   verify_peer: true
-ruby:
-  jit: false
 scheduler: {}
 slack:
   hooks: []
