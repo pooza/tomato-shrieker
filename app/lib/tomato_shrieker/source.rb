@@ -98,6 +98,7 @@ module TomatoShrieker
       yield misskey if misskey?
       yield line if line?
       yield piefed if piefed?
+      yield nostr if nostr?
       (self['/dest/hooks'] || []).each do |hook|
         yield WebhookShrieker.new(Ginseng::URI.parse(hook))
       end
@@ -173,6 +174,21 @@ module TomatoShrieker
 
     def piefed?
       return piefed.present?
+    end
+
+    def nostr
+      unless @nostr
+        return nil unless self['/dest/nostr/private_key']
+        @nostr = NostrShrieker.new(@params.dig('dest', 'nostr'))
+      end
+      return @nostr
+    rescue => e
+      logger.error(source: id, error: e, nostr: 'initialization failed')
+      return nil
+    end
+
+    def nostr?
+      return nostr.present?
     end
 
     def mulukhiya

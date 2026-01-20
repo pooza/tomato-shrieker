@@ -7,6 +7,7 @@ gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', require: 'ginseng/you_tu
 gem 'icalendar'
 gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
   ref: '396a2c3e6b5cf394c2416f39c05e948cccd4ea52'
+gem 'nostr'
 gem 'optparse'
 gem 'parallel'
 gem 'rufus-scheduler'
