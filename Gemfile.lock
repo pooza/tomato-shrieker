@@ -275,6 +275,7 @@ DEPENDENCIES
   icalendar
   icalendar-rrule!
   optparse
+  parallel
   ricecream
   rubocop
   rubocop-minitest
