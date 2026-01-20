@@ -10,16 +10,15 @@ module TomatoShrieker
     def exec(body)
       body = body.clone
       body[:template][:tag] = true
-      content = body[:template].to_s.strip
       event = user.create_event(
         kind: Nostr::EventKind::TEXT_NOTE,
-        content:,
+        content: body[:template].to_s.strip,
       )
       publish(event)
     end
 
     def relays
-      @params[:relays] || config['/nostr/relays'] || []
+      @params[:relays] || config['/nostr/relays']
     end
 
     private
