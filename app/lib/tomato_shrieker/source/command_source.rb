@@ -3,8 +3,7 @@ module TomatoShrieker
     def exec
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
-      statuses = command.stdout.split(delimiter).map(&:strip).select(&:present?)
-      Parallel.each(statuses, in_threads: Environment.parallel_thread_count) do |status|
+      command.stdout.split(delimiter).map(&:strip).select(&:present?).each do |status|
         template = create_template(:default, status)
         shriek(template:, visibility:)
       end
@@ -32,6 +31,7 @@ module TomatoShrieker
         end
         @command.dir = self['/source/dir'] || Environment.dir
         @command.env = @params.dig('source', 'env') || {}
+        @command.env['RUBY_YJIT_ENABLE'] = 'yes' if config['/ruby/jit']
         @command.env['BUNDLE_GEMFILE'] = File.join(@command.dir, 'Gemfile')
         @command.env['RACK_ENV'] ||= Environment.type
       end
