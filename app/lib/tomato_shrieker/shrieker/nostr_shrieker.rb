@@ -19,7 +19,7 @@ module TomatoShrieker
     end
 
     def relays
-      @params[:relays] || config['/nostr/default_relays'] || []
+      @params[:relays] || config['/nostr/relays'] || []
     end
 
     private

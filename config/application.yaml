@@ -35,7 +35,7 @@ package:
   url: https://github.com/pooza/tomato-shrieker
   version: 3.9.4
 nostr:
-  default_relays:
+  relays:
     - wss://relay.damus.io
     - wss://nos.lol
     - wss://relay.nostr.band
