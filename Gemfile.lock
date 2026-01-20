@@ -114,11 +114,7 @@ bigdecimal (4.0.1)
       logger
       ostruct
     ice_cube (0.17.0)
-<<<<<<< HEAD
     json (2.18.0)
-=======
-    json (2.16.0)
->>>>>>> origin/dependabot/bundler/master/sequel-5.100.0
     json-schema (6.1.0)
       addressable (~> 2.8)
       bigdecimal (>= 3.1, < 5)
@@ -239,7 +235,11 @@ bigdecimal (4.0.1)
     sqlite3 (2.9.0-x86_64-linux-gnu)
     syslog (0.3.0)
       logger
+<<<<<<< HEAD
     test-unit (3.7.6)
+=======
+    test-unit (3.7.7)
+>>>>>>> origin/dependabot/bundler/master/test-unit-3.7.7
       power_assert
     time (0.4.2)
       date
