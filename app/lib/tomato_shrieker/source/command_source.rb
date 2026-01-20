@@ -3,7 +3,8 @@ module TomatoShrieker
     def exec
       command.exec
       raise command.stderr || command.stdout unless command.status.zero?
-      command.stdout.split(delimiter).map(&:strip).select(&:present?).each do |status|
+      statuses = command.stdout.split(delimiter).map(&:strip).select(&:present?)
+      Parallel.each(statuses, in_threads: Environment.parallel_thread_count) do |status|
         template = create_template(:default, status)
         shriek(template:, visibility:)
       end

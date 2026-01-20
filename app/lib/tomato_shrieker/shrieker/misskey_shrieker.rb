@@ -5,11 +5,11 @@ module TomatoShrieker
     def exec(body)
       body = body.clone
       body[:fileIds] ||= []
-      if body[:attachments]
-        (body[:attachments] || []).each do |attachment|
-          body[:fileIds].push(upload_remote_resource(attachment[:image_url], {response: :id}))
+      if (attachments = body.delete(:attachments))
+        threads = Environment.parallel_thread_count
+        body[:fileIds] = Parallel.map(attachments, in_threads: threads) do |v|
+          upload_remote_resource(v[:image_url], {response: :id})
         end
-        body.delete(:attachments)
       end
       body[:template][:tag] = true
       body[:text] = body[:template].to_s.strip

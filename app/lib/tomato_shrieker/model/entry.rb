@@ -82,7 +82,7 @@ module TomatoShrieker
       return nil if entry.published < feed.time
       return entry
     rescue SQLite3::BusyException
-      sleep(1)
+      sleep(rand(0.5..2.0))
       retry
     rescue Sequel::UniqueConstraintViolation
       return nil

@@ -97,7 +97,8 @@ module TomatoShrieker
 
     def fetch
       return enum_for(__method__) unless block_given?
-      entries.reject {|v| ignore_entry?(v)}.each do |entry|
+      targets = entries.reject {|v| ignore_entry?(v)}
+      Parallel.each(targets, in_threads: Environment.parallel_thread_count) do |entry|
         next unless record = create_record(entry)
         yield record
       rescue => e

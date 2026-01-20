@@ -23,7 +23,7 @@ module TomatoShrieker
 
     def exec
       return if disable?
-      entries do |entry|
+      Parallel.each(entries, in_threads: Environment.parallel_thread_count) do |entry|
         template = create_template
         template[:entry] = entry
         template[:remind] = false
@@ -36,7 +36,8 @@ module TomatoShrieker
     def remind
       return if disable?
       return unless remind?
-      entries.select {|entry| remind_entry?(entry)}.each do |entry|
+      targets = entries.select {|entry| remind_entry?(entry)}
+      Parallel.each(targets, in_threads: Environment.parallel_thread_count) do |entry|
         template = create_template
         template[:entry] = entry
         template[:remind] = true

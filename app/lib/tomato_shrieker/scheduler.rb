@@ -6,7 +6,8 @@ module TomatoShrieker
     attr_reader :scheduler
 
     def exec
-      Source.all.reject(&:disable?).each(&:register)
+      sources = Source.all.reject(&:disable?)
+      Parallel.each(sources, in_threads: Environment.parallel_thread_count, &:register)
       @scheduler.join
     rescue => e
       logger.error(scheduler: {error: e})
