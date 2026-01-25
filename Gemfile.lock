@@ -35,9 +35,9 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 2b30e1481455a0a54607ebcbc3933e84214394f5
+  revision: ff9d868f0783f3b3b55ea7b8a2999a294c38de69
   specs:
-    ginseng-fediverse (1.8.17)
+    ginseng-fediverse (1.8.18)
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
@@ -343,7 +343,7 @@ CHECKSUMS
   find (0.2.0) sha256=9aabac9dbbea3fdd23781f79a2fd626166e57dab349aaec449400811b40c371b
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
   ginseng-core (1.15.11)
-  ginseng-fediverse (1.8.17)
+  ginseng-fediverse (1.8.18)
   ginseng-youtube (2.0.1)
   http-accept (1.7.0) sha256=c626860682bfbb3b46462f8c39cd470fd7b0584f61b3cc9df5b2e9eb9972a126
   http-cookie (1.1.0) sha256=38a5e60d1527eebc396831b8c4b9455440509881219273a6c99943d29eadbb19
