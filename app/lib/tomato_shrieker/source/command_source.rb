@@ -1,7 +1,7 @@
 module TomatoShrieker
   class CommandSource < Source
     def exec
-      Bundler.with_unbundled_env { command.exec }
+      Bundler.with_unbundled_env {command.exec}
       raise command.stderr || command.stdout unless command.status.zero?
       command.stdout.split(delimiter).map(&:strip).select(&:present?).each do |status|
         template = create_template(:default, status)
@@ -39,7 +39,7 @@ module TomatoShrieker
     end
 
     def register
-      Bundler.with_unbundled_env { command.bundle_install } if bundler?
+      Bundler.with_unbundled_env {command.bundle_install} if bundler?
       return super
     end
 
