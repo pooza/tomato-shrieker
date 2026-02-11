@@ -8,14 +8,14 @@ module TomatoShrieker
           if source.bundler?
             desc 'bundle install'
             task :bundler do
-              source.command.bundle_install
+              Bundler.with_unbundled_env { source.command.bundle_install }
             end
           end
 
           desc "execute '#{source.command}'"
           task :exec do
             start = Time.now
-            source.command.exec
+            Bundler.with_unbundled_env { source.command.exec }
             puts source.command.stdout
             warn ''
             warn "(elapsed: #{(Time.now - start).round(2)}s)"
