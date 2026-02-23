@@ -1,0 +1,7 @@
+[<%= @params[:feed].prefix %>]
+<%= @params[:entry].summary %>
+<%= @params[:entry].uri %>
+
+<% if @params[:tag] -%>
+<%= @params[:entry].tags.join(' ') %>
+<% end -%>

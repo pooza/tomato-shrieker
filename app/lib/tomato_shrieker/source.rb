@@ -100,7 +100,7 @@ module TomatoShrieker
       yield piefed if piefed?
       yield nostr if nostr?
       (self['/dest/hooks'] || []).each do |hook|
-        yield WebhookShrieker.new(Ginseng::URI.parse(hook))
+        yield WebhookShrieker.new(hook)
       end
     end
 
