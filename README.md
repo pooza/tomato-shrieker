@@ -55,7 +55,7 @@
   - [「エビバディ☆ヒーリングッデイ！」再生数ボット](https://precure.ml/@healingoodday)
   - [「勇気の刃」キュアソードラブリンクBot](https://mk.precure.fun/@cureswordlovelinkbot)
   - [非公式「宮本佳那子のこころをこめて」更新通知ボット](https://mstdn.b-shock.org/@kanako_blog_bot)
-  - [ぷーざリリースボット](https://mstdn.b-shock.org/@release_bot)
+  - [Matrixニュースボット](https://mstdn.b-shock.org/deck/@matrix_news_bot)
 
 - 中の人は普段、以下のいずれかに居ます。
   - 個人サーバー「[美食丼](https://mstdn.b-shock.org/)」
