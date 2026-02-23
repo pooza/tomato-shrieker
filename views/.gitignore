@@ -3,4 +3,5 @@
 !calendar.erb
 !common.erb
 !summary.erb
+!summary_with_title.erb
 !title.erb
