@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 ruby '>= 3.4', '< 5.0'
 gem 'feedjira', '~>3.0'
-gem 'ginseng-core', github: 'pooza/ginseng-core', require: 'ginseng'
+gem 'ginseng-core', github: 'pooza/ginseng-core', branch: 'main', require: 'ginseng'
 gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', require: 'ginseng/fediverse'
 gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', require: 'ginseng/you_tube'
 gem 'icalendar'

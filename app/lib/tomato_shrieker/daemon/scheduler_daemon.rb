@@ -13,7 +13,7 @@ module TomatoShrieker
       ].compact.join("\n")
     end
 
-    def start(args)
+    def start(args = [])
       logger.info(daemon: app_name, version: Package.version, message: 'start')
       Sequel.connect(Environment.dsn)
       Scheduler.instance.exec

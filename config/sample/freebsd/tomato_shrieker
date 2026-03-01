@@ -26,12 +26,13 @@ stop_cmd=${name}_stop
 
 tomato_shrieker_start() {
   cd $tomato_shrieker_path
-  sudo -u $tomato_shrieker_user /bin/bash -lc 'bundle exec rake start'
+  sudo -u $tomato_shrieker_user /usr/sbin/daemon \
+    /usr/local/bin/bash -lc "cd ${tomato_shrieker_path} && bundle exec bin/scheduler_daemon.rb start"
 }
 
 tomato_shrieker_stop() {
   cd $tomato_shrieker_path
-  sudo -u $tomato_shrieker_user /bin/bash -lc 'bundle exec rake stop'
+  sudo -u $tomato_shrieker_user /usr/local/bin/bash -lc 'bundle exec bin/scheduler_daemon.rb stop'
 }
 
 run_rc_command "$1"
