@@ -132,6 +132,23 @@ test/                  # テストファイル
 - 行長: 100文字（テストファイルは除外）
 - 末尾カンマ: 複数行では付与
 
+## 4.0 計画
+
+### PieFed 対応の ginseng-piefed 移行
+
+PieFed 対応は姉妹プロダクト mulukhiya-toot-proxy（モロヘイヤ）に由来する。モロヘイヤ側で PieFed 対応を ginseng-piefed gem として独立させる計画があり、tomato-shrieker でも PiefedShrieker を ginseng-piefed ベースに移行する。
+
+- **現状**: PiefedShrieker は独自実装（HTTP クライアントで PieFed API を直接操作）
+- **目標**: Mastodon/Misskey が ginseng-fediverse を基底にしているのと同様に、ginseng-piefed を基底クラスとする構成へ移行
+
+### テンプレート取り回しの統一
+
+Shrieker 間でテンプレートの扱いに差があり、特に PieFed 周りが煩雑。メジャーアップグレードで整理する。
+
+- **Source/FeedSource にハードコードされた `:piefed` キー**: ベースクラスが特定の Shrieker を知っている（他の Shrieker は `:default` のみ）
+- **フォールバックパスの不一致**: Source は `self['/dest/template']`、FeedSource は `self['/piefed/template']` と異なるパスにフォールバック
+- **PiefedShrieker#search_template の二重処理**: Source 側でテンプレートを用意した上で、Shrieker 側でさらに再構築している
+
 ## 関連リポジトリ
 
 - [ginseng-core](https://github.com/pooza/ginseng-core) — 基盤ライブラリ（branch: main）
