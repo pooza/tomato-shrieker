@@ -1,13 +1,12 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 96815baa96349228b5517a8f10780f2381caa171
+  revision: 0671e02cb74dac53ff0693703acc52eb26a20878
   specs:
-    ginseng-core (1.15.16)
+    ginseng-core (1.15.21)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.8.0)
       cgi (>= 0.4.2)
       csv
-      daemon-spawn
       date (>= 3.2.1)
       erb
       etc
@@ -23,7 +22,6 @@ GIT
       nokogiri (>= 1.18.9)
       optparse
       rake
-      rest-client
       sanitize (>= 6.0.2)
       securerandom
       set
@@ -71,7 +69,7 @@ GEM
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
-    addressable (2.8.8)
+    addressable (2.8.9)
       public_suffix (>= 2.0.2, < 8.0)
     ast (2.4.3)
     base64 (0.3.0)
@@ -85,14 +83,12 @@ GEM
     connection_pool (3.0.2)
     crass (1.0.6)
     csv (3.3.5)
-    daemon-spawn (0.4.2)
     date (3.5.1)
-    domain_name (0.6.20240107)
     drb (2.2.3)
     ecdsa (1.2.0)
     ecdsa_ext (0.5.1)
       ecdsa (~> 1.2.0)
-    erb (6.0.1)
+    erb (6.0.2)
     et-orbi (1.4.0)
       tzinfo
     etc (1.4.6)
@@ -111,9 +107,6 @@ GEM
     fugit (1.12.1)
       et-orbi (~> 1.4)
       raabro (~> 1.4)
-    http-accept (1.7.0)
-    http-cookie (1.1.0)
-      domain_name (~> 0.5)
     httparty (0.24.2)
       csv
       mini_mime (>= 1.0.0)
@@ -126,8 +119,8 @@ GEM
       logger
       ostruct
     ice_cube (0.17.0)
-    json (2.18.1)
-    json-schema (6.1.0)
+    json (2.19.1)
+    json-schema (6.2.0)
       addressable (~> 2.8)
       bigdecimal (>= 3.1, < 5)
     language_server-protocol (3.17.0.5)
@@ -142,13 +135,10 @@ GEM
       net-imap
       net-pop
       net-smtp
-    mime-types (3.7.0)
-      logger
-      mime-types-data (~> 3.2025, >= 3.2025.0507)
-    mime-types-data (3.2026.0203)
     mini_mime (1.1.5)
     mini_portile2 (2.8.9)
-    minitest (6.0.1)
+    minitest (6.0.2)
+      drb (~> 2.0)
       prism (~> 1.5)
     multi_json (1.19.1)
     multi_xml (0.8.1)
@@ -162,7 +152,6 @@ GEM
       timeout
     net-smtp (0.5.1)
       net-protocol
-    netrc (0.11.0)
     nokogiri (1.19.1)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
@@ -197,17 +186,12 @@ GEM
       racc
     power_assert (3.0.1)
     prism (1.9.0)
-    public_suffix (7.0.2)
+    public_suffix (7.0.5)
     raabro (1.4.0)
     racc (1.8.1)
     rainbow (3.1.1)
     rake (13.3.1)
     regexp_parser (2.11.3)
-    rest-client (2.1.0)
-      http-accept (>= 1.7.0, < 2.0)
-      http-cookie (>= 1.0.2, < 2.0)
-      mime-types (>= 1.16, < 4.0)
-      netrc (~> 0.8)
     ricecream (0.2.1)
     rubocop (1.84.2)
       json (~> 2.3)
@@ -278,7 +262,7 @@ GEM
     websocket-extensions (0.1.5)
     yajl-ruby (1.4.3)
     zeitwerk (2.7.5)
-    zlib (3.2.2)
+    zlib (3.2.3)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -314,7 +298,7 @@ DEPENDENCIES
 
 CHECKSUMS
   activesupport (8.1.2) sha256=88842578ccd0d40f658289b0e8c842acfe9af751afee2e0744a7873f50b6fdae
-  addressable (2.8.8) sha256=7c13b8f9536cf6364c03b9d417c19986019e28f7c00ac8132da4eb0fe393b057
+  addressable (2.8.9) sha256=cc154fcbe689711808a43601dee7b980238ce54368d23e127421753e46895485
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bech32 (1.5.0) sha256=04520e3bd899a8d9d27e698eb4fc0e9f9292b42d13628d9a1814b3b8a9a68a8a
@@ -325,13 +309,11 @@ CHECKSUMS
   connection_pool (3.0.2) sha256=33fff5ba71a12d2aa26cb72b1db8bba2a1a01823559fb01d29eb74c286e62e0a
   crass (1.0.6) sha256=dc516022a56e7b3b156099abc81b6d2b08ea1ed12676ac7a5657617f012bd45d
   csv (3.3.5) sha256=6e5134ac3383ef728b7f02725d9872934f523cb40b961479f69cf3afa6c8e73f
-  daemon-spawn (0.4.2) sha256=c3a106fa8832e4f8d5f3d541b6b52166bcf313b35dbbe1565d919b1bfe8dc1fb
   date (3.5.1) sha256=750d06384d7b9c15d562c76291407d89e368dda4d4fff957eb94962d325a0dc0
-  domain_name (0.6.20240107) sha256=5f693b2215708476517479bf2b3802e49068ad82167bcd2286f899536a17d933
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
   ecdsa (1.2.0) sha256=b8f7c9541b6c587cbe37e705a1b76be6dc1e85336aa23ac3cf2f07b038bcec55
   ecdsa_ext (0.5.1) sha256=d8ee8bfb6f4519188fe65898fe0b0c735962a5954f31702d0f84ffe12b99fbc6
-  erb (6.0.1) sha256=28ecdd99c5472aebd5674d6061e3c6b0a45c049578b071e5a52c2a7f13c197e5
+  erb (6.0.2) sha256=9fe6264d44f79422c87490a1558479bd0e7dad4dd0e317656e67ea3077b5242b
   et-orbi (1.4.0) sha256=6c7e3c90779821f9e3b324c5e96fda9767f72995d6ae435b96678a4f3e2de8bc
   etc (1.4.6) sha256=0f7e9e7842ea5e3c3bd9bc81746ebb8c65ea29e4c42a93520a0d638129c7de01
   event_emitter (0.2.6) sha256=c72697bd5cce9d36594be1972c17f1c9a573236f44303a4d1d548080364e1391
@@ -342,35 +324,30 @@ CHECKSUMS
   fileutils (1.7.3) sha256=57271e854b694a87755d76f836f5c57b2c9538ebbaf4b2154bb66addf15eb5da
   find (0.2.0) sha256=9aabac9dbbea3fdd23781f79a2fd626166e57dab349aaec449400811b40c371b
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
-  ginseng-core (1.15.16)
+  ginseng-core (1.15.21)
   ginseng-fediverse (1.8.18)
   ginseng-youtube (2.0.1)
-  http-accept (1.7.0) sha256=c626860682bfbb3b46462f8c39cd470fd7b0584f61b3cc9df5b2e9eb9972a126
-  http-cookie (1.1.0) sha256=38a5e60d1527eebc396831b8c4b9455440509881219273a6c99943d29eadbb19
   httparty (0.24.2) sha256=8fca6a54aa0c4aa4303a0fd33e5e2156175d6a5334f714263b458abd7fda9c38
   i18n (1.14.8) sha256=285778639134865c5e0f6269e0b818256017e8cde89993fdfcbfb64d088824a5
   icalendar (2.12.1) sha256=ecff56c550aed551f29ad1faad0da54bf62362dfaf22a428bd7ad782938fe764
   icalendar-rrule (0.1.7)
   ice_cube (0.17.0) sha256=32deb45dda4b4acc53505c2f581f6d32b5afc04d29b9004769944a0df5a5fcbe
-  json (2.18.1) sha256=fe112755501b8d0466b5ada6cf50c8c3f41e897fa128ac5d263ec09eedc9f986
-  json-schema (6.1.0) sha256=6bf70a2cfb6dfd5a06da28093fa8190f324c88eabd36a7f47097f227321dc702
+  json (2.19.1) sha256=dd94fdc59e48bff85913829a32350b3148156bc4fd2a95a2568a78b11344082d
+  json-schema (6.2.0) sha256=e8bff46ed845a22c1ab2bd0d7eccf831c01fe23bb3920caa4c74db4306813666
   language_server-protocol (3.17.0.5) sha256=fd1e39a51a28bf3eec959379985a72e296e9f9acfce46f6a79d31ca8760803cc
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
   loofah (2.25.0) sha256=df5ed7ac3bac6a4ec802df3877ee5cc86d027299f8952e6243b3dac446b060e6
   mail (2.9.0) sha256=6fa6673ecd71c60c2d996260f9ee3dd387d4673b8169b502134659ece6d34941
-  mime-types (3.7.0) sha256=dcebf61c246f08e15a4de34e386ebe8233791e868564a470c3fe77c00eed5e56
-  mime-types-data (3.2026.0203) sha256=54353d693af028847391c28361c07d4b8b689cad78c3e1cc272fb1205c6d2a2f
   mini_mime (1.1.5) sha256=8681b7e2e4215f2a159f9400b5816d85e9d8c6c6b491e96a12797e798f8bccef
   mini_portile2 (2.8.9) sha256=0cd7c7f824e010c072e33f68bc02d85a00aeb6fce05bb4819c03dfd3c140c289
-  minitest (6.0.1) sha256=7854c74f48e2e975969062833adc4013f249a4b212f5e7b9d5c040bf838d54bb
+  minitest (6.0.2) sha256=db6e57956f6ecc6134683b4c87467d6dd792323c7f0eea7b93f66bd284adbc3d
   multi_json (1.19.1) sha256=7aefeff8f2c854bf739931a238e4aea64592845e0c0395c8a7d2eea7fdd631b7
   multi_xml (0.8.1) sha256=addba0290bac34e9088bfe73dc4878530297a82a7bbd66cb44dcd0a4b86edf5a
   net-imap (0.6.3) sha256=9bab75f876596d09ee7bf911a291da478e0cd6badc54dfb82874855ccc82f2ad
   net-pop (0.1.2) sha256=848b4e982013c15b2f0382792268763b748cce91c9e91e36b0f27ed26420dff3
   net-protocol (0.2.2) sha256=aa73e0cba6a125369de9837b8d8ef82a61849360eba0521900e2c3713aa162a8
   net-smtp (0.5.1) sha256=ed96a0af63c524fceb4b29b0d352195c30d82dd916a42f03c62a3a70e5b70736
-  netrc (0.11.0) sha256=de1ce33da8c99ab1d97871726cba75151113f117146becbe45aa85cb3dabee3f
   nokogiri (1.19.1) sha256=598b327f36df0b172abd57b68b18979a6e14219353bca87180c31a51a00d5ad3
   nokogiri (1.19.1-aarch64-linux-gnu) sha256=cfdb0eafd9a554a88f12ebcc688d2b9005f9fce42b00b970e3dc199587b27f32
   nokogiri (1.19.1-aarch64-linux-musl) sha256=1e2150ab43c3b373aba76cd1190af7b9e92103564063e48c474f7600923620b5
@@ -387,13 +364,12 @@ CHECKSUMS
   parser (3.3.10.2) sha256=6f60c84aa4bdcedb6d1a2434b738fe8a8136807b6adc8f7f53b97da9bc4e9357
   power_assert (3.0.1) sha256=8ce9876716cc74e863fcd4cdcdc52d792bd983598d1af3447083a3a9a4d34103
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
-  public_suffix (7.0.2) sha256=9114090c8e4e7135c1fd0e7acfea33afaab38101884320c65aaa0ffb8e26a857
+  public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
   raabro (1.4.0) sha256=d4fa9ff5172391edb92b242eed8be802d1934b1464061ae5e70d80962c5da882
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
   rainbow (3.1.1) sha256=039491aa3a89f42efa1d6dec2fc4e62ede96eb6acd95e52f1ad581182b79bc6a
   rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
   regexp_parser (2.11.3) sha256=ca13f381a173b7a93450e53459075c9b76a10433caadcb2f1180f2c741fc55a4
-  rest-client (2.1.0) sha256=35a6400bdb14fae28596618e312776c158f7ebbb0ccad752ff4fa142bf2747e3
   ricecream (0.2.1) sha256=d32d7781d554d1e1ec44325cabeb22f604a74c563c08d2cfe82f4e2e2bb3ac93
   rubocop (1.84.2) sha256=5692cea54168f3dc8cb79a6fe95c5424b7ea893c707ad7a4307b0585e88dbf5f
   rubocop-ast (1.49.0) sha256=49c3676d3123a0923d333e20c6c2dbaaae2d2287b475273fddee0c61da9f71fd
@@ -430,7 +406,7 @@ CHECKSUMS
   websocket-extensions (0.1.5) sha256=1c6ba63092cda343eb53fc657110c71c754c56484aad42578495227d717a8241
   yajl-ruby (1.4.3) sha256=8c974d9c11ae07b0a3b6d26efea8407269b02e4138118fbe3ef0d2ec9724d1d2
   zeitwerk (2.7.5) sha256=d8da92128c09ea6ec62c949011b00ed4a20242b255293dd66bf41545398f73dd
-  zlib (3.2.2) sha256=908e61263f99c1371b5422581e2d6663bd37c6b04ae13b5f8cb10b0d09379f40
+  zlib (3.2.3) sha256=5bd316698b32f31a64ab910a8b6c282442ca1626a81bbd6a1674e8522e319c20
 
 RUBY VERSION
   ruby 3.4.8
