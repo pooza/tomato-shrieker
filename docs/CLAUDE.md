@@ -134,6 +134,8 @@ test/                  # テストファイル
 
 ## 4.0 計画
 
+モロヘイヤや ginseng 系 gem の成果物を流用してきた経緯があり、モロヘイヤ 5.0 のアーキテクチャ更新も活用できる可能性がある。
+
 ### PieFed 対応の ginseng-piefed 移行
 
 PieFed 対応は姉妹プロダクト mulukhiya-toot-proxy（モロヘイヤ）に由来する。モロヘイヤ側で PieFed 対応を ginseng-piefed gem として独立させる計画があり、tomato-shrieker でも PiefedShrieker を ginseng-piefed ベースに移行する。
@@ -148,6 +150,29 @@ Shrieker 間でテンプレートの扱いに差があり、特に PieFed 周り
 - **Source/FeedSource にハードコードされた `:piefed` キー**: ベースクラスが特定の Shrieker を知っている（他の Shrieker は `:default` のみ）
 - **フォールバックパスの不一致**: Source は `self['/dest/template']`、FeedSource は `self['/piefed/template']` と異なるパスにフォールバック
 - **PiefedShrieker#search_template の二重処理**: Source 側でテンプレートを用意した上で、Shrieker 側でさらに再構築している
+
+### Ruby 4.0 正式対応
+
+Ruby 4.0 をサポート対象に加える。
+
+### Sentry.io 導入
+
+姉妹プロジェクト mulukhiya-toot-proxy・capsicum で成果を上げており、tomato-shrieker にも導入する。
+
+### google-news-rss-cleaner 統合・インフラ構成の検討
+
+google-news-rss-cleaner は tomato-shrieker との連携を目的としたツールだが、Node.js 製。
+
+- **モノレポ案**: 連携が明確になるが、tomato-shrieker は FreeBSD 運用で、ヘッドレスブラウザの動作が困難なため逆に制約になりうる
+- **Ubuntu 集約案**: google-news-rss-cleaner を運用している Ubuntu に tomato-shrieker も寄せる
+- インフラ構成の判断を含む
+
+### Source 管理の改善
+
+現状は YAML 手編集 + rake タスクの組み合わせ。
+
+- **CLI 強化案**: 工数が少なく、現運用との親和性が高い
+- **Web サービス新設案**: 過去に一度断念した長年の懸案。フロントエンド検討が増えるのが断念理由だったが、モロヘイヤの WebUI 設計に乗ることで工数を抑えられる可能性がある。外形監視ツールと組み合わせて監視しやすくなる利点もある
 
 ## 関連リポジトリ
 
