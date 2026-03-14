@@ -251,6 +251,62 @@ Source 管理の CLI 化（#6）とは別課題として、稼働状況の監視
 - 各ソースの最終投稿時刻、エラー状態等をダッシュボード表示
 - Kuma のヘルスチェックエンドポイントを兼ねる
 
+## 12. CI 改善
+
+### 現状
+
+- CI は `rubocop` と `migration:run` のみ実行
+- テスト本体（`rake test`）は CI で実行されていない
+- Ruby バージョンは 3.4.8
+
+### 方針
+
+- テスト改善（#4）と合わせ、CI でテスト本体を実行できるようにする
+- Ruby 4.0 に更新
+- `actions/checkout` を v3 → v4 に更新
+- bundler バージョンを現行に合わせる
+
+**目標の CI ステップ**:
+
+1. checkout
+2. Ruby セットアップ（4.0.x）
+3. apt install（libsqlite3-dev）
+4. bundle install
+5. migration:run
+6. rubocop
+7. rake test
+
+## 13. リリース手順
+
+mulukhiya-toot-proxy の運用を踏襲する。
+
+### リリース時の作業チェックリスト
+
+- [ ] バージョン番号を決定（`config/application.yaml` の `/shrieker/version`）
+- [ ] `develop` → `main` へ PR を作成しマージ
+- [ ] `gh release create vX.Y.Z --target main --title "X.Y.Z"` でリリース作成
+- [ ] docs/CLAUDE.md 更新（リリース済みセクションに追記）
+- [ ] Wiki の関連ページ更新確認
+- [ ] 本番サーバーへのデプロイ
+- [ ] Codex レビューコメント確認（マージ後遅れて届く場合がある）
+- [ ] デプロイ後の動作確認
+
+### GitHub Codex レビュー
+
+- PR マージ後に Codex（chatgpt-codex-connector[bot]）のレビューコメントが遅れて届くことがある
+- セッション開始時に最近マージされた PR のレビューコメントを確認する
+- 未対応の有益な指摘があれば対応し、対応内容をコメントで返信する
+
+### セキュリティレビュー
+
+- リリース前に Codex によるセキュリティレビューを実施
+- 指摘事項はリリース前に対応する
+
+### バージョニング方針
+
+- **パッチリリース**（4.0.x 等）は致命的な不具合時のみ
+- **通常の機能追加・改善はマイナーバージョン**（4.1.0 等）でまとめてリリース
+
 ## タスク一覧
 
 ### 実装済み
@@ -270,7 +326,9 @@ Source 管理の CLI 化（#6）とは別課題として、稼働状況の監視
 - [ ] Ruby 4.0 移行
 - [ ] #1375 Nostr nsec 対応
 - [ ] google-news-rss-cleaner 連携
+- [ ] CI 改善（テスト本体の実行、Ruby 4.0 化）
+- [ ] デフォルトブランチを `master` → `main` に変更
 
 ### 4.0 以降
 
-- [ ] 監視の仕組み検討
+- [ ] 監視（簡易 Web インターフェース + Kuma 連携）
