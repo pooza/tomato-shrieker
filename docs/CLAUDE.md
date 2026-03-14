@@ -167,6 +167,25 @@ google-news-rss-cleaner は tomato-shrieker との連携を目的としたツー
 - **Ubuntu 集約案**: google-news-rss-cleaner を運用している Ubuntu に tomato-shrieker も寄せる
 - インフラ構成の判断を含む
 
+### GoogleNewsSource 同一ニュース重複投稿の抑制
+
+Google News では同じニュースが各社メディアから配信され、URL・タイトルが異なるため既存の DB 重複排除では検出できない。bigram Jaccard 係数による類似度判定で抑制する。
+
+- **実装済み**: `GoogleNewsSource#ignore_entry?` で直近48時間の既存エントリと比較（閾値 0.4）
+- **設定**: デフォルトオン、`/source/news/dedupe: false` でオフ可能
+
+### テスト改善
+
+現在のテストは mock/stub を使用しておらず、実際に外部 API へ投稿してしまう。テスト実行時に実投稿をスキップする仕組みを導入する。
+
+### SQLite 並行アクセスの改善
+
+`FeedSource#fetch` で複数スレッドから同時 INSERT しているが、WAL モード未設定・BusyException リトライ無制限など、並行処理の設定が不十分。
+
+- WAL モード有効化
+- busy_timeout 設定
+- リトライ上限の追加
+
 ### Source 管理の改善
 
 現状は YAML 手編集 + rake タスクの組み合わせ。
