@@ -314,20 +314,20 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1388 daemon-spawn gem 廃止
 - [x] #1401 GoogleNewsSource 重複投稿抑制
 - [x] #1375 Nostr nsec 対応
+- [x] #1309 FreeBSD 起動スクリプト更新（stop の pkill フォールバック追加）
+- [x] #1403 SQLite 並行アクセス改善（WAL モード・busy_timeout・リトライ上限）
 
-### 4.0 リリースに必要
+### 4.0 リリースに必要（着手順）
 
-- [ ] #1398 テンプレート取り回しの統一
-- [ ] #1399 PieFed 対応の ginseng-piefed 移行
-- [ ] #1402 テスト改善（mock/stub 導入）
-- [ ] #1403 SQLite 並行アクセス改善
-- [ ] CLI 新設と rake タスク整理
-- [ ] #1309 FreeBSD 起動スクリプト更新
 - [ ] Sentry.io 導入
 - [ ] Ruby 4.0 移行
-- [ ] google-news-rss-cleaner 連携
+- [ ] #1402 テスト改善（mock/stub 導入）
 - [ ] CI 改善（テスト本体の実行、Ruby 4.0 化）
-- [ ] デフォルトブランチを `master` → `main` に変更
+- [ ] #1398 テンプレート取り回しの統一
+- [ ] CLI 新設と rake タスク整理
+- [ ] google-news-rss-cleaner 連携
+- [ ] #1399 PieFed 対応の ginseng-piefed 移行（ginseng-piefed gem 完成待ち）
+- [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
 
 ### 4.0 以降
 
