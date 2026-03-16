@@ -15,7 +15,7 @@ module TomatoShrieker
 
     def test_timeline
       GitHubRepositorySource.all do |source|
-        assert(['releases', 'commits'].member?(source.timeline))
+        assert_includes(['releases', 'commits'], source.timeline)
       end
     end
   end
