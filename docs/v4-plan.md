@@ -313,6 +313,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 
 - [x] #1388 daemon-spawn gem 廃止
 - [x] #1401 GoogleNewsSource 重複投稿抑制
+- [x] #1375 Nostr nsec 対応
 
 ### 4.0 リリースに必要
 
@@ -324,7 +325,6 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [ ] #1309 FreeBSD 起動スクリプト更新
 - [ ] Sentry.io 導入
 - [ ] Ruby 4.0 移行
-- [ ] #1375 Nostr nsec 対応
 - [ ] google-news-rss-cleaner 連携
 - [ ] CI 改善（テスト本体の実行、Ruby 4.0 化）
 - [ ] デフォルトブランチを `master` → `main` に変更
