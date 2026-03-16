@@ -27,10 +27,10 @@ module TomatoShrieker
       keygen = Nostr::Keygen.new
       private_key = @params[:private_key].decrypt rescue @params[:private_key]
       key = if private_key.start_with?('nsec1')
-              Nostr::PrivateKey.from_bech32(private_key)
-            else
-              Nostr::PrivateKey.new(private_key)
-            end
+        Nostr::PrivateKey.from_bech32(private_key)
+      else
+        Nostr::PrivateKey.new(private_key)
+      end
       keygen.get_key_pair_from_private_key(key)
     end
 

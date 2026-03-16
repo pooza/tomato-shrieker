@@ -26,6 +26,8 @@ Layout/ArrayAlignment:
   EnforcedStyle: with_fixed_indentation
 Layout/EmptyLineAfterGuardClause:
   Enabled: false
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: variable
 Layout/EndOfLine:
   EnforcedStyle: lf
 Layout/FirstArgumentIndentation:
