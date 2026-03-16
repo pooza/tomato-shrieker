@@ -186,12 +186,75 @@ Google News では同じニュースが各社メディアから配信され、UR
 - busy_timeout 設定
 - リトライ上限の追加
 
+### デフォルトブランチの main への変更
+
+現在のデフォルトブランチは `master`。4.0 のタイミングで `main` に統一する。
+
+- GitHub リポジトリのデフォルトブランチを `master` → `main` に変更
+- ブランチ戦略ドキュメント・セッション同期手順の参照先を更新
+- CI の `on: push` ブランチ指定等を更新
+
 ### Source 管理の改善
 
 現状は YAML 手編集 + rake タスクの組み合わせ。
 
 - **CLI 強化案**: 工数が少なく、現運用との親和性が高い
 - **Web サービス新設案**: 過去に一度断念した長年の懸案。フロントエンド検討が増えるのが断念理由だったが、モロヘイヤの WebUI 設計に乗ることで工数を抑えられる可能性がある。外形監視ツールと組み合わせて監視しやすくなる利点もある
+
+## セッション開始時の同期手順
+
+会話の最初に「進捗を同期してください」等の指示があった場合、以下の手順を実行する。
+
+### 1. プロジェクトガイドの読み込み
+
+- `docs/CLAUDE.md` を読む（プロジェクトのルール・構造・履歴の正本）
+- `MEMORY.md` は自動ロードされるので、両者の整合性を意識する
+
+### 2. リモートとの同期・状態確認
+
+- `git fetch origin` — **最初に必ず実行**。リモートが正本であり、ローカルの状態を信用しない
+- `git log HEAD..origin/develop --oneline` — リモートに未取り込みのコミットがないか確認。差分があればpullを検討
+- `git log --oneline -10` — 直近のコミット履歴
+- `gh issue list --state open` — open Issue一覧
+- `gh pr list --state open` — open PR一覧
+
+### 3. Dependabotセキュリティアラート
+
+- `gh api repos/pooza/tomato-shrieker/dependabot/alerts` で open アラートを確認
+- 0件なら対応不要、あれば提案
+
+### 4. Codexレビューコメントの確認
+
+- 最近マージされたPR（`gh pr list --state merged --limit 5`）を取得
+- 各PRに対して `gh api repos/pooza/tomato-shrieker/pulls/{number}/comments` でCodex（`chatgpt-codex-connector[bot]`）のコメントを確認
+- 未返信のコメントがあれば内容を確認し、対応が必要か判断
+
+### 5. Sentry の新規イシュー確認
+
+> **TODO**: Sentry の設定（DSN・トークン等）が整ったタイミングで手順を追加する。
+
+### 6. 外部リポジトリの同期確認
+
+> **TODO**: chubo2 インフラノート（`pooza/chubo2` の `docs/infra-note.md`）との連携が整ったタイミングで手順を追加する。
+
+### 7. マイルストーンの状態確認
+
+- `docs/CLAUDE.md` と MEMORY.md に記載された次期マイルストーンの Issue が、実際の GitHub 上の状態（open/closed）と一致しているか確認
+- クローズ済みの Issue があれば MEMORY.md から除外し、`docs/CLAUDE.md` も必要に応じて更新
+
+### 8. MEMORY.md の更新
+
+- 上記で検出した差分（Issue 状態、リリース日の誤り、件数のズレ等）を反映
+
+### 9. 同期結果の報告
+
+- 現在のブランチ・状態、マイルストーンの状況、各確認項目の結果をまとめて報告する
+
+## 情報の記載先ルール
+
+- **課題・タスク** → GitHub Issue で管理
+- **プロジェクト共有すべき知見** → `docs/CLAUDE.md` など git 管理下のファイルに記載
+- **進捗の同期** → `MEMORY.md` だけでなく `docs/CLAUDE.md` も更新すること。特にリリース済みバージョンの反映（「開発中」→「リリース済み」への変更）を忘れないこと
 
 ## 関連リポジトリ
 
