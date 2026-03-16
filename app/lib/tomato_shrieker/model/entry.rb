@@ -75,6 +75,7 @@ module TomatoShrieker
     alias post shriek
 
     def self.create(entry, feed = nil)
+      retry_count = 0
       parser = EntryParser.new(entry)
       parser.feed = feed if feed
       entry = Entry[Entry.insert(parser.parse)]
@@ -82,6 +83,8 @@ module TomatoShrieker
       return nil if entry.published < feed.time
       return entry
     rescue SQLite3::BusyException
+      retry_count += 1
+      raise if retry_count >= 5
       sleep(rand(0.5..2.0))
       retry
     rescue Sequel::UniqueConstraintViolation

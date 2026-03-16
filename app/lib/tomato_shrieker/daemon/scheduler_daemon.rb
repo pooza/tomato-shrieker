@@ -15,7 +15,9 @@ module TomatoShrieker
 
     def start(args = [])
       logger.info(daemon: app_name, version: Package.version, message: 'start')
-      Sequel.connect(Environment.dsn)
+      db = Sequel.connect(Environment.dsn)
+      db.run('PRAGMA journal_mode=WAL')
+      db.run('PRAGMA busy_timeout=5000')
       Scheduler.instance.exec
       sleep
     rescue => e
