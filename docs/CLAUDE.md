@@ -114,6 +114,82 @@ rake タスク (`rake start` / `rake restart`) は便利コマンドとして残
 
 設定アクセスは Ginseng のスラッシュ記法: `config['/path/to/key']`
 
+## ソース定義 YAML リファレンス
+
+各ソースは `config/sources/*.yaml` に定義する。基本構造:
+
+```yaml
+sources:
+  - id: optional-unique-id  # 省略時は設定全体のダイジェスト
+    source:
+      # ソース固有の設定
+    schedule:
+      every: 1h             # every / cron / at のいずれか
+    dest:
+      # 投稿先固有の設定
+      tags:                  # ハッシュタグ（先頭の # を除いた文字列の配列）
+        - tag1
+      template: default      # ERB テンプレート名（views/ 配下）
+```
+
+### Source 設定項目
+
+| Source | 主要キー | 備考 |
+|--------|----------|------|
+| TextSource | `/source/text` | 定型文 |
+| CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`） |
+| FeedSource | `/source/feed`（`/source/url` でも可） | `/source/title/unique`（デフォルト true）、`/keep/years`、`/dest/prefix`、`/dest/account/bot` |
+| GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true） |
+| IcalendarSource | `/source/icalendar/url` | iCalendar (.ics) URL。`/source/icalendar/keyword` |
+| YouTubeChannelSource | `/source/youtube_channel/channel_id` | `/source/youtube_channel/keyword` |
+| GitHubRepositorySource | `/source/github/repository` | `/source/github/timeline`（releases 等） |
+
+### キーワードフィルタ（FeedSource 系共通）
+
+- `/source/keyword` — 含むエントリのみ対象（正規表現可）
+- `/source/negative_keyword` — 含まないエントリのみ対象（正規表現可）
+
+### マルチエントリ（FeedSource）
+
+- `/dest/multi_entries` — true で直近記事をまとめて投稿（Hexo 対応）
+- `/dest/category` — カテゴリで絞り込み
+- `/dest/limit` — 最大記事数（デフォルト 5）
+
+### Shrieker 設定項目
+
+| Shrieker | 主要キー | 備考 |
+|----------|----------|------|
+| MastodonShrieker | `/dest/mastodon/url`, `/dest/mastodon/token` | 権限: `write:statuses`（画像は `write:media`）。`/dest/visibility` |
+| MisskeyShrieker | `/dest/misskey/url`, `/dest/misskey/token` | 権限: `write:notes`（画像は `write:drive`） |
+| WebhookShrieker | `/dest/hooks` | Slack Incoming Webhooks 互換 URL の配列（Discord は末尾に `/slack`） |
+| LineShrieker | `/dest/line/user_id`, `/dest/line/token` | チャンネルアクセストークン（長期） |
+| PieFedShrieker | `/dest/piefed/url`, `/dest/piefed/access_token`, `/dest/piefed/community_name` | `/dest/piefed/api_version`（デフォルト alpha） |
+| NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/nostr/relays`（application.yaml） |
+
+### モロヘイヤ連携
+
+- `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（デフォルト true）
+- `/dest/mulukhiya/url`, `/dest/mulukhiya/tagging/enable` — ハッシュタグ自動付与
+
+### 暗号化
+
+- `/crypt/password` — アクセストークン等の暗号化用パスワード（PieFedShrieker で使用）
+- `bin/crypt.rb` で暗号化、`bin/decrypt.rb` で復号
+
+### 例外通知
+
+- `/slack/hooks` — 例外発生時の通知先（Slack 互換 Webhook URL の配列）
+
+### スケジュール形式
+
+3形式から選択。指定方法は [rufus-scheduler](https://github.com/jmettraux/rufus-scheduler) に準じる。
+
+| 形式 | キー | 例 |
+|------|------|-----|
+| 定期実行 | `/schedule/every` | `5m`, `1h`, `1d` |
+| cron | `/schedule/cron` | `'0 6 * * *'` |
+| 指定時刻 | `/schedule/at` | `'2026/5/18 18:00'` |
+
 ## CI
 
 GitHub Actions (`.github/workflows/test.yml`):
