@@ -23,16 +23,14 @@
 
 ### Dependabot PR の取り扱い
 
-Dependabot は `master` をターゲットにPRを作成する。以下のフローで対応する。
+`dependabot.yml` で `open-pull-requests-limit: 0` に設定しており、通常のバージョン更新PRは自動作成されない。**セキュリティアドバイザリ由来のPRのみ**が自動生成される（GitHub の仕様としてセキュリティアラートは `open-pull-requests-limit` の制限を受けない）。
 
-1. **判断**: PRの内容を確認し、以下のいずれかに分類する
-   - **不要**: ginseng-\* 系など、develop で別途管理している gem → そのままクローズ
-   - **通常の更新**: 緊急性のないバージョンアップ → develop に取り込み、次回リリースに含める
-   - **緊急セキュリティ修正**: master に直接マージ（稀なケース）
-2. **develop への取り込み手順**（通常の更新の場合）:
-   - Dependabot が作成したブランチを develop にマージする
-   - PRに「develop にマージ済み、次回リリースに含める」旨をコメントしてクローズ
-3. **不要な場合**: 理由を添えてクローズ
+対応フローは2パターン:
+
+1. **未対応の場合**: PRをそのままマージする
+2. **`bundle update` 等で対応済みの場合**: 「Already included via bundle update in commit xxxxx」とコメントしてクローズする
+
+判断基準: Gemfile.lock の該当 gem バージョンが、PRで提示されたバージョン以上かどうかを確認する。
 
 ## アーキテクチャ
 
