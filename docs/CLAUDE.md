@@ -116,7 +116,9 @@ rake タスク (`rake start` / `rake restart`) は便利コマンドとして残
 
 ## ソース定義 YAML リファレンス
 
-各ソースは `config/sources/*.yaml` に定義する。基本構造:
+各ソースは `config/sources/*.yaml` にファイル単位で定義する。ソースごとにファイルを分けて管理できる（例: `config/sources/news.yaml`, `config/sources/blog.yaml`）。起動時にディレクトリ内の全 YAML を動的に読み込む。
+
+基本構造:
 
 ```yaml
 sources:
