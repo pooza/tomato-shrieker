@@ -276,7 +276,44 @@ Source 管理の CLI 化（#6）とは別課題として、稼働状況の監視
 6. rubocop
 7. rake test
 
-## 13. リリース手順
+## 13. GitHub Wiki の最新化と docs ↔ Wiki 整理
+
+**Issue**: #1407
+
+### Wiki の現状
+
+- Wiki の実質的な内容更新は 2022-12 が最後
+- NostrShrieker、GitHubRepositorySource のページが未作成
+- ツイートタイムラインソース（Twitter）が廃止済みなのに残存
+- IcalendarSource・YouTubeChannelSource の設定例が実装と不一致
+- 動作環境の Ruby バージョンが古い
+
+### 方針
+
+#### docs と Wiki の役割分担
+
+| 置き場 | 内容 |
+|--------|------|
+| docs/CLAUDE.md | 開発時に頻繁に参照する情報（アーキテクチャ、規約、設定項目一覧） |
+| Wiki | ユーザー向けセットアップガイド、各機能の設定例、運用手順 |
+
+#### Wiki → docs への転記
+
+- 各ソース・Shrieker の設定項目一覧（開発時の参照頻度が高い）
+- スケジュール形式（at / every / cron）の仕様
+
+#### docs → Wiki への移動（アーカイブ）
+
+- 詳細な設計経緯・実装メモのうち、日常開発で参照頻度が低いもの
+
+#### Wiki の更新作業
+
+- ページ新規作成: NostrShrieker、GitHubRepositorySource
+- 廃止ページの整理: ツイートタイムラインソース
+- 既存ページの更新: 動作環境、設置の手順（systemd/rc.d）、設定例の修正
+- _Sidebar.md の更新
+
+## 14. リリース手順
 
 mulukhiya-toot-proxy の運用を踏襲する。
 
@@ -327,6 +364,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [ ] CLI 新設と rake タスク整理
 - [ ] google-news-rss-cleaner 連携
 - [ ] #1399 PieFed 対応の ginseng-piefed 移行（ginseng-piefed gem 完成待ち）
+- [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
 
 ### 4.0 以降
