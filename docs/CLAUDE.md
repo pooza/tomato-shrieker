@@ -20,6 +20,16 @@
 
 1. `develop` で開発・コミット
 2. リリース時に `develop` → `master` へPRを作成しマージ
+3. `master` でタグを打ちリリース: `gh release create vX.Y.Z --target master --title "X.Y.Z"`
+4. `config/application.yaml` の `/shrieker/version` がバージョンの正本。リリース前に更新する
+5. セキュリティレビューは各マイルストーンの Issue をすべて消化した後、リリース直前に実施する
+6. `docs/CLAUDE.md` のリリース済みセクションを更新する
+
+### リリースノート
+
+- セキュリティアップデート（gem のパッチ更新等）は、実質的に影響がなくてもリリースノートに記載する
+- マイナーリリース: 通常の機能追加・改善
+- パッチリリース: 致命的な不具合やセキュリティ修正時のみ
 
 ### Dependabot PR の取り扱い
 
