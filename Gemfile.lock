@@ -40,6 +40,13 @@ GIT
     ginseng-fediverse (1.8.21)
 
 GIT
+  remote: https://github.com/pooza/ginseng-piefed.git
+  revision: 125e86e3a426c68b0d1cf4d35b8f9d705d93bb0a
+  branch: main
+  specs:
+    ginseng-piefed (0.1.0)
+
+GIT
   remote: https://github.com/pooza/ginseng-youtube.git
   revision: 453a25139a2de765c6f9ad03d450f5053bddfcba
   branch: main
@@ -285,6 +292,7 @@ DEPENDENCIES
   feedjira (~> 3.0)
   ginseng-core!
   ginseng-fediverse!
+  ginseng-piefed!
   ginseng-youtube!
   icalendar
   icalendar-rrule!
@@ -332,6 +340,7 @@ CHECKSUMS
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
   ginseng-core (1.15.21)
   ginseng-fediverse (1.8.21)
+  ginseng-piefed (0.1.0)
   ginseng-youtube (2.0.1)
   httparty (0.24.2) sha256=8fca6a54aa0c4aa4303a0fd33e5e2156175d6a5334f714263b458abd7fda9c38
   i18n (1.14.8) sha256=285778639134865c5e0f6269e0b818256017e8cde89993fdfcbfb64d088824a5

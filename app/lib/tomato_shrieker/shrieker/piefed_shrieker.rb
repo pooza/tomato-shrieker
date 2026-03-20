@@ -1,29 +1,15 @@
 module TomatoShrieker
-  class PiefedShrieker
-    include Package
-
-    attr_reader :http
-
+  class PiefedShrieker < Ginseng::Piefed::Service
     def initialize(params = {})
-      @params = params.deep_symbolize_keys
-      @http = HTTP.new
-      @http.base_uri = uri
+      params = params.deep_symbolize_keys
+      params[:url] = "https://#{params[:host]}" if params[:host] && !params[:url]
+      params[:user] = params[:user_id] if params[:user_id] && !params[:user]
+      super
       login
     end
 
-    def uri
-      @uri ||= Ginseng::URI.parse("https://#{@params[:host]}")
-      return @uri if @uri&.absolute?
-    end
-
-    def login
-      response = http.post("/api/#{api_version}/user/login", {
-        body: {
-          username: @params[:user_id],
-          password: (@params[:password].decrypt rescue @params[:password]),
-        },
-      })
-      @jwt = response['jwt']
+    def api_version
+      return @params[:api_version] || super
     end
 
     def exec(body)
@@ -43,9 +29,7 @@ module TomatoShrieker
       })
     end
 
-    def api_version
-      return @params[:api_version] || 'alpha'
-    end
+    private
 
     def search_template(body)
       unless entry = body[:template].entry
