@@ -12,6 +12,7 @@ gem 'nostr'
 gem 'optparse'
 gem 'parallel'
 gem 'rufus-scheduler'
+gem 'sentry-ruby'
 gem 'sequel'
 gem 'sqlite3'
 

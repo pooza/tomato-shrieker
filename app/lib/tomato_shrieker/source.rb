@@ -39,6 +39,7 @@ module TomatoShrieker
       shriekers do |shrieker|
         shrieker.exec(params)
       rescue => e
+        Sentry.capture_exception(e) if Sentry.initialized?
         logger.error(source: id, error: e)
       end
     end
@@ -290,6 +291,7 @@ module TomatoShrieker
         exec
         logger.info(source: id, class: self.class.to_s, action: 'exec end')
       rescue => e
+        Sentry.capture_exception(e) if Sentry.initialized?
         logger.error(source: id, error: e)
       end
       logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)

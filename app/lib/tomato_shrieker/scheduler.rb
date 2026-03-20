@@ -10,6 +10,7 @@ module TomatoShrieker
       Parallel.each(Source.all.reject(&:disable?), in_threads:, &:register)
       @scheduler.join
     rescue => e
+      Sentry.capture_exception(e) if Sentry.initialized?
       logger.error(scheduler: {error: e})
     end
 

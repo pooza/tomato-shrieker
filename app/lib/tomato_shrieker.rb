@@ -17,6 +17,19 @@ module TomatoShrieker
     return loader
   end
 
+  def self.setup_sentry
+    dsn = Config.instance['/sentry/dsn']
+    return unless dsn
+    Sentry.init do |config|
+      config.dsn = dsn
+      config.release = Package.version
+      config.environment = Environment.type
+      config.traces_sample_rate = Config.instance['/sentry/traces_sample_rate'] || 0
+    end
+  rescue => e
+    warn "Sentry initialization skipped: #{e.message}"
+  end
+
   def self.setup_debug
     Ricecream.disable
     return unless Environment.development?
@@ -40,6 +53,7 @@ module TomatoShrieker
   ENV['BUNDLE_GEMFILE'] = File.join(dir, 'Gemfile')
   Bundler.require
   loader.setup
+  setup_sentry
   setup_debug
   ENV['RACK_ENV'] ||= Environment.type
   RubyVM::YJIT.enable if Environment.jit?

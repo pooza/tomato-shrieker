@@ -21,6 +21,7 @@ module TomatoShrieker
       Scheduler.instance.exec
       sleep
     rescue => e
+      Sentry.capture_exception(e) if Sentry.initialized?
       logger.error(daemon: app_name, error: e)
       raise
     end
