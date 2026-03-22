@@ -141,7 +141,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'calendar'),
-        piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'calendar'),
       }
       return @templates
     end

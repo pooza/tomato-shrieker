@@ -36,7 +36,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
-        piefed: Template.new(self['/dest/piefed/template'] || self['/piefed/template'] || 'title'),
       }
       return @templates
     end

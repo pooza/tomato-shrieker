@@ -13,7 +13,7 @@ module TomatoShrieker
     end
 
     def exec(body)
-      template = search_template(body)
+      template = create_piefed_template(body[:template])
       data = {
         title: template.to_s.gsub(/[\r\n[:blank:]]+/, ' '),
         body: template.to_s,
@@ -31,13 +31,16 @@ module TomatoShrieker
 
     private
 
-    def search_template(body)
-      unless entry = body[:template].entry
-        return body[:template].source.create_template(:piefed, body[:template].to_s)
-      end
-      return entry.create_template(:piefed)
-    rescue
-      return body[:template]
+    def create_piefed_template(original)
+      source = original.source
+      piefed_template_name = source['/dest/piefed/template']
+      return original unless piefed_template_name
+
+      template = Template.new(piefed_template_name)
+      template[:source] = source
+      template[:entry] = original.entry
+      template[:status] = original[:status]
+      return template
     end
   end
 end

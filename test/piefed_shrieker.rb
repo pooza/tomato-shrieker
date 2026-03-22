@@ -16,7 +16,6 @@ module TomatoShrieker
       Source.all.select(&:test?).select(&:piefed).each do |source|
         assert_kind_of(Hash, source.templates)
         assert_kind_of(Template, source.templates[:default])
-        assert_kind_of(Template, source.templates[:piefed])
       end
     end
   end
