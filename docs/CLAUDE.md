@@ -172,6 +172,7 @@ sources:
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（デフォルト true）
 - `/dest/mulukhiya/url`, `/dest/mulukhiya/tagging/enable` — ハッシュタグ自動付与
+- Webhook digest・カスタムフィード連携の詳細: [mulukhiya-toot-proxy 連携ドキュメント](https://github.com/pooza/mulukhiya-toot-proxy/blob/develop/docs/tomato-shrieker-integration.md)
 
 ### 暗号化
 
