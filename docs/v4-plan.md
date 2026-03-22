@@ -356,14 +356,14 @@ mulukhiya-toot-proxy の運用を踏襲する。
 
 ### 4.0 リリースに必要（着手順）
 
-- [ ] Sentry.io 導入
+- [x] Sentry.io 導入
+- [x] #1402 テスト改善（mock/stub 導入）
+- [x] #1398 テンプレート取り回しの統一
+- [x] #1399 PieFed 対応の ginseng-piefed 移行（PR #1408 マージ済み）
 - [ ] Ruby 4.0 移行
-- [ ] #1402 テスト改善（mock/stub 導入）
 - [ ] CI 改善（テスト本体の実行、Ruby 4.0 化）
-- [ ] #1398 テンプレート取り回しの統一
 - [ ] CLI 新設と rake タスク整理
 - [ ] google-news-rss-cleaner 連携
-- [ ] #1399 PieFed 対応の ginseng-piefed 移行（ginseng-piefed gem 完成待ち）
 - [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
 
