@@ -37,6 +37,11 @@ module TomatoShrieker
 
     def shriek(params = {})
       shriekers do |shrieker|
+        if Environment.test?
+          params[:template]&.to_s
+          logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
+          next
+        end
         shrieker.exec(params)
       rescue => e
         Sentry.capture_exception(e) if Sentry.initialized?

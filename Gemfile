@@ -24,4 +24,5 @@ group :development do
   gem 'rubocop-rake'
   gem 'rubocop-sequel'
   gem 'test-unit'
+  gem 'webmock'
 end
