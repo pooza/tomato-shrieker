@@ -5,3 +5,4 @@
 !scheduler_daemon.rb
 !scheduler_worker.rb
 !test.rb
+!migrate_sources.rb
