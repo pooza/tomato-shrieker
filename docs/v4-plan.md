@@ -132,6 +132,8 @@ FreeBSD / tomato-shrieker → HTTP → Ubuntu / google-news-rss-cleaner → Goog
 
 ## 6. CLI 新設と rake タスク整理
 
+**Issue**: #1410
+
 ### 現状の問題
 
 - Source 管理が YAML 手編集 + rake タスクの組み合わせで、操作性が悪い
@@ -144,9 +146,12 @@ FreeBSD / tomato-shrieker → HTTP → Ubuntu / google-news-rss-cleaner → Goog
 
 `bin/shrieker` 等の軽量コマンドを新設し、Source 管理操作を移す。
 
+- `config/sources/` のファイル単位操作を前提とする
 - YAML ファイルの操作 + JSON Schema バリデーションのみで、アプリ全体のロードを不要にする
 - 新規サブコマンド: `list`, `add`, `edit`, `delete`, `validate`
 - 既存 rake タスクからの移行: `fetch`, `shriek`, `touch`, `clear`（DB アクセスが必要なものはアプリロードを行うが、起動パスを最適化）
+- `local.yaml` の `sources:` 互換性は残す（Config 変更なし）。CLI の恩恵を受けるには `config/sources/` への移行が必要
+- `bin/migrate_sources.rb` を移行スクリプトとして提供（推奨だが必須ではない）
 
 #### 6.2 rake タスク整理
 
@@ -353,6 +358,8 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1375 Nostr nsec 対応
 - [x] #1309 FreeBSD 起動スクリプト更新（stop の pkill フォールバック追加）
 - [x] #1403 SQLite 並行アクセス改善（WAL モード・busy_timeout・リトライ上限）
+- [x] WebhookShrieker Webhook URL ログ出力削除（Codex レビュー指摘対応）
+- [x] モロヘイヤ連携ドキュメントへのリンク追加
 
 ### 4.0 リリースに必要（着手順）
 
@@ -362,7 +369,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1399 PieFed 対応の ginseng-piefed 移行（PR #1408 マージ済み）
 - [ ] Ruby 4.0 移行
 - [ ] CI 改善（テスト本体の実行、Ruby 4.0 化）
-- [ ] CLI 新設と rake タスク整理
+- [ ] #1410 CLI 新設と rake タスク整理
 - [ ] google-news-rss-cleaner 連携
 - [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
