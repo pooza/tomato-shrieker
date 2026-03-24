@@ -8,7 +8,7 @@ module TomatoShrieker
     def test_exec
       Source.all.select(&:test?).select(&:mastodon).each do |source|
         source.clear
-        assert_nothing_raised { source.exec }
+        assert_nothing_raised {source.exec}
       end
     end
 
