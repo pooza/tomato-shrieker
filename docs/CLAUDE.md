@@ -5,7 +5,7 @@
 投稿のソース・投稿先・スケジュールの3要素を組み合わせた、単純なつぶやきボットエンジン。
 複数のボットを1インスタンスで管理できる。
 
-- **技術スタック**: Ruby 3.4 / Rufus::Scheduler / SQLite3 (Sequel ORM)
+- **技術スタック**: Ruby 4.0 / Rufus::Scheduler / SQLite3 (Sequel ORM)
 - **投稿先**: Mastodon, Misskey, LINE, PieFed, Nostr, Webhook (Slack, Discord等)
 - **ginseng-\*系gem**: 自作フレームワーク。必要に応じて全て更新してよい
 
@@ -197,9 +197,8 @@ sources:
 
 GitHub Actions (`.github/workflows/test.yml`):
 
-- Ruby 3.4.8 / Ubuntu
-- `bundle exec rake migration:run` → `bundle exec rubocop`
-- テストは `bundle exec rake test`（CI では DB マイグレーション後に実行）
+- Ruby 4.0 / Ubuntu
+- `bundle exec rake migration:run` → `bundle exec rubocop` → `bundle exec rake test`
 
 ## ディレクトリ構成（主要）
 
@@ -232,74 +231,45 @@ test/                  # テストファイル
 - 行長: 100文字（テストファイルは除外）
 - 末尾カンマ: 複数行では付与
 
+## 運用ルール
+
+### Sentry コメント運用
+
+Sentry イシューをクローズせず経過観察とする場合、その意図を Sentry イシューのコメントに記録する。「経過観察」「再発待ち」「次バージョンで対応予定」など、クローズしない理由を明記し、単なる放置と区別できるようにする。
+
+### Nostr のテスト責任
+
+Nostr 対応は外部ユーザーのリクエストで実装された機能。動作確認・テストの責任はリクエスト元ユーザーが負う（伝達済み）。不具合があれば対応するが、積極的なテストは行わない。
+
 ## 4.0 計画
 
-モロヘイヤや ginseng 系 gem の成果物を流用してきた経緯があり、モロヘイヤ 5.0 のアーキテクチャ更新も活用できる可能性がある。
+詳細は `docs/v4-plan.md` を参照。以下は概要と実装状況。
 
-### PieFed 対応の ginseng-piefed 移行
+### 実装済み
 
-PieFed 対応は姉妹プロダクト mulukhiya-toot-proxy（モロヘイヤ）に由来する。モロヘイヤ側で PieFed 対応を ginseng-piefed gem として独立させる計画があり、tomato-shrieker でも PiefedShrieker を ginseng-piefed ベースに移行する。
+- daemon-spawn 廃止 → `Ginseng::Daemon` フォアグラウンド実行
+- GoogleNewsSource 重複投稿抑制（bigram Jaccard 係数）
+- SQLite 並行アクセス改善（WAL モード・busy_timeout・リトライ上限）
+- Nostr nsec 対応
+- FreeBSD 起動スクリプト更新（stop の pkill フォールバック）
+- テンプレート取り回しの統一（**破壊的変更**）
+- PieFed 対応の ginseng-piefed 移行
+- テスト改善（mock/stub 導入、webmock）
+- Sentry.io 導入
+- Ruby 4.0 移行
+- CI 改善（テスト実行追加、Ruby 4.0 化、actions/checkout v4）
 
-- **現状**: PiefedShrieker は独自実装（HTTP クライアントで PieFed API を直接操作）
-- **目標**: Mastodon/Misskey が ginseng-fediverse を基底にしているのと同様に、ginseng-piefed を基底クラスとする構成へ移行
+### 未着手
 
-### テンプレート取り回しの統一
+- #1410 CLI 新設と rake タスク整理
+- google-news-rss-cleaner 連携（別リポ・疎結合）
+- #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
+- #1416 監視（簡易 Web インターフェース + Kuma 連携）
+- デフォルトブランチを `master` → `main` に変更（リリース時）
 
-Shrieker 間でテンプレートの扱いに差があり、特に PieFed 周りが煩雑。メジャーアップグレードで整理する。
+### 4.0 破壊的変更（リリースノート・Wiki 記載必須）
 
-- **Source/FeedSource にハードコードされた `:piefed` キー**: ベースクラスが特定の Shrieker を知っている（他の Shrieker は `:default` のみ）
-- **フォールバックパスの不一致**: Source は `self['/dest/template']`、FeedSource は `self['/piefed/template']` と異なるパスにフォールバック
-- **PiefedShrieker#search_template の二重処理**: Source 側でテンプレートを用意した上で、Shrieker 側でさらに再構築している
-
-### Ruby 4.0 正式対応
-
-Ruby 4.0 をサポート対象に加える。
-
-### Sentry.io 導入
-
-姉妹プロジェクト mulukhiya-toot-proxy・capsicum で成果を上げており、tomato-shrieker にも導入する。
-
-### google-news-rss-cleaner 統合・インフラ構成の検討
-
-google-news-rss-cleaner は tomato-shrieker との連携を目的としたツールだが、Node.js 製。
-
-- **モノレポ案**: 連携が明確になるが、tomato-shrieker は FreeBSD 運用で、ヘッドレスブラウザの動作が困難なため逆に制約になりうる
-- **Ubuntu 集約案**: google-news-rss-cleaner を運用している Ubuntu に tomato-shrieker も寄せる
-- インフラ構成の判断を含む
-
-### GoogleNewsSource 同一ニュース重複投稿の抑制
-
-Google News では同じニュースが各社メディアから配信され、URL・タイトルが異なるため既存の DB 重複排除では検出できない。bigram Jaccard 係数による類似度判定で抑制する。
-
-- **実装済み**: `GoogleNewsSource#ignore_entry?` で直近48時間の既存エントリと比較（閾値 0.4）
-- **設定**: デフォルトオン、`/source/news/dedupe: false` でオフ可能
-
-### テスト改善
-
-現在のテストは mock/stub を使用しておらず、実際に外部 API へ投稿してしまう。テスト実行時に実投稿をスキップする仕組みを導入する。
-
-### SQLite 並行アクセスの改善
-
-`FeedSource#fetch` で複数スレッドから同時 INSERT しているが、WAL モード未設定・BusyException リトライ無制限など、並行処理の設定が不十分。
-
-- WAL モード有効化
-- busy_timeout 設定
-- リトライ上限の追加
-
-### デフォルトブランチの main への変更
-
-現在のデフォルトブランチは `master`。4.0 のタイミングで `main` に統一する。
-
-- GitHub リポジトリのデフォルトブランチを `master` → `main` に変更
-- ブランチ戦略ドキュメント・セッション同期手順の参照先を更新
-- CI の `on: push` ブランチ指定等を更新
-
-### Source 管理の改善
-
-現状は YAML 手編集 + rake タスクの組み合わせ。
-
-- **CLI 強化案**: 工数が少なく、現運用との親和性が高い
-- **Web サービス新設案**: 過去に一度断念した長年の懸案。フロントエンド検討が増えるのが断念理由だったが、モロヘイヤの WebUI 設計に乗ることで工数を抑えられる可能性がある。外形監視ツールと組み合わせて監視しやすくなる利点もある
+- **テンプレート取り回しの統一 (#1398)**: Source/FeedSource/IcalendarSource の `templates` から `:piefed` キーを除去。`/dest/piefed/template` 未設定時のフォールバックが `:default` テンプレートに変更。PieFed 投稿で明示的にテンプレートを設定していないユーザーは投稿フォーマットが変わる可能性あり
 
 ## セッション開始時の同期手順
 
