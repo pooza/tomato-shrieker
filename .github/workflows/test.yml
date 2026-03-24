@@ -7,20 +7,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.4.8
+          ruby-version: '4.0'
       - name: apt install
         run: |
           sudo apt update
           sudo apt install libsqlite3-dev
       - name: bundle install
         run: |
-          gem install bundler -v '~>2.0'
+          gem install bundler -v '~>4.0'
           bundle install --jobs 4 --retry 3
           bundle exec rake bundle:update
           git diff
           bundle exec rake bundle:check
       - run: bundle exec rake migration:run
       - run: bundle exec rubocop
+      - run: bundle exec rake test
