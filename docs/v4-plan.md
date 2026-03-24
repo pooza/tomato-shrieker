@@ -372,8 +372,5 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [ ] #1410 CLI 新設と rake タスク整理
 - [ ] google-news-rss-cleaner 連携
 - [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
+- [ ] #1416 監視（簡易 Web インターフェース + Kuma 連携）
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
-
-### 4.0 以降
-
-- [ ] 監視（簡易 Web インターフェース + Kuma 連携）
