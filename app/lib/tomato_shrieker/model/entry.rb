@@ -80,6 +80,7 @@ module TomatoShrieker
       entry = Entry[Entry.insert(parser.parse)]
       return nil unless feed&.touched?
       return nil if entry.published < feed.time
+      return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
       return entry
     rescue SQLite3::BusyException
       sleep(rand(0.5..2.0))

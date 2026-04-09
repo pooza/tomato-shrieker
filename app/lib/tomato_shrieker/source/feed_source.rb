@@ -19,7 +19,7 @@ module TomatoShrieker
     end
 
     def keep_years
-      return self['/keep/years']
+      return self['/keep/years'] || 3
     end
 
     def clear
