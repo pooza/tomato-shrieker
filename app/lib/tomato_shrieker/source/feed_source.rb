@@ -168,7 +168,7 @@ module TomatoShrieker
 
     def self.all(&block)
       return enum_for(__method__) unless block
-      Source.all.select {|s| s.is_a?(self)}.each(&block)
+      Source.all.grep(self).each(&block)
     end
   end
 end
