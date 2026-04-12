@@ -370,7 +370,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1414 Ruby 4.0 移行
 - [x] #1415 CI 改善（テスト本体の実行、Ruby 4.0 化）
 - [x] #1410 CLI 新設と rake タスク整理（YAML 操作系は #1429 に分離）
-- [ ] google-news-rss-cleaner 連携
+- [x] google-news-rss-cleaner 連携（cleaner URL 設定による切り替え実装済み）
 - [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
 - [ ] #1416 監視（簡易 Web インターフェース + Kuma 連携）
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
