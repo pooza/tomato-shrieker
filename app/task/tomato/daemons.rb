@@ -3,18 +3,29 @@ module TomatoShrieker
 
   namespace :tomato do
     [:scheduler].freeze.each do |daemon|
+      daemon_path = File.join(Environment.dir, 'bin', "#{daemon}_daemon.rb")
+
       namespace daemon do
-        [:start, :stop].freeze.each do |action|
-          desc "#{action} #{daemon}"
-          task action do
-            sh "#{File.join(Environment.dir, 'bin', "#{daemon}_daemon.rb")} #{action}"
-          rescue => e
-            warn "#{e.class} #{daemon}:#{action} #{e.message}"
-          end
+        desc "stop #{daemon}"
+        task :stop do
+          sh "#{daemon_path} stop"
+        rescue => e
+          warn "#{e.class} #{daemon}:stop #{e.message}"
+        end
+
+        desc "start #{daemon}"
+        task start: ['config:lint', 'migration:run'] do
+          sh "#{daemon_path} restart"
+        rescue => e
+          warn "#{e.class} #{daemon}:start #{e.message}"
         end
 
         desc "restart #{daemon}"
-        task restart: ['config:lint', 'migration:run', :stop, :start]
+        task restart: ['config:lint', 'migration:run'] do
+          sh "#{daemon_path} restart"
+        rescue => e
+          warn "#{e.class} #{daemon}:restart #{e.message}"
+        end
       end
     end
   end
