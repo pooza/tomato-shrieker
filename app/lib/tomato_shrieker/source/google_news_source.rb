@@ -4,6 +4,7 @@ module TomatoShrieker
     DEDUPE_HOURS = 48
 
     def uri
+      return cleaner_uri if cleaner_uri
       if self['/source/news/phrase']
         uri = Ginseng::URI.parse(config['/google/news/urls/root'])
         values = uri.query_values || {}
@@ -34,7 +35,21 @@ module TomatoShrieker
       Source.all.grep(self).each(&block)
     end
 
+    def cleaner?
+      return cleaner_uri.present?
+    end
+
     private
+
+    def cleaner_uri
+      base = self['/source/news/cleaner/url'] || config['/google/news/cleaner/url']
+      return nil unless base
+      phrase = self['/source/news/phrase']
+      return nil unless phrase
+      uri = Ginseng::URI.parse(base)
+      uri.query_values = {'q' => phrase}
+      return uri.normalize
+    end
 
     def similar_entry?(entry)
       title = normalize_title(entry.title)
