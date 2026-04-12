@@ -369,7 +369,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1399 PieFed 対応の ginseng-piefed 移行（PR #1408 マージ済み）
 - [x] #1414 Ruby 4.0 移行
 - [x] #1415 CI 改善（テスト本体の実行、Ruby 4.0 化）
-- [ ] #1410 CLI 新設と rake タスク整理
+- [x] #1410 CLI 新設と rake タスク整理（YAML 操作系は #1429 に分離）
 - [ ] google-news-rss-cleaner 連携
 - [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
 - [ ] #1416 監視（簡易 Web インターフェース + Kuma 連携）
