@@ -25,5 +25,10 @@ module TomatoShrieker
       logger.error(daemon: app_name, error: e)
       raise
     end
+
+    def stop
+      logger.info(daemon: app_name, version: Package.version, message: 'stop')
+      Scheduler.instance.scheduler.shutdown(:kill)
+    end
   end
 end
