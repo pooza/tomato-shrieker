@@ -15,6 +15,7 @@ gem 'rufus-scheduler'
 gem 'sentry-ruby'
 gem 'sequel'
 gem 'sqlite3'
+gem 'thor'
 
 group :development do
   gem 'ricecream'

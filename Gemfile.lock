@@ -320,6 +320,7 @@ DEPENDENCIES
   sequel
   sqlite3
   test-unit
+  thor
   webmock
 
 CHECKSUMS
