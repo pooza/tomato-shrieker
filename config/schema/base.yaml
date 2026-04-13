@@ -192,8 +192,5 @@ properties:
         - dest
       type: object
     type: array
-required:
-  - environment
-  - crypt
 title: Local config
 type: object
