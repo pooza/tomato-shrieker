@@ -313,6 +313,7 @@ DEPENDENCIES
   optparse
   parallel
   puma
+  rake (< 13.4)
   ricecream
   rubocop
   rubocop-minitest
