@@ -374,7 +374,12 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1430 ginseng-core `Config#errors` の検証対象を merged config に修正（ginseng-core v1.15.23 / #1431 クローズで完了）
 - [x] #1416 監視（簡易 Web インターフェース + Kuma 連携）— Phase 1 (`/healthz`) + Phase 2 (`/healthz/source/:id`, `/status.json`, `source_run_log`) を develop に実装
 - [x] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理 — CLI 新設・監視ページの追加、4.0 の廃止機能（ツイートタイムラインソース / マルチエントリ）と古い仕様の棚卸しを完了 (2026-04-14)
-- [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
+- [x] PR #1389 Codex レビュー対応 — `bin/shrieker source fetch` を summary 実装ソースに限定 (2026-04-14)
+- [x] **v4.0.0.rc1 pre-release 公開** — develop `7674308` からタグ切り (2026-04-14)。ヘビーユーザー向けの事前テスト版
+- [ ] RC 検証中のフィードバック対応
+- [ ] セキュリティレビュー（Codex）
+- [ ] v4.0.0 正式版リリース（develop → master マージ、タグ切り、デプロイ）
+- [ ] デフォルトブランチを `master` → `main` に変更（正式版リリース時）
 
 ### 4.1.0 以降
 
