@@ -12,7 +12,6 @@ gem 'nostr'
 gem 'optparse'
 gem 'parallel'
 gem 'puma'
-gem 'rake', '< 13.4' # TODO: rake 13.4.0 は lib/rake/options.rb 欠落のアップストリームバグ。修正版リリース後に外す
 gem 'rufus-scheduler'
 gem 'sentry-ruby'
 gem 'sequel'
