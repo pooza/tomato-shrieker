@@ -26,6 +26,8 @@ monitor:
   enabled: true
   bind: 127.0.0.1
   port: 4567
+  default_tolerance_seconds: 7200
+  retention_days: 14
 logger:
   mask_fields:
     - password

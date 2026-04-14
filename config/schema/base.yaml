@@ -19,6 +19,12 @@ properties:
         minimum: 1
         maximum: 65535
         type: integer
+      default_tolerance_seconds:
+        minimum: 1
+        type: integer
+      retention_days:
+        minimum: 1
+        type: integer
     type: object
   environment:
     enum:

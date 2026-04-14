@@ -103,7 +103,45 @@ scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サ
 
 | パス | 用途 | 応答 |
 |------|------|------|
-| `/healthz` | 総合ヘルスチェック | 200 (scheduler + DB いずれも OK) / 503 (どちらか NG) |
+| `/healthz` | 総合ヘルスチェック | 200 / 503 |
+| `/healthz/source/:id` | ソース別ヘルスチェック | 200 / 503 / 404 |
+| `/status.json` | 全体ステータス（人間/ダッシュボード向け） | 200 (JSON) |
+
+#### `/healthz` の判定
+
+scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、すべて満たせば 200。いずれかが NG なら 503。
+
+#### `/healthz/source/:id` の判定
+
+該当ソースの最終実行 (`source_run_log` の最新行) が以下の両方を満たせば 200:
+
+- 最終実行から `tolerance_seconds` 以内に走っている (stale でない)
+- 直近実行が成功している (error でない)
+
+ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
+
+#### `/status.json` の中身
+
+```json
+{
+  "scheduler": true,
+  "database": true,
+  "sources": [
+    {
+      "id": "matrix-news",
+      "class": "TomatoShrieker::FeedSource",
+      "schedule": {"type": "every", "value": "5m"},
+      "tolerance_seconds": 600,
+      "last_run_at": "2026-04-14T14:00:00+09:00",
+      "last_status": "success",
+      "last_error": null,
+      "last_duration_ms": 423
+    }
+  ]
+}
+```
+
+Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
 
 ### 設定
 
@@ -112,10 +150,45 @@ scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サ
 | `/monitor/enabled` | `true` | `false` で監視サーバの起動をスキップ |
 | `/monitor/bind` | `127.0.0.1` | バインドアドレス |
 | `/monitor/port` | `4567` | リッスンポート |
+| `/monitor/default_tolerance_seconds` | `7200` | period 不明時のフォールバック tolerance |
+| `/monitor/retention_days` | `14` | source_run_log の保持日数（自動 prune） |
+
+ソースごとに `/monitor/tolerance` を上書き可（文字列なら `'30m'` のような Rufus 形式、数値なら秒）。デフォルトは `period × 2`。
+
+### 実行ログテーブル `source_run_log`
+
+各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`）:
+
+- `source_id`, `executed_at`, `status` (`success` | `error`), `error_message`, `duration_ms`
+- 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
+
+`Source#schedule` のラッパで成功/失敗を記録するため、CLI からの `bin/shrieker` 直接実行や rake タスクは記録対象外（スケジューラ起因の稼働だけを監視する設計）。
 
 ### Kuma の登録例
 
-HTTP(s) モニターとして `http://<host>:4567/healthz` を登録し、200 以外をアラートにする。scheduler プロセス停止、DB 接続不可、Rufus ジョブが 0 件のいずれかで 503 が返る。
+```
+HTTP(s) Monitor:
+  Name: tomato-shrieker
+  URL: http://<host>:4567/healthz
+  Interval: 60s
+  Accepted Status Codes: 200-299
+```
+
+ソース別に追跡したい場合は `http://<host>:4567/healthz/source/<source-id>` を別モニターとして追加する。
+
+### 運用: 監視ホストから tomato-shrieker への到達経路
+
+`/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト (Kuma 等) から /healthz を叩く経路は環境に応じて選択する:
+
+| 方式 | Pros | Cons / 注意点 |
+|------|------|----------------|
+| **Tailscale** | お手軽、ACL 一式、暗号化、NAT 越え | FreeBSD では Tier 2 扱い (`pkg install tailscale`、ports `net/tailscale`)。userspace で動くがカーネル統合はない |
+| **WireGuard** | ネイティブ、軽量、FreeBSD は kernel module あり | ACL 等は別途 |
+| **Reverse SSH tunnel** | 既存の SSH 鍵運用に乗せられる | tunnel プロセスの監視が別途必要 |
+| **同一ホストに Kuma 同居** | ネットワーク経路ゼロ、127.0.0.1 で完結 | Kuma の UI を見る側で別途 SSH ポートフォワード等が必要 |
+| **Firewall + IP 制限** | VPN 不要 | 監視ホストの固定 IP が前提。bind を 0.0.0.0 にする必要あり |
+
+本番の seas (FreeBSD) では Tailscale を併用する想定。Tailscale が動かない場合でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。
 
 ## 重要な設計判断
 

@@ -260,6 +260,25 @@ module TomatoShrieker
 
     alias every period
 
+    def schedule_spec
+      return {type: 'at', value: post_at} if post_at
+      return {type: 'cron', value: cron} if cron
+      return {type: 'every', value: period}
+    end
+
+    def run_tolerance_seconds
+      return nil if post_at
+      override = self['/monitor/tolerance']
+      return Rufus::Scheduler.parse(override).to_i if override.is_a?(String)
+      return override.to_i if override.is_a?(Numeric)
+      return (Rufus::Scheduler.parse(period) * 2).to_i if period
+      return default_tolerance_seconds
+    end
+
+    def default_tolerance_seconds
+      return Config.instance['/monitor/default_tolerance_seconds']
+    end
+
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|
@@ -291,12 +310,17 @@ module TomatoShrieker
 
     def schedule(method, spec)
       job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id}) do
+        started_at = Time.now
         logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
-        exec
-        logger.info(source: id, class: self.class.to_s, action: 'exec end')
-      rescue => e
-        Sentry.capture_exception(e) if Sentry.initialized?
-        logger.error(source: id, error: e)
+        begin
+          exec
+          SourceRunLog.record_success(id, started_at:)
+          logger.info(source: id, class: self.class.to_s, action: 'exec end')
+        rescue => e
+          SourceRunLog.record_error(id, started_at:, error: e)
+          Sentry.capture_exception(e) if Sentry.initialized?
+          logger.error(source: id, error: e)
+        end
       end
       logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)
       return job
