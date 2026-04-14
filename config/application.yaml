@@ -22,6 +22,10 @@ http:
 line:
   urls:
     api: https://api.line.me
+monitor:
+  enabled: true
+  bind: 127.0.0.1
+  port: 4567
 logger:
   mask_fields:
     - password

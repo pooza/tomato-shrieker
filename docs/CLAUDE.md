@@ -88,11 +88,34 @@ systemd/rc.d → bin/scheduler_daemon.rb start
   → SchedulerDaemon.spawn! (Ginseng::Daemon)
     → SchedulerDaemon#start
       → Sequel.connect (SQLite3)
+      → MonitorServer#start (Puma embedded / 監視用 HTTP)
       → Scheduler.instance.exec (Rufus::Scheduler)
         → Source.all → register (各ソースをスケジューラに登録)
 ```
 
 systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake restart` は廃止済み（#1410）。
+
+## 監視 (Kuma 連携)
+
+scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サーバを同居させ、Kuma 等の外形監視ツールから叩ける HTTP エンドポイントを提供する。UI は持たず、Kuma のダッシュボードが一次情報となる設計。
+
+### エンドポイント
+
+| パス | 用途 | 応答 |
+|------|------|------|
+| `/healthz` | 総合ヘルスチェック | 200 (scheduler + DB いずれも OK) / 503 (どちらか NG) |
+
+### 設定
+
+| キー | 既定値 | 意味 |
+|------|--------|------|
+| `/monitor/enabled` | `true` | `false` で監視サーバの起動をスキップ |
+| `/monitor/bind` | `127.0.0.1` | バインドアドレス |
+| `/monitor/port` | `4567` | リッスンポート |
+
+### Kuma の登録例
+
+HTTP(s) モニターとして `http://<host>:4567/healthz` を登録し、200 以外をアラートにする。scheduler プロセス停止、DB 接続不可、Rufus ジョブが 0 件のいずれかで 503 が返る。
 
 ## 重要な設計判断
 

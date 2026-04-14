@@ -9,6 +9,17 @@ properties:
       - password
   disable:
     type: boolean
+  monitor:
+    properties:
+      enabled:
+        type: boolean
+      bind:
+        type: string
+      port:
+        minimum: 1
+        maximum: 65535
+        type: integer
+    type: object
   environment:
     enum:
       - development

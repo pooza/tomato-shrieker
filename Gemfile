@@ -11,6 +11,7 @@ gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
 gem 'nostr'
 gem 'optparse'
 gem 'parallel'
+gem 'puma'
 gem 'rufus-scheduler'
 gem 'sentry-ruby'
 gem 'sequel'
