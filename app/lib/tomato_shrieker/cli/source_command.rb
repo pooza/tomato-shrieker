@@ -14,6 +14,7 @@ module TomatoShrieker
     desc 'fetch ID', 'ソースのサマリーを表示'
     def fetch(id)
       source = find_source!(id)
+      raise Thor::Error, "source does not support fetch: #{id}" unless source.respond_to?(:summary)
       puts source.summary.deep_stringify_keys.to_yaml
     end
 
