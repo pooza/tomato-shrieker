@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 51ccc81cdee12ed68c2dc703c14d8e1d8cacc891
+  revision: e510866901d6d6c72e28d82131151fa176ca7682
   branch: main
   specs:
-    ginseng-core (1.15.22)
+    ginseng-core (1.15.24)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -22,7 +22,7 @@ GIT
       net-smtp
       nokogiri (>= 1.18.9)
       optparse
-      rake
+      rake (< 13.4)
       sanitize (>= 6.0.2)
       securerandom
       set
@@ -327,7 +327,7 @@ CHECKSUMS
   fileutils (1.7.3) sha256=57271e854b694a87755d76f836f5c57b2c9538ebbaf4b2154bb66addf15eb5da
   find (0.2.0) sha256=9aabac9dbbea3fdd23781f79a2fd626166e57dab349aaec449400811b40c371b
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
-  ginseng-core (1.15.22)
+  ginseng-core (1.15.24)
   ginseng-fediverse (1.8.22)
   ginseng-youtube (2.0.1)
   httparty (0.24.2) sha256=8fca6a54aa0c4aa4303a0fd33e5e2156175d6a5334f714263b458abd7fda9c38
