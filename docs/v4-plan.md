@@ -373,7 +373,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] google-news-rss-cleaner 連携（cleaner URL 設定による切り替え実装済み）
 - [x] #1430 ginseng-core `Config#errors` の検証対象を merged config に修正（ginseng-core v1.15.23 / #1431 クローズで完了）
 - [x] #1416 監視（簡易 Web インターフェース + Kuma 連携）— Phase 1 (`/healthz`) + Phase 2 (`/healthz/source/:id`, `/status.json`, `source_run_log`) を develop に実装
-- [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
+- [x] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理 — CLI 新設・監視ページの追加、4.0 の廃止機能（ツイートタイムラインソース / マルチエントリ）と古い仕様の棚卸しを完了 (2026-04-14)
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
 
 ### 4.1.0 以降
