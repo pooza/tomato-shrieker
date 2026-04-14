@@ -374,9 +374,9 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1430 ginseng-core `Config#errors` の検証対象を merged config に修正（ginseng-core v1.15.23 / #1431 クローズで完了）
 - [ ] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理
 - [ ] #1416 監視（簡易 Web インターフェース + Kuma 連携）
-- [ ] #1432 rake config:lint の CI 定常実行（local_sample.yaml 仕組み検討）
 - [ ] デフォルトブランチを `master` → `main` に変更（リリース時）
 
 ### 4.1.0 以降
 
 - [ ] #1429 CLI: ソース YAML 操作サブコマンド (add/edit/delete/validate)
+- [ ] #1432 rake config:lint の CI 定常実行（local_sample.yaml 仕組み検討）
