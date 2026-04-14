@@ -4,8 +4,8 @@ module TomatoShrieker
   class SourceRunLog < Sequel::Model(:source_run_log)
     include Package
 
-    STATUS_SUCCESS = 'success'
-    STATUS_ERROR = 'error'
+    STATUS_SUCCESS = 'success'.freeze
+    STATUS_ERROR = 'error'.freeze
 
     dataset_module do
       def latest_for(source_id)

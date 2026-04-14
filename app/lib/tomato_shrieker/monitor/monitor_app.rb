@@ -28,7 +28,7 @@ module TomatoShrieker
         database: database_alive?,
       }
       return [200, HEADERS, ["OK\n"]] if checks.values.all?
-      body = checks.map {|k, v| "#{k}: #{v ? 'OK' : 'FAIL'}"}.join("\n") + "\n"
+      body = "#{checks.map {|k, v| "#{k}: #{v ? 'OK' : 'FAIL'}"}.join("\n")}\n"
       return [503, HEADERS, [body]]
     end
 
@@ -42,7 +42,7 @@ module TomatoShrieker
       stale = Time.now - latest.executed_at > tolerance
       errored = latest.status == SourceRunLog::STATUS_ERROR
       return [200, HEADERS, ["OK\n"]] unless stale || errored
-      body = +"status: #{latest.status}\n"
+      body = "status: #{latest.status}\n"
       body << "executed_at: #{latest.executed_at.iso8601}\n"
       body << "tolerance_seconds: #{tolerance}\n"
       body << "stale: #{stale}\n"
@@ -57,9 +57,9 @@ module TomatoShrieker
         database: database_alive?,
         sources:,
       }
-      return [200, JSON_HEADERS, [JSON.pretty_generate(payload) + "\n"]]
+      return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
     rescue => e
-      return [500, JSON_HEADERS, [JSON.dump(error: "#{e.class}: #{e.message}") + "\n"]]
+      return [500, JSON_HEADERS, ["#{JSON.dump(error: "#{e.class}: #{e.message}")}\n"]]
     end
 
     def source_status(source)

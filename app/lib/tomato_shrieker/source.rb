@@ -310,20 +310,22 @@ module TomatoShrieker
 
     def schedule(method, spec)
       job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id}) do
-        started_at = Time.now
-        logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
-        begin
-          exec
-          SourceRunLog.record_success(id, started_at:)
-          logger.info(source: id, class: self.class.to_s, action: 'exec end')
-        rescue => e
-          SourceRunLog.record_error(id, started_at:, error: e)
-          Sentry.capture_exception(e) if Sentry.initialized?
-          logger.error(source: id, error: e)
-        end
+        exec_with_run_log(method, spec)
       end
       logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)
       return job
+    end
+
+    def exec_with_run_log(method, spec)
+      started_at = Time.now
+      logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
+      exec
+      SourceRunLog.record_success(id, started_at:)
+      logger.info(source: id, class: self.class.to_s, action: 'exec end')
+    rescue => e
+      SourceRunLog.record_error(id, started_at:, error: e)
+      Sentry.capture_exception(e) if Sentry.initialized?
+      logger.error(source: id, error: e)
     end
   end
 end
