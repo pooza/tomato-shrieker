@@ -377,6 +377,7 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] PR #1389 Codex レビュー対応 — `bin/shrieker source fetch` を summary 実装ソースに限定 (2026-04-14)
 - [x] **v4.0.0.rc1 pre-release 公開** — develop `7674308` からタグ切り (2026-04-14)。ヘビーユーザー向けの事前テスト版
 - [ ] RC 検証中のフィードバック対応
+- [ ] #1436 Google News 古記事再投稿（cleaner #6 連動、ホットフィックス候補）
 - [ ] セキュリティレビュー（Codex）
 - [ ] v4.0.0 正式版リリース（develop → master マージ、タグ切り、デプロイ）
 - [ ] デフォルトブランチを `master` → `main` に変更（正式版リリース時）
