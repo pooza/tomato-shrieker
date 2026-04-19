@@ -76,23 +76,25 @@ module TomatoShrieker
 
     def self.create(entry, feed = nil)
       retry_count = 0
-      parser = EntryParser.new(entry)
-      parser.feed = feed if feed
-      entry = Entry[Entry.insert(parser.parse)]
-      return nil unless feed&.touched?
-      return nil if entry.published < feed.time
-      return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
-      return entry
-    rescue SQLite3::BusyException
-      retry_count += 1
-      raise if retry_count >= 5
-      sleep(rand(0.5..2.0))
-      retry
-    rescue Sequel::UniqueConstraintViolation
-      return nil
-    rescue => e
-      logger.error(source: feed&.id, error: e, entry:)
-      return nil
+      begin
+        parser = EntryParser.new(entry)
+        parser.feed = feed if feed
+        entry = Entry[Entry.insert(parser.parse)]
+        return nil unless feed&.touched?
+        return nil if entry.published < feed.time
+        return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
+        return entry
+      rescue SQLite3::BusyException
+        retry_count += 1
+        raise if retry_count >= 5
+        sleep(rand(0.5..2.0))
+        retry
+      rescue Sequel::UniqueConstraintViolation
+        return nil
+      rescue => e
+        logger.error(source: feed&.id, error: e, entry:)
+        return nil
+      end
     end
   end
 end
