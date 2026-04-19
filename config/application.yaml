@@ -41,7 +41,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.0.0.rc2
+  version: 4.0.0
 nostr:
   relays:
     - wss://relay.damus.io
