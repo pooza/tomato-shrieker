@@ -35,7 +35,7 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
-    def shriek(params = {})
+    def shriek(params = {}, collect_delivery_errors: true)
       shriekers do |shrieker|
         if Environment.test?
           params[:template]&.to_s
@@ -46,7 +46,7 @@ module TomatoShrieker
       rescue => e
         Sentry.capture_exception(e) if Sentry.initialized?
         logger.error(source: id, shrieker: shrieker.class.to_s, error: e)
-        @delivery_errors_mutex&.synchronize {@delivery_errors << e}
+        @delivery_errors_mutex&.synchronize {@delivery_errors << e} if collect_delivery_errors
       end
     end
 
