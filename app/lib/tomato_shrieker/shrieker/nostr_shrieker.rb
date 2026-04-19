@@ -26,7 +26,12 @@ module TomatoShrieker
     def create_keypair
       keygen = Nostr::Keygen.new
       private_key = @params[:private_key].decrypt rescue @params[:private_key]
-      keygen.get_key_pair_from_private_key(Nostr::PrivateKey.new(private_key))
+      key = if private_key.start_with?('nsec1')
+        Nostr::PrivateKey.from_bech32(private_key)
+      else
+        Nostr::PrivateKey.new(private_key)
+      end
+      keygen.get_key_pair_from_private_key(key)
     end
 
     def user

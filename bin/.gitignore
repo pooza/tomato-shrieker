@@ -1,7 +1,7 @@
 *.rb
-!crawl.rb
 !crypt.rb
 !decrypt.rb
+!migrate_sources.rb
 !scheduler_daemon.rb
-!scheduler_worker.rb
+!shrieker
 !test.rb

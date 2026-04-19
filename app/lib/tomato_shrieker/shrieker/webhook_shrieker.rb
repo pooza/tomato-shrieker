@@ -3,7 +3,6 @@ module TomatoShrieker
     include Package
 
     def initialize(hook)
-      logger.info(hook:)
       case hook
       when Ginseng::URI
         super

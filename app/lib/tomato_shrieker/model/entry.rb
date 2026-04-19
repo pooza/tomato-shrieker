@@ -64,32 +64,37 @@ module TomatoShrieker
     end
 
     def shriek
-      feed.shriek(
+      feed.shriek({
         template: create_template,
         visibility: feed.visibility,
         attachments: enclosures.map {|v| {image_url: v.to_s}}.first(4),
-      )
+      })
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
 
     alias post shriek
 
     def self.create(entry, feed = nil)
-      parser = EntryParser.new(entry)
-      parser.feed = feed if feed
-      entry = Entry[Entry.insert(parser.parse)]
-      return nil unless feed&.touched?
-      return nil if entry.published < feed.time
-      return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
-      return entry
-    rescue SQLite3::BusyException
-      sleep(rand(0.5..2.0))
-      retry
-    rescue Sequel::UniqueConstraintViolation
-      return nil
-    rescue => e
-      logger.error(source: feed&.id, error: e, entry:)
-      return nil
+      retry_count = 0
+      begin
+        parser = EntryParser.new(entry)
+        parser.feed = feed if feed
+        entry = Entry[Entry.insert(parser.parse)]
+        return nil unless feed&.touched?
+        return nil if entry.published < feed.time
+        return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
+        return entry
+      rescue SQLite3::BusyException
+        retry_count += 1
+        raise if retry_count >= 5
+        sleep(rand(0.5..2.0))
+        retry
+      rescue Sequel::UniqueConstraintViolation
+        return nil
+      rescue => e
+        logger.error(source: feed&.id, error: e, entry:)
+        return nil
+      end
     end
   end
 end

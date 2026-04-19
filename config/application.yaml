@@ -11,6 +11,8 @@ google:
   api:
     key: null
   news:
+    cleaner:
+      url: null
     urls:
       root: https://news.google.com/rss/search?hl=ja&gl=JP&ceid=JP%3Aja
 http:
@@ -20,6 +22,12 @@ http:
 line:
   urls:
     api: https://api.line.me
+monitor:
+  enabled: true
+  bind: 127.0.0.1
+  port: 4567
+  default_tolerance_seconds: 7200
+  retention_days: 14
 logger:
   mask_fields:
     - password
@@ -33,7 +41,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 3.9.12
+  version: 4.0.0
 nostr:
   relays:
     - wss://relay.damus.io
@@ -44,6 +52,9 @@ piefed:
     max_length: 50
   verify_peer: true
 scheduler: {}
+sentry:
+  dsn: null
+  traces_sample_rate: 0
 slack:
   hooks: []
 source:

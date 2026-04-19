@@ -14,8 +14,6 @@ module TomatoShrieker
       elsif entry = fetch.to_a.last
         entry.shriek
       end
-    rescue => e
-      logger.error(source: id, error: e)
     end
 
     def keep_years
@@ -36,7 +34,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
-        piefed: Template.new(self['/dest/piefed/template'] || self['/piefed/template'] || 'title'),
       }
       return @templates
     end

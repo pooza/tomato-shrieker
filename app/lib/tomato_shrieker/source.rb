@@ -35,11 +35,18 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
-    def shriek(params = {})
+    def shriek(params = {}, collect_delivery_errors: true)
       shriekers do |shrieker|
+        if Environment.test?
+          params[:template]&.to_s
+          logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
+          next
+        end
         shrieker.exec(params)
       rescue => e
-        logger.error(source: id, error: e)
+        Sentry.capture_exception(e) if Sentry.initialized?
+        logger.error(source: id, shrieker: shrieker.class.to_s, error: e)
+        @delivery_errors_mutex&.synchronize {@delivery_errors << e} if collect_delivery_errors
       end
     end
 
@@ -72,7 +79,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'common'),
-        piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'common'),
       }
       return @templates
     end
@@ -255,6 +261,25 @@ module TomatoShrieker
 
     alias every period
 
+    def schedule_spec
+      return {type: 'at', value: post_at} if post_at
+      return {type: 'cron', value: cron} if cron
+      return {type: 'every', value: period}
+    end
+
+    def run_tolerance_seconds
+      return nil if post_at
+      override = self['/monitor/tolerance']
+      return Rufus::Scheduler.parse(override).to_i if override.is_a?(String)
+      return override.to_i if override.is_a?(Numeric)
+      return (Rufus::Scheduler.parse(period) * 2).to_i if period
+      return default_tolerance_seconds
+    end
+
+    def default_tolerance_seconds
+      return Config.instance['/monitor/default_tolerance_seconds']
+    end
+
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|
@@ -285,15 +310,37 @@ module TomatoShrieker
     private
 
     def schedule(method, spec)
-      job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id}) do
-        logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
-        exec
-        logger.info(source: id, class: self.class.to_s, action: 'exec end')
-      rescue => e
-        logger.error(source: id, error: e)
+      job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id, overlap: false}) do
+        exec_with_run_log(method, spec)
       end
       logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)
       return job
+    end
+
+    def exec_with_run_log(method, spec)
+      started_at = Time.now
+      @delivery_errors = []
+      @delivery_errors_mutex = Mutex.new
+      logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
+      exec
+      finalize_run_log(started_at)
+    rescue => e
+      SourceRunLog.record_error(id, started_at:, error: e)
+      Sentry.capture_exception(e) if Sentry.initialized?
+      logger.error(source: id, error: e)
+    end
+
+    def finalize_run_log(started_at)
+      if @delivery_errors.any?
+        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.first)
+        logger.error(
+          source: id, class: self.class.to_s,
+          action: 'exec end (delivery errors)', count: @delivery_errors.size
+        )
+      else
+        SourceRunLog.record_success(id, started_at:)
+        logger.info(source: id, class: self.class.to_s, action: 'exec end')
+      end
     end
   end
 end

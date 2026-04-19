@@ -3,12 +3,12 @@ Description=tomato-shrieker
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 User=__username__
 WorkingDirectory=/home/__username__/path/to/tomato-shrieker
-ExecStart=/bin/bash -lc 'bundle exec rake start'
-ExecStop=/bin/bash -lc 'bundle exec rake stop'
-TimeoutSec=15
+ExecStart=/bin/bash -lc 'bundle exec bin/scheduler_daemon.rb start'
+ExecStop=/bin/kill -TERM $MAINPID
+TimeoutStopSec=15
 Restart=always
 Environment="LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so"
 

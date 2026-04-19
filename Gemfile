@@ -3,6 +3,7 @@ ruby '>= 3.4', '< 5.0'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core', branch: 'main', require: 'ginseng'
 gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', branch: 'main', require: 'ginseng/fediverse'
+gem 'ginseng-piefed', github: 'pooza/ginseng-piefed', branch: 'main', require: 'ginseng/piefed'
 gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', branch: 'main', require: 'ginseng/you_tube'
 gem 'icalendar'
 gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
@@ -10,9 +11,12 @@ gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
 gem 'nostr'
 gem 'optparse'
 gem 'parallel'
+gem 'puma'
 gem 'rufus-scheduler'
+gem 'sentry-ruby'
 gem 'sequel'
 gem 'sqlite3'
+gem 'thor'
 
 group :development do
   gem 'ricecream'
@@ -22,4 +26,5 @@ group :development do
   gem 'rubocop-rake'
   gem 'rubocop-sequel'
   gem 'test-unit'
+  gem 'webmock'
 end

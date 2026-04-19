@@ -1,9 +1,13 @@
+require 'webmock'
+
 module TomatoShrieker
   class TestCase < Ginseng::TestCase
     include Package
+    include WebMock::API
 
     def teardown
       config.reload
+      WebMock.reset!
     end
 
     def self.load(cases = nil)

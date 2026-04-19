@@ -28,10 +28,8 @@ module TomatoShrieker
         template = create_template
         template[:entry] = entry
         template[:remind] = false
-        shriek(template:, visibility:)
+        shriek({template:, visibility:})
       end
-    rescue => e
-      logger.error(source: id, error: e)
     end
 
     def remind
@@ -42,7 +40,7 @@ module TomatoShrieker
         template = create_template
         template[:entry] = entry
         template[:remind] = true
-        shriek(template:, visibility:)
+        shriek({template:, visibility:}, collect_delivery_errors: false)
       end
     rescue => e
       logger.error(source: id, error: e)
@@ -141,7 +139,6 @@ module TomatoShrieker
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'calendar'),
-        piefed: Template.new(self['/dest/piefed/template'] || self['/dest/template'] || 'calendar'),
       }
       return @templates
     end
@@ -228,7 +225,7 @@ module TomatoShrieker
 
     def schedule_remind
       every = "#{remind_every}m"
-      job = Scheduler.instance.scheduler.every(every, {tag: id}) do
+      job = Scheduler.instance.scheduler.every(every, {tag: id, overlap: false}) do
         logger.info(source: id, class: self.class.to_s, action: 'remind start')
         remind
         logger.info(source: id, class: self.class.to_s, action: 'remind end')
