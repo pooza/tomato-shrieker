@@ -310,7 +310,7 @@ module TomatoShrieker
     private
 
     def schedule(method, spec)
-      job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id}) do
+      job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id, overlap: false}) do
         exec_with_run_log(method, spec)
       end
       logger.info(source: id, job:, class: self.class.to_s, method.to_sym => spec)

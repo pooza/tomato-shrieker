@@ -7,8 +7,6 @@ module TomatoShrieker
         template = create_template(:default, status)
         shriek(template:, visibility:)
       end
-    rescue => e
-      logger.error(source: id, error: e)
     end
 
     def bundler?

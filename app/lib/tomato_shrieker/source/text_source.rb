@@ -2,8 +2,6 @@ module TomatoShrieker
   class TextSource < Source
     def exec
       shriek(template: create_template, visibility:)
-    rescue => e
-      logger.error(source: id, error: e)
     end
 
     def create_template(type = :default, status = nil)
