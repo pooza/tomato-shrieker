@@ -376,8 +376,12 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] #1407 GitHub Wiki の最新化と docs ↔ Wiki 整理 — CLI 新設・監視ページの追加、4.0 の廃止機能（ツイートタイムラインソース / マルチエントリ）と古い仕様の棚卸しを完了 (2026-04-14)
 - [x] PR #1389 Codex レビュー対応 — `bin/shrieker source fetch` を summary 実装ソースに限定 (2026-04-14)
 - [x] **v4.0.0.rc1 pre-release 公開** — develop `7674308` からタグ切り (2026-04-14)。ヘビーユーザー向けの事前テスト版
+- [x] リリース前検証手順の docs 化 — `docs/release-validation.md` に test-*.yaml テンプレート + dry-run + Nostr スモークテスト + PieFed 実投稿テストを整備 (2026-04-19)
+- [x] PiefedShrieker 常時 NameError 修正 (ee43038) — RC1 で PieFed 投稿が 100% 失敗していた (#4146 の include Package 削除時の取り残し) を `TomatoShrieker::Config.instance` 直参照で復旧 (2026-04-19)
+- [x] **v4.0.0.rc2 pre-release 公開** — develop `064d57d` からタグ切り (2026-04-19)。RC1 の PieFed 修正版。RC1 で PieFed を試したテスターには RC2 で再確認依頼
 - [ ] RC 検証中のフィードバック対応
 - [ ] #1436 Google News 古記事再投稿（cleaner #6 連動、ホットフィックス候補）
+- [ ] Codex 再レビュー結果の対応（PR #1389、2026-04-19 依頼済）
 - [ ] セキュリティレビュー（Codex）
 - [ ] v4.0.0 正式版リリース（develop → master マージ、タグ切り、デプロイ）
 - [ ] デフォルトブランチを `master` → `main` に変更（正式版リリース時）
