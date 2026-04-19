@@ -45,7 +45,8 @@ module TomatoShrieker
         shrieker.exec(params)
       rescue => e
         Sentry.capture_exception(e) if Sentry.initialized?
-        logger.error(source: id, error: e)
+        logger.error(source: id, shrieker: shrieker.class.to_s, error: e)
+        @delivery_errors_mutex&.synchronize {@delivery_errors << e}
       end
     end
 
@@ -318,14 +319,28 @@ module TomatoShrieker
 
     def exec_with_run_log(method, spec)
       started_at = Time.now
+      @delivery_errors = []
+      @delivery_errors_mutex = Mutex.new
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       exec
-      SourceRunLog.record_success(id, started_at:)
-      logger.info(source: id, class: self.class.to_s, action: 'exec end')
+      finalize_run_log(started_at)
     rescue => e
       SourceRunLog.record_error(id, started_at:, error: e)
       Sentry.capture_exception(e) if Sentry.initialized?
       logger.error(source: id, error: e)
+    end
+
+    def finalize_run_log(started_at)
+      if @delivery_errors.any?
+        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.first)
+        logger.error(
+          source: id, class: self.class.to_s,
+          action: 'exec end (delivery errors)', count: @delivery_errors.size
+        )
+      else
+        SourceRunLog.record_success(id, started_at:)
+        logger.info(source: id, class: self.class.to_s, action: 'exec end')
+      end
     end
   end
 end
