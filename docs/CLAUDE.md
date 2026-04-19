@@ -22,8 +22,9 @@
 2. リリース時に `develop` → `master` へPRを作成しマージ
 3. `master` でタグを打ちリリース: `gh release create vX.Y.Z --target master --title "X.Y.Z"`
 4. `config/application.yaml` の `/shrieker/version` がバージョンの正本。リリース前に更新する
-5. セキュリティレビューは各マイルストーンの Issue をすべて消化した後、リリース直前に実施する
-6. `docs/CLAUDE.md` のリリース済みセクションを更新する
+5. リリース直前に [release-validation.md](release-validation.md) の手順で各 Source / Shrieker の動作を手動検証する（CI では捕まらない統合系のリグレッション検出用）
+6. セキュリティレビューは各マイルストーンの Issue をすべて消化した後、リリース直前に実施する
+7. `docs/CLAUDE.md` のリリース済みセクションを更新する
 
 ### リリースノート
 
