@@ -35,10 +35,11 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
-    def shriek(params = {}, collect_delivery_errors: true)
+    def shriek(template: nil, visibility: nil, attachments: nil, collect_delivery_errors: true)
+      params = {template:, visibility:, attachments:}.compact
       shriekers do |shrieker|
         if Environment.test?
-          params[:template]&.to_s
+          template&.to_s
           logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
           next
         end
