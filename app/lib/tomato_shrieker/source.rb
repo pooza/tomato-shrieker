@@ -274,6 +274,7 @@ module TomatoShrieker
       return Rufus::Scheduler.parse(override).to_i if override.is_a?(String)
       return override.to_i if override.is_a?(Numeric)
       return (Rufus::Scheduler.parse(period) * 2).to_i if period
+      return cron_interval_seconds * 2 if cron
       return default_tolerance_seconds
     end
 
@@ -309,6 +310,13 @@ module TomatoShrieker
     end
 
     private
+
+    def cron_interval_seconds
+      parsed = Rufus::Scheduler.parse(cron)
+      times = [parsed.next_time]
+      3.times {times << parsed.next_time(times.last)}
+      return times.each_cons(2).map {|a, b| (b - a).to_i}.max
+    end
 
     def schedule(method, spec)
       job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id, overlap: false}) do
