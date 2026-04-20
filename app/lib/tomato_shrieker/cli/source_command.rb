@@ -4,10 +4,10 @@ module TomatoShrieker
   class SourceCommand < Thor
     include Package
 
-    desc 'list', 'ソース一覧を表示'
+    desc 'list', 'ソース一覧 (id とクラス名) を表示'
     def list
       Source.all do |source|
-        puts source.to_h.deep_stringify_keys.to_yaml
+        puts [source.id, source.class.name.split('::').last].join("\t")
       end
     end
 

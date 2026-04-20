@@ -157,6 +157,18 @@ module TomatoShrieker
       end
     end
 
+    def test_run_tolerance_seconds
+      Source.all.each do |source|
+        tolerance = source.run_tolerance_seconds
+        if source.post_at
+          assert_nil(tolerance)
+        else
+          assert_kind_of(Integer, tolerance)
+          assert_operator(tolerance, :>, 0)
+        end
+      end
+    end
+
     def test_classes
       Source.classes.each do |source_class|
         assert_kind_of(Class, source_class[:class])

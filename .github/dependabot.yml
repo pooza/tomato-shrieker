@@ -7,5 +7,5 @@ updates:
     time: '03:00'
     timezone: 'Asia/Tokyo'
   open-pull-requests-limit: 0
-  target-branch: master
+  target-branch: main
   versioning-strategy: lockfile-only

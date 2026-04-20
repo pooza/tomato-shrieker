@@ -15,12 +15,12 @@
 
 | バージョン | ブランチ | 目的 |
 |-----------|---------|------|
-| 3.x | `master` | 現行安定版（4.0 リリース後は廃止） |
+| 3.x | `main` | 現行安定版（4.0 リリース後は廃止） |
 | 4.0 | `develop` → `main`（デフォルトブランチ変更） | アーキテクチャ整理・基盤更新 |
 
 ### リリース時の作業
 
-- デフォルトブランチを `master` → `main` に変更
+- デフォルトブランチを `main` に変更（2026-04-19 完了）
 - 全機能が残存するため、3.x 系のメンテナンスブランチは不要
 - 破壊的変更を含むメジャーアップグレードだが、ソース定義 YAML の互換性は維持する
 
@@ -379,12 +379,12 @@ mulukhiya-toot-proxy の運用を踏襲する。
 - [x] リリース前検証手順の docs 化 — `docs/release-validation.md` に test-*.yaml テンプレート + dry-run + Nostr スモークテスト + PieFed 実投稿テストを整備 (2026-04-19)
 - [x] PiefedShrieker 常時 NameError 修正 (ee43038) — RC1 で PieFed 投稿が 100% 失敗していた (#4146 の include Package 削除時の取り残し) を `TomatoShrieker::Config.instance` 直参照で復旧 (2026-04-19)
 - [x] **v4.0.0.rc2 pre-release 公開** — develop `064d57d` からタグ切り (2026-04-19)。RC1 の PieFed 修正版。RC1 で PieFed を試したテスターには RC2 で再確認依頼
-- [ ] RC 検証中のフィードバック対応
-- [ ] #1436 Google News 古記事再投稿（cleaner #6 連動、ホットフィックス候補）
-- [ ] Codex 再レビュー結果の対応（PR #1389、2026-04-19 依頼済）
-- [ ] セキュリティレビュー（Codex）
-- [ ] v4.0.0 正式版リリース（develop → master マージ、タグ切り、デプロイ）
-- [ ] デフォルトブランチを `master` → `main` に変更（正式版リリース時）
+- [x] Codex セキュリティレビュー（4周目で LGTM、2026-04-19）
+- [x] Codex 指摘対応: 配信失敗の SourceRunLog 伝播 (20b4dd5)、Entry.create retry カウンタ修正 (46881dc)、exec 配下 rescue 撤去と overlap:false 付与 (2784d85)、Source#shriek に collect_delivery_errors フラグ追加 (9bc7a9f) (2026-04-19)
+- [x] **v4.0.0 正式版リリース** — develop → master マージ (PR #1389)、v4.0.0 タグ + GitHub release (2026-04-19)
+- [x] デフォルトブランチを `main` に変更 (2026-04-19)
+- [ ] 本番デプロイ（別途相談）
+- [ ] #1436 Google News 古記事再投稿の再検証（cleaner #6 デプロイ済、数日〜1週間様子見してクローズ）
 
 ### 4.1.0 以降
 
