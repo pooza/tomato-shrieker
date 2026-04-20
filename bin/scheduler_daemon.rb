@@ -3,13 +3,9 @@
 $LOAD_PATH.unshift(File.join(File.expand_path('..', __dir__), 'app/lib'))
 ENV['RAKE'] = nil
 
+$stdin.reopen(File::NULL, 'r') unless $stdin.tty?
 [$stdout, $stderr].each do |io|
-  next if io.tty?
-  begin
-    io.flush
-  rescue Errno::EPIPE, IOError
-    io.reopen(File::NULL, 'w')
-  end
+  io.reopen(File::NULL, 'w') unless io.tty?
 end
 
 require 'tomato_shrieker'
