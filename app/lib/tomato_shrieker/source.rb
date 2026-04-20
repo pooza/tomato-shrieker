@@ -312,9 +312,17 @@ module TomatoShrieker
     private
 
     def cron_interval_seconds
+      @cron_interval_seconds ||= calculate_cron_interval_seconds
+    end
+
+    def calculate_cron_interval_seconds
       parsed = Rufus::Scheduler.parse(cron)
       times = [parsed.next_time]
-      3.times {times << parsed.next_time(times.last)}
+      deadline = times.first + (2 * 366 * 86_400)
+      10_000.times do
+        times << parsed.next_time(times.last)
+        break if times.last >= deadline
+      end
       return times.each_cons(2).map {|a, b| (b - a).to_i}.max
     end
 
