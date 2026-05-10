@@ -29,7 +29,6 @@ module TomatoShrieker
         tags.concat(feed.tags.clone)
         tags.concat(JSON.parse(extra_tags))
         tags.concat(fetch_remote_tags) if feed.remote_tagging?
-        tags.select! {|v| feed.tag_min_length < v.to_s.length}
         @tags = tags.create_tags
       end
       return @tags

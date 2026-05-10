@@ -44,7 +44,8 @@ module TomatoShrieker
           next
         end
         shrieker.exec(params)
-      rescue => e
+      rescue Exception => e # rubocop:disable Lint/RescueException
+        raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
         Sentry.capture_exception(e) if Sentry.initialized?
         logger.error(source: id, shrieker: shrieker.class.to_s, error: e)
         @delivery_errors_mutex&.synchronize {@delivery_errors << e} if collect_delivery_errors
@@ -211,15 +212,10 @@ module TomatoShrieker
       return (self['/dest/tags'] || []).map(&:to_hashtag)
     end
 
-    def tag_min_length
-      return 2
-    end
-
     def create_tags(status)
       container = Ginseng::Fediverse::TagContainer.new
       container.concat(tags.clone)
       container.concat(mulukhiya.search_hashtags(status)) if remote_tagging?
-      container.select! {|v| tag_min_length < v.to_s.length}
       return container.create_tags
     end
 
@@ -341,7 +337,8 @@ module TomatoShrieker
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       exec
       finalize_run_log(started_at)
-    rescue => e
+    rescue Exception => e # rubocop:disable Lint/RescueException
+      raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       SourceRunLog.record_error(id, started_at:, error: e)
       Sentry.capture_exception(e) if Sentry.initialized?
       logger.error(source: id, error: e)

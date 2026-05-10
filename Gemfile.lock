@@ -34,10 +34,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: a9a168441a84aff8b01b19d664c4d6a6d031d20f
+  revision: bfb0dc260c8a74ff4e7bdde559a9167ce3b8d3a9
   branch: main
   specs:
-    ginseng-fediverse (1.8.22)
+    ginseng-fediverse (1.8.24)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
@@ -357,7 +357,7 @@ CHECKSUMS
   find (0.2.0) sha256=9aabac9dbbea3fdd23781f79a2fd626166e57dab349aaec449400811b40c371b
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
   ginseng-core (1.15.24)
-  ginseng-fediverse (1.8.22)
+  ginseng-fediverse (1.8.24)
   ginseng-piefed (0.1.1)
   ginseng-youtube (2.0.1)
   hashdiff (1.2.1) sha256=9c079dbc513dfc8833ab59c0c2d8f230fa28499cc5efb4b8dd276cf931457cd1
