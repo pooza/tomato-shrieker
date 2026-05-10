@@ -175,5 +175,24 @@ module TomatoShrieker
         assert_kind_of(String, source_class[:config])
       end
     end
+
+    def test_create_tags
+      source = TextSource.new('source' => {'text' => 'dummy'}, 'dest' => {'tags' => ['precure_fun']})
+      tags = source.create_tags('dummy')
+
+      assert_kind_of(Set, tags)
+      assert_equal(Set['#precure_fun'], tags)
+    end
+
+    def test_create_tags_with_short_tag
+      # 2文字以下のタグも素通しする (短タグフィルタはモロヘイヤ側責務)
+      source = TextSource.new('source' => {'text' => 'dummy'}, 'dest' => {'tags' => ['実況', 'precure_fun']})
+
+      assert_nothing_raised do
+        tags = source.create_tags('dummy')
+
+        assert_equal(Set['#実況', '#precure_fun'], tags)
+      end
+    end
   end
 end
