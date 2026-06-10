@@ -9,6 +9,7 @@ module TomatoShrieker
       when String
         super(Ginseng::URI.parse(hook))
       when Hash
+        hook = hook.deep_symbolize_keys
         super(hook[:url])
         @params = hook
       end
