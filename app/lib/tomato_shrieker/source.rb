@@ -46,8 +46,9 @@ module TomatoShrieker
         shrieker.exec(params)
       rescue Exception => e # rubocop:disable Lint/RescueException
         raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
-        Sentry.capture_exception(e) if Sentry.initialized?
-        logger.error(source: id, shrieker: shrieker.class.to_s, error: e)
+        klass = shrieker.class.to_s
+        Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
+        logger.error(source: id, shrieker: klass, error: e)
         @delivery_errors_mutex&.synchronize {@delivery_errors << e} if collect_delivery_errors
       end
     end
@@ -340,7 +341,7 @@ module TomatoShrieker
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       SourceRunLog.record_error(id, started_at:, error: e)
-      Sentry.capture_exception(e) if Sentry.initialized?
+      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(source: id, error: e)
     end
 
