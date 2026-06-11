@@ -35,16 +35,18 @@ module TomatoShrieker
     def healthz_source(source_id)
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
-      tolerance = source.run_tolerance_seconds
-      return [200, HEADERS, ["OK (not monitored)\n"]] unless tolerance
+      return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
-      stale = Time.now - latest.executed_at > tolerance
+      next_run = source.next_run_at(latest.executed_at)
+      grace = source.monitor_grace_seconds
+      stale = Time.now > next_run + grace
       errored = latest.status == SourceRunLog::STATUS_ERROR
       return [200, HEADERS, ["OK\n"]] unless stale || errored
       body = "status: #{latest.status}\n"
       body << "executed_at: #{latest.executed_at.iso8601}\n"
-      body << "tolerance_seconds: #{tolerance}\n"
+      body << "next_run_at: #{next_run.iso8601}\n"
+      body << "grace_seconds: #{grace}\n"
       body << "stale: #{stale}\n"
       body << "error: #{latest.error_message}\n" if errored
       return [503, HEADERS, [body]]
@@ -64,12 +66,14 @@ module TomatoShrieker
 
     def source_status(source)
       latest = SourceRunLog.latest_for(source.id)
+      next_run = (source.next_run_at(latest.executed_at) if source.monitored? && latest)
       {
         id: source.id,
         class: source.class.to_s,
         schedule: source.schedule_spec,
-        tolerance_seconds: source.run_tolerance_seconds,
+        grace_seconds: source.monitor_grace_seconds,
         last_run_at: latest&.executed_at&.iso8601,
+        next_run_at: next_run&.iso8601,
         last_status: latest&.status,
         last_error: latest&.error_message,
         last_duration_ms: latest&.duration_ms,

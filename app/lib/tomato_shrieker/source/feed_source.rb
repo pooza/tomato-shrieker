@@ -10,9 +10,9 @@ module TomatoShrieker
 
     def exec
       if touched?
-        fetch(&:shriek)
+        fetch {|entry| entry.shriek(delivery_errors: @delivery_errors)}
       elsif entry = fetch.to_a.last
-        entry.shriek
+        entry.shriek(delivery_errors: @delivery_errors)
       end
     end
 

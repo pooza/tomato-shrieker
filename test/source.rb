@@ -157,16 +157,62 @@ module TomatoShrieker
       end
     end
 
-    def test_run_tolerance_seconds
+    def test_monitored?
       Source.all.each do |source|
-        tolerance = source.run_tolerance_seconds
+        assert_boolean(source.monitored?)
+        assert_equal(source.post_at.nil?, source.monitored?)
+      end
+    end
+
+    def test_next_run_at
+      now = Time.now
+      Source.all.each do |source|
+        next_run = source.next_run_at(now)
         if source.post_at
-          assert_nil(tolerance)
+          assert_nil(next_run)
         else
-          assert_kind_of(Integer, tolerance)
-          assert_operator(tolerance, :>, 0)
+          assert_kind_of(Time, next_run)
+          assert_operator(next_run, :>, now)
         end
       end
+    end
+
+    def test_monitor_grace_seconds
+      Source.all.each do |source|
+        grace = source.monitor_grace_seconds
+        if source.post_at
+          assert_nil(grace)
+        else
+          assert_kind_of(Integer, grace)
+          assert_operator(grace, :>, 0)
+        end
+      end
+    end
+
+    # #1456: 配信エラーは渡された collector へ集約され、別インスタンス経由でも記録される。
+    def test_shriek_collects_delivery_errors
+      saved = ENV.fetch('TEST', nil)
+      ENV.delete('TEST') # Environment.test? を false にし shrieker を実際に走らせる
+      shrieker = Object.new
+      def shrieker.exec(_params)
+        raise('simulated delivery failure')
+      end
+      source = Source.new({'id' => 'test-delivery-collect'})
+      source.define_singleton_method(:shriekers) do |&block|
+        next enum_for(:shriekers) unless block
+        block.call(shrieker)
+      end
+      queue = Thread::Queue.new
+      source.shriek(template: nil, visibility: nil, delivery_errors: queue)
+
+      assert_equal(1, queue.size)
+      assert_kind_of(RuntimeError, queue.pop)
+      assert_nothing_raised do
+        source.shriek(template: nil, visibility: nil, delivery_errors: nil)
+      end
+      assert_equal(0, queue.size)
+    ensure
+      ENV['TEST'] = saved
     end
 
     def test_classes

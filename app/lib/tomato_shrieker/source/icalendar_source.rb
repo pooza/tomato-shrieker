@@ -40,7 +40,7 @@ module TomatoShrieker
         template = create_template
         template[:entry] = entry
         template[:remind] = true
-        shriek(template:, visibility:, collect_delivery_errors: false)
+        shriek(template:, visibility:, delivery_errors: nil)
       end
     rescue => e
       logger.error(source: id, error: e)

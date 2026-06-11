@@ -35,7 +35,7 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
-    def shriek(template: nil, visibility: nil, attachments: nil, collect_delivery_errors: true)
+    def shriek(template: nil, visibility: nil, attachments: nil, delivery_errors: @delivery_errors)
       params = {template:, visibility:, attachments:}.compact
       shriekers do |shrieker|
         if Environment.test?
@@ -49,7 +49,7 @@ module TomatoShrieker
         klass = shrieker.class.to_s
         Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
         logger.error(source: id, shrieker: klass, error: e)
-        @delivery_errors_mutex&.synchronize {@delivery_errors << e} if collect_delivery_errors
+        delivery_errors << e if delivery_errors
       end
     end
 
@@ -265,17 +265,21 @@ module TomatoShrieker
       return {type: 'every', value: period}
     end
 
-    def run_tolerance_seconds
+    def monitored?
+      return post_at.nil?
+    end
+
+    def next_run_at(after)
+      return nil if post_at
+      return Rufus::Scheduler.parse(cron).next_time(after).to_t if cron
+      return after + Rufus::Scheduler.parse(period)
+    end
+
+    def monitor_grace_seconds
       return nil if post_at
       override = self['/monitor/tolerance']
       return Rufus::Scheduler.parse(override).to_i if override.is_a?(String)
       return override.to_i if override.is_a?(Numeric)
-      return (Rufus::Scheduler.parse(period) * 2).to_i if period
-      return cron_interval_seconds * 2 if cron
-      return default_tolerance_seconds
-    end
-
-    def default_tolerance_seconds
       return Config.instance['/monitor/default_tolerance_seconds']
     end
 
@@ -308,21 +312,6 @@ module TomatoShrieker
 
     private
 
-    def cron_interval_seconds
-      @cron_interval_seconds ||= calculate_cron_interval_seconds
-    end
-
-    def calculate_cron_interval_seconds
-      parsed = Rufus::Scheduler.parse(cron)
-      times = [parsed.next_time]
-      deadline = times.first + (2 * 366 * 86_400)
-      10_000.times do
-        times << parsed.next_time(times.last)
-        break if times.last >= deadline
-      end
-      return times.each_cons(2).map {|a, b| (b - a).to_i}.max
-    end
-
     def schedule(method, spec)
       job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id, overlap: false}) do
         exec_with_run_log(method, spec)
@@ -333,8 +322,7 @@ module TomatoShrieker
 
     def exec_with_run_log(method, spec)
       started_at = Time.now
-      @delivery_errors = []
-      @delivery_errors_mutex = Mutex.new
+      @delivery_errors = Thread::Queue.new
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       exec
       finalize_run_log(started_at)
@@ -346,11 +334,12 @@ module TomatoShrieker
     end
 
     def finalize_run_log(started_at)
-      if @delivery_errors.any?
-        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.first)
+      count = @delivery_errors.size
+      if count.positive?
+        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.pop)
         logger.error(
           source: id, class: self.class.to_s,
-          action: 'exec end (delivery errors)', count: @delivery_errors.size
+          action: 'exec end (delivery errors)', count:
         )
       else
         SourceRunLog.record_success(id, started_at:)
