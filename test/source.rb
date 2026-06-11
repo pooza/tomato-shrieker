@@ -157,14 +157,34 @@ module TomatoShrieker
       end
     end
 
-    def test_run_tolerance_seconds
+    def test_monitored?
       Source.all.each do |source|
-        tolerance = source.run_tolerance_seconds
+        assert_boolean(source.monitored?)
+        assert_equal(source.post_at.nil?, source.monitored?)
+      end
+    end
+
+    def test_next_run_at
+      now = Time.now
+      Source.all.each do |source|
+        next_run = source.next_run_at(now)
         if source.post_at
-          assert_nil(tolerance)
+          assert_nil(next_run)
         else
-          assert_kind_of(Integer, tolerance)
-          assert_operator(tolerance, :>, 0)
+          assert_kind_of(Time, next_run)
+          assert_operator(next_run, :>, now)
+        end
+      end
+    end
+
+    def test_monitor_grace_seconds
+      Source.all.each do |source|
+        grace = source.monitor_grace_seconds
+        if source.post_at
+          assert_nil(grace)
+        else
+          assert_kind_of(Integer, grace)
+          assert_operator(grace, :>, 0)
         end
       end
     end

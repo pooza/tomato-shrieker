@@ -265,17 +265,21 @@ module TomatoShrieker
       return {type: 'every', value: period}
     end
 
-    def run_tolerance_seconds
+    def monitored?
+      return post_at.nil?
+    end
+
+    def next_run_at(after)
+      return nil if post_at
+      return Rufus::Scheduler.parse(cron).next_time(after).to_t if cron
+      return after + Rufus::Scheduler.parse(period)
+    end
+
+    def monitor_grace_seconds
       return nil if post_at
       override = self['/monitor/tolerance']
       return Rufus::Scheduler.parse(override).to_i if override.is_a?(String)
       return override.to_i if override.is_a?(Numeric)
-      return (Rufus::Scheduler.parse(period) * 2).to_i if period
-      return cron_interval_seconds * 2 if cron
-      return default_tolerance_seconds
-    end
-
-    def default_tolerance_seconds
       return Config.instance['/monitor/default_tolerance_seconds']
     end
 
@@ -307,21 +311,6 @@ module TomatoShrieker
     end
 
     private
-
-    def cron_interval_seconds
-      @cron_interval_seconds ||= calculate_cron_interval_seconds
-    end
-
-    def calculate_cron_interval_seconds
-      parsed = Rufus::Scheduler.parse(cron)
-      times = [parsed.next_time]
-      deadline = times.first + (2 * 366 * 86_400)
-      10_000.times do
-        times << parsed.next_time(times.last)
-        break if times.last >= deadline
-      end
-      return times.each_cons(2).map {|a, b| (b - a).to_i}.max
-    end
 
     def schedule(method, spec)
       job = Scheduler.instance.scheduler.send(method.to_sym, spec, {tag: id, overlap: false}) do
