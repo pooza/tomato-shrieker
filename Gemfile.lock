@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: b2e3d06d7702c6c1e743dd3b4168dda5d74b553e
+  revision: 98a72b02e5c560e7bf9914fe5b13e89bfbff51b6
   branch: main
   specs:
-    ginseng-core (1.15.25)
+    ginseng-core (1.15.26)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -331,4 +331,4 @@ RUBY VERSION
   ruby 4.0.5
 
 BUNDLED WITH
-  4.0.13
+  4.0.14
