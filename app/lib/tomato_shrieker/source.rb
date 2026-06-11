@@ -35,7 +35,7 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
-    def shriek(template: nil, visibility: nil, attachments: nil, collect_delivery_errors: true)
+    def shriek(template: nil, visibility: nil, attachments: nil, delivery_errors: @delivery_errors)
       params = {template:, visibility:, attachments:}.compact
       shriekers do |shrieker|
         if Environment.test?
@@ -49,7 +49,7 @@ module TomatoShrieker
         klass = shrieker.class.to_s
         Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
         logger.error(source: id, shrieker: klass, error: e)
-        @delivery_errors_mutex&.synchronize {@delivery_errors << e} if collect_delivery_errors
+        delivery_errors << e if delivery_errors
       end
     end
 
@@ -322,8 +322,7 @@ module TomatoShrieker
 
     def exec_with_run_log(method, spec)
       started_at = Time.now
-      @delivery_errors = []
-      @delivery_errors_mutex = Mutex.new
+      @delivery_errors = Thread::Queue.new
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       exec
       finalize_run_log(started_at)
@@ -335,11 +334,12 @@ module TomatoShrieker
     end
 
     def finalize_run_log(started_at)
-      if @delivery_errors.any?
-        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.first)
+      count = @delivery_errors.size
+      if count.positive?
+        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.pop)
         logger.error(
           source: id, class: self.class.to_s,
-          action: 'exec end (delivery errors)', count: @delivery_errors.size
+          action: 'exec end (delivery errors)', count:
         )
       else
         SourceRunLog.record_success(id, started_at:)

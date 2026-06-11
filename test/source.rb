@@ -189,6 +189,32 @@ module TomatoShrieker
       end
     end
 
+    # #1456: 配信エラーは渡された collector へ集約され、別インスタンス経由でも記録される。
+    def test_shriek_collects_delivery_errors
+      saved = ENV.fetch('TEST', nil)
+      ENV.delete('TEST') # Environment.test? を false にし shrieker を実際に走らせる
+      shrieker = Object.new
+      def shrieker.exec(_params)
+        raise('simulated delivery failure')
+      end
+      source = Source.new({'id' => 'test-delivery-collect'})
+      source.define_singleton_method(:shriekers) do |&block|
+        next enum_for(:shriekers) unless block
+        block.call(shrieker)
+      end
+      queue = Thread::Queue.new
+      source.shriek(template: nil, visibility: nil, delivery_errors: queue)
+
+      assert_equal(1, queue.size)
+      assert_kind_of(RuntimeError, queue.pop)
+      assert_nothing_raised do
+        source.shriek(template: nil, visibility: nil, delivery_errors: nil)
+      end
+      assert_equal(0, queue.size)
+    ensure
+      ENV['TEST'] = saved
+    end
+
     def test_classes
       Source.classes.each do |source_class|
         assert_kind_of(Class, source_class[:class])
