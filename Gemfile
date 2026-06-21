@@ -8,6 +8,7 @@ gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', branch: 'main', require:
 gem 'icalendar'
 gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
   ref: '396a2c3e6b5cf394c2416f39c05e948cccd4ea52'
+gem 'json-schema'
 gem 'nostr'
 gem 'optparse'
 gem 'parallel'

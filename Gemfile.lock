@@ -309,6 +309,7 @@ DEPENDENCIES
   ginseng-youtube!
   icalendar
   icalendar-rrule!
+  json-schema
   nostr
   optparse
   parallel
