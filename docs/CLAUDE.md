@@ -23,8 +23,28 @@
 3. `main` でタグを打ちリリース: `gh release create vX.Y.Z --target main --title "X.Y.Z"`
 4. `config/application.yaml` の `/shrieker/version` がバージョンの正本。リリース前に更新する
 5. リリース直前に [release-validation.md](release-validation.md) の手順で各 Source / Shrieker の動作を手動検証する（CI では捕まらない統合系のリグレッション検出用）
-6. セキュリティレビューは各マイルストーンの Issue をすべて消化した後、リリース直前に実施する
+6. 各マイルストーンの Issue をすべて消化した後、リリース直前に下記「リリース前レビュー」の 5 観点並列レビューを実施する。必修（赤）のみ本リリースで対応し、残り（黄・緑）は Issue 起票して次リリース以降へ送る
 7. `docs/CLAUDE.md` のリリース済みセクションを更新する
+
+### リリース前レビュー
+
+各マイルストーンの Issue が消化済みになった後、バージョンバンプに入る前に実施する。**単一のセキュリティレビューだけでは実用上の問題が取りこぼされる**ため、以下 5 観点を独立したサブエージェントで並列に走らせ、指摘を合流させる（モロヘイヤ／capsicum で先行運用しているプラクティスの移植）。
+
+| 観点 | 焦点 |
+| --- | --- |
+| セキュリティ | `/security-review` スキル。Webhook URL/トークン取り扱い・暗号化・Sentry/ログのシークレット scrub・フィード入力（RSS/nokogiri パース）の検証 |
+| 設定・宛先契約 | ソース定義 YAML スキーマ整合（`config/schema/source.yaml`・`base.yaml`）・各 Shrieker の dest 解釈・ginseng-fediverse/piefed/youtube interface・本家 API（Mastodon/Misskey/Nostr/LINE/Matrix/PieFed）呼び出しの正確性・ソース定義リファレンスや `/healthz` 仕様との齟齬 |
+| スケジューラ・ライフサイクル | rufus-scheduler の cron 駆動・`scheduler_daemon`・`source_run_log`・FeedItem 重複判定/entry 管理・Sequel 接続・CommandSource 子プロセス実行・seas(FreeBSD) daemon 駆動 |
+| エラー処理・観測性 | Sentry 計装（source/shrieker タグ）・`Ginseng::GatewayError` の scrub・`/healthz` の error_streak / WARN/NG 判定・ログの本文/個人情報漏洩チェック |
+| コーディングスタイル・規約整合性 | rubocop（+rubocop-sequel）・`rake config:lint`・設定のスラッシュ記法・2 スペースインデント・廃止語（lemmy 等） |
+
+対象範囲は `v<前リリース>..develop` の差分。Codex（`chatgpt-codex-connector[bot]`）は PR ready 時に走るので併走させ、重複しない指摘だけを拾う。
+
+指摘は以下の基準で分類し、必要最小限のみ本リリースで対応、残りは Issue 起票して次リリース以降に送る:
+
+- **赤（必修）**: データ破損・セキュリティ・ユーザー可視の機能不全
+- **黄（余力があれば）**: 単一の edge case、観測性ギャップ
+- **緑（送り）**: 将来の拡張時に顕在化しうる構造改善
 
 ### リリースノート
 
