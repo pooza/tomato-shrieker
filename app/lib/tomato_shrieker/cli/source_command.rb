@@ -88,6 +88,7 @@ module TomatoShrieker
     method_option :class, type: :string, default: 'feed',
       desc: "ソース種別 (#{TEMPLATES.keys.join('/')})"
     def add(id)
+      raise Thor::Error, "invalid id: #{id}" unless id.match?(/\A[\w.-]+\z/)
       path = new_source_path(id)
       raise Thor::Error, "source already exists: #{id}" if File.exist?(path)
       template = TEMPLATES[options[:class]]
@@ -134,6 +135,10 @@ module TomatoShrieker
           say "NG\t#{source_id(path)}"
           errors.each {|e| say "    - #{e}"}
         end
+      rescue Psych::SyntaxError => e
+        ng += 1
+        say "NG\t#{source_id(path)}"
+        say "    - YAML 構文エラー: #{e.message}"
       end
       raise Thor::Error, "#{ng} source(s) invalid" if ng.positive?
     end
@@ -156,25 +161,26 @@ module TomatoShrieker
         warn "WARNING: #{id} の定義にスキーマ違反があります:"
         errors.each {|e| warn "    - #{e}"}
       end
+    rescue Psych::SyntaxError => e
+      warn "WARNING: #{id} の定義が YAML として不正です: #{e.message}"
     end
 
     def open_editor(path)
       editor = ENV['EDITOR'].presence || ENV['VISUAL'].presence || 'vi'
-      system(*Shellwords.split(editor), path)
+      warn "WARNING: エディタの起動に失敗しました: #{editor}" unless system(*Shellwords.split(editor), path)
     end
 
     # コメントやキー順を保つため YAML ラウンドトリップではなく行単位で操作する。
     # トップレベル（インデントなし）の `disable:` 行のみを対象にする。
+    # 既存の `disable:` 行（true/false 問わず）を一旦すべて除去してから付け直すことで、
+    # `disable: false` 明記済みのソースに対する二重キー（YAML 後勝ちで停止が効かない）を防ぐ。
     def set_disable(id, value)
       path = existing_source_path!(id)
       lines = File.readlines(path)
+      removed = lines.reject! {|v| v.match?(/\Adisable\s*:\s*(true|false)\b/)}
       if value
-        if lines.any? {|v| v.match?(/\Adisable\s*:\s*true\b/)}
-          say "already disabled: #{id}"
-          return
-        end
         lines.insert(lines.first&.start_with?('---') ? 1 : 0, "disable: true\n")
-      elsif lines.reject! {|v| v.match?(/\Adisable\s*:\s*(true|false)\b/)}.nil?
+      elsif removed.nil?
         say "already enabled: #{id}"
         return
       end
