@@ -1,0 +1,272 @@
+---
+# 単一ソース定義（config/sources/<id>.yaml）用スキーマ。
+# 1 ファイル = 1 ソース。ファイル名が id になるため、ファイル内に id は持たない。
+# base.yaml はこの定義を $ref で参照する。
+$schema: http://json-schema.org/draft-06/schema#
+title: Source definition
+type: object
+additionalProperties: false
+required:
+  - source
+  - dest
+properties:
+  disable:
+    type: boolean
+  test:
+    type: boolean
+  enclosure:
+    type: object
+    additionalProperties: false
+    properties:
+      enable:
+        type: boolean
+      negative_keyword:
+        type: string
+  monitor:
+    type: object
+    additionalProperties: false
+    properties:
+      tolerance:
+        # 数値（秒）または Rufus::Scheduler 形式の文字列（例: "10m"）
+        type:
+          - integer
+          - string
+  keep:
+    type: object
+    additionalProperties: false
+    properties:
+      years:
+        type: integer
+        minimum: 0
+  schedule:
+    type: object
+    additionalProperties: false
+    properties:
+      at:
+        type: string
+      cron:
+        type: string
+      every:
+        type: string
+      remind:
+        type: object
+        additionalProperties: false
+        properties:
+          enable:
+            type: boolean
+          minutes:
+            type: integer
+  source:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      feed:
+        type: string
+        format: uri
+      url:
+        type: string
+        format: uri
+      calendar:
+        type: string
+        format: uri
+      ical:
+        type: string
+        format: uri
+      google:
+        type: boolean
+      text:
+        type: string
+      keyword:
+        type: string
+      negative_keyword:
+        type: string
+      days:
+        type: integer
+      delimiter:
+        type: string
+      dir:
+        type: string
+      command:
+        # 配列（argv）または文字列（CommandSource が sh -c で実行）
+        type:
+          - array
+          - string
+        items:
+          type: string
+      env:
+        type: object
+        additionalProperties:
+          type: string
+      github:
+        type: object
+        additionalProperties: false
+        properties:
+          repository:
+            type: string
+          repos:
+            type: string
+          timeline:
+            enum:
+              - releases
+              - commits
+      news:
+        type: object
+        additionalProperties: false
+        properties:
+          url:
+            type: string
+            format: uri
+          phrase:
+            type: string
+          dedupe:
+            type: boolean
+          cleaner:
+            type: object
+            additionalProperties: false
+            properties:
+              url:
+                type: string
+                format: uri
+      youtube:
+        type: object
+        additionalProperties: false
+        properties:
+          channel:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+              url:
+                type: string
+                format: uri
+  dest:
+    type: object
+    additionalProperties: false
+    properties:
+      template:
+        type: string
+      sanitize:
+        enum:
+          - fedi
+          - html
+      tags:
+        type: array
+        items:
+          type: string
+      visibility:
+        type: string
+      prefix:
+        type: string
+      spoiler_text:
+        type: string
+      category:
+        type: string
+      account:
+        type: object
+        additionalProperties: false
+        properties:
+          bot:
+            type: boolean
+      hooks:
+        type: array
+        items:
+          oneOf:
+            - type: string
+              format: uri
+            - type: object
+              additionalProperties: false
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                channel:
+                  type: string
+                room_id:
+                  type: string
+      mastodon:
+        type: object
+        additionalProperties: false
+        required:
+          - url
+          - token
+        properties:
+          url:
+            type: string
+            format: uri
+          token:
+            type: string
+      misskey:
+        type: object
+        additionalProperties: false
+        required:
+          - url
+          - token
+        properties:
+          url:
+            type: string
+            format: uri
+          token:
+            type: string
+      line:
+        type: object
+        additionalProperties: false
+        required:
+          - user_id
+          - token
+        properties:
+          user_id:
+            type: string
+          token:
+            type: string
+      piefed:
+        type: object
+        additionalProperties: false
+        required:
+          - host
+          - user_id
+          - password
+          - community_id
+        properties:
+          host:
+            type: string
+          user_id:
+            type: string
+          password:
+            type: string
+          community_id:
+            type: integer
+          template:
+            type: string
+      nostr:
+        type: object
+        additionalProperties: false
+        required:
+          - private_key
+        properties:
+          private_key:
+            type: string
+          relays:
+            type: array
+            items:
+              type: string
+      mulukhiya:
+        type: object
+        additionalProperties: false
+        required:
+          - enable
+        properties:
+          enable:
+            type: boolean
+          url:
+            type: string
+            format: uri
+          tagging:
+            type: object
+            additionalProperties: false
+            properties:
+              enable:
+                type: boolean
