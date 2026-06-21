@@ -14,6 +14,23 @@ properties:
     type: boolean
   test:
     type: boolean
+  enclosure:
+    type: object
+    additionalProperties: false
+    properties:
+      enable:
+        type: boolean
+      negative_keyword:
+        type: string
+  monitor:
+    type: object
+    additionalProperties: false
+    properties:
+      tolerance:
+        # 数値（秒）または Rufus::Scheduler 形式の文字列（例: "10m"）
+        type:
+          - integer
+          - string
   keep:
     type: object
     additionalProperties: false
@@ -71,7 +88,10 @@ properties:
       dir:
         type: string
       command:
-        type: array
+        # 配列（argv）または文字列（CommandSource が sh -c で実行）
+        type:
+          - array
+          - string
         items:
           type: string
       env:
