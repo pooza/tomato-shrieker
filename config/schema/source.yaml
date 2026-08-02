@@ -33,9 +33,12 @@ properties:
           - string
       silence_tolerance:
         # 無配信の許容期間。未指定ならサイレント不発を検知しない（例: "90d"）
-        type:
-          - integer
-          - string
+        # cron 形式の書き間違いを弾くため、文字列は Rufus の duration 形式に限る
+        oneOf:
+          - type: integer
+            minimum: 1
+          - type: string
+            pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
   keep:
     type: object
     additionalProperties: false

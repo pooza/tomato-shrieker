@@ -5,6 +5,13 @@ module TomatoShrieker
     FIXTURE_ID = '__test_monitor_app__'.freeze
     SILENT_ID = '__test_monitor_app_silent__'.freeze
 
+    # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので取り残しは
+    # git status にも出ず、次のスケジューラ起動で偽ソースとして登録されてしまう。
+    at_exit do
+      Dir.glob(File.join(Environment.dir, 'config/sources', '__test_monitor_app*.yaml'))
+        .each {|f| FileUtils.rm_f(f)}
+    end
+
     def setup
       @app = MonitorApp.new
       SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
@@ -27,6 +34,7 @@ module TomatoShrieker
       values = {
         'source' => {'feed' => "https://example.com/#{id}.rss"},
         'schedule' => {'every' => '5m'},
+        'dest' => {'hooks' => ["https://example.com/#{id}/hook"]},
       }.merge(extra)
       File.write(fixture_path(id), YAML.dump(values))
     end
@@ -80,14 +88,25 @@ module TomatoShrieker
       assert_equal(200, status)
     end
 
-    # #1457: 直近が no-op success でも、その手前の連続エラーを見逃さない
-    def test_healthz_source_error_streak_survives_noop
+    # #1457: 一過性エラーのあと no-op success が来たら健全に戻る。
+    # ここで 503 が残ると、新着の少ないソースが次の配信まで貼り付く。
+    def test_healthz_source_recovers_by_noop
       record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1, at: Time.now - 120)
       record(FIXTURE_ID, attempted_count: 0, at: Time.now)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(200, status)
+    end
+
+    def test_healthz_source_errored
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1,
+        error_message: 'RuntimeError: boom')
       status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(503, status)
       assert_include(body.first, 'error_streak: 1')
+      # 「エラーメッセージの無い 503」を運用者に見せない
+      assert_include(body.first, 'RuntimeError: boom')
     end
 
     # 配信できた success が来れば streak は切れて健全に戻る
@@ -163,6 +182,20 @@ module TomatoShrieker
       assert_equal('run_log', source['last_delivered_at_origin'])
       assert_equal(1, source['shrieker_errors']['MastodonShrieker'])
       assert_false(source['silent'])
+    end
+
+    # 1 ソースの不正設定で全ソース分の監視情報を巻き添えにしない
+    def test_status_json_isolates_broken_source
+      write_fixture(SILENT_ID, {'monitor' => {'silence_tolerance' => '0 0 * * *'}})
+      config.reload
+      status, _headers, body = call('/status.json')
+
+      assert_equal(200, status)
+      sources = JSON.parse(body.first)['sources']
+
+      assert_not_nil(sources.find {|v| v['id'] == FIXTURE_ID}['error_streak'])
+      # 壊れた側は握りつぶさず、そのソースだけ無効化する
+      assert_nil(sources.find {|v| v['id'] == SILENT_ID}['silence_tolerance_seconds'])
     end
 
     def test_status_json_silence_tolerance

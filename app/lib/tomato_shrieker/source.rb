@@ -290,6 +290,18 @@ module TomatoShrieker
     def monitor_silence_tolerance_seconds
       return nil if post_at
       value = self['/monitor/silence_tolerance']
+      return nil unless seconds = parse_duration(value)
+      return seconds if seconds.positive?
+      # 0 や負値は「常に沈黙」＝恒久 503 になるだけなので、検知しない側に倒す
+      logger.warn(source: id, key: 'monitor/silence_tolerance', value:, message: 'not positive')
+      return nil
+    rescue => e
+      # 不正値でこのソースだけを黙って無効化する。監視全体を巻き添えにしない。
+      logger.error(source: id, key: 'monitor/silence_tolerance', value:, error: e)
+      return nil
+    end
+
+    def parse_duration(value)
       return Rufus::Scheduler.parse(value).to_i if value.is_a?(String)
       return value.to_i if value.is_a?(Numeric)
       return nil

@@ -45,16 +45,35 @@ module TomatoShrieker
       assert_false(logs[2].noop?)
     end
 
-    # #1457: no-op run は streak を切らさず、数にも入れない
-    def test_error_streak_skips_noop
+    # #1457: no-op run は「run が完走した」証拠なので streak を切る。
+    # ここを読み飛ばすと、新着の少ないソースが一過性エラー 1 回で 503 に貼り付く。
+    def test_error_streak_broken_by_noop
       create_logs(
         {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 1, delivered_count: 1},
-        {status: SourceRunLog::STATUS_ERROR, attempted_count: 1},
         {status: SourceRunLog::STATUS_ERROR, attempted_count: 1},
         {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 0},
       )
 
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
+    def test_error_streak_counts_consecutive_errors
+      create_logs(
+        {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 1, delivered_count: 1},
+        {status: SourceRunLog::STATUS_ERROR, attempted_count: 1},
+        {status: SourceRunLog::STATUS_ERROR, attempted_count: 1},
+      )
+
       assert_equal(2, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
+    # migration 010 直後は既存行が attempted_count = 0 で backfill される。
+    # ここで過去のエラーが生き返ると、デプロイ直後に健全なソースが一斉 503 になる。
+    def test_error_streak_after_migration_backfill
+      logs = Array.new(20) {|i| {status: i == 5 ? SourceRunLog::STATUS_ERROR : SourceRunLog::STATUS_SUCCESS, attempted_count: 0}}
+      create_logs(*logs)
+
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
     end
 
     # 配信できた success が来たら streak は切れる
@@ -65,6 +84,27 @@ module TomatoShrieker
       )
 
       assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
+    # #1470: retention_days を超えて沈黙しても、根拠行が残って検知が続く。
+    # 刈ってしまうと沈黙が長引くほど検知できなくなる。
+    def test_prune_keeps_last_delivered_row
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 1, delivered_count: 1
+      )
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(1, remain.size)
+      assert_true(remain.first.delivered?)
+      assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
     def test_error_streak_empty

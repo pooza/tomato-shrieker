@@ -75,7 +75,15 @@ module TomatoShrieker
 
     def self.prune(retention_days)
       cutoff = Time.now - (retention_days * 86_400)
-      return where(Sequel.lit('executed_at < ?', cutoff)).delete
+      return where(Sequel.lit('executed_at < ?', cutoff)).exclude(id: last_delivered_ids).delete
+    end
+
+    # 「最後に配信できた時刻」の根拠行はソースごとに 1 行だけ prune から守る。
+    # 刈ってしまうと沈黙が retention_days を超えた瞬間に last_delivered_at が nil に化け、
+    # 長期の沈黙ほど検知できなくなる (#1470)。
+    def self.last_delivered_ids
+      return where(Sequel.lit('delivered_count > 0')).group(:source_id)
+          .select(Sequel.function(:max, :id))
     end
 
     def self.duration_ms(started_at)
@@ -103,7 +111,12 @@ module TomatoShrieker
       }
     end
 
-    # 連続エラー回数。no-op run は streak を切らさず、数にも入れない (#1457)。
+    # 連続エラー回数 (#1457)。
+    #
+    # no-op run (新着が無く配信ゼロで完走した run) は「エラーでない」＝ run が最後まで
+    # 走った証拠なので streak を切る。ここを読み飛ばすと、配信のたびにしか streak が
+    # 戻らなくなり、新着の少ないソースが一過性エラー 1 回で 503 に貼り付く。
+    # 「単発で倒さない」は error_streak_threshold で調整する。
     def self.error_streak(source_id, limit: sample_size)
       return error_streak_of(recent_for(source_id, limit))
     end
@@ -111,7 +124,6 @@ module TomatoShrieker
     def self.error_streak_of(logs)
       streak = 0
       logs.each do |log|
-        next if log.noop?
         break unless log.error?
         streak += 1
       end
@@ -174,7 +186,7 @@ module TomatoShrieker
     end
 
     def self.sample_size
-      return Config.instance['/monitor/sample_size'] || 50
+      return Config.instance['/monitor/sample_size']
     end
   end
 end

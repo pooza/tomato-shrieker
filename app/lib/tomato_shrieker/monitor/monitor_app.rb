@@ -33,6 +33,12 @@ module TomatoShrieker
     end
 
     def healthz_source(source_id)
+      return build_healthz_source(source_id)
+    rescue => e
+      return [503, HEADERS, ["#{e.class}: #{e.message}\n"]]
+    end
+
+    def build_healthz_source(source_id)
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
@@ -40,8 +46,7 @@ module TomatoShrieker
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
       next_run = source.next_run_at(latest.executed_at)
       stale = Time.now > next_run + source.monitor_grace_seconds
-      # 単発の失敗では倒さず、配信試行ベースの連続エラーで判定する (#1457)。
-      # no-op run は streak を切らさないので、直近が no-op でも継続失敗を見逃さない。
+      # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
       streak = SourceRunLog.error_streak(source_id)
       errored = streak >= error_streak_threshold
       silent = source.silent?
@@ -78,7 +83,14 @@ module TomatoShrieker
       return [500, JSON_HEADERS, ["#{JSON.dump(error: "#{e.class}: #{e.message}")}\n"]]
     end
 
+    # 1 ソースの失敗で payload 全体を落とさない。壊れた側は error として可視化する。
     def source_status(source)
+      return build_source_status(source)
+    rescue => e
+      return {id: source.id, class: source.class.to_s, error: "#{e.class}: #{e.message}"}
+    end
+
+    def build_source_status(source)
       latest = SourceRunLog.latest_for(source.id)
       next_run = (source.next_run_at(latest.executed_at) if source.monitored? && latest)
       {
@@ -108,7 +120,7 @@ module TomatoShrieker
     end
 
     def error_streak_threshold
-      return Config.instance['/monitor/error_streak_threshold'] || 1
+      return Config.instance['/monitor/error_streak_threshold']
     end
 
     def scheduler_alive?
