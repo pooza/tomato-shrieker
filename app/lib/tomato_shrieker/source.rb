@@ -35,7 +35,7 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
-    def shriek(template: nil, visibility: nil, attachments: nil, delivery_errors: @delivery_errors)
+    def shriek(template: nil, visibility: nil, attachments: nil, stats: @delivery_stats)
       params = {template:, visibility:, attachments:}.compact
       shriekers do |shrieker|
         if Environment.test?
@@ -44,12 +44,13 @@ module TomatoShrieker
           next
         end
         shrieker.exec(params)
+        stats&.record_success(shrieker)
       rescue Exception => e # rubocop:disable Lint/RescueException
         raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
         klass = shrieker.class.to_s
         Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
         logger.error(source: id, shrieker: klass, error: e)
-        delivery_errors << e if delivery_errors
+        stats&.record_error(shrieker, e)
       end
     end
 
@@ -283,6 +284,52 @@ module TomatoShrieker
       return Config.instance['/monitor/default_tolerance_seconds']
     end
 
+    # 無配信をどこまで許容するか (#1470)。
+    # 未指定なら検知しない。chikanan のように年単位で正常に静かなソースがあるため、
+    # 一律のデフォルトは置かず opt-in とする。
+    def monitor_silence_tolerance_seconds
+      return nil if post_at
+      value = self['/monitor/silence_tolerance']
+      return Rufus::Scheduler.parse(value).to_i if value.is_a?(String)
+      return value.to_i if value.is_a?(Numeric)
+      return nil
+    end
+
+    # 実際に配信できた最後の時刻。run_log は retention_days で刈られるので、
+    # 取れなければソース種別ごとの永続データにフォールバックする。
+    def last_delivered_at
+      return delivery_history[:at]
+    end
+
+    # 'run_log' なら保持期間内の実配信、'fallback' はソース種別ごとの永続データ由来。
+    def last_delivered_at_origin
+      return delivery_history[:origin]
+    end
+
+    # run_log の保持期間より古い配信実績の当てになる代替。既定では持たない。
+    def last_delivered_at_fallback
+      return nil
+    end
+
+    def delivery_history
+      @delivery_history ||= if at = SourceRunLog.last_delivered_at(id)
+        {at:, origin: 'run_log'}
+      elsif at = last_delivered_at_fallback
+        {at:, origin: 'fallback'}
+      else
+        {at: nil, origin: nil}
+      end
+      return @delivery_history
+    end
+
+    # しきい値を超えて無配信が続いているか (#1470)。
+    # 一度も配信実績が無い場合は「腐っている」と断定できないので false。
+    def silent?
+      return false unless tolerance = monitor_silence_tolerance_seconds
+      return false unless last = last_delivered_at
+      return Time.now > (last + tolerance)
+    end
+
     def self.all
       return enum_for(__method__) unless block_given?
       config['/sources'].each do |entry|
@@ -322,28 +369,32 @@ module TomatoShrieker
 
     def exec_with_run_log(method, spec)
       started_at = Time.now
-      @delivery_errors = Thread::Queue.new
+      @delivery_stats = DeliveryStats.new
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       exec
       finalize_run_log(started_at)
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
-      SourceRunLog.record_error(id, started_at:, error: e)
+      SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(source: id, error: e)
     end
 
     def finalize_run_log(started_at)
-      count = @delivery_errors.size
-      if count.positive?
-        SourceRunLog.record_error(id, started_at:, error: @delivery_errors.pop)
+      stats = @delivery_stats
+      if stats.error?
+        SourceRunLog.record_error(id, started_at:, error: stats.first_error, stats:)
         logger.error(
           source: id, class: self.class.to_s,
-          action: 'exec end (delivery errors)', count:
+          action: 'exec end (delivery errors)', count: stats.error_count,
+          delivered: stats.delivered_count
         )
       else
-        SourceRunLog.record_success(id, started_at:)
-        logger.info(source: id, class: self.class.to_s, action: 'exec end')
+        SourceRunLog.record_success(id, started_at:, stats:)
+        logger.info(
+          source: id, class: self.class.to_s,
+          action: 'exec end', delivered: stats.delivered_count
+        )
       end
     end
   end

@@ -27,7 +27,12 @@ properties:
     additionalProperties: false
     properties:
       tolerance:
-        # 数値（秒）または Rufus::Scheduler 形式の文字列（例: "10m"）
+        # 実行遅延の猶予。数値（秒）または Rufus::Scheduler 形式の文字列（例: "10m"）
+        type:
+          - integer
+          - string
+      silence_tolerance:
+        # 無配信の許容期間。未指定ならサイレント不発を検知しない（例: "90d"）
         type:
           - integer
           - string

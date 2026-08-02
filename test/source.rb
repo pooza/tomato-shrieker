@@ -202,17 +202,86 @@ module TomatoShrieker
         next enum_for(:shriekers) unless block
         block.call(shrieker)
       end
-      queue = Thread::Queue.new
-      source.shriek(template: nil, visibility: nil, delivery_errors: queue)
+      stats = DeliveryStats.new
+      source.shriek(template: nil, visibility: nil, stats:)
 
-      assert_equal(1, queue.size)
-      assert_kind_of(RuntimeError, queue.pop)
+      assert_equal(1, stats.error_count)
+      assert_equal(1, stats.attempted_count)
+      assert_equal(0, stats.delivered_count)
+      assert_kind_of(RuntimeError, stats.first_error)
       assert_nothing_raised do
-        source.shriek(template: nil, visibility: nil, delivery_errors: nil)
+        source.shriek(template: nil, visibility: nil, stats: nil)
       end
-      assert_equal(0, queue.size)
+      assert_equal(1, stats.error_count)
     ensure
       ENV['TEST'] = saved
+    end
+
+    # #1433: 成功した配信も計上される。
+    def test_shriek_counts_deliveries
+      saved = ENV.fetch('TEST', nil)
+      ENV.delete('TEST')
+      shrieker = Object.new
+      def shrieker.exec(_params)
+        # 何もせず成功する shrieker
+      end
+      source = Source.new({'id' => 'test-delivery-count'})
+      source.define_singleton_method(:shriekers) do |&block|
+        next enum_for(:shriekers) unless block
+        block.call(shrieker)
+      end
+      stats = DeliveryStats.new
+      source.shriek(template: nil, visibility: nil, stats:)
+
+      assert_equal(1, stats.attempted_count)
+      assert_equal(1, stats.delivered_count)
+      assert_false(stats.error?)
+      assert_false(stats.noop?)
+    ensure
+      ENV['TEST'] = saved
+    end
+
+    # #1470: silence_tolerance は未指定なら検知しない (opt-in)。
+    def test_monitor_silence_tolerance_seconds
+      assert_nil(Source.new({'id' => 'test-silence-unset'}).monitor_silence_tolerance_seconds)
+      source = Source.new({'id' => 'test-silence-str', 'monitor' => {'silence_tolerance' => '1d'}})
+
+      assert_equal(86_400, source.monitor_silence_tolerance_seconds)
+      source = Source.new({'id' => 'test-silence-int', 'monitor' => {'silence_tolerance' => 600}})
+
+      assert_equal(600, source.monitor_silence_tolerance_seconds)
+    end
+
+    def test_silent?
+      # しきい値未指定なら常に false
+      source = Source.new({'id' => 'test-silent-unset'})
+      source.define_singleton_method(:last_delivered_at_fallback) {Time.now - 86_400_000}
+
+      assert_false(source.silent?)
+
+      # 配信実績が無ければ断定しない
+      source = Source.new({'id' => 'test-silent-unknown', 'monitor' => {'silence_tolerance' => '1d'}})
+
+      assert_false(source.silent?)
+
+      # しきい値を超えて沈黙していれば true
+      source = Source.new({'id' => 'test-silent-stale', 'monitor' => {'silence_tolerance' => '1d'}})
+      source.define_singleton_method(:last_delivered_at_fallback) {Time.now - 172_800}
+
+      assert_true(source.silent?)
+      assert_equal('fallback', source.last_delivered_at_origin)
+
+      # しきい値内なら false
+      source = Source.new({'id' => 'test-silent-fresh', 'monitor' => {'silence_tolerance' => '1d'}})
+      source.define_singleton_method(:last_delivered_at_fallback) {Time.now - 60}
+
+      assert_false(source.silent?)
+    end
+
+    def test_silent_boolean
+      Source.all do |source|
+        assert_boolean(source.silent?)
+      end
     end
 
     def test_classes

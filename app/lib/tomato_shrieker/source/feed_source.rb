@@ -10,9 +10,9 @@ module TomatoShrieker
 
     def exec
       if touched?
-        fetch {|entry| entry.shriek(delivery_errors: @delivery_errors)}
+        fetch {|entry| entry.shriek(stats: @delivery_stats)}
       elsif entry = fetch.to_a.last
-        entry.shriek(delivery_errors: @delivery_errors)
+        entry.shriek(stats: @delivery_stats)
       end
     end
 
@@ -77,6 +77,12 @@ module TomatoShrieker
 
     def touched?
       return time.present?
+    end
+
+    # entry テーブルは run_log の保持期間に縛られないので、
+    # 「3 年半配信していない」ような長期の沈黙もここから拾える (#1470)。
+    def last_delivered_at_fallback
+      return time
     end
 
     def touch

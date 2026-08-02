@@ -4,6 +4,9 @@ module TomatoShrieker
 
     def load
       super
+      # super が返す配列は @raw の実体そのもの。直に push すると load を呼ぶたびに
+      # ソース定義が積み増され、同じソースが多重登録される。複製してから積む。
+      self['/sources'] = self['/sources'].dup
       suffixes.each do |suffix|
         Dir.glob(File.join(Environment.dir, 'config/sources', "*#{suffix}")).each do |f|
           key = File.basename(f, suffix)
@@ -12,6 +15,12 @@ module TomatoShrieker
           self['/sources'].push(values)
         end
       end
+    end
+
+    # Ginseng::Config の `alias reload load` は親の load を束縛するため、
+    # そのままでは config/sources/*.yaml を読み直さず全ソースが消える。
+    def reload
+      return load
     end
 
     def secure_dump

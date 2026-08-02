@@ -146,12 +146,17 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 #### `/healthz/source/:id` の判定
 
-該当ソースの最終実行 (`source_run_log` の最新行) が以下の両方を満たせば 200:
+該当ソースが以下をすべて満たせば 200:
 
 - 最終実行から `tolerance_seconds` 以内に走っている (stale でない)
-- 直近実行が成功している (error でない)
+- 連続エラー回数が `/monitor/error_streak_threshold` 未満である
+- `silence_tolerance` を超えて無配信が続いていない (silent でない)
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
+
+**エラー判定は「直近 1 件」ではなく error_streak で行う (#1457)。**streak は run ではなく **配信試行** を母数に数え、配信を 1 件も試みなかった run (no-op) は streak を切らさず、数にも入れない。これにより「エラー → 新着なしで no-op success → エラー」のような並びで継続失敗を見逃さない。配信に成功した run が来た時点で streak は 0 に戻る。
+
+**サイレント不発の判定 (#1470)** は `silence_tolerance` を宣言したソースだけが対象（opt-in）。`chikanan` のように年単位で正常に静かなソースがあるため、一律の既定値は置かない。配信実績が 1 件も無いソースは「腐っている」と断定できないので健全側に倒す。
 
 #### `/status.json` の中身
 
@@ -164,17 +169,41 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
       "id": "matrix-news",
       "class": "TomatoShrieker::FeedSource",
       "schedule": {"type": "every", "value": "5m"},
-      "tolerance_seconds": 600,
+      "grace_seconds": 600,
       "last_run_at": "2026-04-14T14:00:00+09:00",
+      "next_run_at": "2026-04-14T14:05:00+09:00",
       "last_status": "success",
       "last_error": null,
-      "last_duration_ms": 423
+      "last_duration_ms": 423,
+      "last_attempted_count": 2,
+      "last_delivered_count": 2,
+      "last_delivered_at": "2026-04-14T14:00:01+09:00",
+      "last_delivered_at_origin": "run_log",
+      "error_streak": 0,
+      "noop_streak": 0,
+      "silence_tolerance_seconds": null,
+      "silent": false,
+      "error_rate_24h": 0.0,
+      "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
+      "shrieker_errors": {"MastodonShrieker": 1}
     }
   ]
 }
 ```
 
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
+
+`last_delivered_at_origin` は配信時刻の出どころ:
+
+| 値 | 意味 |
+|------|------|
+| `run_log` | 保持期間内の実配信記録 |
+| `fallback` | ソース種別ごとの永続データ由来。`FeedSource` 系は `entry` テーブルの最新 `published` |
+| `null` | どちらからも取れない（＝配信実績を確認できない） |
+
+`source_run_log` は `/monitor/retention_days` で刈られるため、**「3 年半配信していない」ような長期の沈黙は run_log だけでは判定できない**。フォールバックを併用する理由がこれ。
+
+**腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
 ### 設定
 
@@ -185,15 +214,37 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 | `/monitor/port` | `4567` | リッスンポート |
 | `/monitor/default_tolerance_seconds` | `7200` | period 不明時のフォールバック tolerance |
 | `/monitor/retention_days` | `14` | source_run_log の保持日数（自動 prune） |
+| `/monitor/error_streak_threshold` | `1` | `/healthz/source/:id` を 503 にする連続エラー回数 |
+| `/monitor/sample_size` | `50` | 統計・streak の算出に使う直近 run 件数 |
 
-ソースごとに `/monitor/tolerance` を上書き可（文字列なら `'30m'` のような Rufus 形式、数値なら秒）。デフォルトは `period × 2`。
+ソース定義側で上書きできるキー:
+
+| キー | 意味 |
+|------|------|
+| `/monitor/tolerance` | 実行遅延の猶予。文字列なら `'30m'` のような Rufus 形式、数値なら秒。既定は `period × 2` |
+| `/monitor/silence_tolerance` | 無配信の許容期間。**未指定ならサイレント不発を検知しない**（opt-in） |
+
+`silence_tolerance` はソースの性格に合わせて宣言する。年単位で正常に静かなソースに短い値を置くと過検知になる。
+
+```yaml
+# 週次で必ず何か出るはずのソース
+monitor:
+  tolerance: 30m
+  silence_tolerance: 30d
+```
 
 ### 実行ログテーブル `source_run_log`
 
-各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`）:
+各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`, `migration/010`）:
 
 - `source_id`, `executed_at`, `status` (`success` | `error`), `error_message`, `duration_ms`
+- `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
+- `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
+
+計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
+
+`Source#schedule` のラッパで成功/失敗を記録するため、CLI からの `bin/shrieker` 直接実行や rake タスクは記録対象外（スケジューラ起因の稼働だけを監視する設計）。
 
 `Source#schedule` のラッパで成功/失敗を記録するため、CLI からの `bin/shrieker` 直接実行や rake タスクは記録対象外（スケジューラ起因の稼働だけを監視する設計）。
 

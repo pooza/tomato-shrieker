@@ -62,12 +62,12 @@ module TomatoShrieker
       return template
     end
 
-    def shriek(delivery_errors: nil)
+    def shriek(stats: nil)
       feed.shriek(
         template: create_template,
         visibility: feed.visibility,
         attachments: enclosures.map {|v| {image_url: v.to_s}}.first(4),
-        delivery_errors:,
+        stats:,
       )
       logger.info(source: feed.id, entry: to_h, message: 'post')
     end
