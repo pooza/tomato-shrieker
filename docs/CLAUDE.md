@@ -96,7 +96,11 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | NostrShrieker | (独自実装) | Nostr イベント ⚠ **動作保証対象外** |
 | WebhookShrieker | SlackService | Webhook (Slack, Discord等) |
 
-⚠ **NostrShrieker は動作保証しない。**運用者が使っていないため、実運用での検証経路が無い。リリース前検証（[release-validation.md](release-validation.md)）にも含めない。コードは残してあるが、**ここに時間を使わない**こと。不具合を見つけても、修正が安く済む場合を除いて次送りでよい。
+⚠ **NostrShrieker は動作保証の対象外。**運用者が使っておらず、実運用での検証経路が無いため。リリース前検証（[release-validation.md](release-validation.md)）にも含めない。
+
+**ただし打ち切りではなく「報告があったら対応する」ステータス。**こちらから能動的に検証したり先回りして直したりはしない、という意味であって、報告された不具合を放置するわけではない。対応のトリガーは **issue での報告**と **Codex レビューの指摘**の 2 つ。
+
+実例: 4.4.0 で Codex が「全リレー失敗でも配信成功として計上される」を P1 で指摘 → 本番の nostr 宛先は 0 件だったが、この方針に沿って `4a20bf5` で修正した。
 
 ## デーモン管理
 
