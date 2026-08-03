@@ -111,6 +111,15 @@ module TomatoShrieker
       assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
     end
 
+    # Codex P2: error_streak_threshold が sample_size より大きいと、読む行数が
+    # 足りずしきい値に到達し得なくなる（＝何回連続で失敗しても健全のまま）
+    def test_streak_window_covers_threshold
+      threshold = Config.instance['/monitor/error_streak_threshold']
+
+      assert_operator(SourceRunLog.streak_window, :>=, threshold)
+      assert_operator(SourceRunLog.streak_window, :>=, SourceRunLog.sample_size)
+    end
+
     # #1470: 配信ゼロが続いた回数。エラー run も数に入れる
     def test_noop_streak
       create_logs(

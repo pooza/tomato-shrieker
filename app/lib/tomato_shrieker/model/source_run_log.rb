@@ -101,7 +101,7 @@ module TomatoShrieker
     # 直近 N 件から求まる指標をまとめて返す。
     # /status.json は全ソース分を 1 リクエストで返すので、
     # 指標ごとに recent_for を呼ぶとソース数 × 指標数のクエリになる。ここで 1 回に畳む。
-    def self.summary_for(source_id, limit: sample_size)
+    def self.summary_for(source_id, limit: streak_window)
       logs = recent_for(source_id, limit)
       return {
         error_streak: error_streak_of(logs),
@@ -117,7 +117,7 @@ module TomatoShrieker
     # 走った証拠なので streak を切る。ここを読み飛ばすと、配信のたびにしか streak が
     # 戻らなくなり、新着の少ないソースが一過性エラー 1 回で 503 に貼り付く。
     # 「単発で倒さない」は error_streak_threshold で調整する。
-    def self.error_streak(source_id, limit: sample_size)
+    def self.error_streak(source_id, limit: streak_window)
       return error_streak_of(recent_for(source_id, limit))
     end
 
@@ -187,6 +187,12 @@ module TomatoShrieker
 
     def self.sample_size
       return Config.instance['/monitor/sample_size']
+    end
+
+    # error_streak_threshold が sample_size より大きいと、読む行数が足りず
+    # しきい値に到達し得ない＝どれだけ連続で失敗しても健全のままになる。
+    def self.streak_window
+      return [sample_size, Config.instance['/monitor/error_streak_threshold']].max
     end
   end
 end
