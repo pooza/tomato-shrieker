@@ -39,6 +39,12 @@ properties:
       retention_days:
         type: integer
         minimum: 1
+      error_streak_threshold:
+        type: integer
+        minimum: 1
+      sample_size:
+        type: integer
+        minimum: 1
   feed:
     type: object
     properties:

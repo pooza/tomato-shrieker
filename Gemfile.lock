@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 98a72b02e5c560e7bf9914fe5b13e89bfbff51b6
+  revision: 4b134cebaf80c6ba0267363d5f729b59bdaf6c36
   branch: main
   specs:
-    ginseng-core (1.15.26)
+    ginseng-core (1.15.28)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -34,10 +34,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: bfb0dc260c8a74ff4e7bdde559a9167ce3b8d3a9
+  revision: 60a38dae2e80096734e408ced2d322b994e4c624
   branch: main
   specs:
-    ginseng-fediverse (1.8.24)
+    ginseng-fediverse (1.8.25)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
@@ -66,7 +66,7 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (8.1.3)
+    activesupport (8.1.3.1)
       base64
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.3.1)
@@ -88,21 +88,21 @@ GEM
     bigdecimal (4.1.2)
     bip-schnorr (0.7.0)
       ecdsa_ext (~> 0.5.0)
-    cgi (0.5.1)
-    concurrent-ruby (1.3.7)
+    cgi (0.5.2)
+    concurrent-ruby (1.3.8)
     connection_pool (3.0.2)
     crack (1.0.1)
       bigdecimal
       rexml
-    crass (1.0.6)
-    csv (3.3.5)
+    crass (1.0.7)
+    csv (3.3.6)
     date (3.5.1)
     drb (2.2.3)
     ecdsa (1.2.0)
     ecdsa_ext (0.5.1)
       ecdsa (~> 1.2.0)
-    erb (6.0.4)
-    et-orbi (1.4.0)
+    erb (6.0.6)
+    et-orbi (1.4.1)
       tzinfo
     etc (1.4.6)
     event_emitter (0.2.6)
@@ -117,7 +117,7 @@ GEM
       sax-machine (>= 1.0, < 2)
     fileutils (1.7.3)
     find (0.2.0)
-    fugit (1.12.2)
+    fugit (1.13.0)
       et-orbi (~> 1.4)
       raabro (~> 1.4)
     hashdiff (1.2.1)
@@ -127,23 +127,23 @@ GEM
       multi_xml (>= 0.5.2)
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
-    icalendar (2.12.3)
+    icalendar (2.12.4)
       base64
       ice_cube (~> 0.16)
       logger
       ostruct
     ice_cube (0.17.0)
-    json (2.19.9)
+    json (2.21.2)
     json-schema (6.2.0)
       addressable (~> 2.8)
       bigdecimal (>= 3.1, < 5)
-    language_server-protocol (3.17.0.5)
+    language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
     logger (1.7.0)
-    loofah (2.25.1)
+    loofah (2.25.2)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
-    mail (2.9.0)
+    mail (2.9.1)
       logger
       mini_mime (>= 0.1.1)
       net-imap
@@ -157,7 +157,7 @@ GEM
     multi_json (1.21.1)
     multi_xml (0.9.1)
       bigdecimal (>= 3.1, < 5)
-    net-imap (0.6.4.1)
+    net-imap (0.6.6)
       date
       net-protocol
     net-pop (0.1.2)
@@ -196,7 +196,7 @@ GEM
     optparse (0.8.1)
     ostruct (0.6.3)
     parallel (2.1.0)
-    parser (3.3.11.1)
+    parser (3.3.12.0)
       ast (~> 2.4.1)
       racc
     power_assert (3.0.1)
@@ -204,14 +204,14 @@ GEM
     public_suffix (7.0.5)
     puma (8.0.2)
       nio4r (~> 2.0)
-    raabro (1.4.0)
+    raabro (1.5.0)
     racc (1.8.1)
     rainbow (3.1.1)
     rake (13.3.1)
     regexp_parser (2.12.0)
     rexml (3.4.4)
     ricecream (0.2.1)
-    rubocop (1.88.0)
+    rubocop (1.88.2)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
@@ -222,10 +222,10 @@ GEM
       rubocop-ast (>= 1.49.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
-    rubocop-ast (1.49.1)
+    rubocop-ast (1.50.0)
       parser (>= 3.3.7.2)
       prism (~> 1.7)
-    rubocop-minitest (0.39.1)
+    rubocop-minitest (0.40.0)
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
       rubocop-ast (>= 1.38.0, < 2.0)
@@ -251,7 +251,7 @@ GEM
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
       logger
-    sequel (5.105.0)
+    sequel (5.106.0)
       bigdecimal
     set (1.1.3)
     sqlite3 (2.9.5)
@@ -282,7 +282,7 @@ GEM
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
-    websocket-driver (0.8.1)
+    websocket-driver (0.8.2)
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
@@ -329,7 +329,7 @@ DEPENDENCIES
   webmock
 
 RUBY VERSION
-  ruby 4.0.5
+  ruby 4.0.6
 
 BUNDLED WITH
-  4.0.14
+  4.0.17

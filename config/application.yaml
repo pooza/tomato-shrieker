@@ -28,6 +28,8 @@ monitor:
   port: 4567
   default_tolerance_seconds: 7200
   retention_days: 14
+  error_streak_threshold: 1
+  sample_size: 50
 logger:
   mask_fields:
     - password
@@ -41,7 +43,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.3.0
+  version: 4.4.0
 nostr:
   relays:
     - wss://relay.damus.io

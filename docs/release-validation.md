@@ -7,9 +7,8 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 ## 前提
 
 - ローカルに `bundle install` 済みで `bin/shrieker` が動くこと
-- `config/local.yaml` に `crypt.password` を設定済み（Nostr nsec 暗号化用、任意の文字列でよい）
-- Google News Cleaner (`http://kues:3000/clean` 等) に到達できること（GoogleNewsSource の検証時のみ）
-- PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82, user `tomato_test`) に投稿可能なアカウント情報
+- Google News Cleaner (`http://scylla.b-shock.local:3000/clean`) に到達できること（GoogleNewsSource の検証時のみ）。⚠ 2026-08-01 に kues から scylla へ移設済み
+- PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82) に投稿可能なアカウント情報。**2026-08-03 に疎通を確認したのは `tkoishi+test@b-shock.co.jp`**（`user_id` にメールアドレスをそのまま書ける）。⚠ **パスワードはリポジトリにも本番にも無い。**`config/sources/test-google-news-piefed.yaml` はローカルにしか存在せず（`config/sources/.gitignore` が `*`）、oscura / seas の `config/local.yaml` にも piefed の項目は無い
 
 ## テスト用ソースの配置
 
@@ -93,6 +92,23 @@ dest:
     - test
 ```
 
+### test-google-news-cleaner.yaml — GoogleNewsSource + cleaner（認証不要）
+
+PieFed の認証情報が無くても cleaner 連携だけは検証できる。`dest` に投稿先を持たないので `fetch` しか通らないが、チェックリストの「実 publisher URL が取れている」はこれで満たせる。
+
+```yaml
+source:
+  news:
+    phrase: プリキュア
+    cleaner:
+      url: http://scylla.b-shock.local:3000/clean
+keep:
+  years: 1
+dest:
+  tags:
+    - test
+```
+
 ### test-google-news-piefed.yaml — GoogleNewsSource + cleaner + PieFed
 
 PieFed 投稿の経路を実投稿で検証するための唯一のソース。`dest.piefed` を持つ。
@@ -102,34 +118,15 @@ source:
   news:
     phrase: プリキュア
     cleaner:
-      url: http://kues:3000/clean
+      url: http://scylla.b-shock.local:3000/clean
 keep:
   years: 1
 dest:
   piefed:
     host: pf.korako.me
-    user_id: tomato_test
+    user_id: tkoishi+test@b-shock.co.jp
     password: <テストアカウントのパスワード>
     community_id: 82
-  tags:
-    - test
-```
-
-### test-nostr.yaml — Nostr スモークテスト
-
-実投稿はせず、設定読込・nsec 復号・キーペア生成までを確認する。
-
-1. 使い捨て nsec を生成: `bundle exec ruby -Iapp/lib -rtomato_shrieker -e 'p = Nostr::Keygen.new.generate_key_pair; puts p.private_key.to_bech32'`
-2. 暗号化: `bundle exec bin/crypt.rb --text=<nsec>`
-3. 出力された暗号文を YAML に貼る:
-
-```yaml
-source:
-  text: |
-    Nostr スモークテスト用テキスト。
-dest:
-  nostr:
-    private_key: <暗号化された nsec>
   tags:
     - test
 ```
@@ -157,22 +154,9 @@ done
 
 各ソースで `entries:` が取得できていればパス。`test-google-news-piefed` の entry URL が Google News のリダイレクト URL ではなく実 publisher URL になっていれば cleaner 連携も動いている。
 
-### 3. TextSource / Nostr のスモークテスト
+### 3. TextSource のスモークテスト
 
-`source fetch` は TextSource 系で `source does not support fetch` を返すのが正常（取得元なし）。Nostr 設定の正当性は別途下記スニペットで確認する:
-
-```sh
-bundle exec ruby -Iapp/lib -rtomato_shrieker -e '
-include TomatoShrieker
-Sequel.connect(Environment.dsn)
-src = Source.create("test-nostr")
-shr = src.nostr
-puts "NostrShrieker initialized: #{shr.class}"
-puts "npub: #{shr.instance_variable_get(:@keypair).public_key.to_bech32}"
-'
-```
-
-`NostrShrieker initialized: TomatoShrieker::NostrShrieker` と npub が出ればパス（暗号化された nsec の復号が通った証拠）。
+`source fetch` は TextSource 系で `source does not support fetch` を返すのが正常（取得元なし）。
 
 ### 4. PieFed 実投稿テスト
 
@@ -193,6 +177,8 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 ### 5. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
+⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
+
 ```sh
 bundle exec ruby -Iapp/lib -rtomato_shrieker -e '
 include TomatoShrieker
@@ -210,12 +196,12 @@ JWT が `present` なら login 成功。`absent` なら認証情報が古い等�
 - [ ] `source list` で全 test-* が出る
 - [ ] FeedSource (matrix-* 等)・IcalendarSource・YouTubeChannelSource・GitHubRepositorySource・GoogleNewsSource の `fetch` が成功
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
-- [ ] Nostr スモークテストで NostrShrieker が初期化される (nsec 復号成功)
 - [ ] PieFed テストコミュニティに実投稿が反映される
 
 ## 後始末
 
-- テスト用 `config/sources/test-*.yaml` は手元に残してよい（次回再利用）。git-ignore されているので commit はされない
+- **テスト用 `config/sources/test-*.yaml` は消さずに残す**（手順を毎回作り直すと安定しないため）。`config/sources/.gitignore` が `*` なので commit はされない
+- ⚠ **`test-google-news-piefed.yaml` にはパスワードが平文で入る。**この端末にしか無い＝**他の端末で検証するときは作り直しになる**ことを織り込んでおく（リポジトリにも本番にも置いていない）
 - 検証で蓄積された `tmp/db/db.sqlite3` の Entry レコードはそのまま残しても問題ないが、繰り返し検証する場合は `bin/shrieker source clear <id>` で消す
 
 ## 関連

@@ -33,23 +33,42 @@ module TomatoShrieker
     end
 
     def healthz_source(source_id)
+      return build_healthz_source(source_id)
+    rescue => e
+      return [503, HEADERS, ["#{e.class}: #{e.message}\n"]]
+    end
+
+    def build_healthz_source(source_id)
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
       next_run = source.next_run_at(latest.executed_at)
-      grace = source.monitor_grace_seconds
-      stale = Time.now > next_run + grace
-      errored = latest.status == SourceRunLog::STATUS_ERROR
-      return [200, HEADERS, ["OK\n"]] unless stale || errored
+      stale = Time.now > next_run + source.monitor_grace_seconds
+      # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
+      streak = SourceRunLog.error_streak(source_id)
+      errored = streak >= error_streak_threshold
+      silent = source.silent?
+      return [200, HEADERS, ["OK\n"]] unless stale || errored || silent
+      return [503, HEADERS, [unhealthy_body(source, latest, {next_run:, stale:, streak:, silent:})]]
+    end
+
+    def unhealthy_body(source, latest, checks)
       body = "status: #{latest.status}\n"
       body << "executed_at: #{latest.executed_at.iso8601}\n"
-      body << "next_run_at: #{next_run.iso8601}\n"
-      body << "grace_seconds: #{grace}\n"
-      body << "stale: #{stale}\n"
-      body << "error: #{latest.error_message}\n" if errored
-      return [503, HEADERS, [body]]
+      body << "next_run_at: #{checks[:next_run].iso8601}\n"
+      body << "grace_seconds: #{source.monitor_grace_seconds}\n"
+      body << "stale: #{checks[:stale]}\n"
+      body << "error_streak: #{checks[:streak]}\n"
+      body << "error: #{latest.error_message}\n" if latest.error?
+      return body unless checks[:silent]
+      # #1470: 配信できていないこと自体を出す
+      body << "silent: true\n"
+      body << "last_delivered_at: #{source.last_delivered_at&.iso8601}\n"
+      body << "silence_tolerance_seconds: #{source.monitor_silence_tolerance_seconds}\n"
+      body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
+      return body
     end
 
     def status_json
@@ -64,7 +83,14 @@ module TomatoShrieker
       return [500, JSON_HEADERS, ["#{JSON.dump(error: "#{e.class}: #{e.message}")}\n"]]
     end
 
+    # 1 ソースの失敗で payload 全体を落とさない。壊れた側は error として可視化する。
     def source_status(source)
+      return build_source_status(source)
+    rescue => e
+      return {id: source.id, class: source.class.to_s, error: "#{e.class}: #{e.message}"}
+    end
+
+    def build_source_status(source)
       latest = SourceRunLog.latest_for(source.id)
       next_run = (source.next_run_at(latest.executed_at) if source.monitored? && latest)
       {
@@ -77,7 +103,24 @@ module TomatoShrieker
         last_status: latest&.status,
         last_error: latest&.error_message,
         last_duration_ms: latest&.duration_ms,
-      }
+      }.merge(delivery_status(source, latest))
+    end
+
+    # #1433 (統計) と #1470 (サイレント不発) の指標。
+    def delivery_status(source, latest)
+      return SourceRunLog.summary_for(source.id).merge(
+        last_attempted_count: latest&.attempted_count,
+        last_delivered_count: latest&.delivered_count,
+        last_delivered_at: source.last_delivered_at&.iso8601,
+        last_delivered_at_origin: source.last_delivered_at_origin,
+        silence_tolerance_seconds: source.monitor_silence_tolerance_seconds,
+        silent: source.silent?,
+        error_rate_24h: SourceRunLog.error_rate(source.id),
+      )
+    end
+
+    def error_streak_threshold
+      return Config.instance['/monitor/error_streak_threshold']
     end
 
     def scheduler_alive?

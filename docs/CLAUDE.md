@@ -93,8 +93,14 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | MisskeyShrieker | Ginseng::Fediverse::MisskeyService | Misskey |
 | LineShrieker | Ginseng::LineService | LINE メッセージング |
 | PiefedShrieker | (独自実装) | PieFed コミュニティ投稿 |
-| NostrShrieker | (独自実装) | Nostr イベント |
+| NostrShrieker | (独自実装) | Nostr イベント ⚠ **動作保証対象外** |
 | WebhookShrieker | SlackService | Webhook (Slack, Discord等) |
+
+⚠ **NostrShrieker は動作保証の対象外。**運用者が使っておらず、実運用での検証経路が無いため。リリース前検証（[release-validation.md](release-validation.md)）にも含めない。
+
+**ただし打ち切りではなく「報告があったら対応する」ステータス。**こちらから能動的に検証したり先回りして直したりはしない、という意味であって、報告された不具合を放置するわけではない。対応のトリガーは **issue での報告**と **Codex レビューの指摘**の 2 つ。
+
+実例: 4.4.0 で Codex が「全リレー失敗でも配信成功として計上される」を P1 で指摘 → 本番の nostr 宛先は 0 件だったが、この方針に沿って `4a20bf5` で修正した。
 
 ## デーモン管理
 
@@ -111,12 +117,19 @@ systemd/rc.d → bin/scheduler_daemon.rb start
   → SchedulerDaemon.spawn! (Ginseng::Daemon)
     → SchedulerDaemon#start
       → Sequel.connect (SQLite3)
+      → SchedulerDaemon#migrate (未適用ならマイグレーション)
       → MonitorServer#start (Puma embedded / 監視用 HTTP)
       → Scheduler.instance.exec (Rufus::Scheduler)
         → Source.all → register (各ソースをスケジューラに登録)
 ```
 
 systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake restart` は廃止済み（#1410）。
+
+### 起動時マイグレーション
+
+**未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
+
+⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
 
 ### 本番操作の注意
 
@@ -146,12 +159,19 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 #### `/healthz/source/:id` の判定
 
-該当ソースの最終実行 (`source_run_log` の最新行) が以下の両方を満たせば 200:
+該当ソースが以下をすべて満たせば 200:
 
-- 最終実行から `tolerance_seconds` 以内に走っている (stale でない)
-- 直近実行が成功している (error でない)
+- 最終実行から `grace_seconds` 以内に走っている (stale でない)
+- 連続エラー回数が `/monitor/error_streak_threshold` 未満である
+- `silence_tolerance` を超えて無配信が続いていない (silent でない)
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
+
+**エラー判定は連続エラー回数 (error_streak) で行う (#1457)。**streak はエラーで終わった run を新しい順に数え、**エラーでない run が来た時点で 0 に戻る**。新着が無く配信ゼロで完走した run (no-op) も「run が最後まで走った」証拠なので streak を切る。
+
+⚠ **no-op を読み飛ばす実装にしてはいけない。**新着の少ないソースは配信が起きるまで no-op が続くため、一過性エラー 1 回で `/healthz/source/:id` が次の配信まで 503 に貼り付く。何回の連続エラーで倒すかは `/monitor/error_streak_threshold` で調整する。
+
+**サイレント不発の判定 (#1470)** は `silence_tolerance` を宣言したソースだけが対象（opt-in）。`chikanan` のように年単位で正常に静かなソースがあるため、一律の既定値は置かない。配信実績が 1 件も無いソースは「腐っている」と断定できないので健全側に倒す。
 
 #### `/status.json` の中身
 
@@ -164,17 +184,43 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
       "id": "matrix-news",
       "class": "TomatoShrieker::FeedSource",
       "schedule": {"type": "every", "value": "5m"},
-      "tolerance_seconds": 600,
+      "grace_seconds": 600,
       "last_run_at": "2026-04-14T14:00:00+09:00",
+      "next_run_at": "2026-04-14T14:05:00+09:00",
       "last_status": "success",
       "last_error": null,
-      "last_duration_ms": 423
+      "last_duration_ms": 423,
+      "last_attempted_count": 2,
+      "last_delivered_count": 2,
+      "last_delivered_at": "2026-04-14T14:00:01+09:00",
+      "last_delivered_at_origin": "run_log",
+      "error_streak": 0,
+      "noop_streak": 0,
+      "silence_tolerance_seconds": null,
+      "silent": false,
+      "error_rate_24h": 0.0,
+      "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
+      "shrieker_errors": {"MastodonShrieker": 1}
     }
   ]
 }
 ```
 
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
+
+`last_delivered_at_origin` は配信時刻の出どころ:
+
+| 値 | 意味 |
+|------|------|
+| `run_log` | 保持期間内の実配信記録 |
+| `fallback` | ソース種別ごとの永続データ由来。`FeedSource` 系は `entry` テーブルの最新 `published` |
+| `null` | どちらからも取れない（＝配信実績を確認できない） |
+
+⚠ **prune は「最後に配信できた run」をソースごとに 1 行だけ残す。**これを刈ると、沈黙が `retention_days` を超えた瞬間に `last_delivered_at` が nil に化けて `silent?` が false に戻り、**沈黙が長引くほど検知できなくなる**。`silence_tolerance` に `retention_days` より大きい値を書けるのはこの保護があるため。
+
+⚠ **`fallback` は配信できたことの証明ではない。**`entry.published` は上流フィードが自称する公開時刻で、`Entry` の行は配信の成否と無関係に INSERT される。未来日付を返すフィードでは `silent?` が永久に false になりうる（Google News の pubDate が信用できない件と同根）。一次情報は `run_log` 側。
+
+**腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
 ### 設定
 
@@ -183,17 +229,37 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 | `/monitor/enabled` | `true` | `false` で監視サーバの起動をスキップ |
 | `/monitor/bind` | `127.0.0.1` | バインドアドレス |
 | `/monitor/port` | `4567` | リッスンポート |
-| `/monitor/default_tolerance_seconds` | `7200` | period 不明時のフォールバック tolerance |
+| `/monitor/default_tolerance_seconds` | `7200` | ソース側の上書きが無いときの実行遅延の猶予 |
 | `/monitor/retention_days` | `14` | source_run_log の保持日数（自動 prune） |
+| `/monitor/error_streak_threshold` | `1` | `/healthz/source/:id` を 503 にする連続エラー回数 |
+| `/monitor/sample_size` | `50` | 統計・streak の算出に使う直近 run 件数 |
 
-ソースごとに `/monitor/tolerance` を上書き可（文字列なら `'30m'` のような Rufus 形式、数値なら秒）。デフォルトは `period × 2`。
+ソース定義側で上書きできるキー:
+
+| キー | 意味 |
+|------|------|
+| `/monitor/tolerance` | 実行遅延の猶予。文字列なら `'30m'` のような Rufus 形式、数値なら秒。既定は `/monitor/default_tolerance_seconds` |
+| `/monitor/silence_tolerance` | 無配信の許容期間。**未指定ならサイレント不発を検知しない**（opt-in） |
+
+`silence_tolerance` はソースの性格に合わせて宣言する。年単位で正常に静かなソースに短い値を置くと過検知になる。
+
+```yaml
+# 週次で必ず何か出るはずのソース
+monitor:
+  tolerance: 30m
+  silence_tolerance: 30d
+```
 
 ### 実行ログテーブル `source_run_log`
 
-各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`）:
+各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`, `migration/010`）:
 
 - `source_id`, `executed_at`, `status` (`success` | `error`), `error_message`, `duration_ms`
+- `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
+- `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
+
+計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
 
 `Source#schedule` のラッパで成功/失敗を記録するため、CLI からの `bin/shrieker` 直接実行や rake タスクは記録対象外（スケジューラ起因の稼働だけを監視する設計）。
 
