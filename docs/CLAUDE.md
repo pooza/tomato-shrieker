@@ -111,12 +111,19 @@ systemd/rc.d → bin/scheduler_daemon.rb start
   → SchedulerDaemon.spawn! (Ginseng::Daemon)
     → SchedulerDaemon#start
       → Sequel.connect (SQLite3)
+      → SchedulerDaemon#migrate (未適用ならマイグレーション)
       → MonitorServer#start (Puma embedded / 監視用 HTTP)
       → Scheduler.instance.exec (Rufus::Scheduler)
         → Source.all → register (各ソースをスケジューラに登録)
 ```
 
 systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake restart` は廃止済み（#1410）。
+
+### 起動時マイグレーション
+
+**未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
+
+⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
 
 ### 本番操作の注意
 
