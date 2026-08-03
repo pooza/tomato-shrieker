@@ -7,8 +7,7 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 ## 前提
 
 - ローカルに `bundle install` 済みで `bin/shrieker` が動くこと
-- `config/local.yaml` に `crypt.password` を設定済み（Nostr nsec 暗号化用、任意の文字列でよい）
-- Google News Cleaner (`http://kues:3000/clean` 等) に到達できること（GoogleNewsSource の検証時のみ）
+- Google News Cleaner (`http://scylla.b-shock.local:3000/clean`) に到達できること（GoogleNewsSource の検証時のみ）。⚠ 2026-08-01 に kues から scylla へ移設済み
 - PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82, user `tomato_test`) に投稿可能なアカウント情報
 
 ## テスト用ソースの配置
@@ -102,7 +101,7 @@ source:
   news:
     phrase: プリキュア
     cleaner:
-      url: http://kues:3000/clean
+      url: http://scylla.b-shock.local:3000/clean
 keep:
   years: 1
 dest:
@@ -111,25 +110,6 @@ dest:
     user_id: tomato_test
     password: <テストアカウントのパスワード>
     community_id: 82
-  tags:
-    - test
-```
-
-### test-nostr.yaml — Nostr スモークテスト
-
-実投稿はせず、設定読込・nsec 復号・キーペア生成までを確認する。
-
-1. 使い捨て nsec を生成: `bundle exec ruby -Iapp/lib -rtomato_shrieker -e 'p = Nostr::Keygen.new.generate_key_pair; puts p.private_key.to_bech32'`
-2. 暗号化: `bundle exec bin/crypt.rb --text=<nsec>`
-3. 出力された暗号文を YAML に貼る:
-
-```yaml
-source:
-  text: |
-    Nostr スモークテスト用テキスト。
-dest:
-  nostr:
-    private_key: <暗号化された nsec>
   tags:
     - test
 ```
@@ -157,22 +137,9 @@ done
 
 各ソースで `entries:` が取得できていればパス。`test-google-news-piefed` の entry URL が Google News のリダイレクト URL ではなく実 publisher URL になっていれば cleaner 連携も動いている。
 
-### 3. TextSource / Nostr のスモークテスト
+### 3. TextSource のスモークテスト
 
-`source fetch` は TextSource 系で `source does not support fetch` を返すのが正常（取得元なし）。Nostr 設定の正当性は別途下記スニペットで確認する:
-
-```sh
-bundle exec ruby -Iapp/lib -rtomato_shrieker -e '
-include TomatoShrieker
-Sequel.connect(Environment.dsn)
-src = Source.create("test-nostr")
-shr = src.nostr
-puts "NostrShrieker initialized: #{shr.class}"
-puts "npub: #{shr.instance_variable_get(:@keypair).public_key.to_bech32}"
-'
-```
-
-`NostrShrieker initialized: TomatoShrieker::NostrShrieker` と npub が出ればパス（暗号化された nsec の復号が通った証拠）。
+`source fetch` は TextSource 系で `source does not support fetch` を返すのが正常（取得元なし）。
 
 ### 4. PieFed 実投稿テスト
 
@@ -210,7 +177,6 @@ JWT が `present` なら login 成功。`absent` なら認証情報が古い等�
 - [ ] `source list` で全 test-* が出る
 - [ ] FeedSource (matrix-* 等)・IcalendarSource・YouTubeChannelSource・GitHubRepositorySource・GoogleNewsSource の `fetch` が成功
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
-- [ ] Nostr スモークテストで NostrShrieker が初期化される (nsec 復号成功)
 - [ ] PieFed テストコミュニティに実投稿が反映される
 
 ## 後始末

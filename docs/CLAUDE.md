@@ -93,8 +93,10 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | MisskeyShrieker | Ginseng::Fediverse::MisskeyService | Misskey |
 | LineShrieker | Ginseng::LineService | LINE メッセージング |
 | PiefedShrieker | (独自実装) | PieFed コミュニティ投稿 |
-| NostrShrieker | (独自実装) | Nostr イベント |
+| NostrShrieker | (独自実装) | Nostr イベント ⚠ **動作保証対象外** |
 | WebhookShrieker | SlackService | Webhook (Slack, Discord等) |
+
+⚠ **NostrShrieker は動作保証しない。**運用者が使っていないため、実運用での検証経路が無い。リリース前検証（[release-validation.md](release-validation.md)）にも含めない。コードは残してあるが、**ここに時間を使わない**こと。不具合を見つけても、修正が安く済む場合を除いて次送りでよい。
 
 ## デーモン管理
 
