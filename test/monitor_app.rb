@@ -118,6 +118,27 @@ module TomatoShrieker
       assert_equal(200, status)
     end
 
+    # #1473: 宛先ゼロは配信が永久に起きないが、run は no-op success を積むだけで
+    # silent? も「配信実績が無ければ断定しない」ので 200 に貼り付いてしまう
+    def test_healthz_source_without_destination
+      write_fixture(FIXTURE_ID, {'dest' => {'tags' => ['a']}})
+      config.reload
+      record(FIXTURE_ID, attempted_count: 0)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'No destination configured')
+    end
+
+    def test_status_json_reports_dest_count
+      assert_equal(1, source_status(FIXTURE_ID)['dest_count'])
+
+      write_fixture(FIXTURE_ID, {'dest' => {'tags' => ['a']}})
+      config.reload
+
+      assert_equal(0, source_status(FIXTURE_ID)['dest_count'])
+    end
+
     # #1470: エラーを出さないまま配信が途絶えたソースを 503 に倒す
     def test_healthz_source_silent
       record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)

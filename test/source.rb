@@ -47,7 +47,102 @@ module TomatoShrieker
       Source.all do |source|
         assert_kind_of(Template, source.create_template)
         assert_kind_of(Template, source.create_template(:default))
+        # 呼ぶたびに別インスタンスでないと Parallel.each で壊し合う (#1474)
+        assert_not_same(source.create_template, source.create_template)
       end
+    end
+
+    def test_dest_count
+      Source.all do |source|
+        assert_kind_of(Integer, source.dest_count)
+        assert_operator(source.dest_count, :>=, 0)
+        assert_equal(source.dest_count.positive?, source.dest?)
+      end
+    end
+
+    def test_dest_count_counts_every_kind
+      source = TextSource.new({
+        'id' => 'test-dest-count',
+        'source' => {'text' => 'body'},
+        'dest' => {
+          'hooks' => ['https://example.com/a', 'https://example.com/b'],
+          'mastodon' => {'url' => 'https://example.com', 'token' => 't'},
+        },
+      })
+
+      assert_equal(3, source.dest_count)
+      assert_true(source.dest?)
+    end
+
+    # /status.json は全ソース分を毎回組み立てる。数えるだけで宛先へ接続してはいけない
+    def test_dest_count_does_not_instantiate_shriekers
+      source = TextSource.new({
+        'id' => 'test-dest-count-piefed',
+        'source' => {'text' => 'body'},
+        'dest' => {
+          'piefed' => {
+            'host' => 'piefed.example.com', 'user_id' => 'u',
+            'password' => 'p', 'community_id' => 1
+          },
+        },
+      })
+
+      assert_equal(1, source.dest_count)
+      # piefed? を経由していれば PiefedShrieker#initialize の login で通信が起きる
+      assert_nil(source.instance_variable_get(:@piefed))
+    end
+
+    # #1473: token を消したような半端な宛先を 1 と数えると、shriekers が 0 件なのに
+    # dest? が真になり、塞いだはずの「永久に no-op success」がそのまま残る
+    def test_dest_count_requires_complete_destination
+      [
+        ['mastodon', {'url' => 'https://example.com'}],
+        ['misskey', {'url' => 'https://example.com'}],
+        ['line', {'user_id' => 'u'}],
+        ['piefed', {'host' => 'h', 'user_id' => 'u', 'password' => 'p'}],
+        ['nostr', {'relays' => ['wss://example.com']}],
+      ].each do |kind, incomplete|
+        source = TextSource.new({
+          'id' => "test-dest-incomplete-#{kind}",
+          'source' => {'text' => 'body'},
+          'dest' => {kind => incomplete},
+        })
+
+        assert_equal(0, source.dest_count, "#{kind} の不完全な設定を宛先として数えている")
+        assert_false(source.dest?)
+      end
+    end
+
+    # 必須キーが揃っていれば数える。DEST_KINDS が各アクセサのガード条件から
+    # ずれていないことの担保（⚠ shriekers を呼ぶと piefed の login で通信するので使わない）
+    def test_dest_count_accepts_complete_destination
+      [
+        ['mastodon', {'url' => 'https://example.com', 'token' => 't'}],
+        ['misskey', {'url' => 'https://example.com', 'token' => 't'}],
+        ['line', {'user_id' => 'u', 'token' => 't'}],
+        ['piefed', {'host' => 'h', 'user_id' => 'u', 'password' => 'p', 'community_id' => 1}],
+        ['nostr', {'private_key' => 'k'}],
+      ].each do |kind, complete|
+        source = TextSource.new({
+          'id' => "test-dest-complete-#{kind}",
+          'source' => {'text' => 'body'},
+          'dest' => {kind => complete},
+        })
+
+        assert_equal(1, source.dest_count, "#{kind} の完全な設定を宛先として数えていない")
+        assert_true(source.dest?)
+      end
+    end
+
+    def test_dest_count_ignores_non_destination_keys
+      source = TextSource.new({
+        'id' => 'test-dest-count-empty',
+        'source' => {'text' => 'body'},
+        'dest' => {'tags' => ['a'], 'template' => 'common'},
+      })
+
+      assert_equal(0, source.dest_count)
+      assert_false(source.dest?)
     end
 
     def test_spoiler_text

@@ -63,13 +63,15 @@ module TomatoShrieker
     end
 
     def shriek(stats: nil)
-      feed.shriek(
+      delivered = feed.shriek(
         template: create_template,
         visibility: feed.visibility,
         attachments: enclosures.map {|v| {image_url: v.to_s}}.first(4),
         stats:,
       )
-      logger.info(source: feed.id, entry: to_h, message: 'post')
+      # feed.shriek は宛先ごとの例外を内部で握るので、件数を添えないと「投稿した」の
+      # 意味にならない。delivered: 0 は全宛先失敗か宛先ゼロ (#1473)。
+      logger.info(source: feed.id, entry: to_h, message: 'post', delivered:)
     end
 
     alias post shriek
@@ -90,10 +92,15 @@ module TomatoShrieker
         sleep(rand(0.5..2.0))
         retry
       rescue Sequel::UniqueConstraintViolation
+        # 既知のエントリ＝異常ではないので nil を返して読み飛ばす
         return nil
       rescue => e
+        # ⚠ 握り潰して nil を返すと、呼び出し元の FeedSource#fetch が
+        # `next unless record` で読み飛ばすため record_failure に到達しない。
+        # 全エントリがパース失敗しても attempted=0 の no-op success になる (#1473)。
+        # fetch 側の rescue がループを継続するので、1 件の失敗でフィードは止まらない。
         logger.error(source: feed&.id, error: e, entry:)
-        return nil
+        raise
       end
     end
   end

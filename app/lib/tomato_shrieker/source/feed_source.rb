@@ -106,6 +106,9 @@ module TomatoShrieker
         yield record
       rescue => e
         logger.error(source: id, error: e)
+        # create_record / create_template / enclosures 由来の失敗は Entry#shriek に
+        # 到達しないので、ここで計上しないと run が no-op success になる (#1473)。
+        @delivery_stats&.record_failure("#{self.class}#fetch", e)
       end
     end
 

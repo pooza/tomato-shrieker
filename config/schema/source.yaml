@@ -9,6 +9,27 @@ additionalProperties: false
 required:
   - source
   - dest
+# 有効なソースは配信先を 1 つ以上持たなければならない (#1473)。
+# dest: {} は validate を通るのに配信が永久に起きず、run は no-op success を
+# 積むだけなので健全に見えてしまう。
+# ⚠ disable: true の死蔵定義（chinachu / epgstation / konomitv / mirakurun）は
+# 実際に dest: {} なので、無効なソースは免除する。
+anyOf:
+  - required:
+      - disable
+    properties:
+      disable:
+        enum:
+          - true
+  - properties:
+      dest:
+        anyOf:
+          - required: [hooks]
+          - required: [mastodon]
+          - required: [misskey]
+          - required: [line]
+          - required: [piefed]
+          - required: [nostr]
 properties:
   disable:
     type: boolean
@@ -179,6 +200,8 @@ properties:
             type: boolean
       hooks:
         type: array
+        # hooks: [] は「宛先を書いたつもりで宛先ゼロ」になる (#1473)
+        minItems: 1
         items:
           oneOf:
             - type: string
