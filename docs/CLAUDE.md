@@ -194,11 +194,14 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 該当ソースが以下をすべて満たせば 200:
 
+- 配信先が 1 つ以上ある (`dest_count > 0`)
 - 最終実行から `grace_seconds` 以内に走っている (stale でない)
 - 連続エラー回数が `/monitor/error_streak_threshold` 未満である
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
+
+**宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。**`No destination configured` を返して 503 に倒す。`dest: {}` や `dest: {hooks: []}`、`token` を落とした `dest.mastodon` のような半端な設定は `shriekers` が 1 件も yield しないため配信が永久に起きないが、run は no-op success を積むだけで健全に見える。silent 判定は「配信実績が無ければ断定しない」設計なのでここを塞がないと 200 のまま貼り付く。
 
 **エラー判定は連続エラー回数 (error_streak) で行う (#1457)。**streak はエラーで終わった run を新しい順に数え、**エラーでない run が来た時点で 0 に戻る**。新着が無く配信ゼロで完走した run (no-op) も「run が最後まで走った」証拠なので streak を切る。
 
@@ -223,6 +226,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
       "last_status": "success",
       "last_error": null,
       "last_duration_ms": 423,
+      "dest_count": 1,
       "last_attempted_count": 2,
       "last_delivered_count": 2,
       "last_delivered_at": "2026-04-14T14:00:01+09:00",

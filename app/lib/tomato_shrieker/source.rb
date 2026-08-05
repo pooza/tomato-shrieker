@@ -208,18 +208,32 @@ module TomatoShrieker
       return nostr.present?
     end
 
-    DEST_KINDS = ['mastodon', 'misskey', 'line', 'piefed', 'nostr'].freeze
+    # 宛先種別 => その宛先が成立するのに要るキー。
+    # ⚠ 各アクセサ（mastodon / misskey / line / piefed / nostr）のガード条件と
+    # 一致させること。ズレると dest_count が shriekers の yield 数と食い違う。
+    DEST_KINDS = {
+      'mastodon' => ['url', 'token'],
+      'misskey' => ['url', 'token'],
+      'line' => ['user_id', 'token'],
+      'piefed' => ['host', 'user_id', 'password', 'community_id'],
+      'nostr' => ['private_key'],
+    }.freeze
 
     # 設定上の宛先数。宛先ゼロなら配信は永久に起きないが、run は no-op success を
     # 積むだけで健全に見えてしまう (#1473)。
-    # ⚠ mastodon? 等の述語は使わない。述語は Shrieker を実体化するので、
+    # ⚠ キーの有無だけを見てはいけない。token を消した dest.mastodon のような
+    # 半端な設定はアクセサが nil を返して shriekers が 0 件になるので、1 と数えると
+    # 塞いだはずの穴（永久に no-op success）がそのまま残る。
+    # ⚠ mastodon? 等の述語も使わない。述語は Shrieker を実体化するので、
     # PiefedShrieker#initialize の login で通信が走る。/status.json は全ソース分を
     # 毎回組み立てるため、数えるだけで宛先へ接続しにいくことになる。
     # ⚠ self['/dest/mastodon'] は使えない。key_flatten は葉のパスしか作らないので、
-    # オブジェクト値の宛先は dig で引く（piefed アクセサと同じ形）。
+    # オブジェクト値の宛先は @params から直接引く（piefed アクセサと同じ形）。
     def dest_count
       dest = @params['dest'] || {}
-      count = DEST_KINDS.count {|kind| dest[kind].present?}
+      count = DEST_KINDS.count do |kind, keys|
+        dest[kind].is_a?(Hash) && keys.all? {|key| dest[kind][key].present?}
+      end
       hooks = dest['hooks']
       return count + (hooks.is_a?(Array) ? hooks.size : 0)
     end

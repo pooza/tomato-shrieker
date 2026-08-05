@@ -16,6 +16,8 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 
 下記テンプレートを `config/sources/test-*.yaml` として保存し、`bin/shrieker source list` で全 ID が認識されることを確認する。
 
+⚠ **`test-google-news-piefed.yaml` 以外は `bin/shrieker source validate` が NG を返す。これは想定どおりで、検証手順上は正常。**4.5.0 (#1473) でスキーマに「有効なソースは `dest` に配信先を 1 つ以上持つ」を入れたため、意図的に投稿先を持たないこれらのテンプレートは契約違反になる。⚠ **検証を邪魔しないよう `source validate` はチェックリストに入れていない**が、他の目的で流したときに新規の不具合と誤読しないこと。宛先をステージングに向けて解消する作業は #1481。
+
 ### test-ical-schedule.yaml — IcalendarSource (cron + days)
 
 ```yaml

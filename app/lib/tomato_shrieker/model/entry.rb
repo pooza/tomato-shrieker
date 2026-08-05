@@ -92,10 +92,15 @@ module TomatoShrieker
         sleep(rand(0.5..2.0))
         retry
       rescue Sequel::UniqueConstraintViolation
+        # 既知のエントリ＝異常ではないので nil を返して読み飛ばす
         return nil
       rescue => e
+        # ⚠ 握り潰して nil を返すと、呼び出し元の FeedSource#fetch が
+        # `next unless record` で読み飛ばすため record_failure に到達しない。
+        # 全エントリがパース失敗しても attempted=0 の no-op success になる (#1473)。
+        # fetch 側の rescue がループを継続するので、1 件の失敗でフィードは止まらない。
         logger.error(source: feed&.id, error: e, entry:)
-        return nil
+        raise
       end
     end
   end

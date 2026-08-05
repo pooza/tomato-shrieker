@@ -24,6 +24,14 @@ module TomatoShrieker
       assert_kind_of(Template, entry.create_template(:default))
     end
 
+    # #1473: 握り潰して nil を返すと FeedSource#fetch が `next` で読み飛ばし、
+    # record_failure に到達せず run が no-op success になる
+    def test_create_reraises_unexpected_error
+      assert_raise(NoMethodError) do
+        Entry.create(Object.new, FeedSource.all.first)
+      end
+    end
+
     def test_uri
       return unless entry = @entries.find(&:uri)
 

@@ -105,6 +105,12 @@ module TomatoShrieker
         {'mastodon' => {'url' => 'https://example.com', 'token' => 't'}},
         {'misskey' => {'url' => 'https://example.com', 'token' => 't'}},
         {'line' => {'user_id' => 'u', 'token' => 't'}},
+        {'piefed' => {
+          'host' => 'h',
+          'user_id' => 'u',
+          'password' => 'p',
+          'community_id' => 1,
+        }},
         {'nostr' => {'private_key' => 'k'}},
       ].each do |dest|
         assert_true(
