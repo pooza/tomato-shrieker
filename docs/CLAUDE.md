@@ -131,9 +131,42 @@ systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake
 
 ⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
 
+### デプロイ手順
+
+本番は oscura（Ubuntu / systemd）、実行ユーザー `deploy`、チェックアウトは `/home/deploy/repos/tomato-shrieker`。デプロイ対象は **`main` ブランチ**（develop は本番へデプロイしない）。
+
+```sh
+# 本体
+ssh oscura 'sudo -H -u deploy bash -lc "cd ~/repos/tomato-shrieker && git pull origin main && bundle install"'
+
+# サテライト 3 本（CommandSource の実行対象。それぞれ独立した Gemfile を持つ）
+ssh oscura 'sudo -H -u deploy bash -lc "
+  RV=\$(cat ~/repos/tomato-shrieker/.ruby-version)
+  for d in loquat:main shooby-do-bop:master dqdai-anniv:main; do
+    cd ~/repos/\${d%%:*} && git pull origin \${d##*:} && RBENV_VERSION=\$RV bundle install
+  done"'
+
+ssh oscura 'sudo systemctl restart tomato-shrieker'
+```
+
+🔴 **`bundle install` は本体・サテライトとも毎回必ず実行する。**冪等なので無駄打ちのコストはほぼ無い。省くと以下で壊れる。
+
+- **Ruby のマイナー更新**（例: 4.0.5 → 4.0.6）で gem ディレクトリが総入れ替えになる。本体だけ `bundle install` してサテライトを忘れると、**サテライトだけが `Bundler::GemNotFound` で全滅**する（2026-08-03 に実際に発生。`loquat` / `shooby-do-bop` / `dqdai-anniv` の 7 ソースが `timecop` 欠落で 24 時間エラー）
+- ginseng-\* gem は `branch: main` 追いなので、`Gemfile.lock` が同じでも中身が動く
+
+⚠ **サテライトの `.ruby-version` は当てにならない。**scheduler_daemon の環境には `RBENV_VERSION` が入っており、それが子プロセスへそのまま継承される。つまりサテライトは自分の `.ruby-version` ではなく **本体と同じ Ruby で動く**（[CommandSource の子プロセス実行](#commandsource-の子プロセス実行) 参照）。`bundle install` も同じバージョンを明示して実行すること。
+
+⚠ `git pull` を引数なしで打つと `There is no tracking information for the current branch.` で止まる。itamae の `git` リソースが upstream 追跡を持たないローカルブランチ `deploy` に着地させるため。本体は必ず **`git pull origin main`** と書く（ブランチ名が実行ユーザー名と同じなのは偶然）。
+
+⚠ `shooby-do-bop` の既定ブランチは `master`（他は `main`）。
+
+⚠ `config/local.yaml` と `config/sources/` は gitignore 配下＝git では上がってこない。ソース定義の正本は本番の実体で、手元の `config/sources` は dev 用。
+
+⚠ `rake migrate` は不要（起動時に自動適用される。上記「起動時マイグレーション」参照）。
+
 ### 本番操作の注意
 
-- 本番デーモンは必ず OS のサービス管理経由 (`service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
+- 本番デーモンは必ず OS のサービス管理経由 (`systemctl restart tomato-shrieker` / `service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
 - Monit を停止/再開する際は事前にユーザーに確認する
 
 ### seas (FreeBSD) 固有
@@ -295,6 +328,12 @@ HTTP(s) Monitor:
 
 `Bundler.with_unbundled_env` で囲む（親の RUBYOPT, GEM_HOME 等の漏洩防止）。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（with_unbundled_env で一掃された後、子プロセスに正しい Gemfile 位置を教える役割）。
+
+⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[デプロイ手順](#デプロイ手順) 参照）。
+
+⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。
+
+🔴 **動作確認のつもりで設定どおりのコマンドを手で叩いてはいけない。**サテライト側が「通知済み」状態を持っていることがあり、実行しただけで**次の定期実行ぶんを食い潰す**。実例: `loquat reserves` は `-n`（保存しない）を付けないと `tmp/cache/reserves-*.json` を更新するので、`precure-reserve`（`-n` なし）を手動実行すると未告知の予約が投稿されないまま消える（2026-08-04 に発生。キャッシュを消して再告知した）。⚠ **`dqdai-reserve` には `-n` が付いており、同じ `loquat reserves` でも挙動が違う。**復旧確認は各ソースの定義を読んでから、副作用のない形（`-n` 相当があるか / 冪等か）を確かめて行う。
 
 ### ginseng-\* gem のデフォルトブランチ
 
