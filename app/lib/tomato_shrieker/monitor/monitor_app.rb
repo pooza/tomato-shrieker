@@ -42,6 +42,9 @@ module TomatoShrieker
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
+      # 宛先ゼロは実行結果を見るまでもなく壊れている。silent? は配信実績が無いと
+      # 断定しない設計なので、この経路を塞がないと永久に 200 のままになる (#1473)。
+      return [503, HEADERS, ["No destination configured\n"]] unless source.dest?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
       next_run = source.next_run_at(latest.executed_at)
@@ -109,6 +112,7 @@ module TomatoShrieker
     # #1433 (統計) と #1470 (サイレント不発) の指標。
     def delivery_status(source, latest)
       return SourceRunLog.summary_for(source.id).merge(
+        dest_count: source.dest_count,
         last_attempted_count: latest&.attempted_count,
         last_delivered_count: latest&.delivered_count,
         last_delivered_at: source.last_delivered_at&.iso8601,

@@ -63,13 +63,15 @@ module TomatoShrieker
     end
 
     def shriek(stats: nil)
-      feed.shriek(
+      delivered = feed.shriek(
         template: create_template,
         visibility: feed.visibility,
         attachments: enclosures.map {|v| {image_url: v.to_s}}.first(4),
         stats:,
       )
-      logger.info(source: feed.id, entry: to_h, message: 'post')
+      # feed.shriek は宛先ごとの例外を内部で握るので、件数を添えないと「投稿した」の
+      # 意味にならない。delivered: 0 は全宛先失敗か宛先ゼロ (#1473)。
+      logger.info(source: feed.id, entry: to_h, message: 'post', delivered:)
     end
 
     alias post shriek

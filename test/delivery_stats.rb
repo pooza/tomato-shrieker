@@ -38,6 +38,18 @@ module TomatoShrieker
       assert_false(@stats.noop?)
     end
 
+    def test_record_failure
+      # Shrieker まで到達せずに落ちた失敗も no-op にしない (#1473)
+      @stats.record_failure('TomatoShrieker::FeedSource#fetch', RuntimeError.new('boom'))
+
+      assert_equal(1, @stats.attempted_count)
+      assert_equal(0, @stats.delivered_count)
+      assert_equal({'TomatoShrieker::FeedSource#fetch' => 1}, @stats.shrieker_errors)
+      assert_equal('boom', @stats.first_error.message)
+      assert_true(@stats.error?)
+      assert_false(@stats.noop?)
+    end
+
     def test_shrieker_errors_isolated
       @stats.record_error(@shrieker, RuntimeError.new('boom'))
       errors = @stats.shrieker_errors

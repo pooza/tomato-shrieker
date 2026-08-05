@@ -63,6 +63,57 @@ module TomatoShrieker
       ))
     end
 
+    # #1473: 宛先ゼロは validate を通ってしまい、no-op success を積み続ける
+    def test_dest_without_destination
+      assert_false(SourceValidator.valid?(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {},
+      ))
+      assert_false(SourceValidator.valid?(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'tags' => ['a']},
+      ))
+    end
+
+    def test_dest_with_empty_hooks
+      assert_false(SourceValidator.valid?(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => []},
+      ))
+    end
+
+    # 死蔵定義（chinachu 等）は dest: {} のまま置いてあるので免除する
+    def test_disabled_source_may_have_no_destination
+      assert_true(SourceValidator.valid?(
+        'disable' => true,
+        'source' => {'github' => {'repos' => 'Chinachu/Chinachu', 'timeline' => 'commits'}},
+        'dest' => {},
+      ))
+    end
+
+    def test_enabled_source_needs_destination_even_if_disable_false
+      assert_false(SourceValidator.valid?(
+        'disable' => false,
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {},
+      ))
+    end
+
+    def test_each_destination_kind_satisfies_requirement
+      [
+        {'hooks' => ['https://example.com/x']},
+        {'mastodon' => {'url' => 'https://example.com', 'token' => 't'}},
+        {'misskey' => {'url' => 'https://example.com', 'token' => 't'}},
+        {'line' => {'user_id' => 'u', 'token' => 't'}},
+        {'nostr' => {'private_key' => 'k'}},
+      ].each do |dest|
+        assert_true(
+          SourceValidator.valid?('source' => {'feed' => 'https://example.com/feed'}, 'dest' => dest),
+          "#{dest.keys.first} が宛先として認められていない",
+        )
+      end
+    end
+
     def test_empty_source
       # source は最低 1 プロパティ必須
       assert_false(SourceValidator.valid?(

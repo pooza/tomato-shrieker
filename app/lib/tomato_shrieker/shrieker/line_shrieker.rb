@@ -3,7 +3,13 @@ module TomatoShrieker
     include Package
 
     def initialize(params = {})
-      super rescue nil
+      # 親の初期化は config が無い環境でも落とさない。ただし黙って捨てると
+      # 後段の say 失敗の原因が追えなくなるので記録は残す (#1473)。
+      begin
+        super
+      rescue => e
+        logger.error(shrieker: self.class.to_s, error: e, message: 'initialization failed')
+      end
       @id = params[:id]
       @token = params[:token]
     end

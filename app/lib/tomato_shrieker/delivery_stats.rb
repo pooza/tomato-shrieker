@@ -30,6 +30,18 @@ module TomatoShrieker
       return nil
     end
 
+    # 配信まで到達せずに落ちた失敗。Shrieker が特定できない経路（FeedSource#fetch の
+    # エントリ単位 rescue 等）から使う。これを計上しないと、全エントリが壊れていても
+    # attempted=0 の no-op success になり error_streak にも error_rate にも出ない (#1473)。
+    def record_failure(kind, error)
+      @mutex.synchronize do
+        @attempted_count += 1
+        @shrieker_errors[kind.to_s] += 1
+        @errors.push(error)
+      end
+      return nil
+    end
+
     def shrieker_errors
       return @mutex.synchronize {@shrieker_errors.dup}
     end

@@ -35,8 +35,10 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
+    # 配信できた宛先の件数を返す。呼び出し側がログに実績を出せるようにするため (#1473)。
     def shriek(template: nil, visibility: nil, attachments: nil, stats: @delivery_stats)
       params = {template:, visibility:, attachments:}.compact
+      delivered = 0
       shriekers do |shrieker|
         if Environment.test?
           template&.to_s
@@ -45,6 +47,7 @@ module TomatoShrieker
         end
         shrieker.exec(params)
         stats&.record_success(shrieker)
+        delivered += 1
       rescue Exception => e # rubocop:disable Lint/RescueException
         raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
         klass = shrieker.class.to_s
@@ -52,6 +55,7 @@ module TomatoShrieker
         logger.error(source: id, shrieker: klass, error: e)
         stats&.record_error(shrieker, e)
       end
+      return delivered
     end
 
     def disable?
@@ -87,8 +91,11 @@ module TomatoShrieker
       return @templates
     end
 
+    # ⚠ 必ず複製を返す。memo 化した実体をそのまま渡すと、Parallel.each で回す
+    # 呼び出し側（IcalendarSource#exec 等）が同じ Template を上書きし合い、
+    # 別エントリの内容で投稿されうる (#1474)。
     def create_template(type = :default, status = nil)
-      template = templates[type]
+      template = templates[type].dup
       template[:source] = self
       template[:status] = status
       return template
@@ -199,6 +206,26 @@ module TomatoShrieker
 
     def nostr?
       return nostr.present?
+    end
+
+    DEST_KINDS = ['mastodon', 'misskey', 'line', 'piefed', 'nostr'].freeze
+
+    # 設定上の宛先数。宛先ゼロなら配信は永久に起きないが、run は no-op success を
+    # 積むだけで健全に見えてしまう (#1473)。
+    # ⚠ mastodon? 等の述語は使わない。述語は Shrieker を実体化するので、
+    # PiefedShrieker#initialize の login で通信が走る。/status.json は全ソース分を
+    # 毎回組み立てるため、数えるだけで宛先へ接続しにいくことになる。
+    # ⚠ self['/dest/mastodon'] は使えない。key_flatten は葉のパスしか作らないので、
+    # オブジェクト値の宛先は dig で引く（piefed アクセサと同じ形）。
+    def dest_count
+      dest = @params['dest'] || {}
+      count = DEST_KINDS.count {|kind| dest[kind].present?}
+      hooks = dest['hooks']
+      return count + (hooks.is_a?(Array) ? hooks.size : 0)
+    end
+
+    def dest?
+      return dest_count.positive?
     end
 
     def mulukhiya
@@ -383,6 +410,10 @@ module TomatoShrieker
       started_at = Time.now
       @delivery_stats = DeliveryStats.new
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
+      # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
+      unless dest?
+        logger.warn(source: id, class: self.class.to_s, message: 'no destination configured')
+      end
       exec
       finalize_run_log(started_at)
     rescue Exception => e # rubocop:disable Lint/RescueException
