@@ -413,10 +413,36 @@ sources:
 |----------|----------|------|
 | MastodonShrieker | `/dest/mastodon/url`, `/dest/mastodon/token` | 権限: `write:statuses`（画像は `write:media`）。`/dest/visibility` |
 | MisskeyShrieker | `/dest/misskey/url`, `/dest/misskey/token` | 権限: `write:notes`（画像は `write:drive`） |
-| WebhookShrieker | `/dest/hooks` | Slack Incoming Webhooks 互換 URL の配列（Discord は末尾に `/slack`） |
+| WebhookShrieker | `/dest/hooks` | Slack Incoming Webhooks 互換の宛先の配列（Discord は末尾に `/slack`）。URL 文字列のほかオブジェクト形式も可 → [Webhook 宛先の指定形式](#webhook-宛先の指定形式) |
 | LineShrieker | `/dest/line/user_id`, `/dest/line/token` | チャンネルアクセストークン（長期） |
 | PieFedShrieker | `/dest/piefed/url`, `/dest/piefed/access_token`, `/dest/piefed/community_name` | `/dest/piefed/api_version`（デフォルト alpha） |
 | NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/nostr/relays`（application.yaml） |
+
+#### Webhook 宛先の指定形式
+
+`/dest/hooks` の各要素は **URL 文字列**か**オブジェクト**のどちらでもよい。オブジェクト形式は [matrix-webhook](https://github.com/tsunagal/matrix-webhook) 宛に送信先ルームを指定するためのもの。
+
+```yaml
+dest:
+  hooks:
+    - https://example.com/hook          # 従来どおりの URL 指定
+    - url: https://example.com/webhook  # matrix-webhook 宛
+      channel: '#alerts:example.com'    # ルームエイリアス
+    - url: https://example.com/webhook
+      room_id: '!AbCdEf:example.com'    # ルーム ID（channel との択一）
+```
+
+| キー | 必須 | 内容 |
+|------|------|------|
+| `url` | 必須 | 送信先 Webhook URL |
+| `channel` | 任意 | ルームエイリアス（`#name:server` 形式） |
+| `room_id` | 任意 | ルーム ID（`!xxxx:server` 形式） |
+
+⚠ **スキーマが `additionalProperties: false` なので、この 3 つ以外のキーは書けない。**`config/schema/source.yaml` の `hooks` を参照。
+
+⚠ **`channel` / `room_id` は matrix-webhook 側の解釈**で、`WebhookShrieker` はペイロードに載せるだけ。Slack / Discord / モロヘイヤ宛に書いても無視される。
+
+⚠ **Matrix 宛では CW（`spoiler_text`）が表示されない (#1493)。**matrix-webhook は `text` / `channel` / `room_id` / `format` しか見ないため、テンプレートに CW があっても**エラーにならずに内容が落ちる**。同じソースをモロヘイヤと matrix-webhook の両方へ流すと Matrix 宛だけ情報が欠ける。
 
 ### モロヘイヤ連携
 
