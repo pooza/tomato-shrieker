@@ -347,30 +347,118 @@ module TomatoShrieker
       assert_equal(600, source.monitor_silence_tolerance_seconds)
     end
 
+    SILENT_ID = '__test_source_silent__'.freeze
+
+    def silent_source(extra = {})
+      SourceRunLog.where(source_id: SILENT_ID).delete
+      return Source.new({'id' => SILENT_ID}.merge(extra))
+    end
+
+    def record_run(at:, delivered_count: 0)
+      SourceRunLog.create({
+        source_id: SILENT_ID,
+        executed_at: at,
+        status: SourceRunLog::STATUS_SUCCESS,
+        duration_ms: 100,
+        attempted_count: delivered_count,
+        delivered_count:,
+      })
+    end
+
     def test_silent?
       # しきい値未指定なら常に false
-      source = Source.new({'id' => 'test-silent-unset'})
-      source.define_singleton_method(:last_delivered_at_fallback) {Time.now - 86_400_000}
+      source = silent_source
+      record_run(at: Time.now - 86_400_000, delivered_count: 1)
 
       assert_false(source.silent?)
 
-      # 配信実績が無ければ断定しない
-      source = Source.new({'id' => 'test-silent-unknown', 'monitor' => {'silence_tolerance' => '1d'}})
+      # run_log がまったく無ければ観測開始時刻も出せないので断定しない
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
 
       assert_false(source.silent?)
 
-      # しきい値を超えて沈黙していれば true
-      source = Source.new({'id' => 'test-silent-stale', 'monitor' => {'silence_tolerance' => '1d'}})
-      source.define_singleton_method(:last_delivered_at_fallback) {Time.now - 172_800}
+      # しきい値を超えて配信が途絶えていれば true
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 172_800, delivered_count: 1)
+      record_run(at: Time.now)
 
       assert_true(source.silent?)
-      assert_equal('fallback', source.last_delivered_at_origin)
 
       # しきい値内なら false
-      source = Source.new({'id' => 'test-silent-fresh', 'monitor' => {'silence_tolerance' => '1d'}})
-      source.define_singleton_method(:last_delivered_at_fallback) {Time.now - 60}
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60, delivered_count: 1)
 
       assert_false(source.silent?)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    # #1483: 一度も配信していないソースは、観測を始めてからの経過を下限として使う。
+    # ここを「実績が無いので断定しない」にすると、開設以来ずっと壊れているソースだけが
+    # 恒久的に検知対象外になる。
+    def test_silent_never_delivered
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 172_800)
+      record_run(at: Time.now)
+
+      assert_true(source.silent?)
+
+      # 観測を始めたばかりなら、まだ沈黙とは言えない
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60)
+
+      assert_false(source.silent?)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    # #1482: run を error に倒すのは 1 件も配信できなかったときだけ。
+    # 部分失敗まで error にすると、エントリ 1 件の失敗で日次 cron のソースが
+    # 次の run まで healthz 503 に貼り付く。
+    def test_finalize_run_log_status
+      assert_equal(SourceRunLog::STATUS_SUCCESS, finalize_run(delivered: 3, errored: 0).status)
+      assert_equal(SourceRunLog::STATUS_PARTIAL, finalize_run(delivered: 99, errored: 1).status)
+      assert_equal(SourceRunLog::STATUS_ERROR, finalize_run(delivered: 0, errored: 3).status)
+      # 全滅だけが error_streak を立てる
+      assert_equal(1, SourceRunLog.error_streak(SILENT_ID))
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    # 部分失敗でも失敗の内訳は残す
+    def test_finalize_run_log_partial_keeps_errors
+      log = finalize_run(delivered: 99, errored: 1)
+
+      assert_equal(100, log.attempted_count)
+      assert_equal(99, log.delivered_count)
+      assert_not_nil(log.error_message)
+      assert_equal({'TomatoShrieker::MastodonShrieker' => 1}, log.shrieker_error_counts)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    def finalize_run(delivered:, errored:)
+      SourceRunLog.where(source_id: SILENT_ID).delete
+      source = Source.new({'id' => SILENT_ID})
+      stats = DeliveryStats.new
+      delivered.times {stats.record_success(MastodonShrieker.allocate)}
+      errored.times {stats.record_error(MastodonShrieker.allocate, RuntimeError.new('boom'))}
+      source.instance_variable_set(:@delivery_stats, stats)
+      source.send(:finalize_run_log, Time.now)
+      return SourceRunLog.latest_for(SILENT_ID)
+    end
+
+    # #1483: entry.published 由来の fallback は配信の成否と無関係に前進するので、
+    # silent? の判定には使わない。表示用には残っている。
+    def test_silent_ignores_fallback
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      source.define_singleton_method(:last_delivered_at_fallback) {Time.now}
+      record_run(at: Time.now - 172_800, delivered_count: 1)
+
+      assert_equal('run_log', source.last_delivered_at_origin)
+      assert_true(source.silent?)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
     end
 
     def test_silent_boolean

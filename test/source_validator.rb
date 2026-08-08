@@ -127,5 +127,23 @@ module TomatoShrieker
         'dest' => {'hooks' => ['https://example.com/x']},
       ))
     end
+
+    # #1470: silence_tolerance は opt-in なのでスキーマ上は妥当だが、
+    # 宣言しなければサイレント不発の検知が丸ごと効かない
+    def test_warnings_silence_tolerance_unset
+      base = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'every' => '5m'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+      }
+
+      assert_equal(1, SourceValidator.warnings(base).size)
+      assert_empty(SourceValidator.warnings(base.merge('monitor' => {'silence_tolerance' => '7d'})))
+      # 無効ソースと、一度きり投稿のソースは監視対象でないので指摘しない
+      assert_empty(SourceValidator.warnings(base.merge('disable' => true)))
+      assert_empty(SourceValidator.warnings(
+        base.merge('schedule' => {'at' => '2026-01-01T00:00:00+09:00'}),
+      ))
+    end
   end
 end

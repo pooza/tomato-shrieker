@@ -107,6 +107,58 @@ module TomatoShrieker
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
+    # #1483: 未配信のソースは last_delivered_ids に引っかからないので、
+    # 最古行を守らないと observed_since が retention_days 前に張り付く。
+    def test_prune_keeps_first_run_row
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (60 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(1, remain.size)
+      assert_equal((Time.now - (60 * 86_400)).to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
+    end
+
+    def test_observed_since
+      assert_nil(SourceRunLog.observed_since(SOURCE_ID))
+      create_logs({attempted_count: 0}, {attempted_count: 1, delivered_count: 1})
+
+      assert_equal(@base.to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
+    end
+
+    # #1482: 配信できたものと失敗したものが混在した run は error と分けて記録し、
+    # error_streak を倒さない
+    def test_record_partial
+      SourceRunLog.record_partial(
+        SOURCE_ID, started_at: @base, error: RuntimeError.new('boom'),
+        stats: nil
+      )
+      log = SourceRunLog.latest_for(SOURCE_ID)
+
+      assert_true(log.partial?)
+      assert_false(log.error?)
+      assert_false(log.noop?)
+      assert_equal('RuntimeError: boom', log.error_message)
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
+    def test_error_streak_broken_by_partial
+      create_logs(
+        {status: SourceRunLog::STATUS_ERROR, attempted_count: 1},
+        {status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2, delivered_count: 1},
+      )
+
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
     def test_error_streak_empty
       assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
     end

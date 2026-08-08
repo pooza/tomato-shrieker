@@ -26,6 +26,17 @@ module TomatoShrieker
       def valid?(params)
         validate(params).empty?
       end
+
+      # スキーマは通るが運用上の穴になる設定の配列を返す（空 = 指摘なし）。
+      # errors と違い NG にはしない。silence_tolerance は opt-in なので未指定でも
+      # 妥当だが、宣言しなければサイレント不発の検知が丸ごと効かない (#1470)。
+      def warnings(params)
+        params = params.deep_stringify_keys
+        return [] if params['disable'] == true
+        return [] if params.dig('schedule', 'at')
+        return [] if params.dig('monitor', 'silence_tolerance')
+        return ['/monitor/silence_tolerance が未設定です。無配信が続いても検知されません']
+      end
     end
   end
 end

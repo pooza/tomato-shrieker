@@ -376,11 +376,22 @@ module TomatoShrieker
     end
 
     # しきい値を超えて無配信が続いているか (#1470)。
-    # 一度も配信実績が無い場合は「腐っている」と断定できないので false。
+    #
+    # ⚠ 判定に使うのは run_log 由来の実配信だけで、last_delivered_at_fallback は見ない (#1483)。
+    # fallback（FeedSource なら entry.published）は配信の成否と無関係に前進するので、
+    # 配信できていなくても silent? が永久に false になる。表示用としては残してある。
+    #
+    # 一度も配信していないソースは、観測を始めてからの経過を無配信期間の下限として使う。
+    # ここを「実績が無いので断定しない」で false にすると、開設以来ずっと壊れている
+    # ソースだけが恒久的に検知対象外になる。
+    # ⚠ ローカル変数に at を使わないこと。alias at post_at があるため、
+    # 代入より前に現れた at はメソッド呼び出しに解決されて nil になる。
     def silent?
       return false unless tolerance = monitor_silence_tolerance_seconds
-      return false unless last = last_delivered_at
-      return Time.now > (last + tolerance)
+      delivered_at = SourceRunLog.last_delivered_at(id)
+      return Time.now > (delivered_at + tolerance) if delivered_at
+      return false unless observed_since = SourceRunLog.observed_since(id)
+      return Time.now > (observed_since + tolerance)
     end
 
     def self.all
@@ -437,22 +448,30 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
+    # run を error に倒すのは 1 件も配信できなかったときだけ (#1482)。
+    # 部分失敗まで error にすると、エントリ 1 件の失敗で error_streak が立ち、
+    # 日次 cron のソースは次の run まで healthz が 503 に貼り付く。
     def finalize_run_log(started_at)
       stats = @delivery_stats
-      if stats.error?
-        SourceRunLog.record_error(id, started_at:, error: stats.first_error, stats:)
-        logger.error(
-          source: id, class: self.class.to_s,
-          action: 'exec end (delivery errors)', count: stats.error_count,
-          delivered: stats.delivered_count
-        )
+      return finalize_success_run_log(started_at, stats) unless stats.error?
+      if stats.delivered_count.positive?
+        SourceRunLog.record_partial(id, started_at:, error: stats.first_error, stats:)
       else
-        SourceRunLog.record_success(id, started_at:, stats:)
-        logger.info(
-          source: id, class: self.class.to_s,
-          action: 'exec end', delivered: stats.delivered_count
-        )
+        SourceRunLog.record_error(id, started_at:, error: stats.first_error, stats:)
       end
+      logger.error(
+        source: id, class: self.class.to_s,
+        action: 'exec end (delivery errors)', count: stats.error_count,
+        delivered: stats.delivered_count
+      )
+    end
+
+    def finalize_success_run_log(started_at, stats)
+      SourceRunLog.record_success(id, started_at:, stats:)
+      logger.info(
+        source: id, class: self.class.to_s,
+        action: 'exec end', delivered: stats.delivered_count
+      )
     end
   end
 end

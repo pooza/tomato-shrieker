@@ -201,13 +201,19 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
 
-**宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。**`No destination configured` を返して 503 に倒す。`dest: {}` や `dest: {hooks: []}`、`token` を落とした `dest.mastodon` のような半端な設定は `shriekers` が 1 件も yield しないため配信が永久に起きないが、run は no-op success を積むだけで健全に見える。silent 判定は「配信実績が無ければ断定しない」設計なのでここを塞がないと 200 のまま貼り付く。
+**宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。**`No destination configured` を返して 503 に倒す。`dest: {}` や `dest: {hooks: []}`、`token` を落とした `dest.mastodon` のような半端な設定は `shriekers` が 1 件も yield しないため配信が永久に起きないが、run は no-op success を積むだけで健全に見える。
+
+⚠ **ただし `disable: true` のソースは除く (#1486)。**スキーマが無効ソースに対して `dest` の配信先必須を免除している（`chinachu` 等の死蔵定義が実際に `dest: {}`）ので、ランタイムだけ咎めると宣言と食い違う。無効ソースは `register` されず run_log も無いため、`No run recorded yet` の 503 に落ちる。
 
 **エラー判定は連続エラー回数 (error_streak) で行う (#1457)。**streak はエラーで終わった run を新しい順に数え、**エラーでない run が来た時点で 0 に戻る**。新着が無く配信ゼロで完走した run (no-op) も「run が最後まで走った」証拠なので streak を切る。
 
 ⚠ **no-op を読み飛ばす実装にしてはいけない。**新着の少ないソースは配信が起きるまで no-op が続くため、一過性エラー 1 回で `/healthz/source/:id` が次の配信まで 503 に貼り付く。何回の連続エラーで倒すかは `/monitor/error_streak_threshold` で調整する。
 
-**サイレント不発の判定 (#1470)** は `silence_tolerance` を宣言したソースだけが対象（opt-in）。`chikanan` のように年単位で正常に静かなソースがあるため、一律の既定値は置かない。配信実績が 1 件も無いソースは「腐っている」と断定できないので健全側に倒す。
+**サイレント不発の判定 (#1470)** は `silence_tolerance` を宣言したソースだけが対象（opt-in）。`chikanan` のように年単位で正常に静かなソースがあるため、一律の既定値は置かない。
+
+⚠ **判定に使うのは run_log 由来の実配信だけで、`fallback` は見ない (#1483)。**下記のとおり `fallback` は配信の成否と無関係に前進するため、これを信じると配信できていなくても `silent?` が永久に false になる。
+
+**一度も配信していないソースは、観測を始めてからの経過 (`SourceRunLog.observed_since`) を無配信期間の下限として使う (#1483)。**ここを「配信実績が無いので断定しない」で健全側に倒すと、**開設以来ずっと壊れているソースだけが恒久的に検知対象外になる**という逆立ちした挙動になる。
 
 #### `/status.json` の中身
 
@@ -253,9 +259,16 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 | `fallback` | ソース種別ごとの永続データ由来。`FeedSource` 系は `entry` テーブルの最新 `published` |
 | `null` | どちらからも取れない（＝配信実績を確認できない） |
 
-⚠ **prune は「最後に配信できた run」をソースごとに 1 行だけ残す。**これを刈ると、沈黙が `retention_days` を超えた瞬間に `last_delivered_at` が nil に化けて `silent?` が false に戻り、**沈黙が長引くほど検知できなくなる**。`silence_tolerance` に `retention_days` より大きい値を書けるのはこの保護があるため。
+⚠ **`fallback` は人間が読むための参考値で、`silent?` は使わない (#1483)。**`entry.published` は上流フィードが自称する公開時刻で、`Entry` の行は配信の成否と無関係に INSERT される。**配信できていなくても上流に新着があるかぎり前進し続ける**ので、判定に使うと「配信していないのに健全」になる（Google News の pubDate が信用できない件と同根）。一次情報は `run_log` 側。
 
-⚠ **`fallback` は配信できたことの証明ではない。**`entry.published` は上流フィードが自称する公開時刻で、`Entry` の行は配信の成否と無関係に INSERT される。未来日付を返すフィードでは `silent?` が永久に false になりうる（Google News の pubDate が信用できない件と同根）。一次情報は `run_log` 側。
+⚠ **prune はソースごとに 2 行を守る。**
+
+| 守る行 | 理由 |
+|------|------|
+| 最後に配信できた run | 刈ると沈黙が `retention_days` を超えた瞬間に `last_delivered_at` が nil に化け、**沈黙が長引くほど検知できなくなる** (#1470) |
+| 最古の run | 未配信のソースは上の保護に引っかからない。刈ると `observed_since` が常に `retention_days` 前に張り付き、それより長い `silence_tolerance` が永久に成立しない (#1483) |
+
+`silence_tolerance` に `retention_days` より大きい値を書けるのはこの保護があるため。
 
 **腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
@@ -278,7 +291,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 | `/monitor/tolerance` | 実行遅延の猶予。文字列なら `'30m'` のような Rufus 形式、数値なら秒。既定は `/monitor/default_tolerance_seconds` |
 | `/monitor/silence_tolerance` | 無配信の許容期間。**未指定ならサイレント不発を検知しない**（opt-in） |
 
-`silence_tolerance` はソースの性格に合わせて宣言する。年単位で正常に静かなソースに短い値を置くと過検知になる。
+`silence_tolerance` はソースの性格に合わせて宣言する。年単位で正常に静かなソースに短い値を置くと過検知になる。**過検知は監視の信頼を壊す**ので、観測された最大の無配信間隔を上回る側に丸める。
 
 ```yaml
 # 週次で必ず何か出るはずのソース
@@ -287,16 +300,32 @@ monitor:
   silence_tolerance: 30d
 ```
 
+⚠ **opt-in なので「書き忘れ」と「意図的に検知しない」が設定上は区別できない。**`bin/shrieker source validate` は監視対象なのに `silence_tolerance` が無いソースを `WARN` として出す（スキーマ上は妥当なので `NG` にはせず、終了コードも倒さない）。年単位で静かなソースは意図的に未設定のままでよい。
+
 ### 実行ログテーブル `source_run_log`
 
 各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`, `migration/010`）:
 
-- `source_id`, `executed_at`, `status` (`success` | `error`), `error_message`, `duration_ms`
+- `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
+
+#### run の status は `delivered_count` で決まる (#1482)
+
+| その run のエラー | `delivered_count` | `status` | `error_streak` |
+|------|------|------|------|
+| なし | – | `success` | リセット |
+| あり | > 0 | `partial` | **リセット** |
+| あり | 0 | `error` | +1 |
+
+⚠ **run を `error` に倒すのは 1 件も配信できなかったときだけ。**部分失敗まで `error` にすると、エントリ 1 件の webhook 失敗で `error_streak` が立ち、`error_streak_threshold: 1` のもとで**日次 cron のソースは次の run まで 24 時間 503 に貼り付く**。`SQLite3::BusyException` のように現実に起こりうる反復エラーがこの経路に乗る。
+
+⚠ **`partial` を握り潰しているわけではない。**`error_message` と `shrieker_errors` はそのまま記録され、`/status.json` の `shrieker_errors` 集計と `last_attempted_count` / `last_delivered_count` の差から読める。
+
+⚠ **`error_rate_24h` は `status == 'error'` の割合**なので、意味は「全滅した run の割合」。部分失敗はここに出ない。
 
 `Source#schedule` のラッパで成功/失敗を記録するため、CLI からの `bin/shrieker` 直接実行や rake タスクは記録対象外（スケジューラ起因の稼働だけを監視する設計）。
 

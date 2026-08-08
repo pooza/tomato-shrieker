@@ -4,6 +4,7 @@ module TomatoShrieker
     # 指標が空振りせず検証されるよう、テスト専用のソース定義を置いてから確かめる。
     FIXTURE_ID = '__test_monitor_app__'.freeze
     SILENT_ID = '__test_monitor_app_silent__'.freeze
+    DISABLED_ID = '__test_monitor_app_disabled__'.freeze
 
     # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので取り残しは
     # git status にも出ず、次のスケジューラ起動で偽ソースとして登録されてしまう。
@@ -21,8 +22,8 @@ module TomatoShrieker
     end
 
     def teardown
-      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
-      [FIXTURE_ID, SILENT_ID].each {|id| FileUtils.rm_f(fixture_path(id))}
+      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
+      [FIXTURE_ID, SILENT_ID, DISABLED_ID].each {|id| FileUtils.rm_f(fixture_path(id))}
       super # TestCase#teardown が config.reload する
     end
 
@@ -86,6 +87,28 @@ module TomatoShrieker
       status, = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(200, status)
+    end
+
+    # #1482: 部分失敗は error_streak を倒さない。
+    # 99 件配信できた run と全滅した run を同じ扱いにしない。
+    def test_healthz_source_partial_is_healthy
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 100,
+        delivered_count: 99, error_message: 'RuntimeError: boom')
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(200, status)
+    end
+
+    # #1486: スキーマは disable: true のとき dest の必須を免除しているので、
+    # ランタイムだけ「宛先がない」と咎めると食い違う
+    def test_healthz_source_disabled_without_dest
+      write_fixture(DISABLED_ID, {'disable' => true, 'dest' => {}})
+      config.reload
+      status, _headers, body = call("/healthz/source/#{DISABLED_ID}")
+
+      assert_equal(503, status)
+      assert_not_include(body.first, 'No destination configured')
+      assert_include(body.first, 'No run recorded yet')
     end
 
     # #1457: 一過性エラーのあと no-op success が来たら健全に戻る。

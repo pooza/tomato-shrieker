@@ -42,9 +42,10 @@ module TomatoShrieker
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
-      # 宛先ゼロは実行結果を見るまでもなく壊れている。silent? は配信実績が無いと
-      # 断定しない設計なので、この経路を塞がないと永久に 200 のままになる (#1473)。
-      return [503, HEADERS, ["No destination configured\n"]] unless source.dest?
+      # 宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。
+      # ⚠ 無効ソースは除く。スキーマが disable: true のとき dest の必須を免除しており
+      # (chinachu 等の死蔵定義が実際に dest: {})、ランタイムだけ咎めると食い違う (#1486)。
+      return [503, HEADERS, ["No destination configured\n"]] unless source.dest? || source.disable?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
       next_run = source.next_run_at(latest.executed_at)

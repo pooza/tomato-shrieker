@@ -127,9 +127,13 @@ module TomatoShrieker
       paths = id ? [existing_source_path!(id)] : source_paths
       ng = 0
       paths.each do |path|
-        errors = SourceValidator.validate(YAML.load_file(path))
+        params = YAML.load_file(path)
+        errors = SourceValidator.validate(params)
         if errors.empty?
-          say "OK\t#{source_id(path)}"
+          # WARN はスキーマ上は妥当な定義への指摘なので ng には数えない (#1470)。
+          warnings = SourceValidator.warnings(params)
+          say "#{warnings.empty? ? 'OK' : 'WARN'}\t#{source_id(path)}"
+          warnings.each {|v| say "    - #{v}"}
         else
           ng += 1
           say "NG\t#{source_id(path)}"
