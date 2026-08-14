@@ -46,6 +46,18 @@ module TomatoShrieker
       return delivered_count.to_i.positive?
     end
 
+    # 配信を試みた run。no-op run と区別する。
+    def attempted?
+      return attempted_count.to_i.positive?
+    end
+
+    # 試みたのに届かなかった宛先がある run (#1504)。
+    # 宛先ごとの識別子を持たなくても、試行数と成功数の差で「取りこぼし」は判る。
+    def undelivered?
+      return false unless attempted?
+      return delivered_count.to_i < attempted_count.to_i
+    end
+
     def shrieker_error_counts
       return {} if shrieker_errors.blank?
       parsed = JSON.parse(shrieker_errors)
@@ -93,7 +105,8 @@ module TomatoShrieker
     def self.prune(retention_days)
       cutoff = Time.now - (retention_days * 86_400)
       return where(Sequel.lit('executed_at < ?', cutoff))
-          .exclude(id: last_delivered_ids).exclude(id: first_run_ids).delete
+          .exclude(id: last_delivered_ids).exclude(id: first_run_ids)
+          .exclude(id: last_attempted_ids).delete
     end
 
     # 「最後に配信できた時刻」の根拠行はソースごとに 1 行だけ prune から守る。
@@ -112,6 +125,14 @@ module TomatoShrieker
       return group(:source_id).select(Sequel.function(:min, :id))
     end
 
+    # 「直近の配信試行」の根拠行もソースごとに 1 行だけ守る (#1504)。
+    # ⚠ これを刈ると、取りこぼしを検知して赤くなったソースが retention_days の経過だけで
+    # 黙って緑に戻る。**次に配信できたときだけ解除する**という仕様が壊れる。
+    def self.last_attempted_ids
+      return where(Sequel.lit('attempted_count > 0')).group(:source_id)
+          .select(Sequel.function(:max, :id))
+    end
+
     def self.duration_ms(started_at)
       return ((Time.now - started_at) * 1000).to_i
     end
@@ -122,6 +143,27 @@ module TomatoShrieker
       row = where(source_id:).where(Sequel.lit('delivered_count > 0'))
         .order(Sequel.desc(:executed_at)).first
       return row&.executed_at
+    end
+
+    # 直近の「配信を試みた run」(#1504)。
+    #
+    # ⚠ no-op run (新着が無く配信ゼロで完走した run) は読み飛ばす。**新着が無いことは
+    # 失敗の解消にならない。**取りこぼしたエントリは `Entry.insert` が配信より先に走る
+    # ため再送されず (`entry.tooted` 列も migration/004 で削除済み)、永久に失われている。
+    # no-op で緑に戻すと、宛先が死んだまま監視だけが健全に見える。
+    def self.last_attempted(source_id)
+      return where(source_id:).where(Sequel.lit('attempted_count > 0'))
+          .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+    end
+
+    # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
+    #
+    # 🔴 2026-06 の Matrix 配信停止 (#1455) がこの形だった。hooks が 2 つあり
+    # matrix-webhook だけ毎回失敗、モロヘイヤは成功。`delivered_count > 0` なので
+    # status は `partial`、`last_delivered_at` も前進し続け、error_streak も silent も
+    # 立たず、監視は最後まで緑だった。
+    def self.undelivered?(source_id)
+      return last_attempted(source_id)&.undelivered? || false
     end
 
     # このソースの run を観測し始めた時刻 (#1483)。

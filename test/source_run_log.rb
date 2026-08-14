@@ -107,6 +107,53 @@ module TomatoShrieker
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
+    # 🔴 #1504: 取りこぼしの根拠行を刈ると、赤くなったソースが retention_days の
+    # 経過だけで黙って緑に戻る。「次に配信できたときだけ解除する」が壊れる。
+    def test_prune_keeps_last_attempted_row
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
+        status: SourceRunLog::STATUS_PARTIAL, duration_ms: 10,
+        attempted_count: 2, delivered_count: 1
+      )
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+    end
+
+    def test_undelivered?
+      create_logs(
+        {attempted_count: 2, delivered_count: 1, status: SourceRunLog::STATUS_PARTIAL},
+        {attempted_count: 0},
+      )
+
+      # no-op は判定を持ち越す
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+
+      create_logs({attempted_count: 2, delivered_count: 2})
+
+      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+    end
+
+    # 全滅も同じ式で拾う（error_streak と二重管理にしない）
+    def test_undelivered_covers_total_failure
+      create_logs({attempted_count: 2, delivered_count: 0, status: SourceRunLog::STATUS_ERROR})
+
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+    end
+
+    # 一度も配信を試みていなければ未達ではない
+    def test_undelivered_ignores_noop_only
+      create_logs({attempted_count: 0}, {attempted_count: 0})
+
+      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_nil(SourceRunLog.last_attempted(SOURCE_ID))
+    end
+
     # #1483: 未配信のソースは last_delivered_ids に引っかからないので、
     # 最古行を守らないと observed_since が retention_days 前に張り付く。
     def test_prune_keeps_first_run_row

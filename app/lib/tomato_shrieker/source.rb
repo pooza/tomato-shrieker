@@ -307,6 +307,12 @@ module TomatoShrieker
       return {type: 'every', value: period}
     end
 
+    # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
+    # 「長期間配信が無い」(silent?) と違い、**これは無条件に失敗**。
+    def undelivered?
+      return SourceRunLog.undelivered?(id)
+    end
+
     def monitored?
       return post_at.nil?
     end

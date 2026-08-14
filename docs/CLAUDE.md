@@ -197,7 +197,22 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - 配信先が 1 つ以上ある (`dest_count > 0`)
 - 最終実行から `grace_seconds` 以内に走っている (stale でない)
 - 連続エラー回数が `/monitor/error_streak_threshold` 未満である
+- **直近の配信試行に取りこぼしが無い (undelivered でない)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
+
+**宛先の一部にだけ配信できていない状態を検知する (#1504)。**直近の「配信を試みた run」(`attempted_count > 0`) で `delivered_count < attempted_count` なら 503。
+
+🔴 **2026-06 の Matrix 配信停止 (#1455) がこの形だった。**matrix 系 3 ソースは `hooks` を 2 つ持ち、`hook[0]`（matrix-webhook）が毎回失敗する一方 `hook[1]`（モロヘイヤ）は成功していた。`delivered_count > 0` なので status は `partial`、`last_delivered_at` も前進し続け、**error_streak も silent も立たず監視は最後まで緑だった。**
+
+⚠ **解除は「次に全宛先へ届いた run」だけ。no-op run では解除しない。**取りこぼしたエントリは再送されない（`Entry.insert` が配信より先に走り、`entry.tooted` 列は `migration/004` で削除済み）ため**永久に失われている**。新着が無いことは失敗の解消にならない。日次 cron のソースが翌日まで 503 になるのは許容する。
+
+⚠ **宛先ごとの識別子は持たない。**Kuma のモニターがソース単位なのでアラートの粒度は元からソース単位であり、1 ソースに宛先を詰め込んで粒度が落ちるのは運用側の判断とする。また hook の URL にはトークンが入っており、宛先を記録すると run_log と `/status.json` にシークレットが載る。**503 の本文には `attempted_count` / `delivered_count` だけを出し、どの宛先かは設定を見て切り分ける。**
+
+⚠ **`delivered_count == 0`（全滅）も同じ式で拾える**ので `error_streak` と二重管理にならない。
+
+⚠ **判定の根拠行は prune から守る**（`last_attempted_ids`）。刈ると赤くなったソースが `retention_days` の経過だけで黙って緑に戻る。
+
+📌 **`silent` との違い。**「試したのに届かなかった」は無条件に失敗だが、**「長期間配信が無い」は一概に失敗と言えない**（上流が静かなだけの場合がある）。前者は常時有効、後者は opt-in。
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
 

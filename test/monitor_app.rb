@@ -90,13 +90,25 @@ module TomatoShrieker
     end
 
     # #1482: 部分失敗は error_streak を倒さない。
-    # 99 件配信できた run と全滅した run を同じ扱いにしない。
-    def test_healthz_source_partial_is_healthy
+    # 99 件配信できた run と全滅した run を status の上で同じ扱いにしない。
+    def test_healthz_source_partial_does_not_raise_error_streak
       record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 100,
         delivered_count: 99, error_message: 'RuntimeError: boom')
-      status, = call("/healthz/source/#{FIXTURE_ID}")
 
-      assert_equal(200, status)
+      assert_equal(0, SourceRunLog.error_streak(FIXTURE_ID))
+    end
+
+    # 🔴 #1504 は #1482 の「partial なら healthz は緑」を覆す。
+    # ⚠ #1482 の判断（status の分類と error_streak）はそのまま。変えたのは healthz の
+    # 扱いだけ。partial は「試したのに届かなかった宛先がある」ことを意味し、
+    # 取りこぼしたエントリは再送されないので、緑に戻す根拠が無い。
+    def test_healthz_source_partial_is_unhealthy
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 100,
+        delivered_count: 99, error_message: 'RuntimeError: boom')
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'undelivered: true')
     end
 
     # #1486: スキーマは disable: true のとき dest の必須を免除しているので、
@@ -113,8 +125,12 @@ module TomatoShrieker
 
     # #1457: 一過性エラーのあと no-op success が来たら健全に戻る。
     # ここで 503 が残ると、新着の少ないソースが次の配信まで貼り付く。
+    #
+    # ⚠ #1504 以降、これが成り立つのは**配信を試みていない run**（attempted_count == 0）
+    # に限る。1 件でも試みて届かなかったなら取りこぼしが確定しているので、no-op では
+    # 解除しない（test_healthz_source_undelivered_survives_noop）。
     def test_healthz_source_recovers_by_noop
-      record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1, at: Time.now - 120)
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0, at: Time.now - 120)
       record(FIXTURE_ID, attempted_count: 0, at: Time.now)
       status, = call("/healthz/source/#{FIXTURE_ID}")
 
@@ -248,6 +264,64 @@ module TomatoShrieker
 
       assert_equal(86_400, source['silence_tolerance_seconds'])
       assert_true(source['silent'])
+    end
+
+    # 🔴 #1504: 2026-06 の Matrix 配信停止 (#1455) の再現。
+    # hooks が 2 つあり片方だけ失敗し続ける。delivered_count > 0 なので status は
+    # partial、last_delivered_at も前進し、error_streak も silent も立たない。
+    # それでも「試したのに届かなかった」ので赤でなければならない。
+    def test_healthz_source_undelivered
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom')
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'undelivered: true')
+      assert_include(body.first, 'attempted_count: 2')
+      assert_include(body.first, 'delivered_count: 1')
+    end
+
+    # 全宛先へ届いた run が来たら解除する
+    def test_healthz_source_undelivered_recovers
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+      record(FIXTURE_ID, attempted_count: 2, delivered_count: 2, at: Time.now)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(200, status)
+    end
+
+    # 🔴 no-op run では解除しない。新着が無いことは失敗の解消にならない。
+    # ⚠ 取りこぼしたエントリは再送されないので、緑に戻す根拠が無い。
+    def test_healthz_source_undelivered_survives_noop
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'undelivered: true')
+    end
+
+    # 一度も配信を試みていないソースを未達扱いしない
+    def test_healthz_source_undelivered_ignores_noop_only
+      record(FIXTURE_ID, attempted_count: 0)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(200, status)
+    end
+
+    def test_status_json_reports_undelivered
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 3,
+        delivered_count: 2)
+      source = source_status(FIXTURE_ID)
+
+      assert_true(source['undelivered'])
+      assert_not_nil(source['last_attempted_at'])
+
+      record(FIXTURE_ID, attempted_count: 3, delivered_count: 3)
+
+      assert_false(source_status(FIXTURE_ID)['undelivered'])
     end
 
     # #1469: DB エラーが起きたときにだけ監視自体が壊れる、という壊れ方を防ぐ。

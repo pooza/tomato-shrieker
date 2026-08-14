@@ -48,14 +48,30 @@ module TomatoShrieker
       return [503, HEADERS, ["No destination configured\n"]] unless source.dest? || source.disable?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
+      checks = source_checks(source, latest)
+      return [200, HEADERS, ["OK\n"]] unless unhealthy?(checks)
+      return [503, HEADERS, [unhealthy_body(source, latest, checks)]]
+    end
+
+    def source_checks(source, latest)
       next_run = source.next_run_at(latest.executed_at)
-      stale = Time.now > next_run + source.monitor_grace_seconds
       # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
-      streak = SourceRunLog.error_streak(source_id)
-      errored = streak >= error_streak_threshold
-      silent = source.silent?
-      return [200, HEADERS, ["OK\n"]] unless stale || errored || silent
-      return [503, HEADERS, [unhealthy_body(source, latest, {next_run:, stale:, streak:, silent:})]]
+      streak = SourceRunLog.error_streak(source.id)
+      return {
+        next_run:,
+        stale: Time.now > next_run + source.monitor_grace_seconds,
+        streak:,
+        errored: streak >= error_streak_threshold,
+        silent: source.silent?,
+        # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
+        # 次に全宛先へ届くまで解除しない。⚠ opt-in の silent? と違い常時有効。
+        undelivered: SourceRunLog.last_attempted(source.id),
+      }
+    end
+
+    def unhealthy?(checks)
+      return true if checks[:stale] || checks[:errored] || checks[:silent]
+      return checks[:undelivered]&.undelivered? || false
     end
 
     def unhealthy_body(source, latest, checks)
@@ -66,12 +82,27 @@ module TomatoShrieker
       body << "stale: #{checks[:stale]}\n"
       body << "error_streak: #{checks[:streak]}\n"
       body << "error: #{latest.error_message}\n" if latest.error?
-      return body unless checks[:silent]
-      # #1470: 配信できていないこと自体を出す
-      body << "silent: true\n"
+      body << undelivered_body(checks[:undelivered]) if checks[:undelivered]&.undelivered?
+      body << silent_body(source) if checks[:silent]
+      return body
+    end
+
+    # #1470: 配信できていないこと自体を出す
+    def silent_body(source)
+      body = "silent: true\n"
       body << "last_delivered_at: #{source.last_delivered_at&.iso8601}\n"
       body << "silence_tolerance_seconds: #{source.monitor_silence_tolerance_seconds}\n"
       body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
+      return body
+    end
+
+    # #1504: 「いつ・何件のうち何件が届かなかったか」を運用者に見せる。
+    # ⚠ 宛先の識別子は持たないので「どの宛先か」は出せない。設定を見て切り分ける。
+    def undelivered_body(log)
+      body = "undelivered: true\n"
+      body << "last_attempted_at: #{log.executed_at.iso8601}\n"
+      body << "attempted_count: #{log.attempted_count}\n"
+      body << "delivered_count: #{log.delivered_count}\n"
       return body
     end
 
@@ -112,8 +143,12 @@ module TomatoShrieker
 
     # #1433 (統計) と #1470 (サイレント不発) の指標。
     def delivery_status(source, latest)
+      attempted = SourceRunLog.last_attempted(source.id)
       return SourceRunLog.summary_for(source.id).merge(
         dest_count: source.dest_count,
+        # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
+        last_attempted_at: attempted&.executed_at&.iso8601,
+        undelivered: attempted&.undelivered? || false,
         last_attempted_count: latest&.attempted_count,
         last_delivered_count: latest&.delivered_count,
         last_delivered_at: source.last_delivered_at&.iso8601,
