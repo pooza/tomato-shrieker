@@ -548,6 +548,23 @@ test/                  # テストファイル
 - 行長: 100文字（テストファイルは除外）
 - 末尾カンマ: 複数行では付与
 
+### 例外メッセージは `Package.error_message` を通す
+
+🔴 **例外メッセージを保存・レスポンス・ログに載せるときは、直接埋め込まず `Package.error_message(error)` を通す**（#1469）。
+
+⚠ **Sequel / SQLite の例外メッセージは ASCII-8BIT で上がる。**日本語を含む SQL が失敗すると `"#{error.class}: #{error.message}"` は非 ASCII バイトを持つ ASCII-8BIT 文字列になる。
+
+| 中身 | json 2.x | json 3.0 | UTF-8 文字列との `<<` |
+|------|----------|----------|----------------------|
+| 妥当な UTF-8 バイト | 警告のみ（通る） | **例外** | **`Encoding::CompatibilityError`** |
+| 不正バイト | **`JSON::GeneratorError`** | 例外 | 同上 |
+
+⚠ **ASCII-8BIT では `valid_encoding?` が常に true** なので、検査で分岐しても意味がない。`Package.error_message` は `String#to_utf8`（`force_encoding` してから `scrub`）で無条件に倒す。
+
+🔴 **この経路が通るのは異常時だけなので、壊れていても平常時には気付けない。**とくに `rescue` 節の中で例外メッセージを組み立てるところは、**エラーを報告しようとして同じ例外を踏む**構造になりやすい。`rescue` の中でも必ず通す。
+
+⚠ **保存側だけでは足りない。**正規化を入れる前に書かれた行が DB に残るので、`SourceRunLog#error_message` は読み出し側でも正規化する。
+
 ## 運用ルール
 
 ### Sentry コメント運用

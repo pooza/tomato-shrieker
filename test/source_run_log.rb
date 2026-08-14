@@ -286,6 +286,46 @@ module TomatoShrieker
       assert_equal({'TomatoShrieker::MastodonShrieker' => 1}, log.shrieker_error_counts)
     end
 
+    # #1469: Sequel / SQLite の例外は ASCII-8BIT で上がる。
+    # 保存の時点で UTF-8 へ倒しておかないと、監視の JSON 化がそこで壊れる。
+    def test_record_error_normalizes_binary_message
+      SourceRunLog.record_error(
+        SOURCE_ID, started_at: Time.now, error: binary_error('テーブル「台詞」が無い')
+      )
+      log = SourceRunLog.latest_for(SOURCE_ID)
+
+      assert_equal(Encoding::UTF_8, log.error_message.encoding)
+      assert_include(log.error_message, 'テーブル「台詞」が無い')
+      # 監視の経路が実際に通ること。json 3.0 ではここが例外になる
+      assert_equal(log.error_message, JSON.parse(JSON.dump(v: log.error_message))['v'])
+    end
+
+    # 不正バイトは json 2.x でも今すぐ JSON::GeneratorError になる（警告どまりではない）
+    def test_record_error_scrubs_invalid_bytes
+      SourceRunLog.record_error(
+        SOURCE_ID, started_at: Time.now, error: binary_error("boom \xff\xfe end")
+      )
+      log = SourceRunLog.latest_for(SOURCE_ID)
+
+      assert_equal(Encoding::UTF_8, log.error_message.encoding)
+      assert_true(log.error_message.valid_encoding?)
+      assert_nothing_raised {JSON.dump(v: log.error_message)}
+    end
+
+    # 保存時の正規化より前に書かれた行を読んでも壊れない (#1469)
+    def test_error_message_normalizes_legacy_row
+      create_logs({status: SourceRunLog::STATUS_ERROR})
+      log = SourceRunLog.latest_for(SOURCE_ID)
+      log.this.update(error_message: Sequel.blob('RuntimeError: 台詞が無い'))
+
+      assert_equal(Encoding::UTF_8, SourceRunLog.latest_for(SOURCE_ID).error_message.encoding)
+      assert_include(SourceRunLog.latest_for(SOURCE_ID).error_message, '台詞が無い')
+    end
+
+    def binary_error(message)
+      return RuntimeError.new(message.dup.force_encoding(Encoding::ASCII_8BIT))
+    end
+
     # stats を渡さない旧来の呼び出しでも既定値で記録できる
     def test_record_without_stats
       SourceRunLog.record_success(SOURCE_ID, started_at: Time.now)

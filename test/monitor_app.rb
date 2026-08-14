@@ -250,6 +250,54 @@ module TomatoShrieker
       assert_true(source['silent'])
     end
 
+    # #1469: DB エラーが起きたときにだけ監視自体が壊れる、という壊れ方を防ぐ。
+    # Sequel / SQLite の例外は ASCII-8BIT で上がるので、正規化前に書かれた行を
+    # 読んだだけで JSON 化が落ちうる。
+    #
+    # ⚠ 中身が妥当な UTF-8 なら json 2.x は警告だけで通し、生成物の encoding も
+    # 正規化してしまうので、レスポンスからは判別できない。json 3.0 で例外になる
+    # 条件そのもの（BINARY を渡していないこと）を、/status.json が使うのと同じ
+    # アクセサで確かめる。
+    def test_status_json_survives_binary_error_message
+      record_with_binary_error(FIXTURE_ID, 'テーブル「台詞」が無い')
+
+      assert_equal(Encoding::UTF_8, SourceRunLog.latest_for(FIXTURE_ID).error_message.encoding)
+
+      status, _headers, body = call('/status.json')
+
+      assert_equal(200, status)
+      source = JSON.parse(body.first)['sources'].find {|v| v['id'] == FIXTURE_ID}
+
+      assert_include(source['last_error'], 'テーブル「台詞」が無い')
+    end
+
+    # 不正バイトは scrub で落とす。ここで落ちると本当のエラーが隠れる
+    def test_status_json_survives_invalid_bytes
+      record_with_binary_error(FIXTURE_ID, "boom \xff\xfe end")
+      status, _headers, body = call('/status.json')
+
+      assert_equal(200, status)
+      source = JSON.parse(body.first)['sources'].find {|v| v['id'] == FIXTURE_ID}
+
+      assert_include(source['last_error'], 'boom')
+    end
+
+    # 503 の本文にも読める形で出す。「エラーメッセージの無い 503」を運用者に見せない
+    def test_healthz_source_errored_with_binary_message
+      record_with_binary_error(FIXTURE_ID, 'テーブル「台詞」が無い')
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'テーブル「台詞」が無い')
+    end
+
+    # 保存時の正規化を迂回して、正規化前に書かれた行を再現する
+    def record_with_binary_error(source_id, message)
+      record(source_id, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)
+      SourceRunLog.latest_for(source_id).this
+        .update(error_message: Sequel.blob("Sequel::DatabaseError: #{message}"))
+    end
+
     def record(source_id, at: Time.now, **values)
       SourceRunLog.create({
         source_id:,

@@ -35,7 +35,7 @@ module TomatoShrieker
     def healthz_source(source_id)
       return build_healthz_source(source_id)
     rescue => e
-      return [503, HEADERS, ["#{e.class}: #{e.message}\n"]]
+      return [503, HEADERS, ["#{Package.error_message(e)}\n"]]
     end
 
     def build_healthz_source(source_id)
@@ -84,14 +84,14 @@ module TomatoShrieker
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
     rescue => e
-      return [500, JSON_HEADERS, ["#{JSON.dump(error: "#{e.class}: #{e.message}")}\n"]]
+      return [500, JSON_HEADERS, ["#{JSON.dump(error: Package.error_message(e))}\n"]]
     end
 
     # 1 ソースの失敗で payload 全体を落とさない。壊れた側は error として可視化する。
     def source_status(source)
       return build_source_status(source)
     rescue => e
-      return {id: source.id, class: source.class.to_s, error: "#{e.class}: #{e.message}"}
+      return {id: source.id, class: source.class.to_s, error: Package.error_message(e)}
     end
 
     def build_source_status(source)

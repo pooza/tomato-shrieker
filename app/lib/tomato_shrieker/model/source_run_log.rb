@@ -21,6 +21,12 @@ module TomatoShrieker
       end
     end
 
+    # 保存時に正規化していても、それ以前に書かれた行には ASCII-8BIT が残っている (#1469)。
+    # 読み出し側でも倒しておかないと、既存行を読んだ瞬間に監視の JSON が壊れる。
+    def error_message
+      return super&.to_utf8
+    end
+
     def error?
       return status == STATUS_ERROR
     end
@@ -67,7 +73,7 @@ module TomatoShrieker
         source_id:,
         executed_at: started_at,
         status:,
-        error_message: error && "#{error.class}: #{error.message}",
+        error_message: Package.error_message(error),
         duration_ms: duration_ms(started_at),
       }.merge(stats_columns(stats)))
     rescue => e
