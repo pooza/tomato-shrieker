@@ -394,10 +394,23 @@ module TomatoShrieker
     # 代入より前に現れた at はメソッド呼び出しに解決されて nil になる。
     def silent?
       return false unless tolerance = monitor_silence_tolerance_seconds
-      delivered_at = SourceRunLog.last_delivered_at(id)
-      return Time.now > (delivered_at + tolerance) if delivered_at
-      return false unless observed_since = SourceRunLog.observed_since(id)
-      return Time.now > (observed_since + tolerance)
+      return false unless since = silence_baseline
+      return Time.now > (since + tolerance)
+    end
+
+    # 沈黙を測る起点 (#1505)。配信・確認・観測開始のうち最も新しいもの。
+    #
+    # ⚠ 確認 (SilenceAck) で起点が前に進むので、運用者が確認すればそのまま緑に戻る。
+    # 配信が再開すれば last_delivered_at が確認を追い越すので、確認記録は自然に
+    # 無効化される。特別な失効処理は要らない。
+    #
+    # observed_since は必ず最古の run なので、他の 2 つがあれば max に選ばれない。
+    def silence_baseline
+      return [
+        SourceRunLog.last_delivered_at(id),
+        SilenceAck.acknowledged_at(id),
+        SourceRunLog.observed_since(id),
+      ].compact.max
     end
 
     def self.all

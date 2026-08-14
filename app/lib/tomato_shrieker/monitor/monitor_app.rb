@@ -93,6 +93,9 @@ module TomatoShrieker
       body << "last_delivered_at: #{source.last_delivered_at&.iso8601}\n"
       body << "silence_tolerance_seconds: #{source.monitor_silence_tolerance_seconds}\n"
       body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
+      # #1505: 静かなだけと分かっているなら `bin/shrieker source ack ID` で緑に戻せる
+      body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
+      body << "silence_acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
       return body
     end
 
@@ -155,6 +158,9 @@ module TomatoShrieker
         last_delivered_at_origin: source.last_delivered_at_origin,
         silence_tolerance_seconds: source.monitor_silence_tolerance_seconds,
         silent: source.silent?,
+        # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
+        # false だが、それは健全だからではなく運用者が確認したから
+        silence_acknowledged_at: SilenceAck.acknowledged_at(source.id)&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(source.id),
       )
     end

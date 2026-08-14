@@ -16,6 +16,7 @@ module TomatoShrieker
     def setup
       @app = MonitorApp.new
       SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
+      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
       write_fixture(FIXTURE_ID, {})
       write_fixture(SILENT_ID, {'monitor' => {'silence_tolerance' => '1d'}})
       config.reload
@@ -23,6 +24,7 @@ module TomatoShrieker
 
     def teardown
       SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
+      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
       [FIXTURE_ID, SILENT_ID, DISABLED_ID].each {|id| FileUtils.rm_f(fixture_path(id))}
       super # TestCase#teardown が config.reload する
     end
@@ -187,6 +189,54 @@ module TomatoShrieker
       assert_equal(503, status)
       assert_include(body.first, 'silent: true')
       assert_include(body.first, 'noop_streak: 1')
+    end
+
+    # #1505: 静かなだけと分かったら運用者が確認して緑に戻せる
+    def test_healthz_source_silence_acknowledged
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
+      record(SILENT_ID, attempted_count: 0, at: Time.now)
+
+      assert_equal(503, call("/healthz/source/#{SILENT_ID}").first)
+
+      SilenceAck.acknowledge(SILENT_ID)
+
+      assert_equal(200, call("/healthz/source/#{SILENT_ID}").first)
+    end
+
+    # 🔴 確認は「今回は問題なかった」の記録であって「今後も問題ない」の保証ではない。
+    # そこからさらに silence_tolerance が経過したら、また念押しする。
+    def test_healthz_source_silence_refires_after_acknowledge
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
+      record(SILENT_ID, attempted_count: 0, at: Time.now)
+      # 1d のしきい値に対し、2 日前に確認した状態
+      SilenceAck.acknowledge(SILENT_ID, at: Time.now - 172_800)
+      status, _headers, body = call("/healthz/source/#{SILENT_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'silent: true')
+      assert_include(body.first, 'silence_acknowledged_at: ')
+    end
+
+    # 配信が再開したら確認記録は自然に無効化される（起点が追い越される）
+    def test_healthz_source_silence_acknowledge_superseded_by_delivery
+      SilenceAck.acknowledge(SILENT_ID, at: Time.now - 172_800)
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now)
+      status, = call("/healthz/source/#{SILENT_ID}")
+
+      assert_equal(200, status)
+    end
+
+    def test_status_json_reports_silence_acknowledged_at
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
+
+      assert_true(source_status(SILENT_ID)['silent'])
+      assert_nil(source_status(SILENT_ID)['silence_acknowledged_at'])
+
+      SilenceAck.acknowledge(SILENT_ID)
+
+      assert_false(source_status(SILENT_ID)['silent'])
+      # 「なぜ緑なのか」を答えられること
+      assert_not_nil(source_status(SILENT_ID)['silence_acknowledged_at'])
     end
 
     # しきい値未指定のソースは、同じ状態でも沈黙では倒さない (opt-in)
