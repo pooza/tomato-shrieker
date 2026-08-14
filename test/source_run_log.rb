@@ -154,6 +154,21 @@ module TomatoShrieker
       assert_nil(SourceRunLog.last_attempted(SOURCE_ID))
     end
 
+    # #1504: 配信手前で落ちた失敗（宛先に一度も触れていない）を未達にしない。
+    # 🔴 ここを未達に数えると、解除が「次に全宛先へ届く run」だけなので、
+    # 新着の少ないソースが一過性のエラー 1 回で数週間 503 に貼り付く。
+    def test_undelivered_ignores_pre_delivery_failure
+      stats = DeliveryStats.new
+      stats.record_failure('TomatoShrieker::FeedSource#fetch', RuntimeError.new('boom'))
+      SourceRunLog.record(
+        SOURCE_ID, started_at: Time.now,
+        status: SourceRunLog::STATUS_ERROR, error: stats.first_error, stats:
+      )
+
+      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_true(SourceRunLog.latest_for(SOURCE_ID).error?)
+    end
+
     # #1483: 未配信のソースは last_delivered_ids に引っかからないので、
     # 最古行を守らないと observed_since が retention_days 前に張り付く。
     def test_prune_keeps_first_run_row

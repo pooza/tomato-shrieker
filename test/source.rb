@@ -336,6 +336,48 @@ module TomatoShrieker
       ENV['TEST'] = saved
     end
 
+    # #1504: 設定されているのに組み立てられなかった宛先を「未達」として計上する。
+    # 🔴 アクセサが例外を握って nil を返すと宛先が shriekers から消えるため、
+    # 計上しないと attempted=0 の no-op success になり、投稿できていないのに緑になる。
+    # url にスキームが無いので MastodonShrieker の生成が必ず失敗する（通信は起きない）。
+    def test_shriek_records_unavailable_dest
+      source = Source.new({
+        'id' => 'test-dest-unavailable',
+        'dest' => {'mastodon' => {'url' => 'mastodon.example.com', 'token' => 'x'}},
+      })
+
+      assert_equal(1, source.dest_count)
+      assert_equal(0, source.shriekers.to_a.size)
+
+      stats = DeliveryStats.new
+      delivered = source.shriek(template: nil, visibility: nil, stats:)
+
+      assert_equal(0, delivered)
+      assert_equal(1, stats.attempted_count)
+      assert_equal(0, stats.delivered_count)
+      assert_equal({'UnavailableDest' => 1}, stats.shrieker_errors)
+      assert_true(stats.error?)
+    end
+
+    # 宛先が全部組み立てられたときは計上しない（過検知しない）。
+    def test_shriek_does_not_record_available_dest
+      source = Source.new({'id' => 'test-dest-available'})
+      shrieker = Object.new
+      def shrieker.exec(_params)
+      end
+      source.define_singleton_method(:shriekers) do |&block|
+        next enum_for(:shriekers) unless block
+        block.call(shrieker)
+      end
+      source.define_singleton_method(:dest_count) {1}
+
+      stats = DeliveryStats.new
+      source.shriek(template: nil, visibility: nil, stats:)
+
+      assert_equal({}, stats.shrieker_errors)
+      assert_false(stats.error?)
+    end
+
     # #1470: silence_tolerance は未指定なら検知しない (opt-in)。
     def test_monitor_silence_tolerance_seconds
       assert_nil(Source.new({'id' => 'test-silence-unset'}).monitor_silence_tolerance_seconds)

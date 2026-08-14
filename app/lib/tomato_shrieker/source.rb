@@ -39,23 +39,52 @@ module TomatoShrieker
     def shriek(template: nil, visibility: nil, attachments: nil, stats: @delivery_stats)
       params = {template:, visibility:, attachments:}.compact
       delivered = 0
+      available = 0
       shriekers do |shrieker|
-        if Environment.test?
-          template&.to_s
-          logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
-          next
-        end
-        shrieker.exec(params)
-        stats&.record_success(shrieker)
-        delivered += 1
-      rescue Exception => e # rubocop:disable Lint/RescueException
-        raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
-        klass = shrieker.class.to_s
-        Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
-        logger.error(source: id, shrieker: klass, error: e)
-        stats&.record_error(shrieker, e)
+        available += 1
+        delivered += 1 if deliver(shrieker, params, stats)
       end
+      record_unavailable_dests(available, stats)
       return delivered
+    end
+
+    # 1 宛先ぶんの配信。配信できたら true。
+    # 宛先ごとの例外はここで握る（1 宛先の失敗で残りの宛先を止めない）。
+    def deliver(shrieker, params, stats)
+      if Environment.test?
+        params[:template]&.to_s
+        logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
+        return false
+      end
+      shrieker.exec(params)
+      stats&.record_success(shrieker)
+      return true
+    rescue Exception => e # rubocop:disable Lint/RescueException
+      raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
+      klass = shrieker.class.to_s
+      Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
+      # ⚠ record_error を先に打つ。logger.error が壊れた例外メッセージで落ちると
+      # 失敗が attempted に載らず、undelivered? の内訳が嘘になる (#1469 の族)。
+      stats&.record_error(shrieker, e)
+      logger.error(source: id, shrieker: klass, error: e)
+      return false
+    end
+
+    # 設定されているのに Shrieker を組み立てられなかった宛先を計上する (#1504)。
+    #
+    # 🔴 各アクセサ（mastodon / misskey / line / piefed / nostr）は生成時の例外を
+    # 握って nil を返すので、その宛先は shriekers から黙って消える。何も記録しないと
+    # attempted=0 の no-op success になり、**投稿できていないのに監視は緑**という
+    # #1455 とまったく同じ見え方になる。dest_count との差でしか気付けない。
+    def record_unavailable_dests(available, stats)
+      missing = dest_count - available
+      return unless missing.positive?
+      logger.error(
+        source: id, class: self.class.to_s,
+        message: 'destination unavailable', missing:, dest_count:
+      )
+      error = Ginseng::GatewayError.new("destination unavailable (#{missing}/#{dest_count})")
+      missing.times {stats&.record_unavailable('UnavailableDest', error)}
     end
 
     def disable?

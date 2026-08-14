@@ -204,7 +204,12 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 🔴 **2026-06 の Matrix 配信停止 (#1455) がこの形だった。**matrix 系 3 ソースは `hooks` を 2 つ持ち、`hook[0]`（matrix-webhook）が毎回失敗する一方 `hook[1]`（モロヘイヤ）は成功していた。`delivered_count > 0` なので status は `partial`、`last_delivered_at` も前進し続け、**error_streak も silent も立たず監視は最後まで緑だった。**
 
-⚠ **解除は「次に全宛先へ届いた run」だけ。no-op run では解除しない。**取りこぼしたエントリは再送されない（`Entry.insert` が配信より先に走り、`entry.tooted` 列は `migration/004` で削除済み）ため**永久に失われている**。新着が無いことは失敗の解消にならない。日次 cron のソースが翌日まで 503 になるのは許容する。
+⚠ **解除は「次に全宛先へ届いた run」だけ。no-op run では解除しない。**取りこぼしたエントリは再送されない（`Entry.insert` が配信より先に走り、`entry.tooted` 列は `migration/004` で削除済み）ため**永久に失われている**。新着が無いことは失敗の解消にならない。
+
+🔴 **だからこそ `attempted_count` に載せてよいのは「宛先に触れた試行」だけ。**解除条件が「次に配信できるまで」である以上、過検知の代償は「翌日まで赤」ではなく**「次に新着が出るまで赤」**になる。本番の実測では 12 日間に 1 度も配信を試みていないソースが 40 件中 13 件あり、疎なソースなら数週間に及ぶ。
+
+- **宛先を組み立てられなかった**（アクセサが例外を握って nil を返した）→ `DeliveryStats#record_unavailable` で **attempted に載せる**。届いていないのは事実なので未達で正しい
+- **配信より手前で落ちた**（`Entry.create` の `SQLite3::BusyException`、`create_template` の失敗等）→ `DeliveryStats#record_failure` で **attempted には載せない**。宛先は全部健全なのに「宛先に届いていない」と表示すると、運用者は存在しない宛先障害を探しに行く。`@errors` には積むので status は `error` / `partial` に倒れ、`error_streak` では捕まる
 
 ⚠ **宛先ごとの識別子は持たない。**Kuma のモニターがソース単位なのでアラートの粒度は元からソース単位であり、1 ソースに宛先を詰め込んで粒度が落ちるのは運用側の判断とする。また hook の URL にはトークンが入っており、宛先を記録すると run_log と `/status.json` にシークレットが載る。**503 の本文には `attempted_count` / `delivered_count` だけを出し、どの宛先かは設定を見て切り分ける。**
 
@@ -217,6 +222,8 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
 
 **宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。**`No destination configured` を返して 503 に倒す。`dest: {}` や `dest: {hooks: []}`、`token` を落とした `dest.mastodon` のような半端な設定は `shriekers` が 1 件も yield しないため配信が永久に起きないが、run は no-op success を積むだけで健全に見える。
+
+🔴 **設定は正しいのに Shrieker を組み立てられない場合も同じ穴になる (#1504)。**各アクセサ（`mastodon` / `misskey` / `line` / `piefed` / `nostr`）は生成時の例外を `rescue` して nil を返すので、**PieFed が落ちている・上流が 429 を返す・URL のスキームが欠けている**といった理由でその宛先が `shriekers` から黙って消える。`dest_count` は設定を数えるだけなので気付けない。`Source#shriek` が `dest_count` と yield 数の差を `record_unavailable` で計上し、未達として倒す。⚠ **この差分を計上しないと `dest_count` は「表示するだけの数字」になる。**
 
 ⚠ **ただし `disable: true` のソースは除く (#1486)。**スキーマが無効ソースに対して `dest` の配信先必須を免除している（`chinachu` 等の死蔵定義が実際に `dest: {}`）ので、ランタイムだけ咎めると宣言と食い違う。無効ソースは `register` されず run_log も無いため、`No run recorded yet` の 503 に落ちる。
 
@@ -276,12 +283,15 @@ bin/shrieker source ack ID
       "dest_count": 1,
       "last_attempted_count": 2,
       "last_delivered_count": 2,
+      "last_attempted_at": "2026-04-14T14:00:01+09:00",
+      "undelivered": false,
       "last_delivered_at": "2026-04-14T14:00:01+09:00",
       "last_delivered_at_origin": "run_log",
       "error_streak": 0,
       "noop_streak": 0,
       "silence_tolerance_seconds": null,
       "silent": false,
+      "silence_acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"MastodonShrieker": 1}
@@ -302,12 +312,13 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 ⚠ **`fallback` は人間が読むための参考値で、`silent?` は使わない (#1483)。**`entry.published` は上流フィードが自称する公開時刻で、`Entry` の行は配信の成否と無関係に INSERT される。**配信できていなくても上流に新着があるかぎり前進し続ける**ので、判定に使うと「配信していないのに健全」になる（Google News の pubDate が信用できない件と同根）。一次情報は `run_log` 側。
 
-⚠ **prune はソースごとに 2 行を守る。**
+⚠ **prune はソースごとに 3 行を守る。**
 
 | 守る行 | 理由 |
 |------|------|
 | 最後に配信できた run | 刈ると沈黙が `retention_days` を超えた瞬間に `last_delivered_at` が nil に化け、**沈黙が長引くほど検知できなくなる** (#1470) |
 | 最古の run | 未配信のソースは上の保護に引っかからない。刈ると `observed_since` が常に `retention_days` 前に張り付き、それより長い `silence_tolerance` が永久に成立しない (#1483) |
+| 最後に配信を試みた run | 刈ると未達で赤くなったソースが `retention_days` の経過だけで黙って緑に戻る。**次に配信できたときだけ解除する**という仕様が壊れる (#1504) |
 
 `silence_tolerance` に `retention_days` より大きい値を書けるのはこの保護があるため。
 
@@ -365,6 +376,8 @@ monitor:
 ⚠ **run を `error` に倒すのは 1 件も配信できなかったときだけ。**部分失敗まで `error` にすると、エントリ 1 件の webhook 失敗で `error_streak` が立ち、`error_streak_threshold: 1` のもとで**日次 cron のソースは次の run まで 24 時間 503 に貼り付く**。`SQLite3::BusyException` のように現実に起こりうる反復エラーがこの経路に乗る。
 
 ⚠ **`partial` を握り潰しているわけではない。**`error_message` と `shrieker_errors` はそのまま記録され、`/status.json` の `shrieker_errors` 集計と `last_attempted_count` / `last_delivered_count` の差から読める。
+
+🔴 **#1504 以降、`partial` は healthz を赤にする。**上の表は `error_streak` の話であって healthz の話ではない。`partial` は定義上 `delivered_count < attempted_count`＝未達なので `undelivered` で 503 になる。**「部分失敗なら緑」と読まないこと。**解除条件も `error_streak` と違い「次の run」ではなく**「次に全宛先へ届く run」**。
 
 ⚠ **`error_rate_24h` は `status == 'error'` の割合**なので、意味は「全滅した run の割合」。部分失敗はここに出ない。
 
