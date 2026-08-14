@@ -5,6 +5,10 @@ module TomatoShrieker
     include Package
 
     STATUS_SUCCESS = 'success'.freeze
+    # 配信できたものと失敗したものが混在した run (#1482)。
+    # error と分けるのは「99 件配信できた run」と「全滅した run」を status の上で
+    # 区別するため。error_streak は倒さないので、部分失敗では healthz を赤にしない。
+    STATUS_PARTIAL = 'partial'.freeze
     STATUS_ERROR = 'error'.freeze
 
     dataset_module do
@@ -17,19 +21,41 @@ module TomatoShrieker
       end
     end
 
+    # 保存時に正規化していても、それ以前に書かれた行には ASCII-8BIT が残っている (#1469)。
+    # 読み出し側でも倒しておかないと、既存行を読んだ瞬間に監視の JSON が壊れる。
+    def error_message
+      return super&.to_utf8
+    end
+
     def error?
       return status == STATUS_ERROR
+    end
+
+    def partial?
+      return status == STATUS_PARTIAL
     end
 
     # 配信を 1 件も試みずに完走した run。#1457 の「no-op run」。
     # run 自体が失敗した場合は試行ゼロでも no-op ではない。
     def noop?
-      return false if error?
+      return false unless status == STATUS_SUCCESS
       return attempted_count.to_i.zero?
     end
 
     def delivered?
       return delivered_count.to_i.positive?
+    end
+
+    # 配信を試みた run。no-op run と区別する。
+    def attempted?
+      return attempted_count.to_i.positive?
+    end
+
+    # 試みたのに届かなかった宛先がある run (#1504)。
+    # 宛先ごとの識別子を持たなくても、試行数と成功数の差で「取りこぼし」は判る。
+    def undelivered?
+      return false unless attempted?
+      return delivered_count.to_i < attempted_count.to_i
     end
 
     def shrieker_error_counts
@@ -41,22 +67,25 @@ module TomatoShrieker
     end
 
     def self.record_success(source_id, started_at:, stats: nil)
-      create({
-        source_id:,
-        executed_at: started_at,
-        status: STATUS_SUCCESS,
-        duration_ms: duration_ms(started_at),
-      }.merge(stats_columns(stats)))
-    rescue => e
-      Sentry.capture_exception(e) if Sentry.initialized?
+      return record(source_id, started_at:, status: STATUS_SUCCESS, stats:)
+    end
+
+    # 配信できたものと失敗したものが混在した run (#1482)。
+    # error_message は残す。status が error でないだけで、失敗は失敗として読めるようにする。
+    def self.record_partial(source_id, started_at:, error:, stats: nil)
+      return record(source_id, started_at:, status: STATUS_PARTIAL, error:, stats:)
     end
 
     def self.record_error(source_id, started_at:, error:, stats: nil)
+      return record(source_id, started_at:, status: STATUS_ERROR, error:, stats:)
+    end
+
+    def self.record(source_id, started_at:, status:, error: nil, stats: nil)
       create({
         source_id:,
         executed_at: started_at,
-        status: STATUS_ERROR,
-        error_message: "#{error.class}: #{error.message}",
+        status:,
+        error_message: Package.error_message(error),
         duration_ms: duration_ms(started_at),
       }.merge(stats_columns(stats)))
     rescue => e
@@ -75,7 +104,9 @@ module TomatoShrieker
 
     def self.prune(retention_days)
       cutoff = Time.now - (retention_days * 86_400)
-      return where(Sequel.lit('executed_at < ?', cutoff)).exclude(id: last_delivered_ids).delete
+      return where(Sequel.lit('executed_at < ?', cutoff))
+          .exclude(id: last_delivered_ids).exclude(id: first_run_ids)
+          .exclude(id: last_attempted_ids).delete
     end
 
     # 「最後に配信できた時刻」の根拠行はソースごとに 1 行だけ prune から守る。
@@ -86,15 +117,60 @@ module TomatoShrieker
           .select(Sequel.function(:max, :id))
     end
 
+    # 「いつから観測しているか」の根拠行もソースごとに 1 行だけ守る (#1483)。
+    # 未配信のソースは last_delivered_ids に引っかからないので、これが無いと
+    # observed_since が常に retention_days 前に張り付き、それより長い
+    # silence_tolerance が永久に成立しない。
+    def self.first_run_ids
+      return group(:source_id).select(Sequel.function(:min, :id))
+    end
+
+    # 「直近の配信試行」の根拠行もソースごとに 1 行だけ守る (#1504)。
+    # ⚠ これを刈ると、取りこぼしを検知して赤くなったソースが retention_days の経過だけで
+    # 黙って緑に戻る。**次に配信できたときだけ解除する**という仕様が壊れる。
+    def self.last_attempted_ids
+      return where(Sequel.lit('attempted_count > 0')).group(:source_id)
+          .select(Sequel.function(:max, :id))
+    end
+
     def self.duration_ms(started_at)
       return ((Time.now - started_at) * 1000).to_i
     end
 
-    # 実際に配信できた最後の時刻。run_log は retention_days で刈られるため、
-    # ここが nil でも「一度も配信していない」とは限らない (#1470)。
+    # 実際に配信できた最後の時刻。last_delivered_ids が根拠行を prune から守るので、
+    # 一度でも配信していれば消えない (#1470)。
     def self.last_delivered_at(source_id)
       row = where(source_id:).where(Sequel.lit('delivered_count > 0'))
         .order(Sequel.desc(:executed_at)).first
+      return row&.executed_at
+    end
+
+    # 直近の「配信を試みた run」(#1504)。
+    #
+    # ⚠ no-op run (新着が無く配信ゼロで完走した run) は読み飛ばす。**新着が無いことは
+    # 失敗の解消にならない。**取りこぼしたエントリは `Entry.insert` が配信より先に走る
+    # ため再送されず (`entry.tooted` 列も migration/004 で削除済み)、永久に失われている。
+    # no-op で緑に戻すと、宛先が死んだまま監視だけが健全に見える。
+    def self.last_attempted(source_id)
+      return where(source_id:).where(Sequel.lit('attempted_count > 0'))
+          .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+    end
+
+    # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
+    #
+    # 🔴 2026-06 の Matrix 配信停止 (#1455) がこの形だった。hooks が 2 つあり
+    # matrix-webhook だけ毎回失敗、モロヘイヤは成功。`delivered_count > 0` なので
+    # status は `partial`、`last_delivered_at` も前進し続け、error_streak も silent も
+    # 立たず、監視は最後まで緑だった。
+    def self.undelivered?(source_id)
+      return last_attempted(source_id)&.undelivered? || false
+    end
+
+    # このソースの run を観測し始めた時刻 (#1483)。
+    # 一度も配信していないソースでは、ここからの経過が無配信期間の下限になる。
+    # first_run_ids が根拠行を prune から守るので retention_days では消えない。
+    def self.observed_since(source_id)
+      row = where(source_id:).order(:executed_at, :id).first
       return row&.executed_at
     end
 

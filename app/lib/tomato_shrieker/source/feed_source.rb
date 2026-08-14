@@ -6,6 +6,9 @@ module TomatoShrieker
       super
       @http = HTTP.new
       @http.base_uri = uri
+      # フィードの取得元は間欠的に 404 を返すことがある (#1500)。
+      # 取得の GET だけに効かせる。宛先への POST は既定どおり再送しない。
+      @http.retry_not_found = true
     end
 
     def exec

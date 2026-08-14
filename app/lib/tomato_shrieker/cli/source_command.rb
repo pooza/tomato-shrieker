@@ -122,14 +122,32 @@ module TomatoShrieker
       set_disable(id, false)
     end
 
+    desc 'ack ID', 'サイレント不発の警告を確認済みにする（silent の起点を今にする）'
+    def ack(id)
+      source = find_source!(id)
+      unless source.monitor_silence_tolerance_seconds
+        say "#{id} は silence_tolerance が未設定です。サイレント不発を検知していません。"
+        return
+      end
+      SilenceAck.acknowledge(id)
+      say "#{id} を確認済みにしました。"
+      # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
+      days = source.monitor_silence_tolerance_seconds / 86_400
+      say "  次に silence_tolerance (#{days}日) を超えたら、再び警告します。"
+    end
+
     desc 'validate [ID]', 'ソース定義を JSON Schema で検証（ID 省略時は全件）'
     def validate(id = nil)
       paths = id ? [existing_source_path!(id)] : source_paths
       ng = 0
       paths.each do |path|
-        errors = SourceValidator.validate(YAML.load_file(path))
+        params = YAML.load_file(path)
+        errors = SourceValidator.validate(params)
         if errors.empty?
-          say "OK\t#{source_id(path)}"
+          # WARN はスキーマ上は妥当な定義への指摘なので ng には数えない (#1470)。
+          warnings = SourceValidator.warnings(params)
+          say "#{warnings.empty? ? 'OK' : 'WARN'}\t#{source_id(path)}"
+          warnings.each {|v| say "    - #{v}"}
         else
           ng += 1
           say "NG\t#{source_id(path)}"

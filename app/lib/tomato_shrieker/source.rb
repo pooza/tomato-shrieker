@@ -39,23 +39,52 @@ module TomatoShrieker
     def shriek(template: nil, visibility: nil, attachments: nil, stats: @delivery_stats)
       params = {template:, visibility:, attachments:}.compact
       delivered = 0
+      available = 0
       shriekers do |shrieker|
-        if Environment.test?
-          template&.to_s
-          logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
-          next
-        end
-        shrieker.exec(params)
-        stats&.record_success(shrieker)
-        delivered += 1
-      rescue Exception => e # rubocop:disable Lint/RescueException
-        raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
-        klass = shrieker.class.to_s
-        Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
-        logger.error(source: id, shrieker: klass, error: e)
-        stats&.record_error(shrieker, e)
+        available += 1
+        delivered += 1 if deliver(shrieker, params, stats)
       end
+      record_unavailable_dests(available, stats)
       return delivered
+    end
+
+    # 1 宛先ぶんの配信。配信できたら true。
+    # 宛先ごとの例外はここで握る（1 宛先の失敗で残りの宛先を止めない）。
+    def deliver(shrieker, params, stats)
+      if Environment.test?
+        params[:template]&.to_s
+        logger.info(source: id, shrieker: shrieker.class.to_s, message: 'skip (test)')
+        return false
+      end
+      shrieker.exec(params)
+      stats&.record_success(shrieker)
+      return true
+    rescue Exception => e # rubocop:disable Lint/RescueException
+      raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
+      klass = shrieker.class.to_s
+      Sentry.capture_exception(e, tags: {source: id, shrieker: klass}) if Sentry.initialized?
+      # ⚠ record_error を先に打つ。logger.error が壊れた例外メッセージで落ちると
+      # 失敗が attempted に載らず、undelivered? の内訳が嘘になる (#1469 の族)。
+      stats&.record_error(shrieker, e)
+      logger.error(source: id, shrieker: klass, error: e)
+      return false
+    end
+
+    # 設定されているのに Shrieker を組み立てられなかった宛先を計上する (#1504)。
+    #
+    # 🔴 各アクセサ（mastodon / misskey / line / piefed / nostr）は生成時の例外を
+    # 握って nil を返すので、その宛先は shriekers から黙って消える。何も記録しないと
+    # attempted=0 の no-op success になり、**投稿できていないのに監視は緑**という
+    # #1455 とまったく同じ見え方になる。dest_count との差でしか気付けない。
+    def record_unavailable_dests(available, stats)
+      missing = dest_count - available
+      return unless missing.positive?
+      logger.error(
+        source: id, class: self.class.to_s,
+        message: 'destination unavailable', missing:, dest_count:
+      )
+      error = Ginseng::GatewayError.new("destination unavailable (#{missing}/#{dest_count})")
+      missing.times {stats&.record_unavailable('UnavailableDest', error)}
     end
 
     def disable?
@@ -307,6 +336,12 @@ module TomatoShrieker
       return {type: 'every', value: period}
     end
 
+    # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
+    # 「長期間配信が無い」(silent?) と違い、**これは無条件に失敗**。
+    def undelivered?
+      return SourceRunLog.undelivered?(id)
+    end
+
     def monitored?
       return post_at.nil?
     end
@@ -376,11 +411,35 @@ module TomatoShrieker
     end
 
     # しきい値を超えて無配信が続いているか (#1470)。
-    # 一度も配信実績が無い場合は「腐っている」と断定できないので false。
+    #
+    # ⚠ 判定に使うのは run_log 由来の実配信だけで、last_delivered_at_fallback は見ない (#1483)。
+    # fallback（FeedSource なら entry.published）は配信の成否と無関係に前進するので、
+    # 配信できていなくても silent? が永久に false になる。表示用としては残してある。
+    #
+    # 一度も配信していないソースは、観測を始めてからの経過を無配信期間の下限として使う。
+    # ここを「実績が無いので断定しない」で false にすると、開設以来ずっと壊れている
+    # ソースだけが恒久的に検知対象外になる。
+    # ⚠ ローカル変数に at を使わないこと。alias at post_at があるため、
+    # 代入より前に現れた at はメソッド呼び出しに解決されて nil になる。
     def silent?
       return false unless tolerance = monitor_silence_tolerance_seconds
-      return false unless last = last_delivered_at
-      return Time.now > (last + tolerance)
+      return false unless since = silence_baseline
+      return Time.now > (since + tolerance)
+    end
+
+    # 沈黙を測る起点 (#1505)。配信・確認・観測開始のうち最も新しいもの。
+    #
+    # ⚠ 確認 (SilenceAck) で起点が前に進むので、運用者が確認すればそのまま緑に戻る。
+    # 配信が再開すれば last_delivered_at が確認を追い越すので、確認記録は自然に
+    # 無効化される。特別な失効処理は要らない。
+    #
+    # observed_since は必ず最古の run なので、他の 2 つがあれば max に選ばれない。
+    def silence_baseline
+      return [
+        SourceRunLog.last_delivered_at(id),
+        SilenceAck.acknowledged_at(id),
+        SourceRunLog.observed_since(id),
+      ].compact.max
     end
 
     def self.all
@@ -437,22 +496,30 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
+    # run を error に倒すのは 1 件も配信できなかったときだけ (#1482)。
+    # 部分失敗まで error にすると、エントリ 1 件の失敗で error_streak が立ち、
+    # 日次 cron のソースは次の run まで healthz が 503 に貼り付く。
     def finalize_run_log(started_at)
       stats = @delivery_stats
-      if stats.error?
-        SourceRunLog.record_error(id, started_at:, error: stats.first_error, stats:)
-        logger.error(
-          source: id, class: self.class.to_s,
-          action: 'exec end (delivery errors)', count: stats.error_count,
-          delivered: stats.delivered_count
-        )
+      return finalize_success_run_log(started_at, stats) unless stats.error?
+      if stats.delivered_count.positive?
+        SourceRunLog.record_partial(id, started_at:, error: stats.first_error, stats:)
       else
-        SourceRunLog.record_success(id, started_at:, stats:)
-        logger.info(
-          source: id, class: self.class.to_s,
-          action: 'exec end', delivered: stats.delivered_count
-        )
+        SourceRunLog.record_error(id, started_at:, error: stats.first_error, stats:)
       end
+      logger.error(
+        source: id, class: self.class.to_s,
+        action: 'exec end (delivery errors)', count: stats.error_count,
+        delivered: stats.delivered_count
+      )
+    end
+
+    def finalize_success_run_log(started_at, stats)
+      SourceRunLog.record_success(id, started_at:, stats:)
+      logger.info(
+        source: id, class: self.class.to_s,
+        action: 'exec end', delivered: stats.delivered_count
+      )
     end
   end
 end

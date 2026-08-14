@@ -107,6 +107,120 @@ module TomatoShrieker
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
+    # 🔴 #1504: 取りこぼしの根拠行を刈ると、赤くなったソースが retention_days の
+    # 経過だけで黙って緑に戻る。「次に配信できたときだけ解除する」が壊れる。
+    def test_prune_keeps_last_attempted_row
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
+        status: SourceRunLog::STATUS_PARTIAL, duration_ms: 10,
+        attempted_count: 2, delivered_count: 1
+      )
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+    end
+
+    def test_undelivered?
+      create_logs(
+        {attempted_count: 2, delivered_count: 1, status: SourceRunLog::STATUS_PARTIAL},
+        {attempted_count: 0},
+      )
+
+      # no-op は判定を持ち越す
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+
+      create_logs({attempted_count: 2, delivered_count: 2})
+
+      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+    end
+
+    # 全滅も同じ式で拾う（error_streak と二重管理にしない）
+    def test_undelivered_covers_total_failure
+      create_logs({attempted_count: 2, delivered_count: 0, status: SourceRunLog::STATUS_ERROR})
+
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+    end
+
+    # 一度も配信を試みていなければ未達ではない
+    def test_undelivered_ignores_noop_only
+      create_logs({attempted_count: 0}, {attempted_count: 0})
+
+      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_nil(SourceRunLog.last_attempted(SOURCE_ID))
+    end
+
+    # #1504: 配信手前で落ちた失敗（宛先に一度も触れていない）を未達にしない。
+    # 🔴 ここを未達に数えると、解除が「次に全宛先へ届く run」だけなので、
+    # 新着の少ないソースが一過性のエラー 1 回で数週間 503 に貼り付く。
+    def test_undelivered_ignores_pre_delivery_failure
+      stats = DeliveryStats.new
+      stats.record_failure('TomatoShrieker::FeedSource#fetch', RuntimeError.new('boom'))
+      SourceRunLog.record(
+        SOURCE_ID, started_at: Time.now,
+        status: SourceRunLog::STATUS_ERROR, error: stats.first_error, stats:
+      )
+
+      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_true(SourceRunLog.latest_for(SOURCE_ID).error?)
+    end
+
+    # #1483: 未配信のソースは last_delivered_ids に引っかからないので、
+    # 最古行を守らないと observed_since が retention_days 前に張り付く。
+    def test_prune_keeps_first_run_row
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (60 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(1, remain.size)
+      assert_equal((Time.now - (60 * 86_400)).to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
+    end
+
+    def test_observed_since
+      assert_nil(SourceRunLog.observed_since(SOURCE_ID))
+      create_logs({attempted_count: 0}, {attempted_count: 1, delivered_count: 1})
+
+      assert_equal(@base.to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
+    end
+
+    # #1482: 配信できたものと失敗したものが混在した run は error と分けて記録し、
+    # error_streak を倒さない
+    def test_record_partial
+      SourceRunLog.record_partial(
+        SOURCE_ID, started_at: @base, error: RuntimeError.new('boom'),
+        stats: nil
+      )
+      log = SourceRunLog.latest_for(SOURCE_ID)
+
+      assert_true(log.partial?)
+      assert_false(log.error?)
+      assert_false(log.noop?)
+      assert_equal('RuntimeError: boom', log.error_message)
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
+    def test_error_streak_broken_by_partial
+      create_logs(
+        {status: SourceRunLog::STATUS_ERROR, attempted_count: 1},
+        {status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2, delivered_count: 1},
+      )
+
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
     def test_error_streak_empty
       assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
     end
@@ -232,6 +346,46 @@ module TomatoShrieker
       assert_equal(1, log.attempted_count)
       assert_equal(0, log.delivered_count)
       assert_equal({'TomatoShrieker::MastodonShrieker' => 1}, log.shrieker_error_counts)
+    end
+
+    # #1469: Sequel / SQLite の例外は ASCII-8BIT で上がる。
+    # 保存の時点で UTF-8 へ倒しておかないと、監視の JSON 化がそこで壊れる。
+    def test_record_error_normalizes_binary_message
+      SourceRunLog.record_error(
+        SOURCE_ID, started_at: Time.now, error: binary_error('テーブル「台詞」が無い')
+      )
+      log = SourceRunLog.latest_for(SOURCE_ID)
+
+      assert_equal(Encoding::UTF_8, log.error_message.encoding)
+      assert_include(log.error_message, 'テーブル「台詞」が無い')
+      # 監視の経路が実際に通ること。json 3.0 ではここが例外になる
+      assert_equal(log.error_message, JSON.parse(JSON.dump(v: log.error_message))['v'])
+    end
+
+    # 不正バイトは json 2.x でも今すぐ JSON::GeneratorError になる（警告どまりではない）
+    def test_record_error_scrubs_invalid_bytes
+      SourceRunLog.record_error(
+        SOURCE_ID, started_at: Time.now, error: binary_error("boom \xff\xfe end")
+      )
+      log = SourceRunLog.latest_for(SOURCE_ID)
+
+      assert_equal(Encoding::UTF_8, log.error_message.encoding)
+      assert_true(log.error_message.valid_encoding?)
+      assert_nothing_raised {JSON.dump(v: log.error_message)}
+    end
+
+    # 保存時の正規化より前に書かれた行を読んでも壊れない (#1469)
+    def test_error_message_normalizes_legacy_row
+      create_logs({status: SourceRunLog::STATUS_ERROR})
+      log = SourceRunLog.latest_for(SOURCE_ID)
+      log.this.update(error_message: Sequel.blob('RuntimeError: 台詞が無い'))
+
+      assert_equal(Encoding::UTF_8, SourceRunLog.latest_for(SOURCE_ID).error_message.encoding)
+      assert_include(SourceRunLog.latest_for(SOURCE_ID).error_message, '台詞が無い')
+    end
+
+    def binary_error(message)
+      return RuntimeError.new(message.dup.force_encoding(Encoding::ASCII_8BIT))
     end
 
     # stats を渡さない旧来の呼び出しでも既定値で記録できる
