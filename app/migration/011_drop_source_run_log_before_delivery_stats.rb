@@ -9,12 +9,23 @@
 # first_run_ids の保護がソースごとに最古行を 1 行だけ永久に残すため、
 # 掃除しないと計測前の行が観測開始時刻として凍りつく。
 #
+# 🔴 境界を固定日付で書いてはいけない。010 が適用された時刻は DB ごとに違い、
+# 4.4.0 から直接上げた環境では 010 と 011 が同時に走るので、既存行がすべて日付より新しくなる。
+# そのとき計測前の行が観測開始時刻として凍りつき、silence_tolerance を設定したソースが
+# 上げた直後に軒並み赤くなる。
+#
+# 代わりに attempted_count > 0 の最古行を「計測が始まっていた証拠」として使う。
+# 010 は既存行を 0 で backfill するので、この条件に合う行は必ず 010 より後に書かれている。
+# 証拠が無ければ計測済みの行が 1 行も無いということなので、全部捨てる。
+# 証拠より古い no-op run も巻き添えで消えるが、観測開始が後ろへ動くだけで過検知にはならない。
+#
 # run_log は retention_days で捨てる前提の監視テレメトリなので、消して失うものはない。
 # 新規 DB では 010 と 011 が同時に走るので削除対象はゼロ。不可逆なので down は持たない。
 Sequel.migration do
   up do
-    # 本番 (oscura) で 010 が適用され、delivered_count の記録が始まった日。
-    cutoff = Time.new(2026, 8, 3)
-    self[:source_run_log].where(Sequel.lit('executed_at < ?', cutoff)).delete
+    logs = self[:source_run_log]
+    evidence = logs.where(Sequel.lit('attempted_count > 0')).order(:executed_at, :id).first
+    logs = logs.where(Sequel.lit('executed_at < ?', evidence[:executed_at])) if evidence
+    logs.delete
   end
 end
