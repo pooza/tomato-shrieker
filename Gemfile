@@ -20,11 +20,8 @@ gem 'sqlite3'
 gem 'thor'
 
 group :development do
+  gem 'ginseng-style', github: 'pooza/ginseng-style', branch: 'main', require: false
   gem 'ricecream'
-  gem 'rubocop'
-  gem 'rubocop-minitest'
-  gem 'rubocop-performance'
-  gem 'rubocop-rake'
   gem 'rubocop-sequel'
   gem 'test-unit'
   gem 'webmock'
