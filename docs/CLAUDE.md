@@ -36,6 +36,23 @@
 | マイグレーション・デプロイ順序・移行作業 | アップデート手順 |
 | ソース種別・投稿先・スケジュール | 各ソース／Shrieker のページ |
 
+### マイルストーンのサイズ
+
+⚠ **正本は [ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)。**ここには tomato での運用だけ書く。
+
+- `size:S`（重み 1・50 行未満）/ `size:M`（3・50〜200 行）/ `size:L`（8・200 行超）を**全 Issue に付ける**。2026-08-21 に open 全件へ遡及付与した
+- **1 マイルストーンの目安は 20〜25 重み。**超えたら Issue を次のマイナーへ送る
+- ⚠ **大物（`size:L`）は 1 マイルストーンに 1 件まで**
+
+重みの合計はこれで出せる。
+
+```sh
+gh issue list --state open --limit 60 --json number,milestone,labels \
+  --jq '.[] | "\(.milestone.title // "未割当") \(.labels | map(.name) | map(select(startswith("size:"))) | join(""))"' \
+  | awk '{w = $2=="size:S" ? 1 : $2=="size:M" ? 3 : $2=="size:L" ? 8 : 0; n[$1]++; c[$1]+=w} \
+         END {for (k in c) printf "%s: %d 件 / 重み %d\n", k, n[k], c[k]}' | sort
+```
+
 ### リリース前レビュー
 
 各マイルストーンの Issue が消化済みになった後、バージョンバンプに入る前に実施する。**単一のセキュリティレビューだけでは実用上の問題が取りこぼされる**ため、以下 5 観点を独立したサブエージェントで並列に走らせ、指摘を合流させる（モロヘイヤ／capsicum で先行運用しているプラクティスの移植）。
