@@ -47,6 +47,17 @@ GIT
     ginseng-piefed (0.1.1)
 
 GIT
+  remote: https://github.com/pooza/ginseng-style.git
+  revision: 2474936f5598640c9cf8464f71195c2bb03e4309
+  branch: main
+  specs:
+    ginseng-style (1.0.0)
+      rubocop
+      rubocop-minitest
+      rubocop-performance
+      rubocop-rake
+
+GIT
   remote: https://github.com/pooza/ginseng-youtube.git
   revision: 453a25139a2de765c6f9ad03d450f5053bddfcba
   branch: main
@@ -306,6 +317,7 @@ DEPENDENCIES
   ginseng-core!
   ginseng-fediverse!
   ginseng-piefed!
+  ginseng-style!
   ginseng-youtube!
   icalendar
   icalendar-rrule!
@@ -315,10 +327,6 @@ DEPENDENCIES
   parallel
   puma
   ricecream
-  rubocop
-  rubocop-minitest
-  rubocop-performance
-  rubocop-rake
   rubocop-sequel
   rufus-scheduler
   sentry-ruby
