@@ -19,6 +19,10 @@ http:
   retry:
     limit: 3
     seconds: 1
+  # ⚠ ginseng-core 1.19.0 の HTTP#initialize が必須で読む (`/http/timeout/seconds`)。
+  # 既定へ倒れないので、無いと HTTP を作った時点で ConfigError になる。
+  timeout:
+    seconds: 30
 line:
   urls:
     api: https://api.line.me
