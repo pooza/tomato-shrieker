@@ -714,7 +714,7 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 - `$TOKEN` は `~/.sentryclirc` の `[auth]` セクションから取得する
 - Sentry 未導入のプロジェクトではこのステップをスキップする
 
-### 6. 外部リポジトリの同期確認
+### 6. 外部リポジトリ・外部システムの同期確認
 
 #### ginseng-* のピン棚卸し
 
@@ -736,6 +736,21 @@ done
 遅れがあれば `bundle update <gem>` で追随する。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
+
+#### Kuma のモニターと有効ソースの突き合わせ
+
+🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。2026-08-21 時点で **有効 39 に対しモニター 24＝15 ソースが不可視**だった。
+
+```sh
+diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
+     <(ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
+        "select name from monitor where name like \"tomato-shrieker %\";"' | sed 's/^tomato-shrieker //' | sort)
+```
+
+- `<` の行 ＝ **Kuma に登録されていないソース**
+- `>` の行 ＝ **Kuma にあるが本番に無いソース**（消したソースのモニターが残っている）
+
+⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
 
 #### 上流への差し戻し
 
