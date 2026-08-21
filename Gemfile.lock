@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 4b134cebaf80c6ba0267363d5f729b59bdaf6c36
+  revision: e445a60500fc8ebd50a4ef4c7a20f032dd927ef5
   branch: main
   specs:
-    ginseng-core (1.15.28)
+    ginseng-core (1.19.0)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -22,7 +22,7 @@ GIT
       net-smtp
       nokogiri (>= 1.18.9)
       optparse
-      rake (< 13.4)
+      rake (!= 13.4.0)
       sanitize (>= 6.0.2)
       securerandom
       set
@@ -34,14 +34,14 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 60a38dae2e80096734e408ced2d322b994e4c624
+  revision: 9b2fdd584ef72de24ff860dd10803cee00bddf8b
   branch: main
   specs:
-    ginseng-fediverse (1.8.25)
+    ginseng-fediverse (1.8.28)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 56208ffd262652788eb0a3d2ff8e34df410d0b0f
+  revision: 4c8b94d71eb85fcc77e728c1ff1416100cc545d7
   branch: main
   specs:
     ginseng-piefed (0.1.1)
@@ -59,7 +59,7 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: 453a25139a2de765c6f9ad03d450f5053bddfcba
+  revision: b27af86e1a9e60bf254fb06ebebb771575d6ffa1
   branch: main
   specs:
     ginseng-youtube (2.0.1)
@@ -112,7 +112,7 @@ GEM
     ecdsa (1.2.0)
     ecdsa_ext (0.5.1)
       ecdsa (~> 1.2.0)
-    erb (6.0.6)
+    erb (6.0.7)
     et-orbi (1.4.1)
       tzinfo
     etc (1.4.6)
@@ -218,7 +218,7 @@ GEM
     raabro (1.5.0)
     racc (1.8.1)
     rainbow (3.1.1)
-    rake (13.3.1)
+    rake (13.4.2)
     regexp_parser (2.12.0)
     rexml (3.4.4)
     ricecream (0.2.1)
@@ -298,7 +298,7 @@ GEM
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
     yajl-ruby (1.4.3)
-    zeitwerk (2.8.2)
+    zeitwerk (2.8.3)
     zlib (3.2.3)
 
 PLATFORMS
