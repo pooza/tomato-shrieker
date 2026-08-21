@@ -11,9 +11,11 @@
 
 ## ブランチ戦略
 
+⚠ **Issue 駆動・ブランチ命名（`fix/<issue>-<slug>`）・`gh pr create --base` の明示は [ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**ここに書き写さない。
+
 | ブランチ | 目的 |
 | --- | --- |
-| `main` | リリース済み安定版（デフォルト） |
+| `main` | リリース済み安定版（デフォルト）。**本番のデプロイ対象**＝ここへマージするのは必ずリリース |
 | `develop` | 開発ブランチ。日常の作業はここで行う |
 
 ### リリースフロー
@@ -67,11 +69,9 @@ gh issue list --state open --limit 60 --json number,milestone,labels \
 
 対象範囲は `v<前リリース>..develop` の差分。Codex（`chatgpt-codex-connector[bot]`）は PR ready 時に走るので併走させ、重複しない指摘だけを拾う。
 
-指摘は以下の基準で分類し、必要最小限のみ本リリースで対応、残りは Issue 起票して次リリース以降に送る:
+⚠ **指摘の分類（赤＝必修 / 黄＝余力があれば / 緑＝送り）とその扱いは [workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**必要最小限のみ本リリースで対応し、残りは Issue 起票して次リリース以降へ送る。
 
-- **赤（必修）**: データ破損・セキュリティ・ユーザー可視の機能不全
-- **黄（余力があれば）**: 単一の edge case、観測性ギャップ
-- **緑（送り）**: 将来の拡張時に顕在化しうる構造改善
+⚠ **上の 5 観点のうち共通なのは「セキュリティ」「エラー処理・観測性」「コーディングスタイル・規約整合性」の 3 つ**で、正本にも同じものがある。**「設定・宛先契約」「スケジューラ・ライフサイクル」が tomato 固有**の観点。
 
 ### リリースノート
 
@@ -790,8 +790,9 @@ diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[
 
 ## 情報の記載先ルール
 
-- **課題・タスク** → GitHub Issue で管理
-- **プロジェクト共有すべき知見** → `docs/CLAUDE.md` など git 管理下のファイルに記載
+⚠ **「課題・タスクは Issue で管理する」「docs に書くだけでは管理されていない扱い」は [workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**tomato 固有はこの 2 つ。
+
+- **プロジェクト共有すべき知見** → `docs/CLAUDE.md` など git 管理下のファイルに記載する。⚠ **メモリにだけ置かない**
 - **進捗の同期** → `MEMORY.md` だけでなく `docs/CLAUDE.md` も更新すること。特にリリース済みバージョンの反映（「開発中」→「リリース済み」への変更）を忘れないこと
 
 ## 関連リポジトリ
