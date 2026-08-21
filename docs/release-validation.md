@@ -181,17 +181,20 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 ⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
 
+⚠ **4.7.0 (#1514) から login は遅延する。**構築しただけでは `@jwt` は `absent` のままなので、**明示的に `login` を呼んでから見る**こと。
+
 ```sh
 bundle exec ruby -Iapp/lib -rtomato_shrieker -e '
 include TomatoShrieker
 Sequel.connect(Environment.dsn)
 src = Source.create("test-google-news-piefed")
 shr = src.piefed
+shr.login
 puts "JWT: #{shr.instance_variable_get(:@jwt) ? "present" : "absent"}"
 '
 ```
 
-JWT が `present` なら login 成功。`absent` なら認証情報が古い等の可能性。
+JWT が `present` なら login 成功。`Ginseng::AuthError` が上がるなら認証情報が古い等の可能性。
 
 ## チェックリスト
 
