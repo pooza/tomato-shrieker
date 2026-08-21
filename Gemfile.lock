@@ -48,7 +48,7 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-style.git
-  revision: 2474936f5598640c9cf8464f71195c2bb03e4309
+  revision: 86738fedd657d3203e88038ce3b27def51ea971e
   branch: main
   specs:
     ginseng-style (1.0.0)
@@ -222,7 +222,7 @@ GEM
     regexp_parser (2.12.0)
     rexml (3.4.4)
     ricecream (0.2.1)
-    rubocop (1.88.2)
+    rubocop (1.89.0)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
@@ -240,9 +240,9 @@ GEM
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
       rubocop-ast (>= 1.38.0, < 2.0)
-    rubocop-performance (1.26.1)
+    rubocop-performance (1.27.0)
       lint_roller (~> 1.1)
-      rubocop (>= 1.75.0, < 2.0)
+      rubocop (>= 1.89.0, < 2.0)
       rubocop-ast (>= 1.47.1, < 2.0)
     rubocop-rake (0.7.1)
       lint_roller (~> 1.1)
