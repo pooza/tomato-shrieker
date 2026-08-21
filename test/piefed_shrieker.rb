@@ -53,12 +53,14 @@ module TomatoShrieker
     # source list・テストの初期化）でも認証 API を叩き、429 を踏みやすくなる。
     def test_does_not_login_on_initialize
       PiefedShrieker.new(PARAMS)
+
       assert_not_requested(@stub)
     end
 
     def test_logs_in_on_demand
       shrieker = PiefedShrieker.new(PARAMS)
       shrieker.login
+
       assert_requested(@stub, times: 1)
     end
 
@@ -66,6 +68,7 @@ module TomatoShrieker
     def test_does_not_login_twice
       shrieker = PiefedShrieker.new(PARAMS)
       2.times {shrieker.login}
+
       assert_requested(@stub, times: 1)
     end
   end
