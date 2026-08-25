@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: e445a60500fc8ebd50a4ef4c7a20f032dd927ef5
+  revision: 8443ae749e35a49a49751828f4e58c522c8d1eb8
   branch: main
   specs:
-    ginseng-core (1.19.0)
+    ginseng-core (1.20.0)
       activesupport (>= 7.0.7.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -34,14 +34,14 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 9b2fdd584ef72de24ff860dd10803cee00bddf8b
+  revision: 8b23e095d68674d18840ea782c15c560202f3adb
   branch: main
   specs:
-    ginseng-fediverse (1.8.28)
+    ginseng-fediverse (1.8.31)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 4c8b94d71eb85fcc77e728c1ff1416100cc545d7
+  revision: 1150891191edb02dbbc60153a375b1756b0bd943
   branch: main
   specs:
     ginseng-piefed (0.1.1)
@@ -59,7 +59,7 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: b27af86e1a9e60bf254fb06ebebb771575d6ffa1
+  revision: f041de996b98a6d24df07c5fcd70893290206f68
   branch: main
   specs:
     ginseng-youtube (2.0.1)
