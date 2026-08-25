@@ -260,6 +260,25 @@ module TomatoShrieker
       assert_kind_of(Array, payload['sources'])
     end
 
+    # #1471: ランタイムの能力欠落を検知できるようにする。
+    #
+    # 🔴 YJIT は Rust の無い環境ではビルド時に黙って外れ、エラーにならないまま
+    # 24〜25% 遅いサーバーが出来上がる。⚠ **後者になっても誰も気づけない**ので、
+    # Kuma がキーワード監視で見られる形に出す。
+    def test_status_json_reports_ruby_runtime
+      _status, _headers, body = call('/status.json')
+      ruby = JSON.parse(body.first)['ruby']
+
+      assert_kind_of(Hash, ruby)
+      assert_equal(RUBY_VERSION, ruby['version'])
+      # ⚠ Ginseng::Environment.jit? は真のとき "constant"（String）を返す。
+      # JSON へ素で載せると boolean にならないので、真偽に倒れていることを見る。
+      assert_boolean(ruby['yjit_available'])
+      assert_boolean(ruby['yjit_enabled'])
+      # 積まれていなければ有効にはなりえない
+      assert_true(ruby['yjit_available']) if ruby['yjit_enabled']
+    end
+
     # #1433 / #1457 / #1470 で足した指標が全ソース分そろっていること
     def test_status_json_delivery_fields
       _status, _headers, body = call('/status.json')

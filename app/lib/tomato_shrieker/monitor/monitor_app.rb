@@ -121,6 +121,8 @@ module TomatoShrieker
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,
+        # ⚠ 情報として出すだけで判定はしない (#1471)。詳細は Environment.ruby_health。
+        ruby: Environment.ruby_health,
         sources:,
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
