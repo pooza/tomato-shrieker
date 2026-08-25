@@ -11,9 +11,11 @@
 
 ## ブランチ戦略
 
+⚠ **Issue 駆動・ブランチ命名（`fix/<issue>-<slug>`）・`gh pr create --base` の明示は [ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**ここに書き写さない。
+
 | ブランチ | 目的 |
 | --- | --- |
-| `main` | リリース済み安定版（デフォルト） |
+| `main` | リリース済み安定版（デフォルト）。**本番のデプロイ対象**＝ここへマージするのは必ずリリース |
 | `develop` | 開発ブランチ。日常の作業はここで行う |
 
 ### リリースフロー
@@ -36,6 +38,23 @@
 | マイグレーション・デプロイ順序・移行作業 | アップデート手順 |
 | ソース種別・投稿先・スケジュール | 各ソース／Shrieker のページ |
 
+### マイルストーンのサイズ
+
+⚠ **正本は [ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)。**ここには tomato での運用だけ書く。
+
+- `size:S`（重み 1・50 行未満）/ `size:M`（3・50〜200 行）/ `size:L`（8・200 行超）を**全 Issue に付ける**。2026-08-21 に open 全件へ遡及付与した
+- **1 マイルストーンの目安は 20〜25 重み。**超えたら Issue を次のマイナーへ送る
+- ⚠ **大物（`size:L`）は 1 マイルストーンに 1 件まで**
+
+重みの合計はこれで出せる。
+
+```sh
+gh issue list --state open --limit 60 --json number,milestone,labels \
+  --jq '.[] | "\(.milestone.title // "未割当") \(.labels | map(.name) | map(select(startswith("size:"))) | join(""))"' \
+  | awk '{w = $2=="size:S" ? 1 : $2=="size:M" ? 3 : $2=="size:L" ? 8 : 0; n[$1]++; c[$1]+=w} \
+         END {for (k in c) printf "%s: %d 件 / 重み %d\n", k, n[k], c[k]}' | sort
+```
+
 ### リリース前レビュー
 
 各マイルストーンの Issue が消化済みになった後、バージョンバンプに入る前に実施する。**単一のセキュリティレビューだけでは実用上の問題が取りこぼされる**ため、以下 5 観点を独立したサブエージェントで並列に走らせ、指摘を合流させる（モロヘイヤ／capsicum で先行運用しているプラクティスの移植）。
@@ -50,11 +69,9 @@
 
 対象範囲は `v<前リリース>..develop` の差分。Codex（`chatgpt-codex-connector[bot]`）は PR ready 時に走るので併走させ、重複しない指摘だけを拾う。
 
-指摘は以下の基準で分類し、必要最小限のみ本リリースで対応、残りは Issue 起票して次リリース以降に送る:
+⚠ **指摘の分類（赤＝必修 / 黄＝余力があれば / 緑＝送り）とその扱いは [workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**必要最小限のみ本リリースで対応し、残りは Issue 起票して次リリース以降へ送る。
 
-- **赤（必修）**: データ破損・セキュリティ・ユーザー可視の機能不全
-- **黄（余力があれば）**: 単一の edge case、観測性ギャップ
-- **緑（送り）**: 将来の拡張時に顕在化しうる構造改善
+⚠ **上の 5 観点のうち共通なのは「セキュリティ」「エラー処理・観測性」「コーディングスタイル・規約整合性」の 3 つ**で、正本にも同じものがある。**「設定・宛先契約」「スケジューラ・ライフサイクル」が tomato 固有**の観点。
 
 ### リリースノート
 
@@ -178,6 +195,7 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 
 ### 本番操作の注意
 
+- ⚠ **本番のチェックアウトを `git` で覗くときは必ず `deploy` ユーザーで。**`ssh oscura 'git -C ~deploy/repos/tomato-shrieker log'` は `detected dubious ownership` で落ちる。`sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && git log"` と書く（`sudo -u deploy` では rbenv が効かず system ruby になるので `-i` が要る）
 - 本番デーモンは必ず OS のサービス管理経由 (`systemctl restart tomato-shrieker` / `service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
 - Monit を停止/再開する際は事前にユーザーに確認する
 
@@ -522,22 +540,33 @@ dest:
   hooks:
     - https://example.com/hook          # 従来どおりの URL 指定
     - url: https://example.com/webhook  # matrix-webhook 宛
+      type: tsunagal
       channel: '#alerts:example.com'    # ルームエイリアス
     - url: https://example.com/webhook
+      type: tsunagal
       room_id: '!AbCdEf:example.com'    # ルーム ID（channel との択一）
 ```
 
 | キー | 必須 | 内容 |
 |------|------|------|
 | `url` | 必須 | 送信先 Webhook URL |
+| `type` | 任意 | 宛先の種別。`tsunagal` のみ。省略すると Slack 互換の素の Webhook 扱い |
 | `channel` | 任意 | ルームエイリアス（`#name:server` 形式） |
 | `room_id` | 任意 | ルーム ID（`!xxxx:server` 形式） |
 
-⚠ **スキーマが `additionalProperties: false` なので、この 3 つ以外のキーは書けない。**`config/schema/source.yaml` の `hooks` を参照。
+⚠ **スキーマが `additionalProperties: false` なので、この 4 つ以外のキーは書けない。**`config/schema/source.yaml` の `hooks` を参照。
 
 ⚠ **`channel` / `room_id` は matrix-webhook 側の解釈**で、`WebhookShrieker` はペイロードに載せるだけ。Slack / Discord / モロヘイヤ宛に書いても無視される。
 
-⚠ **Matrix 宛では CW（`spoiler_text`）が表示されない (#1493)。**matrix-webhook は `text` / `channel` / `room_id` / `format` しか見ないため、テンプレートに CW があっても**エラーにならずに内容が落ちる**。同じソースをモロヘイヤと matrix-webhook の両方へ流すと Matrix 宛だけ情報が欠ける。
+##### `type: tsunagal` — Tsunagal（matrix-webhook）宛 (#1493)
+
+🔴 **matrix-webhook は `text` / `channel` / `room_id` / `format` しか見ない。**未知のフィールドは黙って無視されるので、`WebhookShrieker` が積む `spoiler_text` は**エラーにもならずに落ちていた**。同じソースをモロヘイヤと matrix-webhook の両方へ流すと、**Matrix 宛だけ CW の内容が消える。**
+
+`type: tsunagal` を書くと `TsunagalWebhookShrieker` が選ばれ、**CW を本文の先頭へ畳んで送る**（`spoiler_text` ＋ 空行 ＋ 本文）。⚠ **Matrix に CW の標準は無い**ので、これは独自の見せ方。
+
+⚠⚠ **`type` を書かないと従来どおり CW は落ちる。**`room_id` の有無のような暗黙判定は**しない** — `channel` は Slack でも意味を持つので判定に使えず、「Matrix 固有なのは `room_id` だけ」という前提に乗ると、**`channel` だけで書かれた宛先（本番の 3 ソースがこの形）を取りこぼす**。
+
+⚠ **クラス名が `Matrix～` でないのは意図的。**喋る相手は Matrix の Client-Server API ではなく `tsunagal/matrix-webhook` という HTTP webhook なので、`MatrixShrieker` は将来 C-S API を実装するときのために空けてある。
 
 ### モロヘイヤ連携
 
@@ -713,7 +742,68 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 - `$TOKEN` は `~/.sentryclirc` の `[auth]` セクションから取得する
 - Sentry 未導入のプロジェクトではこのステップをスキップする
 
-### 6. 外部リポジトリの同期確認
+### 6. 外部リポジトリ・外部システムの同期確認
+
+#### ginseng-* のピン棚卸し
+
+🔴 **毎回必ず実行する。**`Gemfile.lock` は git 参照のリビジョンを固定するので、**放っておくと何ヶ月も進まず、security 修正だけが届かない状態になる**。2026-08-21 の sync では `ginseng-core` が **82 コミット遅れ**（1.15.28 → 1.19.0）で、SSRF 対策・ログの資格情報スクラブが丸ごと未達だった。⚠ **この手順が空だったことが原因**。
+
+⚠ **サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`）も対象。**本体だけ追随すると CommandSource の 7 ソースだけ古い gem で動き続ける。
+
+🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず `origin/HEAD` から取り出す。**
+
+```sh
+for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
+  git -C ~/repos/$d fetch -q origin
+  git -C ~/repos/$d show origin/HEAD:Gemfile.lock |
+  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' |
+  while read -r gem rev; do
+    ahead=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
+    printf '%-16s %-18s %s\n' "$d" "$gem" "${ahead:-?}"
+  done
+done
+```
+
+遅れがあれば `bundle update <gem>` で追随する。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
+
+⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
+
+#### サテライト 3 本の open PR / issue と CI
+
+🔴 **毎回実行する。**`loquat` / `shooby-do-bop` / `dqdai-anniv` は **CommandSource の 7 ソースの実体**だが、tomato 側からは見えないので**放置されても誰も気づかない**。⚠ **上流（`ginseng-style` / `ginseng-*`）はこちらへ PR / Issue を送ってくるので、受け取りが止まると横断の変更がここで詰まる。**
+
+```sh
+for d in loquat shooby-do-bop dqdai-anniv; do
+  b=$(gh repo view pooza/$d --json defaultBranchRef --jq .defaultBranchRef.name)
+  echo "=== $d ($b) ==="
+  gh pr list -R pooza/$d --state open
+  gh issue list -R pooza/$d --state open
+  gh run list -R pooza/$d -b $b -L 1 --json conclusion,headSha --jq '.[]|"CI \(.conclusion) \(.headSha[0:7])"'
+done
+```
+
+🔴 **2026-08-25 の実測では 3 本とも default ブランチの CI が赤で、上流からの PR が 6 日間止まっていた。**⚠ **`dqdai-anniv` は TZ 依存のバグ（[#32](https://github.com/pooza/dqdai-anniv/issues/32)）で 4 日以上赤のまま**で、それが上流の PR まで巻き添えにしていた。
+
+⚠ **上流から届いた PR がブランチを切った時点より default が進んでいることがある。**`chore/*-ginseng-style` は `/http/timeout/seconds` の設定より前から出ていたので、**そのままでは CI が `ConfigError` で落ちる**。**default をマージしてから通す。**
+
+#### Kuma のモニターと有効ソースの突き合わせ
+
+🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。2026-08-21 時点で **有効 39 に対しモニター 24＝15 ソースが不可視**だった。
+
+```sh
+diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
+     <(ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
+        "select name from monitor where name like \"tomato-shrieker %\";"' | sed 's/^tomato-shrieker //' | sort)
+```
+
+- `<` の行 ＝ **Kuma に登録されていないソース**
+- `>` の行 ＝ **Kuma にあるが本番に無いソース**（消したソースのモニターが残っている）
+
+⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
+
+#### 上流への差し戻し
+
+⚠ **アプリ側で回避策を持たない。**gem を直せば済むと分かったら、**該当 gem のリポジトリに Issue を立てる**。横断の話（RuboCop 設定・規約・CI）は [pooza/ginseng-style](https://github.com/pooza/ginseng-style) へ。ginseng-* は自走しており、Issue / PR は埋もれない。
 
 > **TODO**: chubo2 インフラノート（`pooza/chubo2` の `docs/infra-note.md`）との連携が整ったタイミングで手順を追加する。
 
@@ -732,8 +822,9 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 ## 情報の記載先ルール
 
-- **課題・タスク** → GitHub Issue で管理
-- **プロジェクト共有すべき知見** → `docs/CLAUDE.md` など git 管理下のファイルに記載
+⚠ **「課題・タスクは Issue で管理する」「docs に書くだけでは管理されていない扱い」は [workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**tomato 固有はこの 2 つ。
+
+- **プロジェクト共有すべき知見** → `docs/CLAUDE.md` など git 管理下のファイルに記載する。⚠ **メモリにだけ置かない**
 - **進捗の同期** → `MEMORY.md` だけでなく `docs/CLAUDE.md` も更新すること。特にリリース済みバージョンの反映（「開発中」→「リリース済み」への変更）を忘れないこと
 
 ## 関連リポジトリ

@@ -5,7 +5,6 @@ module TomatoShrieker
       params[:url] = "https://#{params[:host]}" if params[:host] && !params[:url]
       params[:user] = params[:user_id] if params[:user_id] && !params[:user]
       super
-      login
     end
 
     def api_version
@@ -13,6 +12,11 @@ module TomatoShrieker
     end
 
     def exec(body)
+      # ⚠ **構築時ではなくここで login する (#1514)。**上流の `Service#login` は
+      # `return if @jwt` を持つので、二重に叩くことはない。構築時に無条件で叩くと、
+      # 投稿しないケース（設定の読み込み・`source list`・テストの初期化）でも
+      # PieFed の認証 API を叩き、レートリミット (429) を踏みやすくなる。
+      login
       template = create_piefed_template(body[:template])
       data = {
         title: template.to_s.gsub(/[\r\n[:blank:]]+/, ' '),

@@ -132,8 +132,7 @@ module TomatoShrieker
       SilenceAck.acknowledge(id)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
-      days = source.monitor_silence_tolerance_seconds / 86_400
-      say "  次に silence_tolerance (#{days}日) を超えたら、再び警告します。"
+      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。"
     end
 
     desc 'validate [ID]', 'ソース定義を JSON Schema で検証（ID 省略時は全件）'
@@ -162,6 +161,20 @@ module TomatoShrieker
     end
 
     private
+
+    # silence_tolerance を人が読める長さで返す (#1513)。
+    #
+    # ⚠ **整数除算で「0日」と出してはいけない。** スキーマは `12h` / `30m` を許す
+    # ので（`^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$`）、日未満を設定した
+    # ソースでは「次に silence_tolerance (0日) を超えたら」と出ていた。
+    # ⚠ #1496 の「9 月上旬に 7d → 3d へ締める」運用で日未満を入れたら踏む。
+    def tolerance_label(source)
+      seconds = source.monitor_silence_tolerance_seconds
+      return "#{seconds / 86_400}日" if (seconds % 86_400).zero?
+      return "#{seconds / 3_600}時間" if (seconds % 3_600).zero?
+      return "#{seconds / 60}分" if (seconds % 60).zero?
+      return "#{seconds}秒"
+    end
 
     def find_source!(id, klass = nil)
       sources = klass ? klass.all : Source.all

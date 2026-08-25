@@ -146,7 +146,8 @@ module TomatoShrieker
       yield piefed if piefed?
       yield nostr if nostr?
       (self['/dest/hooks'] || []).each do |hook|
-        yield WebhookShrieker.new(hook)
+        # ⚠ `new` ではなく `create`。hook の `type` で Shrieker を選ぶ (#1493)。
+        yield WebhookShrieker.create(hook)
       end
     end
 

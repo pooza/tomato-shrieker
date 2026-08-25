@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'json'
 
 module TomatoShrieker
@@ -89,7 +91,11 @@ module TomatoShrieker
 
     # #1470: 配信できていないこと自体を出す
     def silent_body(source)
-      body = "silent: true\n"
+      # ⚠ `+` を付けて可変にする (#1512)。式展開の無いリテラルは将来 frozen に
+      # なるので、`<<` すると FrozenError で healthz_source の rescue に落ち、
+      # **503 の本文が診断情報を丸ごと失う**（ステータスは 503 のままなので
+      # Kuma は気づかない）。
+      body = +"silent: true\n"
       body << "last_delivered_at: #{source.last_delivered_at&.iso8601}\n"
       body << "silence_tolerance_seconds: #{source.monitor_silence_tolerance_seconds}\n"
       body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
@@ -102,7 +108,8 @@ module TomatoShrieker
     # #1504: 「いつ・何件のうち何件が届かなかったか」を運用者に見せる。
     # ⚠ 宛先の識別子は持たないので「どの宛先か」は出せない。設定を見て切り分ける。
     def undelivered_body(log)
-      body = "undelivered: true\n"
+      # ⚠ 式展開の無いリテラルなので `+` で可変にする (#1512)。上の silent_body 参照。
+      body = +"undelivered: true\n"
       body << "last_attempted_at: #{log.executed_at.iso8601}\n"
       body << "attempted_count: #{log.attempted_count}\n"
       body << "delivered_count: #{log.delivered_count}\n"
@@ -114,6 +121,8 @@ module TomatoShrieker
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,
+        # ⚠ 情報として出すだけで判定はしない (#1471)。詳細は Environment.ruby_health。
+        ruby: Environment.ruby_health,
         sources:,
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
