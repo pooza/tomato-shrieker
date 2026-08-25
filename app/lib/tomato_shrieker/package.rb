@@ -61,7 +61,35 @@ module TomatoShrieker
     # 「エラーを報告しようとして同じ例外を踏む」を避けるため、rescue 節の中でも通す。
     def self.error_message(error)
       return nil unless error
-      return "#{error.class}: #{error.message}".to_utf8
+      return mask_credentials("#{error.class}: #{error.message}".to_utf8)
+    end
+
+    # 🔴 **例外メッセージに埋まった資格情報を落とす (#1511)。**
+    #
+    # アプリは URL を丸ごとメッセージへ埋める。
+    #
+    #   raise Ginseng::GatewayError, "Invalid feed #{id} (#{uri}) #{e.message}"
+    #
+    # ここを通った文字列は **`source_run_log.error_message` に保存され**、
+    # `/status.json` と `/healthz/source` からそのまま読める。⚠ 本番の
+    # `monitor.bind` は `0.0.0.0` なので、LAN / VPN の誰からでも見える (#1531)。
+    #
+    # ⚠⚠ **`to_utf8` の後に通すこと。** 不正なバイト列のまま gsub すると
+    # ArgumentError になり、**マスクごと素通りする** (#518 で踏んだ型)。
+    #
+    # ⚠ マスクの正本は `Ginseng::Masking`。ここで同等品を書かない (#1467)。
+    def self.mask_credentials(message)
+      return Logger.new.mask_urls_in(message)
+    rescue => e
+      # 🔴 **fail closed。** マスクを通せなかった文字列は出さない。素通しにすると
+      # 伏せるはずだった値が run_log と監視エンドポイントへ残る。
+      return "#{error_class_of(message)} (masking failed: #{e.class})"
+    end
+
+    # マスクに失敗したとき、せめて例外クラス名だけは残す。⚠ 診断の手掛かりが
+    # ゼロになると「マスクが壊れている」ことにも気付けない。
+    def self.error_class_of(message)
+      return message.to_s.split(':', 2).first.to_s
     end
 
     def self.included(base)
