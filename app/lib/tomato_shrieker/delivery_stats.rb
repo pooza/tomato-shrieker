@@ -23,24 +23,14 @@ module TomatoShrieker
     end
 
     def record_error(shrieker, error)
-      @mutex.synchronize do
-        @attempted_count += 1
-        @shrieker_errors[shrieker.class.to_s] += 1
-        @errors.push(error)
-      end
-      return nil
+      return record_attempted_failure(shrieker.class, error)
     end
 
     # 設定されているのに Shrieker を組み立てられなかった宛先 (#1504)。
     # アクセサが例外を握って nil を返すため、この宛先は shriekers から消える。
     # attempted に載せないと「宛先ゼロで完走した run」＝緑になる。
     def record_unavailable(kind, error)
-      @mutex.synchronize do
-        @attempted_count += 1
-        @shrieker_errors[kind.to_s] += 1
-        @errors.push(error)
-      end
-      return nil
+      return record_attempted_failure(kind, error)
     end
 
     # 配信まで到達せずに落ちた失敗。Shrieker が特定できない経路（FeedSource#fetch の
@@ -63,6 +53,25 @@ module TomatoShrieker
 
     def shrieker_errors
       return @mutex.synchronize {@shrieker_errors.dup}
+    end
+
+    # 「宛先に触ったが届かなかった」失敗の共通処理 (#1490)。
+    #
+    # ⚠⚠ **record_failure と一本化してはいけない。** 見た目は似ているが
+    # **`@attempted_count` と `@failure_count` で別の数を数えている**。
+    # `record_failure` は宛先に一度も触れていない失敗なので attempted に載せず、
+    # 載せると `delivered < attempted` が成立して `undelivered?`（#1504）が嘘で
+    # 立つ。⚠ しかも解除は「次に全宛先へ届く run」だけなので、疎なソースは
+    # 数週間 503 に貼り付く。
+    #
+    # ⚠ `kind` は Class でも文字列でもよい（`to_s` で同じ値になる）。
+    def record_attempted_failure(kind, error)
+      @mutex.synchronize do
+        @attempted_count += 1
+        @shrieker_errors[kind.to_s] += 1
+        @errors.push(error)
+      end
+      return nil
     end
 
     def error_count
