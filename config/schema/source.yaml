@@ -220,6 +220,13 @@ properties:
                 url:
                   type: string
                   format: uri
+                # 宛先の種別 (#1493)。省略すると Slack 互換の素の Webhook 扱い。
+                # ⚠ room_id の有無のような暗黙判定はしないので、Tsunagal 宛は
+                # 明示すること。書かないと CW (spoiler_text) が黙って落ちる。
+                type:
+                  type: string
+                  enum:
+                    - tsunagal
                 channel:
                   type: string
                 room_id:

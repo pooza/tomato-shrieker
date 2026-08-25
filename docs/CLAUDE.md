@@ -540,22 +540,33 @@ dest:
   hooks:
     - https://example.com/hook          # 従来どおりの URL 指定
     - url: https://example.com/webhook  # matrix-webhook 宛
+      type: tsunagal
       channel: '#alerts:example.com'    # ルームエイリアス
     - url: https://example.com/webhook
+      type: tsunagal
       room_id: '!AbCdEf:example.com'    # ルーム ID（channel との択一）
 ```
 
 | キー | 必須 | 内容 |
 |------|------|------|
 | `url` | 必須 | 送信先 Webhook URL |
+| `type` | 任意 | 宛先の種別。`tsunagal` のみ。省略すると Slack 互換の素の Webhook 扱い |
 | `channel` | 任意 | ルームエイリアス（`#name:server` 形式） |
 | `room_id` | 任意 | ルーム ID（`!xxxx:server` 形式） |
 
-⚠ **スキーマが `additionalProperties: false` なので、この 3 つ以外のキーは書けない。**`config/schema/source.yaml` の `hooks` を参照。
+⚠ **スキーマが `additionalProperties: false` なので、この 4 つ以外のキーは書けない。**`config/schema/source.yaml` の `hooks` を参照。
 
 ⚠ **`channel` / `room_id` は matrix-webhook 側の解釈**で、`WebhookShrieker` はペイロードに載せるだけ。Slack / Discord / モロヘイヤ宛に書いても無視される。
 
-⚠ **Matrix 宛では CW（`spoiler_text`）が表示されない (#1493)。**matrix-webhook は `text` / `channel` / `room_id` / `format` しか見ないため、テンプレートに CW があっても**エラーにならずに内容が落ちる**。同じソースをモロヘイヤと matrix-webhook の両方へ流すと Matrix 宛だけ情報が欠ける。
+##### `type: tsunagal` — Tsunagal（matrix-webhook）宛 (#1493)
+
+🔴 **matrix-webhook は `text` / `channel` / `room_id` / `format` しか見ない。**未知のフィールドは黙って無視されるので、`WebhookShrieker` が積む `spoiler_text` は**エラーにもならずに落ちていた**。同じソースをモロヘイヤと matrix-webhook の両方へ流すと、**Matrix 宛だけ CW の内容が消える。**
+
+`type: tsunagal` を書くと `TsunagalWebhookShrieker` が選ばれ、**CW を本文の先頭へ畳んで送る**（`spoiler_text` ＋ 空行 ＋ 本文）。⚠ **Matrix に CW の標準は無い**ので、これは独自の見せ方。
+
+⚠⚠ **`type` を書かないと従来どおり CW は落ちる。**`room_id` の有無のような暗黙判定は**しない** — `channel` は Slack でも意味を持つので判定に使えず、「Matrix 固有なのは `room_id` だけ」という前提に乗ると、**`channel` だけで書かれた宛先（本番の 3 ソースがこの形）を取りこぼす**。
+
+⚠ **クラス名が `Matrix～` でないのは意図的。**喋る相手は Matrix の Client-Server API ではなく `tsunagal/matrix-webhook` という HTTP webhook なので、`MatrixShrieker` は将来 C-S API を実装するときのために空けてある。
 
 ### モロヘイヤ連携
 
