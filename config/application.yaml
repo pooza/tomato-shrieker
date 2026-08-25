@@ -39,6 +39,14 @@ logger:
     - password
     - secret
     - auth
+  # ⚠ URL の**パス**が資格情報になっている宛先 (pooza/ginseng-core#580)。
+  # モロヘイヤの webhook は POST /mulukhiya/webhook/{digest} で、digest を知って
+  # いれば誰でもそのアカウントで投稿できる。接頭辞の次の 1 セグメントを落とす。
+  #
+  # ⚠ ginseng-core の既定にも同じ値が入っているので、ここは「本アプリが何を
+  # 秘密とみなしているか」を明示するためのもの。既定に頼らず書いておく。
+  mask_url_paths:
+    - /mulukhiya/webhook/
 package:
   authors:
     - Tatsuya Koishi

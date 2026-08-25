@@ -20,11 +20,19 @@ module TomatoShrieker
   def self.setup_sentry
     dsn = Config.instance['/sentry/dsn']
     return unless dsn
+    # ⚠⚠ **マスクを Sentry.init の外で用意する (#1467)。** 中で組み立てると、
+    # 失敗が下の rescue に落ちて「Sentry は初期化されないが警告だけ出る」形になり、
+    # **マスクが無いまま送る状態には決してしない**という意図が読めなくなる。
+    # ここで raise すれば Sentry ごと立ち上がらない ＝ fail closed。
+    scrubber = SentryScrubber.new
     Sentry.init do |config|
       config.dsn = dsn
       config.release = Package.version
       config.environment = Environment.type
       config.traces_sample_rate = Config.instance['/sentry/traces_sample_rate'] || 0
+      # ⚠ `send_default_pii` は既定 false のまま。問題は「自分で例外メッセージへ
+      # 埋めているぶん」なので、既定値では守れない。
+      config.before_send = proc {|event, _hint| scrubber.scrub(event)}
     end
   rescue => e
     warn "Sentry initialization skipped: #{e.message}"
