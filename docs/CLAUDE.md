@@ -739,10 +739,13 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 ⚠ **サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`）も対象。**本体だけ追随すると CommandSource の 7 ソースだけ古い gem で動き続ける。
 
+🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず `origin/HEAD` から取り出す。**
+
 ```sh
 for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
-  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' \
-    ~/repos/$d/Gemfile.lock |
+  git -C ~/repos/$d fetch -q origin
+  git -C ~/repos/$d show origin/HEAD:Gemfile.lock |
+  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' |
   while read -r gem rev; do
     ahead=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
     printf '%-16s %-18s %s\n' "$d" "$gem" "${ahead:-?}"
@@ -753,6 +756,24 @@ done
 遅れがあれば `bundle update <gem>` で追随する。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
+
+#### サテライト 3 本の open PR / issue と CI
+
+🔴 **毎回実行する。**`loquat` / `shooby-do-bop` / `dqdai-anniv` は **CommandSource の 7 ソースの実体**だが、tomato 側からは見えないので**放置されても誰も気づかない**。⚠ **上流（`ginseng-style` / `ginseng-*`）はこちらへ PR / Issue を送ってくるので、受け取りが止まると横断の変更がここで詰まる。**
+
+```sh
+for d in loquat shooby-do-bop dqdai-anniv; do
+  b=$(gh repo view pooza/$d --json defaultBranchRef --jq .defaultBranchRef.name)
+  echo "=== $d ($b) ==="
+  gh pr list -R pooza/$d --state open
+  gh issue list -R pooza/$d --state open
+  gh run list -R pooza/$d -b $b -L 1 --json conclusion,headSha --jq '.[]|"CI \(.conclusion) \(.headSha[0:7])"'
+done
+```
+
+🔴 **2026-08-25 の実測では 3 本とも default ブランチの CI が赤で、上流からの PR が 6 日間止まっていた。**⚠ **`dqdai-anniv` は TZ 依存のバグ（[#32](https://github.com/pooza/dqdai-anniv/issues/32)）で 4 日以上赤のまま**で、それが上流の PR まで巻き添えにしていた。
+
+⚠ **上流から届いた PR がブランチを切った時点より default が進んでいることがある。**`chore/*-ginseng-style` は `/http/timeout/seconds` の設定より前から出ていたので、**そのままでは CI が `ConfigError` で落ちる**。**default をマージしてから通す。**
 
 #### Kuma のモニターと有効ソースの突き合わせ
 
