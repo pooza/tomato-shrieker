@@ -41,11 +41,23 @@ module TomatoShrieker
     rescue => e
       # 🔴 **fail closed。** マスクを通せなかったイベントは送らない。
       # 素通しで送ると、伏せるはずだった値がそのまま外部サービスへ出る。
-      warn "Sentry event dropped (scrub failed): #{e.class}"
+      report_drop(e)
       return nil
     end
 
     private
+
+    # 🔴 **`warn` で出してはいけない。** `bin/scheduler_daemon.rb` が
+    # `$stderr.reopen(File::NULL)` するので、**本番では丸ごと消える**。
+    # ここが見えないと「scrub が壊れて Sentry へ何も届かないのに、誰も気づけない」
+    # という #1467 の目的と正反対の状態になる。
+    #
+    # ⚠ ログ自体が落ちても before_send を巻き込まない（イベントは落とす側に倒す）。
+    def report_drop(error)
+      @logger.error(sentry: 'before_send', message: 'event dropped (scrub failed)', error:)
+    rescue StandardError
+      return nil
+    end
 
     # 例外メッセージ本体。⚠ **ここが tomato でいちばん漏れる場所。**
     # `SingleExceptionInterface#value` だけが writable。

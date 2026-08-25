@@ -88,8 +88,17 @@ module TomatoShrieker
 
     # マスクに失敗したとき、せめて例外クラス名だけは残す。⚠ 診断の手掛かりが
     # ゼロになると「マスクが壊れている」ことにも気付けない。
+    #
+    # ⚠⚠ **区切りは `': '`（コロン＋空白）。** `':'` で切ると
+    # `Ginseng::GatewayError` の名前空間で切れて **`Ginseng` しか残らない**。
+    # tomato の例外はほぼ全部 `Ginseng::` 配下なので、実質いつも壊れる。
+    #
+    # ⚠ 区切りが無い文字列は**丸ごと返さない**。呼び出し元は必ず
+    # `"#{error.class}: #{error.message}"` を渡すので通らない経路だが、
+    # ここで素通しにすると**マスクに失敗した本文がそのまま出る**。
     def self.error_class_of(message)
-      return message.to_s.split(':', 2).first.to_s
+      head, separator, = message.to_s.partition(': ')
+      return separator.empty? ? 'UnknownError' : head
     end
 
     def self.included(base)

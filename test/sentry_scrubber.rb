@@ -71,6 +71,32 @@ module TomatoShrieker
       assert_nil(@scrubber.scrub(event))
     end
 
+    # 🔴 **落としたことをログに残すこと。** `warn` は本番で `/dev/null`
+    # （scheduler_daemon が stderr を潰す）なので、そこへ出すと「Sentry へ何も
+    # 届かないのに誰も気づけない」になる。
+    def test_scrub_logs_when_event_is_dropped
+      event = error_event(StandardError.new('boom'))
+      event.define_singleton_method(:extra) {raise 'boom'}
+      logged = []
+      @scrubber.instance_variable_get(:@logger).define_singleton_method(:error) do |arg|
+        logged.push(arg)
+      end
+
+      @scrubber.scrub(event)
+
+      assert_equal(1, logged.size, 'イベントを黙って捨てている')
+      assert_equal('before_send', logged.first[:sentry])
+    end
+
+    # ⚠ ログ自体が落ちても before_send を巻き込まないこと。
+    def test_scrub_survives_logger_failure
+      event = error_event(StandardError.new('boom'))
+      event.define_singleton_method(:extra) {raise 'boom'}
+      @scrubber.instance_variable_get(:@logger).define_singleton_method(:error) {|_arg| raise 'logger boom'}
+
+      assert_nothing_raised {assert_nil(@scrubber.scrub(event))}
+    end
+
     private
 
     def error_event(error)

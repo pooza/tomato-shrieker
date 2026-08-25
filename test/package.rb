@@ -54,6 +54,25 @@ module TomatoShrieker
       assert_include(message, 'vjump-youtube')
     end
 
+    # ⚠⚠ マスクに失敗したときのフォールバックが、名前空間付きのクラス名で
+    # 壊れないこと。`':'` で切ると `Ginseng::GatewayError` が `Ginseng` になる。
+    # tomato の例外はほぼ全部 `Ginseng::` 配下なので実質いつも壊れていた。
+    def test_error_class_of
+      assert_equal(
+        'Ginseng::GatewayError',
+        Package.error_class_of('Ginseng::GatewayError: Bad response 404 (https://x/y)'),
+      )
+      assert_equal('RuntimeError', Package.error_class_of('RuntimeError: boom'))
+    end
+
+    # 🔴 区切りが無い文字列を丸ごと返さないこと。素通しにすると、マスクに失敗した
+    # 本文がそのまま出る。
+    def test_error_class_of_does_not_pass_through
+      message = 'https://precure.ml/mulukhiya/webhook/SECRET'
+
+      assert_not_include(Package.error_class_of(message), 'SECRET')
+    end
+
     # ⚠ 不正なバイト列でもマスクごと素通りしないこと (#518 / #1469 の族)。
     # to_utf8 の後にマスクを通しているかを見る。
     def test_error_message_masks_broken_bytes
