@@ -20,7 +20,7 @@ gem 'sqlite3'
 gem 'thor'
 
 group :development do
-  gem 'ginseng-style', github: 'pooza/ginseng-style', branch: 'main', require: false
+  gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.4', require: false
   gem 'ricecream'
   gem 'rubocop-sequel'
   gem 'test-unit'
