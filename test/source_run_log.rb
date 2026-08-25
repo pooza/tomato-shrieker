@@ -107,6 +107,42 @@ module TomatoShrieker
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
+    # 🔴 #1511: 保護行は retention_days を超えて無期限に残るので、そこに
+    # error_message が乗ったままだと「例外メッセージは N 日で消える」という
+    # 保持上限が保護行だけ外れる。⚠ 判定に使うのは executed_at /
+    # attempted_count / delivered_count だけなので、落としても保護は壊れない。
+    def test_prune_redacts_error_message_of_protected_rows
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
+        status: SourceRunLog::STATUS_PARTIAL, duration_ms: 10,
+        attempted_count: 2, delivered_count: 1,
+        error_message: 'Ginseng::GatewayError: Invalid feed x (https://example.com/f?access_token=TOKENVALUE)'
+      )
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(1, remain.size, '保護行そのものは残る')
+      assert_nil(remain.first.error_message)
+      assert_true(SourceRunLog.undelivered?(SOURCE_ID), '取りこぼしの判定は生きている')
+    end
+
+    # ⚠ 期限内の行の error_message は消さないこと。消すと直近の失敗理由が
+    # 読めなくなる。
+    def test_prune_keeps_error_message_within_retention
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - 3600,
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+        attempted_count: 1, delivered_count: 0,
+        error_message: 'Ginseng::GatewayError: Bad response 404'
+      )
+      SourceRunLog.prune(14)
+
+      assert_equal(
+        'Ginseng::GatewayError: Bad response 404',
+        SourceRunLog.where(source_id: SOURCE_ID).first.error_message,
+      )
+    end
+
     # 🔴 #1504: 取りこぼしの根拠行を刈ると、赤くなったソースが retention_days の
     # 経過だけで黙って緑に戻る。「次に配信できたときだけ解除する」が壊れる。
     def test_prune_keeps_last_attempted_row
