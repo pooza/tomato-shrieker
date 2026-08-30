@@ -2,7 +2,8 @@ source 'https://rubygems.org'
 ruby '>= 3.4', '< 5.0'
 gem 'feedjira', '~>3.0'
 gem 'ginseng-core', github: 'pooza/ginseng-core', branch: 'main', require: 'ginseng'
-gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', branch: 'main', require: 'ginseng/fediverse'
+gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', branch: 'main',
+  require: 'ginseng/fediverse'
 gem 'ginseng-piefed', github: 'pooza/ginseng-piefed', branch: 'main', require: 'ginseng/piefed'
 gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', branch: 'main', require: 'ginseng/you_tube'
 gem 'icalendar'
@@ -20,7 +21,7 @@ gem 'sqlite3'
 gem 'thor'
 
 group :development do
-  gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.4', require: false
+  gem 'ginseng-style', github: 'pooza/ginseng-style', tag: 'v1.1.11', require: false
   gem 'ricecream'
   gem 'rubocop-sequel'
   gem 'test-unit'
