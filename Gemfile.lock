@@ -48,14 +48,14 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-style.git
-  revision: 91c49d3b512a31dcd714baf156cd253b84eb4f0f
-  tag: v1.1.11
+  revision: ed862dcf9550d704ee670f65a30a333a694b883a
+  tag: v1.1.12
   specs:
-    ginseng-style (1.1.11)
-      rubocop
-      rubocop-minitest
-      rubocop-performance
-      rubocop-rake
+    ginseng-style (1.1.12)
+      rubocop (~> 1.90.0)
+      rubocop-minitest (~> 0.40.0)
+      rubocop-performance (~> 1.27.0)
+      rubocop-rake (~> 0.7.1)
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
@@ -222,8 +222,8 @@ GEM
     regexp_parser (2.12.0)
     rexml (3.4.4)
     ricecream (0.2.1)
-    rubocop (1.89.0)
-      json (~> 2.3)
+    rubocop (1.90.0)
+      json (>= 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
       parallel (>= 1.10)
