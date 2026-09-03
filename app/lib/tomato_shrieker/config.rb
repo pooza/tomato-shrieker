@@ -21,10 +21,29 @@ module TomatoShrieker
     #
     # ⚠ `+` で新しい配列を作る。`super` が返す配列は `@raw` の実体そのものなので、
     # そこへ push すると load のたびに積み増さる（ginseng-core#491）。
+    # ⚠ **公開は 1 手にする (#1548)。**`super` は self を直接 `update` するので、
+    # そのままだと `/sources` が `application.yaml` の値（＝ `[]`）へ戻り、
+    # **完成するまでの間、読み手には空の一覧が見える**。⚠ 窓を短くしても消えない。
+    # `update` を横流しして完成品を組み立て、**1 回の `replace`** で公開する
+    # （MRI の `Hash#replace` は C で完結するので中間状態が見えない）。
     def load
       entries = source_entries
-      super
-      self['/sources'] = self['/sources'] + entries
+      @staging = {}
+      begin
+        super
+        staged = @staging
+        staged['/sources'] = (staged['/sources'] || []) + entries
+      ensure
+        @staging = nil
+      end
+      replace(staged)
+    end
+
+    # ⚠ `load` の最中だけ横流しする。ここを素通しにすると `super` が self を
+    # 書き換え、上の「公開は 1 手」が崩れる。
+    def update(other)
+      return @staging.update(other) if @staging
+      return super
     end
 
     # `config/sources/*.yaml` を読んで配列にする。⚠ self には触らない。
