@@ -17,13 +17,20 @@ module TomatoShrieker
 
     def start(args = [])
       logger.info(daemon: app_name, version: Package.version, message: 'start')
+      # 🔴 **trap は他の初期化より先に張る (#1545 Codex P2)。**`run_start` は
+      # `start` を呼ぶ前に pid を書くので、`source reload` はこの時点から
+      # 「生きている」と見て HUP を送れる。trap が無い間に届くと、**既定動作で
+      # daemon が死ぬ**（マイグレーションを挟むぶん窓は短くない）。
+      start_reload_worker
       db = Sequel.connect(Environment.dsn)
       db.run('PRAGMA journal_mode=WAL')
       db.run('PRAGMA busy_timeout=5000')
       migrate(db)
       @monitor_server = MonitorServer.new
       @monitor_server.start
-      start_reload_worker
+      # ⚠ ここまでの HUP は queue に積むだけで、処理はしない。マイグレーションの
+      # 前にジョブを立てると `no such table` を踏む。
+      @reload_ready.push(true)
       Scheduler.instance.exec
     rescue => e
       Sentry.capture_exception(e) if Sentry.initialized?
@@ -40,20 +47,23 @@ module TomatoShrieker
     # `write_pid` / TERM・INT の trap を複製することになる。ここで張れば足りる。
     def start_reload_worker
       @reload_queue = Thread::Queue.new
-      @reload_thread = Thread.new do
-        # ⚠ `stop` が `close` すると `pop` は nil を返す。そこで抜ける。
-        while @reload_queue.pop
-          begin
-            Scheduler.instance.reload
-          rescue => e
-            # ⚠ **reload の失敗で daemon を落とさない。**壊れた YAML を掴んだだけなら
-            # 古い定義のまま走り続けるのが正しい。
-            Sentry.capture_exception(e) if Sentry.initialized?
-            logger.error(scheduler: 'reload', error: e)
-          end
+      @reload_ready = Thread::Queue.new
+      trap('HUP') {@reload_queue.push(true)}
+      @reload_thread = Thread.new {process_reloads if @reload_ready.pop}
+    end
+
+    def process_reloads
+      # ⚠ `stop` が `close` すると `pop` は nil を返す。そこで抜ける。
+      while @reload_queue.pop
+        begin
+          Scheduler.instance.reload
+        rescue => e
+          # ⚠ **reload の失敗で daemon を落とさない。**壊れた YAML を掴んだだけなら
+          # 古い定義のまま走り続けるのが正しい。
+          Sentry.capture_exception(e) if Sentry.initialized?
+          logger.error(scheduler: 'reload', error: e)
         end
       end
-      trap('HUP') {@reload_queue.push(true)}
     end
 
     # #1410 で rake start/restart を廃止したとき、その前提タスクだった migration:run が
@@ -73,6 +83,7 @@ module TomatoShrieker
     def stop
       logger.info(daemon: app_name, version: Package.version, message: 'stop')
       @reload_queue&.close
+      @reload_ready&.close
       @monitor_server&.stop
       Scheduler.instance.scheduler.shutdown(:kill)
     end

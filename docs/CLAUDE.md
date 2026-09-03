@@ -174,20 +174,23 @@ bin/shrieker source reload
 
 `source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
 
+🔴 **trap は他の初期化より先に張る。**`Ginseng::Daemon#run_start` は `start` を呼ぶ**前に** pid を書くので、`source reload` はその時点から「生きている」と見て HUP を送れる。⚠ **trap が無い間に届くと、既定動作で daemon が死ぬ**（マイグレーションを挟むぶん窓は短くない）。⚠ **ただし処理は起動完了後。**マイグレーション前にジョブを立てると `no such table` を踏むので、監視サーバーを上げるまでは**積むだけ**にする。
+
 🔴 **reload するのは「ソース定義」だけ。**`Ginseng::Config#load` は `next if @raw.key?(key)` で一度読んだファイルを二度と読まないため、`application.yaml` / `local.yaml` は反映されない。⚠ **「reload ＝ 設定を全部読み直す」と説明すると嘘になる。**`/monitor/bind` のようなキーを稼働中に差し替えられても困るので、これは**仕様として維持する**（コマンド名が `source reload` なのはそのため）。
 
-**差分だけをジョブに反映する。**id 単位で設定の digest を持ち、**無変更のソースはジョブに触らない**。
+**差分だけをジョブに反映する。**id 単位で設定の digest を持ち、**無変更のソースはジョブに触らない**。⚠ **起動時の初回登録も同じ差分適用を通す。**SIGHUP は起動の途中から受け付けるので、初回登録と reload が両方とも素通しで `register` すると**同じソースにジョブが 2 本立ち、以後は digest が一致するので誰も気付けない**（＝ 1 周期に 2 回投稿する）。
 
 - ⚠ **全件を貼り替えてはいけない。**`every` は登録時に発火しない代わりに、差し替えると**次回発火が 1 周期先へずれる**。全件貼り替えは全ソースの位相をリセットする
 - ⚠ **消すのは job id ではなく tag。**`IcalendarSource#register` は remind と本体の 2 本を**同じ `tag: id`** で登録し、`register` の戻り値は本体ぶんだけ。job id を控える設計にすると remind ジョブが取り残される
 - ⚠ `schedule_maintenance`（prune）の日次ジョブは**無タグ**。「全部 unschedule」をやると巻き添えで消える
 - ⚠ **実行中の run は殺さない。**`unschedule` は以後の発火を止めるだけなので、**進行中の run は古い定義のまま完走する**
+- 🔴 **新しいジョブを立ててから古いジョブを落とす。**`register` は失敗しうる（`CommandSource` は `bundle install` を走らせるし、reload はスキーマ検証をしないので**不正な cron 式**もここへ来る）。先に消すと、**失敗したソースが次の reload までジョブ 1 本無いまま放置される**。⚠ **失敗した id は registry を更新しない**ので、定義を直せば次の reload で必ず張り直る。⚠ 1 ソースの失敗は他のソースの反映を止めない（ログの `failed` に出る）
 - 🔴 **壊れた定義を掴んだら何も変えない。**`Config#load` は読み切ってから 1 回で差し替える（#1530）ので、YAML が 1 つでも壊れていれば例外だけが上がり、**ジョブも設定も前のまま**走り続ける
 - ⚠ **reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
 
 ⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
 
-⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...]}` 行で見る（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
+⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
 ### デプロイ手順
 

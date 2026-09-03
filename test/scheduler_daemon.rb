@@ -9,6 +9,7 @@ module TomatoShrieker
     def teardown
       FileUtils.rm_f(@path)
       @daemon.instance_variable_get(:@reload_queue)&.close
+      @daemon.instance_variable_get(:@reload_ready)&.close
       @daemon.instance_variable_get(:@reload_thread)&.join(5)
       trap('HUP', 'DEFAULT')
       @stubbed&.singleton_class&.remove_method(:reload)
@@ -23,7 +24,24 @@ module TomatoShrieker
       calls = Thread::Queue.new
       stub_reload {calls.push(:called)}
       @daemon.send(:start_reload_worker)
+      ready
       Process.kill('HUP', Process.pid)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 🔴 **trap は他の初期化より先に張るが、処理は起動完了後 (#1545 Codex P2)。**
+    # `run_start` は `start` を呼ぶ前に pid を書くので、`source reload` はこの時点
+    # から HUP を送れる。trap が無ければ既定動作で daemon が死ぬ。⚠ とはいえ
+    # マイグレーション前にジョブを立てると `no such table` を踏むので、積むだけ。
+    def test_reload_worker_defers_until_ready
+      calls = Thread::Queue.new
+      stub_reload {calls.push(:called)}
+      @daemon.send(:start_reload_worker)
+      Process.kill('HUP', Process.pid)
+
+      assert_nil(calls.pop(timeout: 1))
+      ready
 
       assert_equal(:called, calls.pop(timeout: 10))
     end
@@ -37,6 +55,7 @@ module TomatoShrieker
         raise 'boom'
       end
       @daemon.send(:start_reload_worker)
+      ready
       queue = @daemon.instance_variable_get(:@reload_queue)
       queue.push(true)
 
@@ -44,6 +63,11 @@ module TomatoShrieker
       queue.push(true)
 
       assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 起動完了の合図。SchedulerDaemon#start では monitor server を上げた直後に押す。
+    def ready
+      @daemon.instance_variable_get(:@reload_ready).push(true)
     end
 
     def stub_reload(&)
