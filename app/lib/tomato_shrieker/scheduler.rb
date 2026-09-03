@@ -6,6 +6,9 @@ module TomatoShrieker
     attr_reader :scheduler, :registry
 
     def exec
+      # ⚠ 初回登録も reload と**同じ差分適用**を通す (#1545 Codex P1)。SIGHUP は
+      # 起動の途中から受け付けるので、両方が素通しで register すると同じソースに
+      # ジョブが 2 本立ち、以後 digest が一致するので誰も気付けない。
       register_all
       schedule_maintenance
       @scheduler.join
@@ -31,7 +34,7 @@ module TomatoShrieker
         # 壊れた YAML があればここで raise する。#1530 以降 Config#load は読み切って
         # から 1 回で差し替えるので、**設定もジョブも何も変わらないまま**抜ける。
         Config.instance.reload
-        apply(desired_sources)
+        apply(desired_sources, action: 'reload')
       end
     end
 
@@ -44,30 +47,66 @@ module TomatoShrieker
       @reload_mutex = Mutex.new
     end
 
-    def apply(desired)
+    def apply(desired, action:)
       digests = desired.transform_values {|v| digest(v)}
-      removed = @registry.keys - digests.keys
+      removed = drop_removed(digests.keys)
       stale = digests.reject {|id, d| @registry[id] == d}.keys
       added = stale - @registry.keys
+      failed = swap_all(stale, desired, action)
+      # ⚠ **失敗した id は registry を更新しない。**次の reload で必ずやり直す。
+      (stale - failed).each {|id| @registry[id] = digests[id]}
+      result = {added: added - failed, removed:, changed: stale - added - failed, failed:}
+      logger.info({scheduler: action}.merge(result))
+      return result
+    end
+
+    def drop_removed(wanted)
+      removed = @registry.keys - wanted
       removed.each do |id|
         unschedule(id)
         @registry.delete(id)
       end
-      stale.each do |id|
-        unschedule(id)
-        desired[id].each(&:register)
-        @registry[id] = digests[id]
-      end
-      result = {added:, removed:, changed: stale - added}
-      logger.info({scheduler: 'reload'}.merge(result))
-      return result
+      return removed
     end
 
-    def register_all
-      desired = desired_sources
+    # 失敗した id を返す。⚠ CommandSource#register は bundle install を走らせる
+    # ので、初回登録の速さのために並列のまま置く。
+    def swap_all(stale, desired, action)
       in_threads = Parallel.processor_count * 2
-      Parallel.each(desired.values.flatten, in_threads:, &:register)
-      desired.each {|id, sources| @registry[id] = digest(sources)}
+      return Parallel.map(stale, in_threads:) do |id|
+        id unless swap(id, desired[id], action)
+      end.compact
+    end
+
+    # 🔴 **新しいジョブを立ててから古いジョブを落とす (#1545 Codex P1)。**
+    # `register` は失敗しうる（`CommandSource` は bundle install を走らせるし、
+    # reload はスキーマ検証をしないので不正な cron 式もここへ来る）。先に消すと、
+    # **失敗したソースが次の reload までジョブ 1 本無いまま放置される**。
+    def swap(id, sources, action)
+      old = @scheduler.jobs(tag: id)
+      sources.each(&:register)
+      old.each(&:unschedule)
+      return true
+    rescue => e
+      # 立った分だけ巻き戻して、古いジョブをそのまま残す。
+      unschedule(id, except: old)
+      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
+      logger.error(scheduler: action, source: id, error: e)
+      return false
+    end
+
+    # 🔴 **起動時の失敗は握らない (#1547 Codex P1)。**reload は「壊れた 1 件を
+    # 飛ばして走り続ける」のが正しいが、**起動時に同じことをすると、そのソースが
+    # 二度と登録されないまま daemon が正常に見える**（総合 `/healthz` は無タグの
+    # maintenance ジョブがあれば通ってしまう）。ここで倒せば systemd の
+    # `Restart=always` が 5 秒後に再試行する ＝ **#1459 の前と同じ挙動**。
+    #
+    # ⚠ **起動は fail closed、reload は fail safe** と覚える。稼働中の daemon を
+    # 「誰かが YAML を打ち間違えた」で落とす理由は無い。
+    def register_all
+      result = @reload_mutex.synchronize {apply(desired_sources, action: 'register')}
+      return if result[:failed].empty?
+      raise Ginseng::ConfigError, "failed to register: #{result[:failed].join(', ')}"
     end
 
     # 有効なソースを id 単位でまとめる。⚠ 1 つの定義が複数のソースクラスに
@@ -80,8 +119,9 @@ module TomatoShrieker
     # ⚠ **job id ではなく tag で消す。**`IcalendarSource#register` は remind と本体の
     # 2 本を同じ `tag: id` で登録し、戻り値は本体ぶんだけなので、job id を控える
     # 設計にすると remind ジョブが取り残される。
-    def unschedule(id)
-      @scheduler.jobs(tag: id).each(&:unschedule)
+    def unschedule(id, except: [])
+      kept = except.map(&:job_id)
+      @scheduler.jobs(tag: id).reject {|v| kept.include?(v.job_id)}.each(&:unschedule)
     end
 
     # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。

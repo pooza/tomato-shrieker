@@ -128,6 +128,68 @@ module TomatoShrieker
       assert_empty(jobs(ICAL_ID).map(&:job_id) & before)
     end
 
+    # 🔴 **register が失敗したソースは、古いジョブを残す (#1545 Codex P1)。**
+    # reload はスキーマ検証をしないので、不正な cron 式はここまで来る。先に
+    # unschedule する実装だと、失敗したソースが次の reload までジョブ 1 本無い
+    # まま放置される（daemon 側は例外を握って走り続けるので誰も気付けない）。
+    def test_reload_keeps_old_jobs_when_register_fails
+      job = jobs(FIXTURE_ID).first
+      write_fixture(FIXTURE_ID, {'schedule' => {'cron' => 'not a cron'}})
+      result = @scheduler.reload
+
+      assert_include(result[:failed], FIXTURE_ID)
+      assert_equal(1, jobs(FIXTURE_ID).size)
+      assert_equal(job.job_id, jobs(FIXTURE_ID).first.job_id)
+    end
+
+    # 失敗した id は registry を更新しないので、直せば次の reload で必ず張り直る。
+    def test_reload_retries_failed_source
+      write_fixture(FIXTURE_ID, {'schedule' => {'cron' => 'not a cron'}})
+      @scheduler.reload
+      write_fixture(FIXTURE_ID, {'schedule' => {'every' => '2d'}})
+      result = @scheduler.reload
+
+      assert_empty(result[:failed])
+      assert_equal('2d', jobs(FIXTURE_ID).first.original)
+    end
+
+    # 1 ソースの失敗で他のソースの反映を止めない。
+    def test_reload_isolates_failed_source
+      write_fixture(FIXTURE_ID, {'schedule' => {'cron' => 'not a cron'}})
+      write_fixture(OTHER_ID, {})
+      result = @scheduler.reload
+
+      assert_include(result[:failed], FIXTURE_ID)
+      assert_include(result[:added], OTHER_ID)
+      assert_equal(1, jobs(OTHER_ID).size)
+    end
+
+    # 🔴 **起動時の register 失敗は握らない (#1547 Codex P1)。**reload と違い、
+    # ここで飛ばすとそのソースは二度と登録されないまま daemon が正常に見える
+    # （総合 /healthz は無タグの maintenance ジョブがあれば通る）。倒しておけば
+    # systemd の `Restart=always` が再試行する。⚠ **起動は fail closed、
+    # reload は fail safe。**
+    def test_register_all_raises_when_register_fails
+      write_fixture(OTHER_ID, {'schedule' => {'cron' => 'not a cron'}})
+      config.reload
+      @scheduler.registry.clear
+
+      error = assert_raise(Ginseng::ConfigError) {@scheduler.send(:register_all)}
+
+      assert_include(error.message, OTHER_ID)
+    end
+
+    # ⚠ **初回登録も同じ差分適用を通す (#1545 Codex P1)。**SIGHUP は起動の途中から
+    # 受け付けるので、両方が素通しで register するとジョブが 2 本立ち、以後は
+    # digest が一致するので誰も気付けない。
+    def test_register_all_after_reload_does_not_duplicate
+      job = jobs(FIXTURE_ID).first
+      @scheduler.send(:register_all)
+
+      assert_equal(1, jobs(FIXTURE_ID).size)
+      assert_equal(job.job_id, jobs(FIXTURE_ID).first.job_id)
+    end
+
     # 🔴 壊れた定義を掴んだら、ジョブは 1 本も触らずに古い定義のまま走り続ける。
     def test_reload_keeps_jobs_when_config_is_broken
       job = jobs(FIXTURE_ID).first
