@@ -52,7 +52,7 @@ module TomatoShrieker
       removed = drop_removed(digests.keys)
       stale = digests.reject {|id, d| @registry[id] == d}.keys
       added = stale - @registry.keys
-      failed = swap_all(stale, desired)
+      failed = swap_all(stale, desired, action)
       # ⚠ **失敗した id は registry を更新しない。**次の reload で必ずやり直す。
       (stale - failed).each {|id| @registry[id] = digests[id]}
       result = {added: added - failed, removed:, changed: stale - added - failed, failed:}
@@ -71,16 +71,18 @@ module TomatoShrieker
 
     # 失敗した id を返す。⚠ CommandSource#register は bundle install を走らせる
     # ので、初回登録の速さのために並列のまま置く。
-    def swap_all(stale, desired)
+    def swap_all(stale, desired, action)
       in_threads = Parallel.processor_count * 2
-      return Parallel.map(stale, in_threads:) {|id| id unless swap(id, desired[id])}.compact
+      return Parallel.map(stale, in_threads:) do |id|
+        id unless swap(id, desired[id], action)
+      end.compact
     end
 
     # 🔴 **新しいジョブを立ててから古いジョブを落とす (#1545 Codex P1)。**
     # `register` は失敗しうる（`CommandSource` は bundle install を走らせるし、
     # reload はスキーマ検証をしないので不正な cron 式もここへ来る）。先に消すと、
     # **失敗したソースが次の reload までジョブ 1 本無いまま放置される**。
-    def swap(id, sources)
+    def swap(id, sources, action)
       old = @scheduler.jobs(tag: id)
       sources.each(&:register)
       old.each(&:unschedule)
@@ -89,12 +91,22 @@ module TomatoShrieker
       # 立った分だけ巻き戻して、古いジョブをそのまま残す。
       unschedule(id, except: old)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
-      logger.error(scheduler: 'reload', source: id, error: e)
+      logger.error(scheduler: action, source: id, error: e)
       return false
     end
 
+    # 🔴 **起動時の失敗は握らない (#1547 Codex P1)。**reload は「壊れた 1 件を
+    # 飛ばして走り続ける」のが正しいが、**起動時に同じことをすると、そのソースが
+    # 二度と登録されないまま daemon が正常に見える**（総合 `/healthz` は無タグの
+    # maintenance ジョブがあれば通ってしまう）。ここで倒せば systemd の
+    # `Restart=always` が 5 秒後に再試行する ＝ **#1459 の前と同じ挙動**。
+    #
+    # ⚠ **起動は fail closed、reload は fail safe** と覚える。稼働中の daemon を
+    # 「誰かが YAML を打ち間違えた」で落とす理由は無い。
     def register_all
-      @reload_mutex.synchronize {apply(desired_sources, action: 'register')}
+      result = @reload_mutex.synchronize {apply(desired_sources, action: 'register')}
+      return if result[:failed].empty?
+      raise Ginseng::ConfigError, "failed to register: #{result[:failed].join(', ')}"
     end
 
     # 有効なソースを id 単位でまとめる。⚠ 1 つの定義が複数のソースクラスに

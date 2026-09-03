@@ -164,6 +164,21 @@ module TomatoShrieker
       assert_equal(1, jobs(OTHER_ID).size)
     end
 
+    # 🔴 **起動時の register 失敗は握らない (#1547 Codex P1)。**reload と違い、
+    # ここで飛ばすとそのソースは二度と登録されないまま daemon が正常に見える
+    # （総合 /healthz は無タグの maintenance ジョブがあれば通る）。倒しておけば
+    # systemd の `Restart=always` が再試行する。⚠ **起動は fail closed、
+    # reload は fail safe。**
+    def test_register_all_raises_when_register_fails
+      write_fixture(OTHER_ID, {'schedule' => {'cron' => 'not a cron'}})
+      config.reload
+      @scheduler.registry.clear
+
+      error = assert_raise(Ginseng::ConfigError) {@scheduler.send(:register_all)}
+
+      assert_include(error.message, OTHER_ID)
+    end
+
     # ⚠ **初回登録も同じ差分適用を通す (#1545 Codex P1)。**SIGHUP は起動の途中から
     # 受け付けるので、両方が素通しで register するとジョブが 2 本立ち、以後は
     # digest が一致するので誰も気付けない。
