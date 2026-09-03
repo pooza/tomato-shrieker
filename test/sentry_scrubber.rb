@@ -88,6 +88,46 @@ module TomatoShrieker
       assert_equal('before_send', logged.first[:sentry])
     end
 
+    # 🔴 **logger 自身が落ちても、どこかへ残すこと (#1549)。**
+    # scrub が落ちる原因がマスク設定そのものなら、報告に使う `@logger.error` も
+    # 同じ理由で落ちる。⚠ そこで黙ると「**Sentry へ 1 件も届かないのに、どこにも
+    # 何も出ない**」＝ #1467 が塞ごうとした状態に戻る。マスク経路に依存しない
+    # sink（素の `Syslog::Logger`）へ、例外のクラス名だけを出す。
+    def test_scrub_reports_drop_when_logger_fails
+      event = error_event(StandardError.new('boom'))
+      event.define_singleton_method(:extra) {raise 'boom'}
+      @scrubber.instance_variable_get(:@logger).define_singleton_method(:error) {|_arg| raise 'logger boom'}
+      fallback = []
+      @scrubber.define_singleton_method(:report_drop_fallback) do |error, log_error|
+        fallback.push([error.class, log_error.class])
+      end
+
+      @scrubber.scrub(event)
+
+      assert_equal(1, fallback.size, 'logger が落ちたときに何も残っていない')
+    end
+
+    # ⚠ 予備の sink は「マスク経路を通らないこと」と「クラス名しか出さないこと」
+    # の両方が要る。⚠ **メッセージを載せると、伏せるはずだった値が素で出る。**
+    def test_report_drop_fallback_emits_class_names_only
+      written = []
+      logger = Object.new
+      logger.define_singleton_method(:error) {|arg| written.push(arg)}
+      Syslog::Logger.define_singleton_method(:new) {|*| logger}
+      begin
+        @scrubber.send(:report_drop_fallback,
+          Ginseng::GatewayError.new(WEBHOOK_URL), RuntimeError.new(FEED_TOKEN))
+      ensure
+        Syslog::Logger.singleton_class.remove_method(:new)
+      end
+
+      assert_equal(1, written.size)
+      assert_include(written.first, 'Ginseng::GatewayError')
+      assert_include(written.first, 'RuntimeError')
+      assert_not_include(written.first, WEBHOOK_DIGEST)
+      assert_not_include(written.first, FEED_TOKEN)
+    end
+
     # ⚠ ログ自体が落ちても before_send を巻き込まないこと。
     def test_scrub_survives_logger_failure
       event = error_event(StandardError.new('boom'))
