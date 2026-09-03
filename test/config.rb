@@ -35,6 +35,29 @@ module TomatoShrieker
       assert_equal([expected], observed.uniq, "reload の途中経過が見えている: #{observed.uniq.sort}")
     end
 
+    # 🔴 #1548: 公開は 1 手。⚠ **上のサンプリングでは窓を取りこぼしうる**ので、
+    # 「公開の直前まで self が触られていないこと」を決定的に見る。
+    # `super` が self を `update` する実装だと、この時点で `/sources` は
+    # `application.yaml` の値（＝空）へ戻っている。
+    def test_load_does_not_touch_self_until_publish
+      write_sources(3)
+      config.reload
+      expected = config['/sources'].size
+      seen = nil
+      config.define_singleton_method(:replace) do |hash|
+        seen = self['/sources'].size
+        super(hash)
+      end
+      begin
+        config.reload
+      ensure
+        config.singleton_class.remove_method(:replace)
+      end
+
+      assert_equal(expected, seen, '公開の前に self が書き換わっている')
+      assert_equal(expected, config['/sources'].size)
+    end
+
     # 🔴 #1530: 壊れた YAML があっても、それまでの内容を壊さないこと。
     #
     # 以前は 3 件目で raise すると 2 件目まで積まれた状態で残った。⚠ ソース定義を
