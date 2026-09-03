@@ -174,7 +174,7 @@ bin/shrieker source reload
 
 `source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
 
-🔴 **trap は他の初期化より先に張る。**`Ginseng::Daemon#run_start` は `start` を呼ぶ**前に** pid を書くので、`source reload` はその時点から「生きている」と見て HUP を送れる。⚠ **trap が無い間に届くと、既定動作で daemon が死ぬ**（マイグレーションを挟むぶん窓は短くない）。⚠ **ただし処理は起動完了後。**マイグレーション前にジョブを立てると `no such table` を踏むので、監視サーバーを上げるまでは**積むだけ**にする。
+🔴 **trap は pid が外から見えるより前に張る。**`Ginseng::Daemon#run_start` は `start` を呼ぶ**前に** pid を書くので、`source reload` は**書かれた瞬間から**「生きている」と見て HUP を送れる。⚠ **trap が無い間に届くと、既定動作で daemon が死ぬ。**⚠⚠ **`start` の先頭で張るのでは閉じない**（実測: `write_pid` から `start` の trap までは med 0.013ms / max 2.26ms・n=200。CLI 側は pid ファイルを読んだ直後に撃つので、窓が縮むだけで原理的に残る）。そこで **`write_pid` を override** して、`super` の前に trap を張る。⚠ **`run_start` は override しない** — `abort_if_running!` / TERM・INT の trap まで複製することになり、上流が [#509](https://github.com/pooza/ginseng-core/issues/509) / [#510](https://github.com/pooza/ginseng-core/issues/510) / [#532](https://github.com/pooza/ginseng-core/issues/532) で個別に塞いだレースを写し取る羽目になる。⚠ **ただし処理は起動完了後。**マイグレーション前にジョブを立てると `no such table` を踏むので、監視サーバーを上げるまでは**積むだけ**にする。
 
 🔴 **reload するのは「ソース定義」だけ。**`Ginseng::Config#load` は `next if @raw.key?(key)` で一度読んだファイルを二度と読まないため、`application.yaml` / `local.yaml` は反映されない。⚠ **「reload ＝ 設定を全部読み直す」と説明すると嘘になる。**`/monitor/bind` のようなキーを稼働中に差し替えられても困るので、これは**仕様として維持する**（コマンド名が `source reload` なのはそのため）。
 

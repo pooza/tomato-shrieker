@@ -3,11 +3,16 @@ module TomatoShrieker
     def setup
       @daemon = SchedulerDaemon.new
       @path = File.join(Environment.dir, 'tmp/db', "__test_scheduler_daemon_#{Process.pid}.sqlite3")
+      # ⚠ 本物の pid ファイルを書かない。開発機で稼働中の daemon を指す pid を
+      # 上書きすると、次の stop / restart が別プロセスを掴む。
+      @pid_path = File.join(Environment.dir, 'tmp/pids', "__test_scheduler_daemon_#{Process.pid}.pid")
       FileUtils.rm_f(@path)
+      FileUtils.rm_f(@pid_path)
     end
 
     def teardown
       FileUtils.rm_f(@path)
+      FileUtils.rm_f(@pid_path)
       @daemon.instance_variable_get(:@reload_queue)&.close
       @daemon.instance_variable_get(:@reload_ready)&.close
       @daemon.instance_variable_get(:@reload_thread)&.join(5)
@@ -30,10 +35,10 @@ module TomatoShrieker
       assert_equal(:called, calls.pop(timeout: 10))
     end
 
-    # 🔴 **trap は他の初期化より先に張るが、処理は起動完了後 (#1545 Codex P2)。**
-    # `run_start` は `start` を呼ぶ前に pid を書くので、`source reload` はこの時点
-    # から HUP を送れる。trap が無ければ既定動作で daemon が死ぬ。⚠ とはいえ
-    # マイグレーション前にジョブを立てると `no such table` を踏むので、積むだけ。
+    # 🔴 **trap は pid を書く前に張るが、処理は起動完了後 (#1545 Codex P2)。**
+    # `write_pid` が pid を書いた瞬間から `source reload` は HUP を送れるので、
+    # trap が無ければ既定動作で daemon が死ぬ。⚠ とはいえマイグレーション前に
+    # ジョブを立てると `no such table` を踏むので、届いても積むだけにする。
     def test_reload_worker_defers_until_ready
       calls = Thread::Queue.new
       stub_reload {calls.push(:called)}
@@ -63,6 +68,26 @@ module TomatoShrieker
       queue.push(true)
 
       assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 🔴 **pid が外から見えた時点で trap が張られていること (#1545 Codex P2)。**
+    # `bin/shrieker source reload` は pid ファイルを読んで HUP を送るので、
+    # `start` の先頭で張るのでは間に合わないことがある（窓が縮むだけで閉じない）。
+    #
+    # ⚠ **観測点は `pid_file`。**上流の `write_pid` は `File.write` の直前にこれを
+    # 呼ぶので、**pid が公開される瞬間の trap の状態**はここでしか見られない。
+    def test_write_pid_installs_hup_trap_before_publishing
+      observed = nil
+      path = @pid_path
+      @daemon.define_singleton_method(:pid_file) do
+        # ⚠ `trap` は現在のハンドラを返すが同時に差し替えるので、読んだら戻す。
+        observed ||= trap('HUP', 'DEFAULT').tap {|prev| trap('HUP', prev)}
+        path
+      end
+      @daemon.send(:write_pid)
+
+      assert_equal(Process.pid.to_s, File.read(path))
+      assert_not_equal('DEFAULT', observed)
     end
 
     # 起動完了の合図。SchedulerDaemon#start では monitor server を上げた直後に押す。

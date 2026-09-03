@@ -17,11 +17,6 @@ module TomatoShrieker
 
     def start(args = [])
       logger.info(daemon: app_name, version: Package.version, message: 'start')
-      # 🔴 **trap は他の初期化より先に張る (#1545 Codex P2)。**`run_start` は
-      # `start` を呼ぶ前に pid を書くので、`source reload` はこの時点から
-      # 「生きている」と見て HUP を送れる。trap が無い間に届くと、**既定動作で
-      # daemon が死ぬ**（マイグレーションを挟むぶん窓は短くない）。
-      start_reload_worker
       db = Sequel.connect(Environment.dsn)
       db.run('PRAGMA journal_mode=WAL')
       db.run('PRAGMA busy_timeout=5000')
@@ -42,9 +37,6 @@ module TomatoShrieker
     #
     # ⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）。`Scheduler#reload` は
     # Mutex を取るので、**trap は Queue に積むだけ**にして専用スレッドが処理する。
-    #
-    # ⚠ `Ginseng::Daemon#run_start` は override しない。あちらの `abort_if_running!` /
-    # `write_pid` / TERM・INT の trap を複製することになる。ここで張れば足りる。
     def start_reload_worker
       @reload_queue = Thread::Queue.new
       @reload_ready = Thread::Queue.new
@@ -86,6 +78,22 @@ module TomatoShrieker
       @reload_ready&.close
       @monitor_server&.stop
       Scheduler.instance.scheduler.shutdown(:kill)
+    end
+
+    private
+
+    # 🔴 **HUP の trap は pid が外から見えるより前に張る (#1545 Codex P2)。**
+    # `bin/shrieker source reload` は pid ファイルを読んで HUP を送るので、
+    # **書かれた瞬間から届きうる**。trap がまだ無ければ既定動作で daemon が死ぬ。
+    # `start` の先頭で張っても窓は縮むだけで閉じない（実測 0.013ms・max 2.26ms）。
+    #
+    # ⚠ **`run_start` は override しない。**あちらの `abort_if_running!` /
+    # TERM・INT の trap まで複製することになり、上流が #509 / #510 / #532 で
+    # 個別に塞いだレースを写し取る羽目になる。pid を書く直前に通るのはここだけ
+    # なので、1 行の `write_pid` を挟む。
+    def write_pid
+      start_reload_worker
+      super
     end
   end
 end
