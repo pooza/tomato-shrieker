@@ -8,7 +8,47 @@ module TomatoShrieker
 
     def teardown
       FileUtils.rm_f(@path)
+      @daemon.instance_variable_get(:@reload_queue)&.close
+      @daemon.instance_variable_get(:@reload_thread)&.join(5)
+      trap('HUP', 'DEFAULT')
+      @stubbed&.singleton_class&.remove_method(:reload)
       super
+    end
+
+    # #1459: SIGHUP でソース定義を読み直す。
+    # ⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）。`Scheduler#reload` は
+    # Mutex を取るので、trap は Queue に積むだけにして専用スレッドが処理する。
+    # ここで確かめているのは「HUP がワーカー経由で reload に届く」配線。
+    def test_reload_worker_handles_sighup
+      calls = Thread::Queue.new
+      stub_reload {calls.push(:called)}
+      @daemon.send(:start_reload_worker)
+      Process.kill('HUP', Process.pid)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 🔴 **reload の失敗で daemon を落とさない。**壊れた YAML を掴んだだけなら
+    # 古い定義のまま走り続けるのが正しく、次の reload 要求も処理できねばならない。
+    def test_reload_worker_survives_error
+      calls = Thread::Queue.new
+      stub_reload do
+        calls.push(:called)
+        raise 'boom'
+      end
+      @daemon.send(:start_reload_worker)
+      queue = @daemon.instance_variable_get(:@reload_queue)
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    def stub_reload(&)
+      @stubbed = Scheduler.instance
+      @stubbed.define_singleton_method(:reload, &)
     end
 
     def migration_dir
