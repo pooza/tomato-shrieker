@@ -146,6 +146,7 @@ systemd/rc.d → bin/scheduler_daemon.rb start
       → Sequel.connect (SQLite3)
       → SchedulerDaemon#migrate (未適用ならマイグレーション)
       → MonitorServer#start (Puma embedded / 監視用 HTTP)
+      → SchedulerDaemon#start_reload_worker (SIGHUP → Queue → Scheduler#reload)
       → Scheduler.instance.exec (Rufus::Scheduler)
         → Source.all → register (各ソースをスケジューラに登録)
 ```
@@ -157,6 +158,36 @@ systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake
 **未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
 
 ⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
+
+### ソース定義の reload (#1459)
+
+**稼働中の scheduler にソース定義を読み直させる。**`bin/shrieker source add / edit / delete / disable / enable` はファイルを書くだけなので、以前は反映に再起動が要った。
+
+```sh
+bin/shrieker source disable foo
+# disabled: foo
+# ⚠ 稼働中の scheduler に反映するには bin/shrieker source reload
+
+bin/shrieker source reload
+# reload requested (pid 1322485)
+```
+
+`source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
+
+🔴 **reload するのは「ソース定義」だけ。**`Ginseng::Config#load` は `next if @raw.key?(key)` で一度読んだファイルを二度と読まないため、`application.yaml` / `local.yaml` は反映されない。⚠ **「reload ＝ 設定を全部読み直す」と説明すると嘘になる。**`/monitor/bind` のようなキーを稼働中に差し替えられても困るので、これは**仕様として維持する**（コマンド名が `source reload` なのはそのため）。
+
+**差分だけをジョブに反映する。**id 単位で設定の digest を持ち、**無変更のソースはジョブに触らない**。
+
+- ⚠ **全件を貼り替えてはいけない。**`every` は登録時に発火しない代わりに、差し替えると**次回発火が 1 周期先へずれる**。全件貼り替えは全ソースの位相をリセットする
+- ⚠ **消すのは job id ではなく tag。**`IcalendarSource#register` は remind と本体の 2 本を**同じ `tag: id`** で登録し、`register` の戻り値は本体ぶんだけ。job id を控える設計にすると remind ジョブが取り残される
+- ⚠ `schedule_maintenance`（prune）の日次ジョブは**無タグ**。「全部 unschedule」をやると巻き添えで消える
+- ⚠ **実行中の run は殺さない。**`unschedule` は以後の発火を止めるだけなので、**進行中の run は古い定義のまま完走する**
+- 🔴 **壊れた定義を掴んだら何も変えない。**`Config#load` は読み切ってから 1 回で差し替える（#1530）ので、YAML が 1 つでも壊れていれば例外だけが上がり、**ジョブも設定も前のまま**走り続ける
+- ⚠ **reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
+
+⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
+
+⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...]}` 行で見る（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
 ### デプロイ手順
 
@@ -288,8 +319,10 @@ bin/shrieker source ack ID
 | 状況 | 対処 |
 |------|------|
 | 一時的に静か（たまたま 1 か月新着が無かった） | `bin/shrieker source ack ID` |
-| 投稿が恒久的に終了した | `bin/shrieker source disable ID` |
+| 投稿が恒久的に終了した | `bin/shrieker source disable ID`（＋ `source reload`） |
 | 年単位で正常に静か（`chikanan` 等） | `silence_tolerance` を設定しない |
+
+⚠ **`disable` にしたソースは監視対象外になり、`/healthz/source/:id` は `OK (disabled)` の 200 を返す (#1503)。**「意図的に止めた」と「壊れている」を同じ 503 で表さない。
 
 ⚠ **判定に使うのは run_log 由来の実配信だけで、`fallback` は見ない (#1483)。**下記のとおり `fallback` は配信の成否と無関係に前進するため、これを信じると配信できていなくても `silent?` が永久に false になる。
 
