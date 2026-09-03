@@ -1,28 +1,28 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 430ad064e94c3e8cea53cd1d5d8b3b4b32a723dc
+  revision: d53a18b5c74d13af6b78b6a7ae6e0c6a7a0caa88
   branch: main
   specs:
-    ginseng-core (1.22.0)
-      activesupport (>= 7.0.7.1)
+    ginseng-core (1.23.5)
+      activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
       csv
       date (>= 3.2.1)
-      erb
+      erb (>= 6.0.4)
       etc
       facets
       fileutils (~> 1.7.0)
       find
       httparty (>= 0.24.0)
       json-schema
-      mail
+      mail (>= 2.5.5)
       multi_json
       net-protocol
       net-smtp
-      nokogiri (>= 1.18.9)
+      nokogiri (>= 1.19.4)
       optparse
-      rake (!= 13.4.0)
+      rake (>= 12.3.3, != 13.4.0)
       sanitize (>= 6.0.2)
       securerandom
       set
@@ -30,18 +30,18 @@ GIT
       time (>= 0.2.2)
       yajl-ruby (>= 1.4.3)
       zeitwerk (>= 2.4.0)
-      zlib
+      zlib (>= 3.2.3)
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 8b23e095d68674d18840ea782c15c560202f3adb
+  revision: 8d6d1fa6f9e49f71347cd3b47eea794f12ae8f45
   branch: main
   specs:
     ginseng-fediverse (1.8.31)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 1150891191edb02dbbc60153a375b1756b0bd943
+  revision: afddcdace7ae524cfba4967e5f7de97637bbea32
   branch: main
   specs:
     ginseng-piefed (0.1.1)
@@ -59,10 +59,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: f041de996b98a6d24df07c5fcd70893290206f68
+  revision: 71415a45d291f7a823e1b51c397e4651d9625237
   branch: main
   specs:
-    ginseng-youtube (2.0.1)
+    ginseng-youtube (3.0.1)
 
 GIT
   remote: https://github.com/pooza/icalendar-rrule.git
@@ -173,7 +173,7 @@ GEM
       net-protocol
     net-pop (0.1.2)
       net-protocol
-    net-protocol (0.2.2)
+    net-protocol (0.3.0)
       timeout
     net-smtp (0.5.1)
       net-protocol
