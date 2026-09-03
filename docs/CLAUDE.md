@@ -785,12 +785,16 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 ⚠ **サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`）も対象。**本体だけ追随すると CommandSource の 7 ソースだけ古い gem で動き続ける。
 
-🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず `origin/HEAD` から取り出す。**
+🔴 **tomato 自身は `origin/develop` から読む (#1550)。**⚠ **`origin/HEAD` は `main` ＝ リリース済みの版**で、日常の作業は `develop`。main と develop でピンが違う期間、`origin/HEAD` を読むと**すでに `develop` で追随済みのものをもう一度上げようとするか、`develop` 側の乖離を見落とす**。⚠ **サテライト 3 本はそれぞれの default ブランチのまま**（`shooby-do-bop` は `master`）。
+
+🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず追跡ブランチから取り出す**（上記のとおり tomato は `origin/develop`、サテライトは `origin/HEAD`）。
 
 ```sh
 for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
+  # ⚠ tomato 自身だけ develop。origin/HEAD は main ＝ リリース済みの版 (#1550)
+  ref=origin/HEAD; [ "$d" = tomato-shrieker ] && ref=origin/develop
   git -C ~/repos/$d fetch -q origin
-  git -C ~/repos/$d show origin/HEAD:Gemfile.lock |
+  git -C ~/repos/$d show $ref:Gemfile.lock |
   awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' |
   while read -r gem rev; do
     ahead=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
