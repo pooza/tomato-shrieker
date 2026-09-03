@@ -43,11 +43,14 @@ module TomatoShrieker
     def build_healthz_source(source_id)
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
+      # 意図的に止めたソースを「壊れている」と混同しない (#1503)。
+      return [200, HEADERS, ["OK (disabled)\n"]] if source.disable?
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
       # 宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。
-      # ⚠ 無効ソースは除く。スキーマが disable: true のとき dest の必須を免除しており
-      # (chinachu 等の死蔵定義が実際に dest: {})、ランタイムだけ咎めると食い違う (#1486)。
-      return [503, HEADERS, ["No destination configured\n"]] unless source.dest? || source.disable?
+      # ⚠ 無効ソースはここまで来ない (#1503)。スキーマが disable: true のとき dest の
+      # 必須を免除している (chinachu 等の死蔵定義が実際に dest: {}) 件 (#1486) も、
+      # 「無効なら監視しない」で一括して片付く。
+      return [503, HEADERS, ["No destination configured\n"]] unless source.dest?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
       checks = source_checks(source, latest)

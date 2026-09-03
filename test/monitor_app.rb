@@ -114,15 +114,28 @@ module TomatoShrieker
     end
 
     # #1486: スキーマは disable: true のとき dest の必須を免除しているので、
-    # ランタイムだけ「宛先がない」と咎めると食い違う
+    # ランタイムだけ「宛先がない」と咎めると食い違う。
+    # ⚠ #1503 で「無効なソースは監視しない」に統一したので、run の有無に関わらず 200。
     def test_healthz_source_disabled_without_dest
       write_fixture(DISABLED_ID, {'disable' => true, 'dest' => {}})
       config.reload
       status, _headers, body = call("/healthz/source/#{DISABLED_ID}")
 
-      assert_equal(503, status)
-      assert_not_include(body.first, 'No destination configured')
-      assert_include(body.first, 'No run recorded yet')
+      assert_equal(200, status)
+      assert_include(body.first, 'OK (disabled)')
+    end
+
+    # #1503: 一度稼働してから無効化したソースは run_log が残るので stale 判定まで進み、
+    # しかも scheduler が register しないので executed_at が二度と前に進まない。
+    # grace を跨いだ時点で恒久的に 503 になっていた。
+    def test_healthz_source_disabled_after_running
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      record(DISABLED_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 86_400)
+      status, _headers, body = call("/healthz/source/#{DISABLED_ID}")
+
+      assert_equal(200, status)
+      assert_include(body.first, 'OK (disabled)')
     end
 
     # #1457: 一過性エラーのあと no-op success が来たら健全に戻る。

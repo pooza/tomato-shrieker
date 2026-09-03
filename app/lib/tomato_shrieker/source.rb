@@ -343,7 +343,12 @@ module TomatoShrieker
       return SourceRunLog.undelivered?(id)
     end
 
+    # 監視の対象か (#1503)。
+    # ⚠ 無効ソースは scheduler が register しないので executed_at が前に進まず、
+    # 一度稼働してから無効化すると stale 判定が恒久的に成立して赤が貼り付く。
+    # 「無効なソースは監視しない」で /status.json の reject(&:disable?) と揃える。
     def monitored?
+      return false if disable?
       return post_at.nil?
     end
 

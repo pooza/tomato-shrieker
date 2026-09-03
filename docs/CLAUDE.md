@@ -251,11 +251,13 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
 
+🔴 **`disable: true` のソースも監視対象外で、常に `OK (disabled)` の 200 (#1503)。**scheduler は `reject(&:disable?)` で無効ソースを register しないので `executed_at` が二度と前に進まない。**一度稼働してから無効化すると `stale` が恒久的に成立し、Kuma のモニターが永久に赤くなる**（無効化直後は 200 なのでその場では気付けない）。⚠ **「意図的に止めた」と「壊れている」を同じ 503 で表さない。**`/status.json` が `reject(&:disable?)` しているのと同じ規則で揃えてある。
+
 **宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。**`No destination configured` を返して 503 に倒す。`dest: {}` や `dest: {hooks: []}`、`token` を落とした `dest.mastodon` のような半端な設定は `shriekers` が 1 件も yield しないため配信が永久に起きないが、run は no-op success を積むだけで健全に見える。
 
 🔴 **設定は正しいのに Shrieker を組み立てられない場合も同じ穴になる (#1504)。**各アクセサ（`mastodon` / `misskey` / `line` / `piefed` / `nostr`）は生成時の例外を `rescue` して nil を返すので、**PieFed が落ちている・上流が 429 を返す・URL のスキームが欠けている**といった理由でその宛先が `shriekers` から黙って消える。`dest_count` は設定を数えるだけなので気付けない。`Source#shriek` が `dest_count` と yield 数の差を `record_unavailable` で計上し、未達として倒す。⚠ **この差分を計上しないと `dest_count` は「表示するだけの数字」になる。**
 
-⚠ **ただし `disable: true` のソースは除く (#1486)。**スキーマが無効ソースに対して `dest` の配信先必須を免除している（`chinachu` 等の死蔵定義が実際に `dest: {}`）ので、ランタイムだけ咎めると宣言と食い違う。無効ソースは `register` されず run_log も無いため、`No run recorded yet` の 503 に落ちる。
+⚠ **ただし `disable: true` のソースは除く (#1486)。**スキーマが無効ソースに対して `dest` の配信先必須を免除している（`chinachu` 等の死蔵定義が実際に `dest: {}`）ので、ランタイムだけ咎めると宣言と食い違う。**#1503 以降、無効ソースは宛先チェックの手前で 200 に抜ける**ので、この食い違いは監視の入口で片付いている。
 
 **エラー判定は連続エラー回数 (error_streak) で行う (#1457)。**streak はエラーで終わった run を新しい順に数え、**エラーでない run が来た時点で 0 に戻る**。新着が無く配信ゼロで完走した run (no-op) も「run が最後まで走った」証拠なので streak を切る。
 

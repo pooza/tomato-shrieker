@@ -255,7 +255,8 @@ module TomatoShrieker
     def test_monitored?
       Source.all.each do |source|
         assert_boolean(source.monitored?)
-        assert_equal(source.post_at.nil?, source.monitored?)
+        # #1503: 無効ソースは scheduler に register されないので監視もしない
+        assert_equal(!source.disable? && source.post_at.nil?, source.monitored?)
       end
     end
 
