@@ -86,9 +86,27 @@ module TomatoShrieker
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
       body << "error_streak: #{checks[:streak]}\n"
-      body << "error: #{latest.error_message}\n" if latest.error?
-      body << undelivered_body(checks[:undelivered]) if checks[:undelivered]&.undelivered?
+      body << failure_body(latest)
+      body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]&.undelivered?
       body << silent_body(source) if checks[:silent]
+      return body
+    end
+
+    # 🔴 **失敗の理由は status に関係なく出す (#1507)。**
+    #
+    # 以前は `latest.error?`（＝ `status == "error"`）でだけ出していた。⚠ #1482 で
+    # `partial` を分けた時点で、**Matrix 配信停止 (#1455) と同じ形の run は
+    # `partial` になり、理由がまったく出ない 503** になっていた（v4.5.0 からの後退）。
+    # `record_partial` は「status が error でないだけで、失敗は失敗として読める
+    # ようにする」ために `error_message` を残しているので、それを出す。
+    #
+    # ⚠⚠ **宛先ごとの識別子は出さない。**webhook の URL はパスそのものが資格情報
+    # (#1467)。`shrieker_errors` なら宛先の**種別**までは絞れて、識別子は載らない。
+    def failure_body(log, prefix = '')
+      body = +''
+      body << "#{prefix}error: #{log.error_message}\n" if log.error_message.present?
+      errors = log.shrieker_error_counts
+      body << "#{prefix}shrieker_errors: #{JSON.dump(errors)}\n" if errors.any?
       return body
     end
 
@@ -110,12 +128,18 @@ module TomatoShrieker
 
     # #1504: 「いつ・何件のうち何件が届かなかったか」を運用者に見せる。
     # ⚠ 宛先の識別子は持たないので「どの宛先か」は出せない。設定を見て切り分ける。
-    def undelivered_body(log)
+    def undelivered_body(log, latest)
       # ⚠ 式展開の無いリテラルなので `+` で可変にする (#1512)。上の silent_body 参照。
       body = +"undelivered: true\n"
       body << "last_attempted_at: #{log.executed_at.iso8601}\n"
       body << "attempted_count: #{log.attempted_count}\n"
       body << "delivered_count: #{log.delivered_count}\n"
+      # 🔴 **no-op を挟むと `latest` は success の no-op 行になる (#1507)。**
+      # そのとき理由を持っているのは `latest` ではなく「直近の配信試行」の行なので、
+      # ここでも出す。⚠ 同じ行なら上の failure_body と重複するので出さない。
+      return body if log.id == latest.id
+      body << "last_attempted_status: #{log.status}\n"
+      body << failure_body(log, 'last_attempted_')
       return body
     end
 

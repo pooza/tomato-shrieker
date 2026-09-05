@@ -363,6 +363,32 @@ module TomatoShrieker
       assert_include(body.first, 'delivered_count: 1')
     end
 
+    # 🔴 **理由の無い 503 を運用者に見せない (#1507)。**
+    # #1482 で `partial` を分けてから、`error:` 行の条件が `status == "error"` の
+    # ままだったので、**#1455 の形の 503 は本文に理由がゼロ**になっていた。
+    # ⚠ v4.5.0 では出ていた＝後退。
+    def test_healthz_source_undelivered_shows_reason
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom',
+        shrieker_errors: JSON.dump('WebhookShrieker' => 1))
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(body.first, 'RuntimeError: boom', '理由の無い 503 になっている')
+      # 宛先の**種別**までは絞れる。⚠ 識別子は載せない (#1467)
+      assert_include(body.first, 'shrieker_errors: {"WebhookShrieker":1}')
+    end
+
+    # ⚠ 同じ行を 2 度出さない。latest が直近の配信試行そのものなら
+    # `last_attempted_error:` は要らない。
+    def test_healthz_source_undelivered_reason_is_not_duplicated
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom')
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_not_include(body.first, 'last_attempted_error:')
+      assert_equal(1, body.first.scan('RuntimeError: boom').size)
+    end
+
     # 全宛先へ届いた run が来たら解除する
     def test_healthz_source_undelivered_recovers
       record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
@@ -383,6 +409,22 @@ module TomatoShrieker
 
       assert_equal(503, status)
       assert_include(body.first, 'undelivered: true')
+    end
+
+    # 🔴 **no-op を挟むと `latest` は success の no-op 行になる (#1507)。**
+    # そのとき `status: success` ＋ `undelivered: true` だけが出て、**理由が
+    # どこにも無い 503** になっていた。理由を持っているのは「直近の配信試行」の行。
+    def test_healthz_source_undelivered_shows_reason_after_noop
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom',
+        shrieker_errors: JSON.dump('WebhookShrieker' => 1), at: Time.now - 120)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(body.first, 'status: success', '前提: latest は no-op の success 行')
+      assert_include(body.first, 'last_attempted_status: partial')
+      assert_include(body.first, 'last_attempted_error: RuntimeError: boom')
+      assert_include(body.first, 'last_attempted_shrieker_errors: {"WebhookShrieker":1}')
     end
 
     # 一度も配信を試みていないソースを未達扱いしない
