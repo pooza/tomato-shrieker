@@ -4,6 +4,11 @@ module TomatoShrieker
   class Source # rubocop:disable Metrics/ClassLength
     include Package
 
+    # 沈黙の起点の根拠 (#1502)。
+    BASELINE_DELIVERY = 'delivery'.freeze
+    BASELINE_ACKNOWLEDGEMENT = 'acknowledgement'.freeze
+    BASELINE_OBSERVATION = 'observation'.freeze
+
     def initialize(params)
       @params = params
     end
@@ -427,10 +432,36 @@ module TomatoShrieker
     # ソースだけが恒久的に検知対象外になる。
     # ⚠ ローカル変数に at を使わないこと。alias at post_at があるため、
     # 代入より前に現れた at はメソッド呼び出しに解決されて nil になる。
+    # 🔴 **3 値を返す (#1502)。**`true` = 沈黙、`false` = 沈黙していない、
+    # **`nil` = まだ判定できない**。
+    #
+    # ⚠⚠ **`false` が「健全」と「判定不能」を兼ねていた。**#1483 で fallback を
+    # 捨てて `observed_since` 起点にしたので、**run_log 上に配信実績が無いソースは
+    # 「観測開始から tolerance 経過するまで」検知されない**。本番実測では
+    # `precure-toei-event`（180d）の検知が **2027-01-30 まで後ろ倒し**になる。
+    # ⚠ **コードの入れ替えでアラートが消えるのは運用上いちばん紛らわしい**ので、
+    # せめて「黙っているのではなく、まだ判定できない」と言えるようにする。
+    #
+    # ⚠ 判定に使うのは run_log 由来の実配信だけで、last_delivered_at_fallback は見ない (#1483)。
+    # fallback（FeedSource なら entry.published）は配信の成否と無関係に前進するので、
+    # 配信できていなくても silent? が永久に false になる。表示用としては残してある。
+    #
+    # 一度も配信していないソースは、観測を始めてからの経過を無配信期間の下限として使う。
+    # ここを「実績が無いので断定しない」で false にすると、開設以来ずっと壊れている
+    # ソースだけが恒久的に検知対象外になる。
+    # ⚠ ローカル変数に at を使わないこと。alias at post_at があるため、
+    # 代入より前に現れた at はメソッド呼び出しに解決されて nil になる。
     def silent?
+      # しきい値未設定は「この機能を使っていない」＝判定不能ではない。
       return false unless tolerance = monitor_silence_tolerance_seconds
+      # run が 1 件も無いソースは #1560 の領分（`No run recorded yet` で既に 503）。
       return false unless since = silence_baseline
-      return Time.now > (since + tolerance)
+      return true if Time.now > (since + tolerance)
+      # 配信実績も確認記録も無いなら、まだ「沈黙していない」とは言い切れない。
+      # ⚠ **述語が nil を返すのは意図的**（この issue の主題そのもの）。false に
+      # 丸めると「健全」と「判定不能」がまた同じ顔になる。
+      return nil if silence_baseline_origin == BASELINE_OBSERVATION # rubocop:disable Style/ReturnNilInPredicateMethodDefinition
+      return false
     end
 
     # 沈黙を測る起点 (#1505)。配信・確認・観測開始のうち最も新しいもの。
@@ -441,11 +472,26 @@ module TomatoShrieker
     #
     # observed_since は必ず最古の run なので、他の 2 つがあれば max に選ばれない。
     def silence_baseline
-      return [
-        SourceRunLog.last_delivered_at(id),
-        SilenceAck.acknowledged_at(id),
-        SourceRunLog.observed_since(id),
-      ].compact.max
+      return silence_baseline_entry.last
+    end
+
+    # 起点がどれだったか (#1502)。`observation` なら **run_log 上に配信実績も確認記録も
+    # 無い**＝ silent? の判定は観測開始からの経過という下限に頼っている、という意味。
+    # これが出ていないと `silent: false` の理由が外から分からない。
+    def silence_baseline_origin
+      return silence_baseline_entry.first
+    end
+
+    # ⚠ **同時刻なら宣言順で先に書いたものが勝つ。**`max_by` は最初の最大値を返す
+    # ので、初回 run でいきなり配信できたソースは `observation` ではなく `delivery`
+    # になる（`observed_since` と同じ行なので時刻が一致する）。
+    def silence_baseline_entry
+      @silence_baseline_entry ||= {
+        BASELINE_DELIVERY => SourceRunLog.last_delivered_at(id),
+        BASELINE_ACKNOWLEDGEMENT => SilenceAck.acknowledged_at(id),
+        BASELINE_OBSERVATION => SourceRunLog.observed_since(id),
+      }.compact.max_by(&:last) || []
+      return @silence_baseline_entry
     end
 
     def self.all

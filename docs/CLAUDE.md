@@ -304,6 +304,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 ```
 silent? = now > max(last_delivered_at, silence_acknowledged_at, observed_since) + silence_tolerance
+          ただし配信実績も確認記録も無く、まだ超えていなければ nil (= 判定不能・#1502)
 ```
 
 ⚠ **「長期間配信が無い」は一概に失敗と言えない。**上流が静かなだけのこともある（実例: `precure-toei-event` は東映のイベントが実際に開催されていなかった）。とはいえ**何らかのエラーを抱えている疑いがある状態**でもあるので、**いったん赤にして、静かなだけと分かったら運用者が確認して緑に戻す**。
@@ -331,6 +332,20 @@ bin/shrieker source ack ID
 ⚠ **判定に使うのは run_log 由来の実配信だけで、`fallback` は見ない (#1483)。**下記のとおり `fallback` は配信の成否と無関係に前進するため、これを信じると配信できていなくても `silent?` が永久に false になる。
 
 **一度も配信していないソースは、観測を始めてからの経過 (`SourceRunLog.observed_since`) を無配信期間の下限として使う (#1483)。**ここを「配信実績が無いので断定しない」で健全側に倒すと、**開設以来ずっと壊れているソースだけが恒久的に検知対象外になる**という逆立ちした挙動になる。
+
+🔴 **`silent` は 3 値 (#1502)。**`true` = 沈黙、`false` = 沈黙していない、**`null` = まだ判定できない**。
+
+⚠⚠ **`false` が「健全」と「判定不能」を兼ねていた。**上の下限に頼っている以上、**run_log 上に配信実績が無いソースは「観測開始から `silence_tolerance` 経過するまで」検知されない**。2026-09-05 の本番実測では `precure-toei-event`（180d・観測開始 2026-08-03）の検知が **2027-01-30 まで後ろ倒し**になる。⚠ **検知しないこと自体は #1483 の判断どおりで変えない。嘘をつかないようにしただけ。**
+
+**なぜその判定なのかは `silence_baseline_origin` で読む。**
+
+| 値 | 意味 |
+|---|---|
+| `delivery` | run_log 上の実配信が起点。判定は確か |
+| `acknowledgement` | 運用者の確認が起点 (#1505)。緑なのは健全だからではない |
+| `observation` | **観測開始が起点。配信実績も確認記録も無い**＝ `silent` は `null` か、下限だけを根拠にした `true` |
+
+⚠ **初回 run でいきなり配信できたソースは `observed_since` と時刻が一致する**が、`delivery` が勝つ（同着は宣言順）。
 
 #### `/status.json` の中身
 
@@ -360,6 +375,8 @@ bin/shrieker source ack ID
       "noop_streak": 0,
       "silence_tolerance_seconds": null,
       "silent": false,
+      "silence_baseline": "2026-04-14T14:00:01+09:00",
+      "silence_baseline_origin": "delivery",
       "silence_acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},

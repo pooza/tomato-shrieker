@@ -122,6 +122,7 @@ module TomatoShrieker
       body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
       # #1505: 静かなだけと分かっているなら `bin/shrieker source ack ID` で緑に戻せる
       body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
+      body << "silence_baseline_origin: #{source.silence_baseline_origin}\n"
       body << "silence_acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
       return body
     end
@@ -193,7 +194,13 @@ module TomatoShrieker
         last_delivered_at: source.last_delivered_at&.iso8601,
         last_delivered_at_origin: source.last_delivered_at_origin,
         silence_tolerance_seconds: source.monitor_silence_tolerance_seconds,
+        # 🔴 **3 値 (#1502)。**`null` は「まだ判定できない」＝ run_log 上に配信実績も
+        # 確認記録も無く、観測開始からしきい値も経っていない。⚠ 以前は `false` が
+        # 「健全」と「判定不能」を兼ねていて、外から区別できなかった。
         silent: source.silent?,
+        # なぜその判定なのか。`observation` なら下限（観測開始からの経過）に頼っている
+        silence_baseline: source.silence_baseline&.iso8601,
+        silence_baseline_origin: source.silence_baseline_origin,
         # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
         # false だが、それは健全だからではなく運用者が確認したから
         silence_acknowledged_at: SilenceAck.acknowledged_at(source.id)&.iso8601,
