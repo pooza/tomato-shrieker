@@ -428,6 +428,48 @@ module TomatoShrieker
       assert_include(body.first, 'last_attempted_shrieker_errors: {"WebhookShrieker":1}')
     end
 
+    # 🔴 **未達も運用者が確認して緑に戻せること (#1506)。**
+    # ⚠ 取りこぼしは再送されないので、赤を放置しても失われたものは戻らない。一方で
+    # 疎なソース（本番は 57 中 17 件が 12 日間に配信試行ゼロ）は逃げ道が無いと
+    # 数週間 503 に貼り付き、「いつも赤いモニター」を作ってしまう。
+    def test_healthz_source_undelivered_acknowledged
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+
+      SilenceAck.acknowledge(FIXTURE_ID)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      assert_false(source_status(FIXTURE_ID)['undelivered'])
+    end
+
+    # 🔴 **消えるのは「確認したその試行」だけ。**確認より後の試行で再び届かなければ
+    # また赤くなる。⚠ ここを「確認したら以後ずっと緑」にすると、宛先が死んだままの
+    # ソースが恒久的に見えなくなる。
+    def test_healthz_source_undelivered_refires_after_acknowledge
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+      SilenceAck.acknowledge(FIXTURE_ID)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now + 60)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # ⚠ no-op run は「配信試行」ではないので、確認済みの状態を崩さない。
+    def test_healthz_source_undelivered_acknowledge_survives_noop
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+      SilenceAck.acknowledge(FIXTURE_ID)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now + 60)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
     # 一度も配信を試みていないソースを未達扱いしない
     def test_healthz_source_undelivered_ignores_noop_only
       record(FIXTURE_ID, attempted_count: 0)

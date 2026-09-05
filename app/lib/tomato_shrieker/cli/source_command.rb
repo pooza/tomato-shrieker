@@ -77,17 +77,22 @@ module TomatoShrieker
       set_disable(id, false)
     end
 
-    desc 'ack ID', 'サイレント不発の警告を確認済みにする（silent の起点を今にする）'
+    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達）'
+    # 🔴 **出力は実際に効いた範囲だけを言う (#1506)。**
+    #
+    # ⚠ 以前は `SilenceAck` を書くだけで **`undelivered` には一切効かない**のに、
+    # 出力は「確認済みにしました」とだけ返していた。**運用者は緑に戻ると期待して
+    # Kuma の赤を放置する。**いまは ack が両方に効くが、**どちらに効いたかを言う**。
     def ack(id)
       source = find_source!(id)
-      unless source.monitor_silence_tolerance_seconds
-        say "#{id} は silence_tolerance が未設定です。サイレント不発を検知していません。"
-        return
-      end
+      undelivered = source.undelivered?
+      tolerance = source.monitor_silence_tolerance_seconds
+      return say(nothing_to_ack_message(id)) unless undelivered || tolerance
       SilenceAck.acknowledge(id)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
-      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。"
+      say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
+      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
@@ -134,6 +139,10 @@ module TomatoShrieker
     end
 
     private
+
+    def nothing_to_ack_message(id)
+      return "#{id} は silence_tolerance が未設定で、未達の警告も出ていません。確認するものがありません。"
+    end
 
     # silence_tolerance を人が読める長さで返す (#1513)。
     #
