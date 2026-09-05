@@ -2,6 +2,15 @@ require 'feedjira'
 
 module TomatoShrieker
   class FeedSource < Source
+    # 配信まで到達せずに落ちたエントリを `shrieker_errors` に積むときのキー (#1485)。
+    #
+    # ⚠⚠ **`self.class` を使わない。**以前は `"#{self.class}#fetch"` だったので
+    # `TomatoShrieker::GoogleNewsSource#fetch` / `...YouTubeChannelSource#fetch` と
+    # **サブクラスの数だけキーが増え**、宛先別の分布（`MastodonShrieker` 等）と
+    # 同じ Hash に足し込まれて `/status.json` が読めなくなっていた。
+    # ⚠ ソース ID は run_log の行が持っているので、クラス名は冗長。
+    FETCH_FAILURE_KIND = 'source#fetch'.freeze
+
     def initialize(params)
       super
       @http = HTTP.new
@@ -108,10 +117,20 @@ module TomatoShrieker
         next unless record = create_record(entry)
         yield record
       rescue => e
-        logger.error(source: id, error: e)
         # create_record / create_template / enclosures 由来の失敗は Entry#shriek に
         # 到達しないので、ここで計上しないと run が no-op success になる (#1473)。
-        @delivery_stats&.record_failure("#{self.class}#fetch", e)
+        #
+        # ⚠⚠ **計上を先に打つ (#1485)。**この rescue で `/healthz` を赤にできるのは
+        # run_log への計上だけで、Sentry と logger は報告でしかない。報告を先に打つと、
+        # 壊れた例外メッセージ（#1469 の族）でそこが落ちたときに **失敗がまったく
+        # 計上されず run が no-op success に戻る**＝ #1473 が塞いだ穴が開き直す。
+        @delivery_stats&.record_failure(FETCH_FAILURE_KIND, e)
+        # 🔴 **`/healthz` を 503 にするのに Sentry へ出ないエラーを作らない (#1485)。**
+        # 既存の失敗チャンネル（`Source#shriek` の shrieker 失敗、run 全体の例外）は
+        # 送っているのに、4.5.0 で新設したこの経路だけ送っていなかった。
+        # ⚠ シークレットは `SentryScrubber` が落とす (#1467)。
+        Sentry.capture_exception(e, tags: {source: id, stage: 'fetch'}) if Sentry.initialized?
+        logger.error(source: id, error: e)
       end
     end
 

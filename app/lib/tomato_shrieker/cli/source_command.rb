@@ -6,52 +6,6 @@ module TomatoShrieker
   class SourceCommand < Thor
     include Package
 
-    # `add --class` で生成する雛形の共通パーツ。
-    DEFAULT_DEST = {
-      'hooks' => ['https://mastodon.example.com/mulukhiya/webhook/CHANGE_ME'],
-      'tags' => [],
-    }.freeze
-    DEFAULT_SCHEDULE = {'cron' => '0 0 * * *'}.freeze
-
-    # `add --class` で生成する種別ごとの雛形。いずれもスキーマ妥当な最小構成。
-    TEMPLATES = {
-      'feed' => {
-        'source' => {'feed' => 'https://example.com/feed'},
-        'dest' => DEFAULT_DEST,
-      },
-      'url' => {
-        'source' => {'url' => 'https://example.com/'},
-        'dest' => DEFAULT_DEST,
-      },
-      'news' => {
-        'source' => {'news' => {'phrase' => 'CHANGE_ME'}},
-        'dest' => DEFAULT_DEST,
-      },
-      'github' => {
-        'source' => {'github' => {'repository' => 'owner/repo', 'timeline' => 'releases'}},
-        'dest' => DEFAULT_DEST,
-      },
-      'icalendar' => {
-        'source' => {'ical' => 'https://example.com/calendar.ics'},
-        'schedule' => DEFAULT_SCHEDULE,
-        'dest' => DEFAULT_DEST,
-      },
-      'youtube' => {
-        'source' => {'youtube' => {'channel' => {'url' => 'https://www.youtube.com/@CHANGE_ME'}}},
-        'dest' => DEFAULT_DEST,
-      },
-      'command' => {
-        'source' => {'command' => ['echo', 'hello'], 'dir' => '/path/to/workdir'},
-        'schedule' => DEFAULT_SCHEDULE,
-        'dest' => DEFAULT_DEST,
-      },
-      'text' => {
-        'source' => {'text' => 'CHANGE_ME'},
-        'schedule' => DEFAULT_SCHEDULE,
-        'dest' => DEFAULT_DEST,
-      },
-    }.freeze
-
     desc 'list', 'ソース一覧 (id とクラス名) を表示'
     def list
       Source.all do |source|
@@ -86,14 +40,14 @@ module TomatoShrieker
 
     desc 'add ID', '雛形を生成し $EDITOR で編集してソース定義を作成'
     method_option :class, type: :string, default: 'feed',
-      desc: "ソース種別 (#{TEMPLATES.keys.join('/')})"
+      desc: "ソース種別 (#{SourceTemplates::ALL.keys.join('/')})"
     def add(id)
       raise Thor::Error, "invalid id: #{id}" unless id.match?(/\A[\w.-]+\z/)
       path = new_source_path(id)
       raise Thor::Error, "source already exists: #{id}" if File.exist?(path)
-      template = TEMPLATES[options[:class]]
+      template = SourceTemplates::ALL[options[:class]]
       unless template
-        raise Thor::Error, "unknown class: #{options[:class]} (#{TEMPLATES.keys.join('/')})"
+        raise Thor::Error, "unknown class: #{options[:class]} (#{SourceTemplates::ALL.keys.join('/')})"
       end
       File.write(path, template.to_yaml)
       edit_and_validate(id, path)
@@ -110,6 +64,7 @@ module TomatoShrieker
       return unless yes?("delete #{path} ? [y/N]")
       File.delete(path)
       say "deleted: #{path}"
+      say reload_hint
     end
 
     desc 'disable ID', 'ソースを停止 (disable: true)'
@@ -122,17 +77,40 @@ module TomatoShrieker
       set_disable(id, false)
     end
 
-    desc 'ack ID', 'サイレント不発の警告を確認済みにする（silent の起点を今にする）'
+    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達）'
+    # 🔴 **出力は実際に効いた範囲だけを言う (#1506)。**
+    #
+    # ⚠ 以前は `SilenceAck` を書くだけで **`undelivered` には一切効かない**のに、
+    # 出力は「確認済みにしました」とだけ返していた。**運用者は緑に戻ると期待して
+    # Kuma の赤を放置する。**いまは ack が両方に効くが、**どちらに効いたかを言う**。
     def ack(id)
       source = find_source!(id)
-      unless source.monitor_silence_tolerance_seconds
-        say "#{id} は silence_tolerance が未設定です。サイレント不発を検知していません。"
-        return
-      end
+      undelivered = source.undelivered?
+      tolerance = source.monitor_silence_tolerance_seconds
+      return say(nothing_to_ack_message(id)) unless undelivered || tolerance
       SilenceAck.acknowledge(id)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
-      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。"
+      say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
+      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
+    end
+
+    desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
+    def reload
+      daemon = SchedulerDaemon.new
+      case daemon.alive_state
+      when :alive
+        pid = daemon.pid
+        Process.kill('HUP', pid)
+        say "reload requested (pid #{pid})"
+        # ⚠ シグナルは非同期なので、CLI は「要求した」までしか言えない (#1529)。
+        say '  結果はログの {"scheduler":"reload",...} 行で確認できます。'
+      when :unknown
+        # ⚠ :unknown（EPERM）を :dead と混ぜない。プロセスは生きている可能性がある。
+        raise Thor::Error, "PID #{daemon.pid} exists but is not ours. reload できません。"
+      else
+        say 'scheduler は停止しています。ソース定義は次回起動時に読み込まれます。'
+      end
     end
 
     desc 'validate [ID]', 'ソース定義を JSON Schema で検証（ID 省略時は全件）'
@@ -162,6 +140,10 @@ module TomatoShrieker
 
     private
 
+    def nothing_to_ack_message(id)
+      return "#{id} は silence_tolerance が未設定で、未達の警告も出ていません。確認するものがありません。"
+    end
+
     # silence_tolerance を人が読める長さで返す (#1513)。
     #
     # ⚠ **整数除算で「0日」と出してはいけない。** スキーマは `12h` / `30m` を許す
@@ -188,6 +170,7 @@ module TomatoShrieker
       errors = SourceValidator.validate(YAML.load_file(path))
       if errors.empty?
         say "OK: #{path}"
+        say reload_hint
       else
         warn "WARNING: #{id} の定義にスキーマ違反があります:"
         errors.each {|e| warn "    - #{e}"}
@@ -217,6 +200,15 @@ module TomatoShrieker
       end
       File.write(path, lines.join)
       say "#{value ? 'disabled' : 'enabled'}: #{id}"
+      say reload_hint
+    end
+
+    # ⚠ **自動 reload はしない (#1459)。**add / edit / delete / disable / enable の
+    # 契約を 1 つずつのままに保つ。自動にすると「エディタを閉じただけで本番へ反映
+    # される」「validate NG のとき」「daemon が停止中のとき」の分岐を全部説明する
+    # ことになる。代わりに、反映がまだであることを操作のたびに言う。
+    def reload_hint
+      return '⚠ 稼働中の scheduler に反映するには bin/shrieker source reload'
     end
 
     def sources_dir

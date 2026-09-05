@@ -146,6 +146,7 @@ systemd/rc.d → bin/scheduler_daemon.rb start
       → Sequel.connect (SQLite3)
       → SchedulerDaemon#migrate (未適用ならマイグレーション)
       → MonitorServer#start (Puma embedded / 監視用 HTTP)
+      → SchedulerDaemon#start_reload_worker (SIGHUP → Queue → Scheduler#reload)
       → Scheduler.instance.exec (Rufus::Scheduler)
         → Source.all → register (各ソースをスケジューラに登録)
 ```
@@ -157,6 +158,40 @@ systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake
 **未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
 
 ⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
+
+### ソース定義の reload (#1459)
+
+**稼働中の scheduler にソース定義を読み直させる。**`bin/shrieker source add / edit / delete / disable / enable` はファイルを書くだけなので、以前は反映に再起動が要った。
+
+```sh
+bin/shrieker source disable foo
+# disabled: foo
+# ⚠ 稼働中の scheduler に反映するには bin/shrieker source reload
+
+bin/shrieker source reload
+# reload requested (pid 1322485)
+```
+
+`source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
+
+🔴 **trap は pid が外から見えるより前に張る。**`Ginseng::Daemon#run_start` は `start` を呼ぶ**前に** pid を書くので、`source reload` は**書かれた瞬間から**「生きている」と見て HUP を送れる。⚠ **trap が無い間に届くと、既定動作で daemon が死ぬ。**⚠⚠ **`start` の先頭で張るのでは閉じない**（実測: `write_pid` から `start` の trap までは med 0.013ms / max 2.26ms・n=200。CLI 側は pid ファイルを読んだ直後に撃つので、窓が縮むだけで原理的に残る）。そこで **`write_pid` を override** して、`super` の前に trap を張る。⚠ **`run_start` は override しない** — `abort_if_running!` / TERM・INT の trap まで複製することになり、上流が [#509](https://github.com/pooza/ginseng-core/issues/509) / [#510](https://github.com/pooza/ginseng-core/issues/510) / [#532](https://github.com/pooza/ginseng-core/issues/532) で個別に塞いだレースを写し取る羽目になる。⚠ **ただし処理は起動完了後。**マイグレーション前にジョブを立てると `no such table` を踏むので、監視サーバーを上げるまでは**積むだけ**にする。
+
+🔴 **reload するのは「ソース定義」だけ。**`Ginseng::Config#load` は `next if @raw.key?(key)` で一度読んだファイルを二度と読まないため、`application.yaml` / `local.yaml` は反映されない。⚠ **「reload ＝ 設定を全部読み直す」と説明すると嘘になる。**`/monitor/bind` のようなキーを稼働中に差し替えられても困るので、これは**仕様として維持する**（コマンド名が `source reload` なのはそのため）。
+
+**差分だけをジョブに反映する。**id 単位で設定の digest を持ち、**無変更のソースはジョブに触らない**。⚠ **起動時の初回登録も同じ差分適用を通す。**SIGHUP は起動の途中から受け付けるので、初回登録と reload が両方とも素通しで `register` すると**同じソースにジョブが 2 本立ち、以後は digest が一致するので誰も気付けない**（＝ 1 周期に 2 回投稿する）。
+
+- ⚠ **全件を貼り替えてはいけない。**`every` は登録時に発火しない代わりに、差し替えると**次回発火が 1 周期先へずれる**。全件貼り替えは全ソースの位相をリセットする
+- ⚠ **消すのは job id ではなく tag。**`IcalendarSource#register` は remind と本体の 2 本を**同じ `tag: id`** で登録し、`register` の戻り値は本体ぶんだけ。job id を控える設計にすると remind ジョブが取り残される
+- ⚠ `schedule_maintenance`（prune）の日次ジョブは**無タグ**。「全部 unschedule」をやると巻き添えで消える
+- ⚠ **実行中の run は殺さない。**`unschedule` は以後の発火を止めるだけなので、**進行中の run は古い定義のまま完走する**
+- 🔴 **起動は fail closed、reload は fail safe。**起動時に 1 件でも `register` に失敗したら**起動しない**（`Ginseng::ConfigError`）。⚠ ここで飛ばすと**そのソースは二度と登録されないのに daemon は正常に見える**（総合 `/healthz` は無タグの maintenance ジョブがあれば通る）。倒しておけば systemd の `Restart=always` が 5 秒後に再試行する。⚠ **一方 reload では倒さない。**稼働中の daemon を「誰かが YAML を打ち間違えた」で落とす理由は無い
+- 🔴 **新しいジョブを立ててから古いジョブを落とす。**`register` は失敗しうる（`CommandSource` は `bundle install` を走らせるし、reload はスキーマ検証をしないので**不正な cron 式**もここへ来る）。先に消すと、**失敗したソースが次の reload までジョブ 1 本無いまま放置される**。⚠ **失敗した id は registry を更新しない**ので、定義を直せば次の reload で必ず張り直る。⚠ 1 ソースの失敗は他のソースの反映を止めない（ログの `failed` に出る）
+- 🔴 **壊れた定義を掴んだら何も変えない。**`Config#load` は読み切ってから 1 回で差し替える（#1530）ので、YAML が 1 つでも壊れていれば例外だけが上がり、**ジョブも設定も前のまま**走り続ける
+- ⚠ **reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
+
+⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
+
+⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
 ### デプロイ手順
 
@@ -251,11 +286,13 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 ソースが存在しない場合は 404。`/schedule/at` の単発ソースは監視対象外として常に 200 を返す。
 
+🔴 **`disable: true` のソースも監視対象外で、常に `OK (disabled)` の 200 (#1503)。**scheduler は `reject(&:disable?)` で無効ソースを register しないので `executed_at` が二度と前に進まない。**一度稼働してから無効化すると `stale` が恒久的に成立し、Kuma のモニターが永久に赤くなる**（無効化直後は 200 なのでその場では気付けない）。⚠ **「意図的に止めた」と「壊れている」を同じ 503 で表さない。**`/status.json` が `reject(&:disable?)` しているのと同じ規則で揃えてある。
+
 **宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。**`No destination configured` を返して 503 に倒す。`dest: {}` や `dest: {hooks: []}`、`token` を落とした `dest.mastodon` のような半端な設定は `shriekers` が 1 件も yield しないため配信が永久に起きないが、run は no-op success を積むだけで健全に見える。
 
 🔴 **設定は正しいのに Shrieker を組み立てられない場合も同じ穴になる (#1504)。**各アクセサ（`mastodon` / `misskey` / `line` / `piefed` / `nostr`）は生成時の例外を `rescue` して nil を返すので、**PieFed が落ちている・上流が 429 を返す・URL のスキームが欠けている**といった理由でその宛先が `shriekers` から黙って消える。`dest_count` は設定を数えるだけなので気付けない。`Source#shriek` が `dest_count` と yield 数の差を `record_unavailable` で計上し、未達として倒す。⚠ **この差分を計上しないと `dest_count` は「表示するだけの数字」になる。**
 
-⚠ **ただし `disable: true` のソースは除く (#1486)。**スキーマが無効ソースに対して `dest` の配信先必須を免除している（`chinachu` 等の死蔵定義が実際に `dest: {}`）ので、ランタイムだけ咎めると宣言と食い違う。無効ソースは `register` されず run_log も無いため、`No run recorded yet` の 503 に落ちる。
+⚠ **ただし `disable: true` のソースは除く (#1486)。**スキーマが無効ソースに対して `dest` の配信先必須を免除している（`chinachu` 等の死蔵定義が実際に `dest: {}`）ので、ランタイムだけ咎めると宣言と食い違う。**#1503 以降、無効ソースは宛先チェックの手前で 200 に抜ける**ので、この食い違いは監視の入口で片付いている。
 
 **エラー判定は連続エラー回数 (error_streak) で行う (#1457)。**streak はエラーで終わった run を新しい順に数え、**エラーでない run が来た時点で 0 に戻る**。新着が無く配信ゼロで完走した run (no-op) も「run が最後まで走った」証拠なので streak を切る。
 
@@ -267,6 +304,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 ```
 silent? = now > max(last_delivered_at, silence_acknowledged_at, observed_since) + silence_tolerance
+          ただし配信実績も確認記録も無く、まだ超えていなければ nil (= 判定不能・#1502)
 ```
 
 ⚠ **「長期間配信が無い」は一概に失敗と言えない。**上流が静かなだけのこともある（実例: `precure-toei-event` は東映のイベントが実際に開催されていなかった）。とはいえ**何らかのエラーを抱えている疑いがある状態**でもあるので、**いったん赤にして、静かなだけと分かったら運用者が確認して緑に戻す**。
@@ -277,6 +315,12 @@ bin/shrieker source ack ID
 
 🔴 **確認は「今回は問題なかった」の記録であって「今後も問題ない」の保証ではない。**起点が前に進むだけなので、**そこからさらに `silence_tolerance` が経過すれば再び赤になる**（「また 1 か月経ったけど、やっぱりおかしくない?」という念押し）。配信が再開すれば `last_delivered_at` が確認を追い越すので、確認記録は自然に無効化される。
 
+🔴 **`ack` は未達 (`undelivered`) にも効く (#1506)。**⚠ **消えるのは「確認したその試行」だけ**で、確認より後の試行で再び届かなければまた赤くなる（サイレント不発と同じ規則）。
+
+⚠⚠ **「確定的な信号を運用者が消してよいのか」は判断した上でこうしている。**取りこぼしたエントリは**再送されないので、赤を放置しても失われたものは戻らない**。一方 **2026-09-05 の実測では 57 ソースのうち 17 件が 12 日間に配信試行ゼロ**で、逃げ道が無いと疎なソースは数週間 503 に貼り付く。**「いつも赤いモニター」は監視ごと信用されなくなる**ほうが害が大きい。
+
+⚠ **`ack` はソースごとに 1 つの記録**（`silence_ack` テーブル）なので、**サイレント不発と未達のどちらを確認しても両方に効く**。`bin/shrieker source ack` は**実際に効いた範囲だけを出力する**。
+
 📌 **この仕組みがあるので `silence_tolerance` を保守的に丸める必要は無い。**偽陽性のコストが「設定を直す」から「1 回確認する」に下がる。
 
 ⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `silence_acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。
@@ -286,12 +330,28 @@ bin/shrieker source ack ID
 | 状況 | 対処 |
 |------|------|
 | 一時的に静か（たまたま 1 か月新着が無かった） | `bin/shrieker source ack ID` |
-| 投稿が恒久的に終了した | `bin/shrieker source disable ID` |
+| 投稿が恒久的に終了した | `bin/shrieker source disable ID`（＋ `source reload`） |
 | 年単位で正常に静か（`chikanan` 等） | `silence_tolerance` を設定しない |
+
+⚠ **`disable` にしたソースは監視対象外になり、`/healthz/source/:id` は `OK (disabled)` の 200 を返す (#1503)。**「意図的に止めた」と「壊れている」を同じ 503 で表さない。
 
 ⚠ **判定に使うのは run_log 由来の実配信だけで、`fallback` は見ない (#1483)。**下記のとおり `fallback` は配信の成否と無関係に前進するため、これを信じると配信できていなくても `silent?` が永久に false になる。
 
 **一度も配信していないソースは、観測を始めてからの経過 (`SourceRunLog.observed_since`) を無配信期間の下限として使う (#1483)。**ここを「配信実績が無いので断定しない」で健全側に倒すと、**開設以来ずっと壊れているソースだけが恒久的に検知対象外になる**という逆立ちした挙動になる。
+
+🔴 **`silent` は 3 値 (#1502)。**`true` = 沈黙、`false` = 沈黙していない、**`null` = まだ判定できない**。
+
+⚠⚠ **`false` が「健全」と「判定不能」を兼ねていた。**上の下限に頼っている以上、**run_log 上に配信実績が無いソースは「観測開始から `silence_tolerance` 経過するまで」検知されない**。2026-09-05 の本番実測で該当するのは **2 件**で、`precure-toei-event`（180d・観測開始 2026-08-03）は検知が **2027-01-30 まで**、`precure-toei-news`（90d）は **2026-11-01 まで**後ろ倒しになる。⚠ **検知しないこと自体は #1483 の判断どおりで変えない。嘘をつかないようにしただけ。**
+
+**なぜその判定なのかは `silence_baseline_origin` で読む。**
+
+| 値 | 意味 |
+|---|---|
+| `delivery` | run_log 上の実配信が起点。判定は確か |
+| `acknowledgement` | 運用者の確認が起点 (#1505)。緑なのは健全だからではない |
+| `observation` | **観測開始が起点。配信実績も確認記録も無い**＝ `silent` は `null` か、下限だけを根拠にした `true` |
+
+⚠ **初回 run でいきなり配信できたソースは `observed_since` と時刻が一致する**が、`delivery` が勝つ（同着は宣言順）。
 
 #### `/status.json` の中身
 
@@ -321,6 +381,8 @@ bin/shrieker source ack ID
       "noop_streak": 0,
       "silence_tolerance_seconds": null,
       "silent": false,
+      "silence_baseline": "2026-04-14T14:00:01+09:00",
+      "silence_baseline_origin": "delivery",
       "silence_acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
@@ -391,6 +453,8 @@ monitor:
 - `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
+  - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
+  - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
@@ -750,12 +814,16 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 ⚠ **サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`）も対象。**本体だけ追随すると CommandSource の 7 ソースだけ古い gem で動き続ける。
 
-🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず `origin/HEAD` から取り出す。**
+🔴 **tomato 自身は `origin/develop` から読む (#1550)。**⚠ **`origin/HEAD` は `main` ＝ リリース済みの版**で、日常の作業は `develop`。main と develop でピンが違う期間、`origin/HEAD` を読むと**すでに `develop` で追随済みのものをもう一度上げようとするか、`develop` 側の乖離を見落とす**。⚠ **サテライト 3 本はそれぞれの default ブランチのまま**（`shooby-do-bop` は `master`）。
+
+🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず追跡ブランチから取り出す**（上記のとおり tomato は `origin/develop`、サテライトは `origin/HEAD`）。
 
 ```sh
 for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
+  # ⚠ tomato 自身だけ develop。origin/HEAD は main ＝ リリース済みの版 (#1550)
+  ref=origin/HEAD; [ "$d" = tomato-shrieker ] && ref=origin/develop
   git -C ~/repos/$d fetch -q origin
-  git -C ~/repos/$d show origin/HEAD:Gemfile.lock |
+  git -C ~/repos/$d show $ref:Gemfile.lock |
   awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' |
   while read -r gem rev; do
     ahead=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
@@ -788,7 +856,9 @@ done
 
 #### Kuma のモニターと有効ソースの突き合わせ
 
-🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。2026-08-21 時点で **有効 39 に対しモニター 24＝15 ソースが不可視**だった。
+🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。
+
+📌 **2026-09-05 時点で 56 ソース / 56 モニターが一致し、全部 active。**（2026-08-21 は 39 に対し 24＝15 ソースが不可視だった。）**「登録を義務づける運用」で塞ぐ**という #1508 の案 A が成立している状態なので、**この突き合わせがその唯一の担保**になる。
 
 ```sh
 diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
@@ -798,6 +868,15 @@ diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[
 
 - `<` の行 ＝ **Kuma に登録されていないソース**
 - `>` の行 ＝ **Kuma にあるが本番に無いソース**（消したソースのモニターが残っている）
+
+⚠⚠ **名前が揃っているだけでは足りない。一時停止したモニターは「登録されているが盲目」**で、上の diff には出ない。**`active` も見ること。**
+
+```sh
+ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
+  "select active, count(*) from monitor where name like \"tomato-shrieker %\" group by active;"'
+```
+
+⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。
 
 ⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
 

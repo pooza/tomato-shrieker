@@ -10,6 +10,10 @@ module TomatoShrieker
     WEBHOOK_URL = "https://precure.ml/mulukhiya/webhook/#{WEBHOOK_DIGEST}".freeze
     FEED_TOKEN = 'SUPERSECRETTOKEN'.freeze
     FEED_URL = "https://example.com/feed.xml?access_token=#{FEED_TOKEN}".freeze
+    # ⚠ 既定にも tomato の設定にも無いキー。`Ginseng::Masking::MASK_FIELDS` の
+    # どれかを使うと、reload しなくても最初から落ちてしまい判定にならない。
+    PROBE_FIELD = 'shrieker_reload_probe'.freeze
+    PROBE_VALUE = 'PROBEPLAINTEXT'.freeze
 
     def setup
       @scrubber = SentryScrubber.new
@@ -62,6 +66,26 @@ module TomatoShrieker
       assert_include(scrubbed, 'UCTwO5UAGiB8AdFrsxhNKaRQ')
     end
 
+    # 🔴 **稼働中の `Config#reload` が、掴んだままの logger にも効くこと (#1538)。**
+    #
+    # `SentryScrubber` は初期化時に logger を 1 個掴んで `before_send` の
+    # クロージャへ閉じ込める。⚠ これは意図的で、**設定が読めないときは Sentry ごと
+    # 立ち上がらない（fail closed）**という性質を作っている（#1467）。
+    #
+    # 🔴 `Ginseng::Masking` がマスク一覧を単純な `||=` で memo 化していた頃は、
+    # **マスク対象を足して reload しても、この scrubber だけ古い一覧のまま**
+    # 送り続けた。⚠ ログには効いてスタックトレースには効かない、という非対称な
+    # 形になる（`Package.error_message` は毎回 `Logger.new` するため）。
+    # 上流 pooza/ginseng-core#592 で memo の鍵を「合成後」ではなく
+    # **設定そのもの**にして解消した。#1459 の reload が入ったのでここで固定する。
+    def test_scrub_follows_config_reload
+      assert_include(scrubbed_probe, PROBE_VALUE, '前提: まだマスク対象ではない')
+
+      with_mask_field(PROBE_FIELD) do
+        assert_not_include(scrubbed_probe, PROBE_VALUE, 'reload が掴んだままの logger に効いていない')
+      end
+    end
+
     # 🔴 **fail closed。** マスクを通せなかったイベントは送らない。素通しで送ると
     # 伏せるはずだった値がそのまま外部サービスへ出る。
     def test_scrub_drops_event_when_mask_fails
@@ -88,6 +112,46 @@ module TomatoShrieker
       assert_equal('before_send', logged.first[:sentry])
     end
 
+    # 🔴 **logger 自身が落ちても、どこかへ残すこと (#1549)。**
+    # scrub が落ちる原因がマスク設定そのものなら、報告に使う `@logger.error` も
+    # 同じ理由で落ちる。⚠ そこで黙ると「**Sentry へ 1 件も届かないのに、どこにも
+    # 何も出ない**」＝ #1467 が塞ごうとした状態に戻る。マスク経路に依存しない
+    # sink（素の `Syslog::Logger`）へ、例外のクラス名だけを出す。
+    def test_scrub_reports_drop_when_logger_fails
+      event = error_event(StandardError.new('boom'))
+      event.define_singleton_method(:extra) {raise 'boom'}
+      @scrubber.instance_variable_get(:@logger).define_singleton_method(:error) {|_arg| raise 'logger boom'}
+      fallback = []
+      @scrubber.define_singleton_method(:report_drop_fallback) do |error, log_error|
+        fallback.push([error.class, log_error.class])
+      end
+
+      @scrubber.scrub(event)
+
+      assert_equal(1, fallback.size, 'logger が落ちたときに何も残っていない')
+    end
+
+    # ⚠ 予備の sink は「マスク経路を通らないこと」と「クラス名しか出さないこと」
+    # の両方が要る。⚠ **メッセージを載せると、伏せるはずだった値が素で出る。**
+    def test_report_drop_fallback_emits_class_names_only
+      written = []
+      logger = Object.new
+      logger.define_singleton_method(:error) {|arg| written.push(arg)}
+      Syslog::Logger.define_singleton_method(:new) {|*| logger}
+      begin
+        @scrubber.send(:report_drop_fallback,
+          Ginseng::GatewayError.new(WEBHOOK_URL), RuntimeError.new(FEED_TOKEN))
+      ensure
+        Syslog::Logger.singleton_class.remove_method(:new)
+      end
+
+      assert_equal(1, written.size)
+      assert_include(written.first, 'Ginseng::GatewayError')
+      assert_include(written.first, 'RuntimeError')
+      assert_not_include(written.first, WEBHOOK_DIGEST)
+      assert_not_include(written.first, FEED_TOKEN)
+    end
+
     # ⚠ ログ自体が落ちても before_send を巻き込まないこと。
     def test_scrub_survives_logger_failure
       event = error_event(StandardError.new('boom'))
@@ -98,6 +162,32 @@ module TomatoShrieker
     end
 
     private
+
+    # ⚠ **scrubber は setup で作ってある**（＝設定を変える前に掴んだ logger）。
+    # ここで作り直すと、この検査の意味が無くなる。
+    def scrubbed_probe
+      event = error_event(StandardError.new('boom'))
+      event.extra = {PROBE_FIELD => PROBE_VALUE}
+      return payload(@scrubber.scrub(event))
+    end
+
+    # マスク対象を 1 つ足して `Config#reload` する。
+    #
+    # ⚠ **`raw` の鍵は設定ファイルの basename**（`local` / `application` / `lib` /
+    # hostname）で、優先順は `Config#basenames` の順。`raw['logger']` へ書いても
+    # 効かないし、低い側へ書いても高い側の値に上書きされる。**実在するうち
+    # いちばん強い basename** へ足す。
+    def with_mask_field(field)
+      key = config.basenames.find {|v| config.raw.key?(v)}
+      original = config.raw[key]['logger']
+      config.raw[key]['logger'] = (original || {}).deep_dup
+      config.raw[key]['logger']['mask_fields'] = config['/logger/mask_fields'] + [field]
+      config.reload
+      yield
+    ensure
+      config.raw[key]['logger'] = original
+      config.reload
+    end
 
     def error_event(error)
       client = Sentry::Client.new(sentry_configuration)

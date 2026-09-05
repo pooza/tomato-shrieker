@@ -255,7 +255,8 @@ module TomatoShrieker
     def test_monitored?
       Source.all.each do |source|
         assert_boolean(source.monitored?)
-        assert_equal(source.post_at.nil?, source.monitored?)
+        # #1503: 無効ソースは scheduler に register されないので監視もしない
+        assert_equal(!source.disable? && source.post_at.nil?, source.monitored?)
       end
     end
 
@@ -445,11 +446,66 @@ module TomatoShrieker
 
       assert_true(source.silent?)
 
-      # 観測を始めたばかりなら、まだ沈黙とは言えない
+      # 🔴 観測を始めたばかりなら「まだ判定できない」＝ nil (#1502)。
+      # ⚠ ここを false にすると「健全」と区別がつかない。
       source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
       record_run(at: Time.now - 60)
 
+      assert_nil(source.silent?, '「健全」と「判定不能」を兼ねている')
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    # 🔴 **`silent: false` が「健全」と「判定不能」を兼ねていないこと (#1502)。**
+    # #1483 で fallback を捨てて observed_since 起点にした結果、run_log 上に配信実績が
+    # 無いソースは「観測開始から tolerance 経過するまで」検知されない。本番実測では
+    # `precure-toei-event`（180d）の検知が 2027-01-30 まで後ろ倒しになる。
+    # ⚠ 検知しないこと自体は #1483 の判断どおりで変えない。**嘘をつかないようにする。**
+    def test_silent_states
+      # 配信実績があってしきい値内 ＝ 健全
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60, delivered_count: 1)
+
       assert_false(source.silent?)
+      assert_equal('delivery', source.silence_baseline_origin)
+
+      # 配信実績が無く観測も浅い ＝ 判定不能
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60)
+
+      assert_nil(source.silent?)
+      assert_equal('observation', source.silence_baseline_origin)
+
+      # しきい値未設定は「この機能を使っていない」＝判定不能ではない
+      source = silent_source
+      record_run(at: Time.now - 60)
+
+      assert_false(source.silent?)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    # ⚠ 運用者が確認したら判定不能ではなくなる。起点も `acknowledgement` に変わるので、
+    # 「なぜ緑なのか」が外から読める (#1505)。
+    def test_silence_baseline_origin_after_acknowledge
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60)
+      SilenceAck.acknowledge(SILENT_ID)
+
+      assert_false(source.silent?)
+      assert_equal('acknowledgement', source.silence_baseline_origin)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+      SilenceAck.where(source_id: SILENT_ID).delete
+    end
+
+    # ⚠ 初回 run でいきなり配信できたソースは、observed_since と同じ行なので時刻が
+    # 一致する。`observation` ではなく `delivery` になること。
+    def test_silence_baseline_origin_prefers_delivery_on_tie
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60, delivered_count: 1)
+
+      assert_equal('delivery', source.silence_baseline_origin)
     ensure
       SourceRunLog.where(source_id: SILENT_ID).delete
     end
@@ -503,9 +559,10 @@ module TomatoShrieker
       SourceRunLog.where(source_id: SILENT_ID).delete
     end
 
-    def test_silent_boolean
+    # ⚠ #1502 で 3 値になった。`nil`（判定不能）も正当な返り値。
+    def test_silent_tri_state
       Source.all do |source|
-        assert_boolean(source.silent?)
+        assert_include([true, false, nil], source.silent?)
       end
     end
 

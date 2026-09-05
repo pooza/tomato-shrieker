@@ -3,12 +3,129 @@ module TomatoShrieker
     def setup
       @daemon = SchedulerDaemon.new
       @path = File.join(Environment.dir, 'tmp/db', "__test_scheduler_daemon_#{Process.pid}.sqlite3")
+      # ⚠ 本物の pid ファイルを書かない。開発機で稼働中の daemon を指す pid を
+      # 上書きすると、次の stop / restart が別プロセスを掴む。
+      @pid_path = File.join(Environment.dir, 'tmp/pids', "__test_scheduler_daemon_#{Process.pid}.pid")
       FileUtils.rm_f(@path)
+      FileUtils.rm_f(@pid_path)
     end
 
     def teardown
       FileUtils.rm_f(@path)
+      FileUtils.rm_f(@pid_path)
+      @daemon.instance_variable_get(:@reload_queue)&.close
+      @daemon.instance_variable_get(:@reload_ready)&.close
+      @daemon.instance_variable_get(:@reload_thread)&.join(5)
+      trap('HUP', 'DEFAULT')
+      @stubbed&.singleton_class&.remove_method(:reload)
       super
+    end
+
+    # #1459: SIGHUP でソース定義を読み直す。
+    # ⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）。`Scheduler#reload` は
+    # Mutex を取るので、trap は Queue に積むだけにして専用スレッドが処理する。
+    # ここで確かめているのは「HUP がワーカー経由で reload に届く」配線。
+    def test_reload_worker_handles_sighup
+      calls = Thread::Queue.new
+      stub_reload {calls.push(:called)}
+      @daemon.send(:start_reload_worker)
+      ready
+      Process.kill('HUP', Process.pid)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 🔴 **trap は pid を書く前に張るが、処理は起動完了後 (#1545 Codex P2)。**
+    # `write_pid` が pid を書いた瞬間から `source reload` は HUP を送れるので、
+    # trap が無ければ既定動作で daemon が死ぬ。⚠ とはいえマイグレーション前に
+    # ジョブを立てると `no such table` を踏むので、届いても積むだけにする。
+    def test_reload_worker_defers_until_ready
+      calls = Thread::Queue.new
+      stub_reload {calls.push(:called)}
+      @daemon.send(:start_reload_worker)
+      Process.kill('HUP', Process.pid)
+
+      assert_nil(calls.pop(timeout: 1))
+      ready
+
+      assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 🔴 **reload の失敗で daemon を落とさない。**壊れた YAML を掴んだだけなら
+    # 古い定義のまま走り続けるのが正しく、次の reload 要求も処理できねばならない。
+    def test_reload_worker_survives_error
+      calls = Thread::Queue.new
+      stub_reload do
+        calls.push(:called)
+        raise 'boom'
+      end
+      @daemon.send(:start_reload_worker)
+      ready
+      queue = @daemon.instance_variable_get(:@reload_queue)
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+    end
+
+    # 🔴🔴 **報告そのものが落ちてもワーカーを死なせない（4.8.0 リリース前レビュー）。**
+    #
+    # 内側の rescue が `logger.error` で落ちると、例外が `while` を貫通して
+    # **`process_reloads` を抜け、ワーカースレッドが終わる**。以後 trap は Queue に
+    # 積み続けるが誰も pop しない ＝ **`source reload` は「reload requested」と言い、
+    # daemon は健全に見えたまま、再起動するまで reload が二度と効かない。**
+    # ⚠ `bin/scheduler_daemon.rb` が stderr を潰すので `report_on_exception` も出ない。
+    def test_reload_worker_survives_reporting_failure
+      calls = Thread::Queue.new
+      stub_reload do
+        calls.push(:called)
+        raise 'boom'
+      end
+      # 報告経路そのものを壊す。⚠ 最後の砦（syslog）まで潰すと検証にならないので、
+      # 潰すのは logger だけにする。
+      @daemon.define_singleton_method(:logger) {raise 'logger boom'}
+      @daemon.define_singleton_method(:report_reload_fallback) {|_error, _log_error| nil}
+      @daemon.send(:start_reload_worker)
+      ready
+      queue = @daemon.instance_variable_get(:@reload_queue)
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10), 'ワーカーが死んで HUP が no-op になっている')
+    end
+
+    # 🔴 **pid が外から見えた時点で trap が張られていること (#1545 Codex P2)。**
+    # `bin/shrieker source reload` は pid ファイルを読んで HUP を送るので、
+    # `start` の先頭で張るのでは間に合わないことがある（窓が縮むだけで閉じない）。
+    #
+    # ⚠ **観測点は `pid_file`。**上流の `write_pid` は `File.write` の直前にこれを
+    # 呼ぶので、**pid が公開される瞬間の trap の状態**はここでしか見られない。
+    def test_write_pid_installs_hup_trap_before_publishing
+      observed = nil
+      path = @pid_path
+      @daemon.define_singleton_method(:pid_file) do
+        # ⚠ `trap` は現在のハンドラを返すが同時に差し替えるので、読んだら戻す。
+        observed ||= trap('HUP', 'DEFAULT').tap {|prev| trap('HUP', prev)}
+        path
+      end
+      @daemon.send(:write_pid)
+
+      assert_equal(Process.pid.to_s, File.read(path))
+      assert_not_equal('DEFAULT', observed)
+    end
+
+    # 起動完了の合図。SchedulerDaemon#start では monitor server を上げた直後に押す。
+    def ready
+      @daemon.instance_variable_get(:@reload_ready).push(true)
+    end
+
+    def stub_reload(&)
+      @stubbed = Scheduler.instance
+      @stubbed.define_singleton_method(:reload, &)
     end
 
     def migration_dir

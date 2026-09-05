@@ -34,20 +34,29 @@ module TomatoShrieker
       return [503, HEADERS, [body]]
     end
 
+    # ⚠ **503 を返すなら Sentry にも出す（4.8.0 リリース前レビュー）。**#1485 で
+    # 「`/healthz` を 503 にするのに Sentry へ出ないエラーを作らない」と決めたのに、
+    # 監視コード自身の失敗だけが例外になっていた。
     def healthz_source(source_id)
       return build_healthz_source(source_id)
     rescue => e
+      if Sentry.initialized?
+        Sentry.capture_exception(e, tags: {source: source_id, stage: 'healthz'})
+      end
       return [503, HEADERS, ["#{Package.error_message(e)}\n"]]
     end
 
     def build_healthz_source(source_id)
       source = Source.create(source_id)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
+      # 意図的に止めたソースを「壊れている」と混同しない (#1503)。
+      return [200, HEADERS, ["OK (disabled)\n"]] if source.disable?
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
       # 宛先ゼロは実行結果を見るまでもなく壊れている (#1473)。
-      # ⚠ 無効ソースは除く。スキーマが disable: true のとき dest の必須を免除しており
-      # (chinachu 等の死蔵定義が実際に dest: {})、ランタイムだけ咎めると食い違う (#1486)。
-      return [503, HEADERS, ["No destination configured\n"]] unless source.dest? || source.disable?
+      # ⚠ 無効ソースはここまで来ない (#1503)。スキーマが disable: true のとき dest の
+      # 必須を免除している (chinachu 等の死蔵定義が実際に dest: {}) 件 (#1486) も、
+      # 「無効なら監視しない」で一括して片付く。
+      return [503, HEADERS, ["No destination configured\n"]] unless source.dest?
       latest = SourceRunLog.latest_for(source_id)
       return [503, HEADERS, ["No run recorded yet\n"]] unless latest
       checks = source_checks(source, latest)
@@ -66,14 +75,16 @@ module TomatoShrieker
         errored: streak >= error_streak_threshold,
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
-        # 次に全宛先へ届くまで解除しない。⚠ opt-in の silent? と違い常時有効。
-        undelivered: SourceRunLog.last_attempted(source.id),
+        # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
+        # ⚠ opt-in の silent? と違い、しきい値の設定なしに常時有効。
+        # 判定は Source 側に寄せてある。
+        undelivered: (source.undelivered_log if source.undelivered?),
       }
     end
 
     def unhealthy?(checks)
       return true if checks[:stale] || checks[:errored] || checks[:silent]
-      return checks[:undelivered]&.undelivered? || false
+      return !checks[:undelivered].nil?
     end
 
     def unhealthy_body(source, latest, checks)
@@ -83,9 +94,27 @@ module TomatoShrieker
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
       body << "error_streak: #{checks[:streak]}\n"
-      body << "error: #{latest.error_message}\n" if latest.error?
-      body << undelivered_body(checks[:undelivered]) if checks[:undelivered]&.undelivered?
+      body << failure_body(latest)
+      body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]
+      return body
+    end
+
+    # 🔴 **失敗の理由は status に関係なく出す (#1507)。**
+    #
+    # 以前は `latest.error?`（＝ `status == "error"`）でだけ出していた。⚠ #1482 で
+    # `partial` を分けた時点で、**Matrix 配信停止 (#1455) と同じ形の run は
+    # `partial` になり、理由がまったく出ない 503** になっていた（v4.5.0 からの後退）。
+    # `record_partial` は「status が error でないだけで、失敗は失敗として読める
+    # ようにする」ために `error_message` を残しているので、それを出す。
+    #
+    # ⚠⚠ **宛先ごとの識別子は出さない。**webhook の URL はパスそのものが資格情報
+    # (#1467)。`shrieker_errors` なら宛先の**種別**までは絞れて、識別子は載らない。
+    def failure_body(log, prefix = '')
+      body = +''
+      body << "#{prefix}error: #{log.error_message}\n" if log.error_message.present?
+      errors = log.shrieker_error_counts
+      body << "#{prefix}shrieker_errors: #{JSON.dump(errors)}\n" if errors.any?
       return body
     end
 
@@ -101,18 +130,25 @@ module TomatoShrieker
       body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
       # #1505: 静かなだけと分かっているなら `bin/shrieker source ack ID` で緑に戻せる
       body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
+      body << "silence_baseline_origin: #{source.silence_baseline_origin}\n"
       body << "silence_acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
       return body
     end
 
     # #1504: 「いつ・何件のうち何件が届かなかったか」を運用者に見せる。
     # ⚠ 宛先の識別子は持たないので「どの宛先か」は出せない。設定を見て切り分ける。
-    def undelivered_body(log)
+    def undelivered_body(log, latest)
       # ⚠ 式展開の無いリテラルなので `+` で可変にする (#1512)。上の silent_body 参照。
       body = +"undelivered: true\n"
       body << "last_attempted_at: #{log.executed_at.iso8601}\n"
       body << "attempted_count: #{log.attempted_count}\n"
       body << "delivered_count: #{log.delivered_count}\n"
+      # 🔴 **no-op を挟むと `latest` は success の no-op 行になる (#1507)。**
+      # そのとき理由を持っているのは `latest` ではなく「直近の配信試行」の行なので、
+      # ここでも出す。⚠ 同じ行なら上の failure_body と重複するので出さない。
+      return body if log.id == latest.id
+      body << "last_attempted_status: #{log.status}\n"
+      body << failure_body(log, 'last_attempted_')
       return body
     end
 
@@ -127,13 +163,23 @@ module TomatoShrieker
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
     rescue => e
+      Sentry.capture_exception(e, tags: {stage: 'status_json'}) if Sentry.initialized?
       return [500, JSON_HEADERS, ["#{JSON.dump(error: Package.error_message(e))}\n"]]
     end
 
     # 1 ソースの失敗で payload 全体を落とさない。壊れた側は error として可視化する。
+    #
+    # 🔴 **ここが最も静かに壊れる（4.8.0 リリース前レビュー）。**返る行が
+    # `{id, class, error}` の 3 キーに退化するので、**`undelivered` / `silent` が
+    # キーごと消える**。`sources[].undelivered == true` を探す消費者はそのソースを
+    # 「異常なし」と読む。⚠ 総合 `/healthz` は scheduler と database しか見ないので
+    # 200 のまま ＝ **Kuma 未登録のソースでは誰にも届かない** (#1508)。
     def source_status(source)
       return build_source_status(source)
     rescue => e
+      if Sentry.initialized?
+        Sentry.capture_exception(e, tags: {source: source.id, stage: 'status_json'})
+      end
       return {id: source.id, class: source.class.to_s, error: Package.error_message(e)}
     end
 
@@ -160,13 +206,26 @@ module TomatoShrieker
         dest_count: source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
-        undelivered: attempted&.undelivered? || false,
-        last_attempted_count: latest&.attempted_count,
-        last_delivered_count: latest&.delivered_count,
+        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは silence_acknowledged_at で読む
+        undelivered: source.undelivered?,
+        # 🔴 **`attempted` から出す（4.8.0 リリース前レビュー）。**`latest` は
+        # **直近の run** なので、no-op を挟むと **`last_attempted_at` は前の試行を
+        # 指しているのに件数だけ 0** という自己矛盾になる。⚠ 本番で再現した:
+        # `capsicum` が `/status.json` で 0/0、同じ行が DB では 1/1。
+        # ⚠ `/healthz/source/:id` の 503 本文は `attempted` 側から出しているので、
+        # **2 つのエンドポイントが同名フィールドで違う数字**を出していた。
+        last_attempted_count: attempted&.attempted_count,
+        last_delivered_count: attempted&.delivered_count,
         last_delivered_at: source.last_delivered_at&.iso8601,
         last_delivered_at_origin: source.last_delivered_at_origin,
         silence_tolerance_seconds: source.monitor_silence_tolerance_seconds,
+        # 🔴 **3 値 (#1502)。**`null` は「まだ判定できない」＝ run_log 上に配信実績も
+        # 確認記録も無く、観測開始からしきい値も経っていない。⚠ 以前は `false` が
+        # 「健全」と「判定不能」を兼ねていて、外から区別できなかった。
         silent: source.silent?,
+        # なぜその判定なのか。`observation` なら下限（観測開始からの経過）に頼っている
+        silence_baseline: source.silence_baseline&.iso8601,
+        silence_baseline_origin: source.silence_baseline_origin,
         # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
         # false だが、それは健全だからではなく運用者が確認したから
         silence_acknowledged_at: SilenceAck.acknowledged_at(source.id)&.iso8601,

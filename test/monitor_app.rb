@@ -114,15 +114,28 @@ module TomatoShrieker
     end
 
     # #1486: スキーマは disable: true のとき dest の必須を免除しているので、
-    # ランタイムだけ「宛先がない」と咎めると食い違う
+    # ランタイムだけ「宛先がない」と咎めると食い違う。
+    # ⚠ #1503 で「無効なソースは監視しない」に統一したので、run の有無に関わらず 200。
     def test_healthz_source_disabled_without_dest
       write_fixture(DISABLED_ID, {'disable' => true, 'dest' => {}})
       config.reload
       status, _headers, body = call("/healthz/source/#{DISABLED_ID}")
 
-      assert_equal(503, status)
-      assert_not_include(body.first, 'No destination configured')
-      assert_include(body.first, 'No run recorded yet')
+      assert_equal(200, status)
+      assert_include(body.first, 'OK (disabled)')
+    end
+
+    # #1503: 一度稼働してから無効化したソースは run_log が残るので stale 判定まで進み、
+    # しかも scheduler が register しないので executed_at が二度と前に進まない。
+    # grace を跨いだ時点で恒久的に 503 になっていた。
+    def test_healthz_source_disabled_after_running
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      record(DISABLED_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 86_400)
+      status, _headers, body = call("/healthz/source/#{DISABLED_ID}")
+
+      assert_equal(200, status)
+      assert_include(body.first, 'OK (disabled)')
     end
 
     # #1457: 一過性エラーのあと no-op success が来たら健全に戻る。
@@ -188,6 +201,7 @@ module TomatoShrieker
 
       assert_equal(503, status)
       assert_include(body.first, 'silent: true')
+      assert_include(body.first, 'silence_baseline_origin: delivery')
       assert_include(body.first, 'noop_streak: 1')
     end
 
@@ -350,6 +364,53 @@ module TomatoShrieker
       assert_include(body.first, 'delivered_count: 1')
     end
 
+    # 🔴 **理由の無い 503 を運用者に見せない (#1507)。**
+    # #1482 で `partial` を分けてから、`error:` 行の条件が `status == "error"` の
+    # ままだったので、**#1455 の形の 503 は本文に理由がゼロ**になっていた。
+    # ⚠ v4.5.0 では出ていた＝後退。
+    def test_healthz_source_undelivered_shows_reason
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom',
+        shrieker_errors: JSON.dump('WebhookShrieker' => 1))
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(body.first, 'RuntimeError: boom', '理由の無い 503 になっている')
+      # 宛先の**種別**までは絞れる。⚠ 識別子は載せない (#1467)
+      assert_include(body.first, 'shrieker_errors: {"WebhookShrieker":1}')
+    end
+
+    # 🔴🔴 **503 の本文に資格情報を出さないこと。**
+    #
+    # ⚠ #1507 の他のテストは `error_message` を DB へ直接書いているので、
+    # **`Package.error_message` のマスクを外しても緑のまま通る**。ここだけは
+    # `record_partial` を通して、マスク済みの値が保存され本文にも出ないことを見る。
+    # モロヘイヤの webhook は `POST /mulukhiya/webhook/{digest}` で**パスそのものが
+    # 資格情報**。
+    def test_healthz_source_undelivered_masks_credentials
+      digest = 'fa9c541e163ff35ac49e12dd5ad71dc4e27876a3a5514f46d074e9b6f190652d'
+      stats = DeliveryStats.new
+      stats.record_success(MastodonShrieker.allocate)
+      stats.record_error(WebhookShrieker.allocate,
+        Ginseng::GatewayError.new("Bad response 404 (https://precure.ml/mulukhiya/webhook/#{digest})"))
+      SourceRunLog.record_partial(FIXTURE_ID, started_at: Time.now - 60,
+        error: stats.first_error, stats:)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_not_include(body.first, digest, '503 の本文に webhook の digest が出ている')
+      assert_include(body.first, '[FILTERED]')
+    end
+
+    # ⚠ 同じ行を 2 度出さない。latest が直近の配信試行そのものなら
+    # `last_attempted_error:` は要らない。
+    def test_healthz_source_undelivered_reason_is_not_duplicated
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom')
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_not_include(body.first, 'last_attempted_error:')
+      assert_equal(1, body.first.scan('RuntimeError: boom').size)
+    end
+
     # 全宛先へ届いた run が来たら解除する
     def test_healthz_source_undelivered_recovers
       record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
@@ -372,12 +433,124 @@ module TomatoShrieker
       assert_include(body.first, 'undelivered: true')
     end
 
+    # 🔴 **no-op を挟むと `latest` は success の no-op 行になる (#1507)。**
+    # そのとき `status: success` ＋ `undelivered: true` だけが出て、**理由が
+    # どこにも無い 503** になっていた。理由を持っているのは「直近の配信試行」の行。
+    def test_healthz_source_undelivered_shows_reason_after_noop
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, error_message: 'RuntimeError: boom',
+        shrieker_errors: JSON.dump('WebhookShrieker' => 1), at: Time.now - 120)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(body.first, 'status: success', '前提: latest は no-op の success 行')
+      assert_include(body.first, 'last_attempted_status: partial')
+      assert_include(body.first, 'last_attempted_error: RuntimeError: boom')
+      assert_include(body.first, 'last_attempted_shrieker_errors: {"WebhookShrieker":1}')
+    end
+
+    # 🔴 **未達も運用者が確認して緑に戻せること (#1506)。**
+    # ⚠ 取りこぼしは再送されないので、赤を放置しても失われたものは戻らない。一方で
+    # 疎なソース（本番は 57 中 17 件が 12 日間に配信試行ゼロ）は逃げ道が無いと
+    # 数週間 503 に貼り付き、「いつも赤いモニター」を作ってしまう。
+    def test_healthz_source_undelivered_acknowledged
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+
+      SilenceAck.acknowledge(FIXTURE_ID)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      assert_false(source_status(FIXTURE_ID)['undelivered'])
+    end
+
+    # 🔴 **消えるのは「確認したその試行」だけ。**確認より後の試行で再び届かなければ
+    # また赤くなる。⚠ ここを「確認したら以後ずっと緑」にすると、宛先が死んだままの
+    # ソースが恒久的に見えなくなる。
+    def test_healthz_source_undelivered_refires_after_acknowledge
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+      SilenceAck.acknowledge(FIXTURE_ID)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now + 60)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # 🔴🔴 **確認より後に終わった run は消さない（4.8.0 リリース前レビュー・Codex P2）。**
+    #
+    # ⚠⚠ `executed_at` は run の**開始**時刻なので、開始時刻で ack と比べると
+    # **ack の直前に始まって直後に未達で終わった run を「確認済み」として消す**。
+    # 本番の最長 run は 62.6 秒（60 秒級が 5 本）あるので窓は微小ではない。
+    def test_healthz_source_undelivered_survives_run_finishing_after_acknowledge
+      SilenceAck.acknowledge(FIXTURE_ID, at: Time.now)
+      # ack の 30 秒前に始まり、60 秒かけて未達で終わった run
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, duration_ms: 60_000, at: Time.now - 30)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first,
+        '運用者が見ていない失敗を確認済みにしている')
+    end
+
+    # ⚠ no-op run は「配信試行」ではないので、確認済みの状態を崩さない。
+    def test_healthz_source_undelivered_acknowledge_survives_noop
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, at: Time.now - 120)
+      SilenceAck.acknowledge(FIXTURE_ID)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now + 60)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
     # 一度も配信を試みていないソースを未達扱いしない
     def test_healthz_source_undelivered_ignores_noop_only
       record(FIXTURE_ID, attempted_count: 0)
       status, = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(200, status)
+    end
+
+    # 🔴 **`/status.json` で「健全」と「判定不能」を区別できること (#1502)。**
+    # #1483 で observed_since 起点にした結果、run_log 上に配信実績が無いソースは
+    # 「観測開始から tolerance 経過するまで」検知されない。⚠ 検知しないこと自体は
+    # 変えないが、`silent: false` で「健全」と同じ顔をするのはやめる。
+    def test_status_json_silent_is_tri_state
+      record(SILENT_ID, attempted_count: 0, at: Time.now - 60)
+      source = source_status(SILENT_ID)
+
+      assert_true(source.key?('silent'), 'キーごと落としてはいけない')
+      assert_nil(source['silent'], '「健全」と「判定不能」を兼ねている')
+      assert_equal('observation', source['silence_baseline_origin'])
+    end
+
+    # 配信実績があれば判定は確か。⚠ 起点も `delivery` になる
+    def test_status_json_silent_false_when_delivered
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 60)
+      source = source_status(SILENT_ID)
+
+      assert_false(source['silent'])
+      assert_equal('delivery', source['silence_baseline_origin'])
+    end
+
+    # 🔴 **`/status.json` と `/healthz` が同名フィールドで違う数字を出さないこと。**
+    # ⚠ 本番で再現した: `capsicum` が `/status.json` で 0/0、同じ行が DB では 1/1。
+    # `last_attempted_at` は「直近の配信試行」を指しているのに、件数だけ「直近の run」
+    # 由来だったので、no-op を挟むと自己矛盾していた（4.8.0 リリース前レビュー）。
+    def test_status_json_attempted_counts_match_healthz
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 3,
+        delivered_count: 1, at: Time.now - 120)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now)
+      source = source_status(FIXTURE_ID)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(3, source['last_attempted_count'])
+      assert_equal(1, source['last_delivered_count'])
+      assert_include(body.first, 'attempted_count: 3')
+      assert_include(body.first, 'delivered_count: 1')
     end
 
     def test_status_json_reports_undelivered

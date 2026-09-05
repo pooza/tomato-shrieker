@@ -55,6 +55,24 @@ module TomatoShrieker
     # ⚠ ログ自体が落ちても before_send を巻き込まない（イベントは落とす側に倒す）。
     def report_drop(error)
       @logger.error(sentry: 'before_send', message: 'event dropped (scrub failed)', error:)
+    rescue StandardError => e
+      report_drop_fallback(error, e)
+    end
+
+    # 🔴 **報告の最後の 1 手はマスク経路に依存させない (#1549)。**
+    # scrub が落ちる原因がマスク設定そのものなら、`@logger.error` も同じ理由で
+    # 落ちる。⚠ そこを黙って捨てると「**Sentry へ 1 件も届かないのに、どこにも
+    # 何も出ない**」＝ #1467 が塞ごうとした状態に戻る。
+    #
+    # ⚠ **出すのは例外のクラス名だけ。**メッセージを載せると、伏せるはずだった
+    # 値をマスク無しで書くことになる。
+    # ⚠ **`warn` は使えない。**`bin/scheduler_daemon.rb` が
+    # `$stderr.reopen(File::NULL)` するので本番では丸ごと消える。
+    def report_drop_fallback(error, log_error)
+      ::Syslog::Logger.new(Package.name).error(
+        'sentry before_send: event dropped (scrub failed):' \
+          " #{error.class} (logging failed: #{log_error.class})",
+      )
     rescue StandardError
       return nil
     end
