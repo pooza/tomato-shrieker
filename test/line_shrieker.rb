@@ -53,12 +53,18 @@ module TomatoShrieker
     # `Ginseng::LineService#initialize` が落ちるのは `/line/urls/api` の欠落時だけ。
     #
     # ⚠ **`raw` の鍵は設定ファイルの basename**（`local` / `application` / `lib` /
-    # hostname）で、優先順は `Config#basenames` の順。低い側へ書いても高い側の値に
-    # 上書きされるので、**実在するうちいちばん強い basename** を差し替える。
+    # hostname）で、優先順は `Config#basenames` の順。
+    #
+    # 🔴🔴 **「いちばん強い basename から消す」では効かない。**`Config#load` は
+    # basename ごとに `update(key_flatten)` するので、**強い側でキーを消しても弱い側の
+    # 値がそのまま残る**。⚠ 実際に踏んだ: 手元には `local.yaml` が無いので
+    # `application` を削って通ったが、**CI は `local_sample.yaml` を `local.yaml` へ
+    # コピーする**ため `local` が選ばれ、`application` の値が生き残って落ちなかった。
+    # **nil で明示的に上書きする**（`Config#[]` は nil を「無い」として扱う）。
     def with_broken_line_config
       key = config.basenames.find {|v| config.raw.key?(v)}
       original = config.raw[key]['line']
-      config.raw[key]['line'] = (original || {}).deep_dup.tap {|v| v.delete('urls')}
+      config.raw[key]['line'] = {'urls' => {'api' => nil}}
       config.reload
       yield
     ensure
