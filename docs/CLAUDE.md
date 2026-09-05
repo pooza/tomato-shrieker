@@ -831,7 +831,9 @@ done
 
 #### Kuma のモニターと有効ソースの突き合わせ
 
-🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。2026-08-21 時点で **有効 39 に対しモニター 24＝15 ソースが不可視**だった。
+🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。
+
+📌 **2026-09-05 時点で 56 ソース / 56 モニターが一致し、全部 active。**（2026-08-21 は 39 に対し 24＝15 ソースが不可視だった。）**「登録を義務づける運用」で塞ぐ**という #1508 の案 A が成立している状態なので、**この突き合わせがその唯一の担保**になる。
 
 ```sh
 diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
@@ -841,6 +843,15 @@ diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[
 
 - `<` の行 ＝ **Kuma に登録されていないソース**
 - `>` の行 ＝ **Kuma にあるが本番に無いソース**（消したソースのモニターが残っている）
+
+⚠⚠ **名前が揃っているだけでは足りない。一時停止したモニターは「登録されているが盲目」**で、上の diff には出ない。**`active` も見ること。**
+
+```sh
+ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
+  "select active, count(*) from monitor where name like \"tomato-shrieker %\" group by active;"'
+```
+
+⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。
 
 ⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
 
