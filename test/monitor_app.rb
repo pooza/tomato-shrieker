@@ -201,6 +201,7 @@ module TomatoShrieker
 
       assert_equal(503, status)
       assert_include(body.first, 'silent: true')
+      assert_include(body.first, 'silence_baseline_origin: delivery')
       assert_include(body.first, 'noop_streak: 1')
     end
 
@@ -433,6 +434,28 @@ module TomatoShrieker
       status, = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(200, status)
+    end
+
+    # 🔴 **`/status.json` で「健全」と「判定不能」を区別できること (#1502)。**
+    # #1483 で observed_since 起点にした結果、run_log 上に配信実績が無いソースは
+    # 「観測開始から tolerance 経過するまで」検知されない。⚠ 検知しないこと自体は
+    # 変えないが、`silent: false` で「健全」と同じ顔をするのはやめる。
+    def test_status_json_silent_is_tri_state
+      record(SILENT_ID, attempted_count: 0, at: Time.now - 60)
+      source = source_status(SILENT_ID)
+
+      assert_true(source.key?('silent'), 'キーごと落としてはいけない')
+      assert_nil(source['silent'], '「健全」と「判定不能」を兼ねている')
+      assert_equal('observation', source['silence_baseline_origin'])
+    end
+
+    # 配信実績があれば判定は確か。⚠ 起点も `delivery` になる
+    def test_status_json_silent_false_when_delivered
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 60)
+      source = source_status(SILENT_ID)
+
+      assert_false(source['silent'])
+      assert_equal('delivery', source['silence_baseline_origin'])
     end
 
     def test_status_json_reports_undelivered
