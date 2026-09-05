@@ -70,13 +70,14 @@ module TomatoShrieker
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
         # 次に全宛先へ届くまで解除しない。⚠ opt-in の silent? と違い常時有効。
-        undelivered: SourceRunLog.last_attempted(source.id),
+        # ⚠ 運用者が確認済みなら緑に戻す (#1506)。判定は Source 側に寄せてある。
+        undelivered: (source.undelivered_log if source.undelivered?),
       }
     end
 
     def unhealthy?(checks)
       return true if checks[:stale] || checks[:errored] || checks[:silent]
-      return checks[:undelivered]&.undelivered? || false
+      return !checks[:undelivered].nil?
     end
 
     def unhealthy_body(source, latest, checks)
@@ -87,7 +88,7 @@ module TomatoShrieker
       body << "stale: #{checks[:stale]}\n"
       body << "error_streak: #{checks[:streak]}\n"
       body << failure_body(latest)
-      body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]&.undelivered?
+      body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]
       return body
     end
@@ -188,7 +189,8 @@ module TomatoShrieker
         dest_count: source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
-        undelivered: attempted&.undelivered? || false,
+        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは silence_acknowledged_at で読む
+        undelivered: source.undelivered?,
         last_attempted_count: latest&.attempted_count,
         last_delivered_count: latest&.delivered_count,
         last_delivered_at: source.last_delivered_at&.iso8601,

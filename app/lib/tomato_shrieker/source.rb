@@ -344,8 +344,26 @@ module TomatoShrieker
 
     # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
     # 「長期間配信が無い」(silent?) と違い、**これは無条件に失敗**。
+    # 試みたのに届かなかった宛先が未解決のまま残っているか (#1504)。
+    #
+    # 🔴 **運用者が確認したら緑に戻す (#1506)。**取りこぼしたエントリは再送されない
+    # ので、赤を放置しても失われたものは戻らない。⚠ **本番の 57 ソースのうち 17 件は
+    # 12 日間に配信試行がゼロ**（2026-09-05 実測）なので、確認手段が無いと疎なソースは
+    # 数週間 503 に貼り付き、**「いつも赤いモニター」を作って監視ごと信用されなくなる**。
+    #
+    # ⚠ **消せるのは「確認したその試行」だけ。**確認より後の試行で再び届かなければ
+    # また赤くなる。#1505 の「起点が前に進むだけ」と同じ規則。
     def undelivered?
-      return SourceRunLog.undelivered?(id)
+      return false unless log = undelivered_log
+      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return log.executed_at > acknowledged_at
+    end
+
+    # 未達の根拠になっている run (#1506)。確認済みかどうかは見ない。
+    def undelivered_log
+      @undelivered_log ||= SourceRunLog.last_attempted(id)
+      return nil unless @undelivered_log&.undelivered?
+      return @undelivered_log
     end
 
     # 監視の対象か (#1503)。
