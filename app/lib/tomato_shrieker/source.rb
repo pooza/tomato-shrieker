@@ -342,8 +342,6 @@ module TomatoShrieker
       return {type: 'every', value: period}
     end
 
-    # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
-    # 「長期間配信が無い」(silent?) と違い、**これは無条件に失敗**。
     # 試みたのに届かなかった宛先が未解決のまま残っているか (#1504)。
     #
     # 🔴 **運用者が確認したら緑に戻す (#1506)。**取りこぼしたエントリは再送されない
@@ -356,7 +354,10 @@ module TomatoShrieker
     def undelivered?
       return false unless log = undelivered_log
       return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
-      return log.executed_at > acknowledged_at
+      # ⚠⚠ **開始時刻ではなく終了時刻で比べる。**`executed_at` は run の開始時刻なので、
+      # **ack の直前に始まって直後に未達で終わった run を消してしまう**（本番の最長 run
+      # は 62.6 秒）。運用者が見ていないものを「確認済み」にしない。
+      return log.finished_at > acknowledged_at
     end
 
     # 未達の根拠になっている run (#1506)。確認済みかどうかは見ない。
@@ -441,15 +442,6 @@ module TomatoShrieker
 
     # しきい値を超えて無配信が続いているか (#1470)。
     #
-    # ⚠ 判定に使うのは run_log 由来の実配信だけで、last_delivered_at_fallback は見ない (#1483)。
-    # fallback（FeedSource なら entry.published）は配信の成否と無関係に前進するので、
-    # 配信できていなくても silent? が永久に false になる。表示用としては残してある。
-    #
-    # 一度も配信していないソースは、観測を始めてからの経過を無配信期間の下限として使う。
-    # ここを「実績が無いので断定しない」で false にすると、開設以来ずっと壊れている
-    # ソースだけが恒久的に検知対象外になる。
-    # ⚠ ローカル変数に at を使わないこと。alias at post_at があるため、
-    # 代入より前に現れた at はメソッド呼び出しに解決されて nil になる。
     # 🔴 **3 値を返す (#1502)。**`true` = 沈黙、`false` = 沈黙していない、
     # **`nil` = まだ判定できない**。
     #

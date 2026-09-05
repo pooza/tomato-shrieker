@@ -379,6 +379,27 @@ module TomatoShrieker
       assert_include(body.first, 'shrieker_errors: {"WebhookShrieker":1}')
     end
 
+    # 🔴🔴 **503 の本文に資格情報を出さないこと。**
+    #
+    # ⚠ #1507 の他のテストは `error_message` を DB へ直接書いているので、
+    # **`Package.error_message` のマスクを外しても緑のまま通る**。ここだけは
+    # `record_partial` を通して、マスク済みの値が保存され本文にも出ないことを見る。
+    # モロヘイヤの webhook は `POST /mulukhiya/webhook/{digest}` で**パスそのものが
+    # 資格情報**。
+    def test_healthz_source_undelivered_masks_credentials
+      digest = 'fa9c541e163ff35ac49e12dd5ad71dc4e27876a3a5514f46d074e9b6f190652d'
+      stats = DeliveryStats.new
+      stats.record_success(MastodonShrieker.allocate)
+      stats.record_error(WebhookShrieker.allocate,
+        Ginseng::GatewayError.new("Bad response 404 (https://precure.ml/mulukhiya/webhook/#{digest})"))
+      SourceRunLog.record_partial(FIXTURE_ID, started_at: Time.now - 60,
+        error: stats.first_error, stats:)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_not_include(body.first, digest, '503 の本文に webhook の digest が出ている')
+      assert_include(body.first, '[FILTERED]')
+    end
+
     # ⚠ 同じ行を 2 度出さない。latest が直近の配信試行そのものなら
     # `last_attempted_error:` は要らない。
     def test_healthz_source_undelivered_reason_is_not_duplicated
@@ -460,6 +481,21 @@ module TomatoShrieker
       assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
     end
 
+    # 🔴🔴 **確認より後に終わった run は消さない（4.8.0 リリース前レビュー・Codex P2）。**
+    #
+    # ⚠⚠ `executed_at` は run の**開始**時刻なので、開始時刻で ack と比べると
+    # **ack の直前に始まって直後に未達で終わった run を「確認済み」として消す**。
+    # 本番の最長 run は 62.6 秒（60 秒級が 5 本）あるので窓は微小ではない。
+    def test_healthz_source_undelivered_survives_run_finishing_after_acknowledge
+      SilenceAck.acknowledge(FIXTURE_ID, at: Time.now)
+      # ack の 30 秒前に始まり、60 秒かけて未達で終わった run
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+        delivered_count: 1, duration_ms: 60_000, at: Time.now - 30)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first,
+        '運用者が見ていない失敗を確認済みにしている')
+    end
+
     # ⚠ no-op run は「配信試行」ではないので、確認済みの状態を崩さない。
     def test_healthz_source_undelivered_acknowledge_survives_noop
       record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
@@ -498,6 +534,23 @@ module TomatoShrieker
 
       assert_false(source['silent'])
       assert_equal('delivery', source['silence_baseline_origin'])
+    end
+
+    # 🔴 **`/status.json` と `/healthz` が同名フィールドで違う数字を出さないこと。**
+    # ⚠ 本番で再現した: `capsicum` が `/status.json` で 0/0、同じ行が DB では 1/1。
+    # `last_attempted_at` は「直近の配信試行」を指しているのに、件数だけ「直近の run」
+    # 由来だったので、no-op を挟むと自己矛盾していた（4.8.0 リリース前レビュー）。
+    def test_status_json_attempted_counts_match_healthz
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 3,
+        delivered_count: 1, at: Time.now - 120)
+      record(FIXTURE_ID, attempted_count: 0, at: Time.now)
+      source = source_status(FIXTURE_ID)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(3, source['last_attempted_count'])
+      assert_equal(1, source['last_delivered_count'])
+      assert_include(body.first, 'attempted_count: 3')
+      assert_include(body.first, 'delivered_count: 1')
     end
 
     def test_status_json_reports_undelivered

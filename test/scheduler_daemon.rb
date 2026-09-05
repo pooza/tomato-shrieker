@@ -70,6 +70,34 @@ module TomatoShrieker
       assert_equal(:called, calls.pop(timeout: 10))
     end
 
+    # 🔴🔴 **報告そのものが落ちてもワーカーを死なせない（4.8.0 リリース前レビュー）。**
+    #
+    # 内側の rescue が `logger.error` で落ちると、例外が `while` を貫通して
+    # **`process_reloads` を抜け、ワーカースレッドが終わる**。以後 trap は Queue に
+    # 積み続けるが誰も pop しない ＝ **`source reload` は「reload requested」と言い、
+    # daemon は健全に見えたまま、再起動するまで reload が二度と効かない。**
+    # ⚠ `bin/scheduler_daemon.rb` が stderr を潰すので `report_on_exception` も出ない。
+    def test_reload_worker_survives_reporting_failure
+      calls = Thread::Queue.new
+      stub_reload do
+        calls.push(:called)
+        raise 'boom'
+      end
+      # 報告経路そのものを壊す。⚠ 最後の砦（syslog）まで潰すと検証にならないので、
+      # 潰すのは logger だけにする。
+      @daemon.define_singleton_method(:logger) {raise 'logger boom'}
+      @daemon.define_singleton_method(:report_reload_fallback) {|_error, _log_error| nil}
+      @daemon.send(:start_reload_worker)
+      ready
+      queue = @daemon.instance_variable_get(:@reload_queue)
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10))
+      queue.push(true)
+
+      assert_equal(:called, calls.pop(timeout: 10), 'ワーカーが死んで HUP が no-op になっている')
+    end
+
     # 🔴 **pid が外から見えた時点で trap が張られていること (#1545 Codex P2)。**
     # `bin/shrieker source reload` は pid ファイルを読んで HUP を送るので、
     # `start` の先頭で張るのでは間に合わないことがある（窓が縮むだけで閉じない）。

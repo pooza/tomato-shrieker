@@ -5,11 +5,24 @@ module TomatoShrieker
 
     attr_reader :scheduler, :registry
 
+    # 🔴 **起動は fail closed、ループは fail safe (4.8.0 リリース前レビュー)。**
+    #
+    # ⚠⚠ **`register_all` を rescue の内側に置いてはいけない。**`Ginseng::ConfigError`
+    # も `StandardError` なので、`rescue => e` があると **`register_all` の
+    # 「起動時の失敗は握らない」(#1547) が丸ごと無効化される**（実測でプロセスが
+    # 終了コード 0 で落ちた）。そうなると `SchedulerDaemon#start` の `raise` も
+    # 走らないので、`systemctl status` 上は正常停止と区別がつかない。
     def exec
       # ⚠ 初回登録も reload と**同じ差分適用**を通す (#1545 Codex P1)。SIGHUP は
       # 起動の途中から受け付けるので、両方が素通しで register すると同じソースに
       # ジョブが 2 本立ち、以後 digest が一致するので誰も気付けない。
       register_all
+      run_jobs
+    end
+
+    # 走り出した後は落とさない。⚠ 稼働中の daemon を「ジョブが 1 回こけた」で
+    # 止める理由は無い。
+    def run_jobs
       schedule_maintenance
       @scheduler.join
     rescue => e

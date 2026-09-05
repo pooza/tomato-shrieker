@@ -27,6 +27,16 @@ module TomatoShrieker
       return super&.to_utf8
     end
 
+    # run が終わった時刻 (#1506 の Codex P2)。
+    #
+    # ⚠⚠ **`executed_at` は run の「開始」時刻**（`record` が `started_at` を書く）。
+    # 確認 (ack) との前後を開始時刻で比べると、**ack の直前に始まって直後に未達で
+    # 終わった run を「確認済み」として消してしまう**。本番の最長 run は 62.6 秒
+    # （2026-09-05 実測・60 秒級が 5 本）あるので、窓は微小ではない。
+    def finished_at
+      return executed_at + (duration_ms.to_i / 1000.0)
+    end
+
     def error?
       return status == STATUS_ERROR
     end

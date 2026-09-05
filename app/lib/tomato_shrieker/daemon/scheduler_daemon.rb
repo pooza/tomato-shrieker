@@ -44,18 +44,44 @@ module TomatoShrieker
       @reload_thread = Thread.new {process_reloads if @reload_ready.pop}
     end
 
+    # ⚠ `stop` が `close` すると `pop` は nil を返す。そこで抜ける。
     def process_reloads
-      # ⚠ `stop` が `close` すると `pop` は nil を返す。そこで抜ける。
-      while @reload_queue.pop
-        begin
-          Scheduler.instance.reload
-        rescue => e
-          # ⚠ **reload の失敗で daemon を落とさない。**壊れた YAML を掴んだだけなら
-          # 古い定義のまま走り続けるのが正しい。
-          Sentry.capture_exception(e) if Sentry.initialized?
-          logger.error(scheduler: 'reload', error: e)
-        end
-      end
+      reload_once while @reload_queue.pop
+    end
+
+    # ⚠ **reload の失敗で daemon を落とさない。**壊れた YAML を掴んだだけなら
+    # 古い定義のまま走り続けるのが正しい。
+    def reload_once
+      Scheduler.instance.reload
+    rescue => e
+      report_reload_failure(e)
+    end
+
+    # 🔴🔴 **ワーカーを絶対に死なせない (4.8.0 リリース前レビュー)。**
+    #
+    # 報告そのものが落ちると（`logger.error` が壊れた例外メッセージで落ちる形＝
+    # #1469 の族。#1485 / #1549 が別経路で塞いだのと同じ）、例外が `while` を貫通して
+    # **`process_reloads` を抜け、ワーカースレッドが終わる**。以後 trap は Queue に
+    # 積み続けるが誰も pop しない ＝ **`source reload` は「reload requested」と言い、
+    # daemon は健全に見えたまま、再起動するまで reload が二度と効かない。**
+    # ⚠ `bin/scheduler_daemon.rb` が stderr を潰すので `report_on_exception` も出ない。
+    #
+    # ⚠ **出すのは例外のクラス名だけ。**メッセージを載せると、伏せるはずだった値を
+    # マスク無しで書くことになる (#1549 と同じ判断)。
+    def report_reload_failure(error)
+      Sentry.capture_exception(error) if Sentry.initialized?
+      logger.error(scheduler: 'reload', error:)
+    rescue StandardError => e
+      report_reload_fallback(error, e)
+    end
+
+    # 最後の 1 手はマスク経路にも Sentry にも依存させない (#1549 と同じ形)。
+    def report_reload_fallback(error, log_error)
+      ::Syslog::Logger.new(Package.name).error(
+        "scheduler reload failed: #{error.class} (logging failed: #{log_error.class})",
+      )
+    rescue StandardError
+      return nil
     end
 
     # #1410 で rake start/restart を廃止したとき、その前提タスクだった migration:run が

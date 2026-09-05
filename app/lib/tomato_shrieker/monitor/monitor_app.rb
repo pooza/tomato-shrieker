@@ -34,9 +34,15 @@ module TomatoShrieker
       return [503, HEADERS, [body]]
     end
 
+    # ⚠ **503 を返すなら Sentry にも出す（4.8.0 リリース前レビュー）。**#1485 で
+    # 「`/healthz` を 503 にするのに Sentry へ出ないエラーを作らない」と決めたのに、
+    # 監視コード自身の失敗だけが例外になっていた。
     def healthz_source(source_id)
       return build_healthz_source(source_id)
     rescue => e
+      if Sentry.initialized?
+        Sentry.capture_exception(e, tags: {source: source_id, stage: 'healthz'})
+      end
       return [503, HEADERS, ["#{Package.error_message(e)}\n"]]
     end
 
@@ -69,8 +75,9 @@ module TomatoShrieker
         errored: streak >= error_streak_threshold,
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
-        # 次に全宛先へ届くまで解除しない。⚠ opt-in の silent? と違い常時有効。
-        # ⚠ 運用者が確認済みなら緑に戻す (#1506)。判定は Source 側に寄せてある。
+        # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
+        # ⚠ opt-in の silent? と違い、しきい値の設定なしに常時有効。
+        # 判定は Source 側に寄せてある。
         undelivered: (source.undelivered_log if source.undelivered?),
       }
     end
@@ -156,13 +163,23 @@ module TomatoShrieker
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
     rescue => e
+      Sentry.capture_exception(e, tags: {stage: 'status_json'}) if Sentry.initialized?
       return [500, JSON_HEADERS, ["#{JSON.dump(error: Package.error_message(e))}\n"]]
     end
 
     # 1 ソースの失敗で payload 全体を落とさない。壊れた側は error として可視化する。
+    #
+    # 🔴 **ここが最も静かに壊れる（4.8.0 リリース前レビュー）。**返る行が
+    # `{id, class, error}` の 3 キーに退化するので、**`undelivered` / `silent` が
+    # キーごと消える**。`sources[].undelivered == true` を探す消費者はそのソースを
+    # 「異常なし」と読む。⚠ 総合 `/healthz` は scheduler と database しか見ないので
+    # 200 のまま ＝ **Kuma 未登録のソースでは誰にも届かない** (#1508)。
     def source_status(source)
       return build_source_status(source)
     rescue => e
+      if Sentry.initialized?
+        Sentry.capture_exception(e, tags: {source: source.id, stage: 'status_json'})
+      end
       return {id: source.id, class: source.class.to_s, error: Package.error_message(e)}
     end
 
@@ -191,8 +208,14 @@ module TomatoShrieker
         last_attempted_at: attempted&.executed_at&.iso8601,
         # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは silence_acknowledged_at で読む
         undelivered: source.undelivered?,
-        last_attempted_count: latest&.attempted_count,
-        last_delivered_count: latest&.delivered_count,
+        # 🔴 **`attempted` から出す（4.8.0 リリース前レビュー）。**`latest` は
+        # **直近の run** なので、no-op を挟むと **`last_attempted_at` は前の試行を
+        # 指しているのに件数だけ 0** という自己矛盾になる。⚠ 本番で再現した:
+        # `capsicum` が `/status.json` で 0/0、同じ行が DB では 1/1。
+        # ⚠ `/healthz/source/:id` の 503 本文は `attempted` 側から出しているので、
+        # **2 つのエンドポイントが同名フィールドで違う数字**を出していた。
+        last_attempted_count: attempted&.attempted_count,
+        last_delivered_count: attempted&.delivered_count,
         last_delivered_at: source.last_delivered_at&.iso8601,
         last_delivered_at_origin: source.last_delivered_at_origin,
         silence_tolerance_seconds: source.monitor_silence_tolerance_seconds,
