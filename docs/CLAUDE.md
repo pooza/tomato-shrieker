@@ -430,6 +430,8 @@ monitor:
 - `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
+  - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
+  - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
