@@ -169,6 +169,27 @@ module TomatoShrieker
     # （総合 /healthz は無タグの maintenance ジョブがあれば通る）。倒しておけば
     # systemd の `Restart=always` が再試行する。⚠ **起動は fail closed、
     # reload は fail safe。**
+    # 🔴🔴 **`exec` 経由で倒れること（4.8.0 リリース前レビュー）。**
+    #
+    # ⚠ `register_all` を直接叩くテストだけだと**この穴を判別できない**。
+    # `Ginseng::ConfigError` も `StandardError` なので、`exec` に `rescue => e` が
+    # あると **「起動時の失敗は握らない」(#1547) が丸ごと無効化され**、プロセスは
+    # 終了コード 0 で落ちる（`systemctl status` 上は正常停止と区別がつかない）。
+    # ⚠ `Scheduler` は Singleton なので、差し替えたメソッドは必ず外すこと。
+    # 残すと後続のテストが巻き添えになる（実際に踏んだ）。
+    def test_exec_does_not_swallow_register_failure
+      @scheduler.define_singleton_method(:register_all) do
+        raise Ginseng::ConfigError, 'failed to register: x'
+      end
+      @scheduler.define_singleton_method(:run_jobs) {nil}
+
+      assert_raise_kind_of(Ginseng::ConfigError) {@scheduler.exec}
+    ensure
+      [:register_all, :run_jobs].each do |name|
+        @scheduler.singleton_class.remove_method(name) if @scheduler.singleton_methods.include?(name)
+      end
+    end
+
     def test_register_all_raises_when_register_fails
       write_fixture(OTHER_ID, {'schedule' => {'cron' => 'not a cron'}})
       config.reload
