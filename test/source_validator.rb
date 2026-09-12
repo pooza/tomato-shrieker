@@ -130,6 +130,80 @@ module TomatoShrieker
 
     # #1470: silence_tolerance は opt-in なのでスキーマ上は妥当だが、
     # 宣言しなければサイレント不発の検知が丸ごと効かない
+    # 🔴 **スキーマ項目そのものを守る（レビュー R2 / M12）。**monitor は
+    # additionalProperties: false なので、この項目が消えた瞬間に docs に書いた
+    # 設定例が source validate / source edit で弾かれる。⚠ それを検知するテストが無かった。
+    def test_valid_monitor_error_streak_threshold
+      base = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+      }
+
+      assert_true(SourceValidator.valid?(base.merge('monitor' => {'error_streak_threshold' => 4})))
+      assert_true(SourceValidator.valid?(base.merge('monitor' => {'error_streak_threshold' => 28})))
+      # minimum: 1 / type: integer
+      assert_false(SourceValidator.valid?(base.merge('monitor' => {'error_streak_threshold' => 0})))
+      assert_false(SourceValidator.valid?(base.merge('monitor' => {'error_streak_threshold' => '4'})))
+    end
+
+    # 🔴 Codex P1 (#1558): しきい値に到達するのに retention_days より長くかかる
+    # 組み合わせを弾く。⚠ **どれだけ連続で失敗しても 503 にならない**設定になる。
+    def test_warnings_unreachable_error_streak_threshold
+      retention = Config.instance['/monitor/retention_days']
+      daily = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '1 0 * * *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d'},
+      }
+
+      # 日次 × retention+1 回ぶん = 窓に入らない
+      warnings = SourceValidator.warnings(
+        daily.merge('monitor' => {'silence_tolerance' => '7d',
+                                  'error_streak_threshold' => retention + 1}),
+      )
+
+      assert_equal(1, warnings.size)
+      assert_match(/error_streak_threshold/, warnings.first)
+      assert_match(/retention_days/, warnings.first)
+
+      # 日次 × retention 回ぶんなら収まる
+      assert_empty(SourceValidator.warnings(
+        daily.merge('monitor' => {'silence_tolerance' => '7d',
+                                  'error_streak_threshold' => retention}),
+      ))
+      # ⚠ 既定（未指定）と 1 は指摘しない
+      assert_empty(SourceValidator.warnings(daily))
+      assert_empty(SourceValidator.warnings(
+        daily.merge('monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 1}),
+      ))
+    end
+
+    # 15 分間隔ならしきい値を大きくしても収まる（本番の YouTube 系がこれ）
+    def test_warnings_frequent_source_tolerates_large_threshold
+      source = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '0,15,30,45 * * * *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '90d', 'error_streak_threshold' => 8},
+      }
+
+      assert_empty(SourceValidator.warnings(source))
+    end
+
+    # ⚠ 壊れた schedule で警告の算出が倒れて validate 全体を止めない
+    def test_warnings_survive_broken_schedule
+      source = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => 'not a cron'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 999},
+      }
+
+      assert_nothing_raised {SourceValidator.warnings(source)}
+      assert_empty(SourceValidator.warnings(source))
+    end
+
     def test_warnings_silence_tolerance_unset
       base = {
         'source' => {'feed' => 'https://example.com/feed'},

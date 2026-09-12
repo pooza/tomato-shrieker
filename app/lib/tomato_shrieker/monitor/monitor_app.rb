@@ -67,12 +67,19 @@ module TomatoShrieker
     def source_checks(source, latest)
       next_run = source.next_run_at(latest.executed_at)
       # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
-      streak = SourceRunLog.error_streak(source.id)
+      # ⚠ **しきい値はソース単位で上書きできる (#1558)。**読む行数もそれに従わせないと、
+      # しきい値だけ大きくしても窓が足りず、到達し得ないまま健全扱いになる。
+      logs = SourceRunLog.recent_for(
+        source.id, SourceRunLog.streak_window(source.monitor_error_streak_threshold)
+      )
+      streak = SourceRunLog.error_streak_of(logs)
+      threshold = effective_error_streak_threshold(source, logs)
       return {
         next_run:,
         stale: Time.now > next_run + source.monitor_grace_seconds,
         streak:,
-        errored: streak >= error_streak_threshold,
+        threshold:,
+        errored: streak >= threshold,
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
         # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
@@ -80,6 +87,20 @@ module TomatoShrieker
         # 判定は Source 側に寄せてある。
         undelivered: (source.undelivered_log if source.undelivered?),
       }
+    end
+
+    # 🔴🔴 **緩和を効かせてよい失敗かを見てから、しきい値を決める (#1558)。**
+    #
+    # ⚠⚠ **エントリを読んだ後に落ちた失敗は 1 回で赤にする。**緩めるとそのぶんの
+    # エントリが**恒久的に失われる**（`Entry.insert` は配信より先・unique 制約で
+    # 再取得されない）のに、`undelivered` / `stale` / `silent` のどれも立たないので
+    # **`error_streak` が唯一のゲート**になっている（#1473）。
+    #
+    # 📌 緩められるのは「エントリを 1 件も読めていない失敗」＝フィード取得そのものの
+    # 失敗だけ。#1558 の動機である YouTube の 404 はこちら。
+    def effective_error_streak_threshold(source, logs)
+      return 1 if SourceRunLog.entry_level_error?(logs)
+      return source.monitor_error_streak_threshold
     end
 
     def unhealthy?(checks)
@@ -93,7 +114,7 @@ module TomatoShrieker
       body << "next_run_at: #{checks[:next_run].iso8601}\n"
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
-      body << "error_streak: #{checks[:streak]}\n"
+      body << "error_streak: #{checks[:streak]} / #{checks[:threshold]}\n"
       body << failure_body(latest)
       body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]
@@ -202,7 +223,18 @@ module TomatoShrieker
     # #1433 (統計) と #1470 (サイレント不発) の指標。
     def delivery_status(source, latest)
       attempted = SourceRunLog.last_attempted(source.id)
-      return SourceRunLog.summary_for(source.id).merge(
+      # 🔴 **窓もしきい値も /healthz/source/:id と完全に同じものを使う（Codex P2・#1558）。**
+      # 既定の窓はグローバルのしきい値しか見ないので、ソース側で sample_size (50) を
+      # 超える値に上書きすると **503 にしている当人が `error_streak: 50 / 100` という
+      # 自己矛盾した数字を出す**。⚠⚠ **しきい値も「宣言値」ではなく実効値を出す。**
+      # `effective_error_streak_threshold` が 1 に倒している場合、宣言値を出すと
+      # `/healthz` が `1 / 1` で 503 なのに `/status.json` は `4` と言う。
+      # ⚠ **2 つのエンドポイントが同名フィールドで違う数字を出す**のは 4.8.0 の
+      # レビューで `last_attempted_count` で潰した型の不具合なので、繰り返さない。
+      logs = SourceRunLog.recent_for(
+        source.id, SourceRunLog.streak_window(source.monitor_error_streak_threshold)
+      )
+      return SourceRunLog.summary_of(logs).merge(
         dest_count: source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
@@ -230,11 +262,9 @@ module TomatoShrieker
         # false だが、それは健全だからではなく運用者が確認したから
         silence_acknowledged_at: SilenceAck.acknowledged_at(source.id)&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(source.id),
+        # #1558: 「なぜこのソースはまだ緑なのか」を外から説明できるようにする
+        error_streak_threshold: effective_error_streak_threshold(source, logs),
       )
-    end
-
-    def error_streak_threshold
-      return Config.instance['/monitor/error_streak_threshold']
     end
 
     def scheduler_alive?

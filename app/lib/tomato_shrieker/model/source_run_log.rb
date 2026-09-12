@@ -207,13 +207,26 @@ module TomatoShrieker
     # 直近 N 件から求まる指標をまとめて返す。
     # /status.json は全ソース分を 1 リクエストで返すので、
     # 指標ごとに recent_for を呼ぶとソース数 × 指標数のクエリになる。ここで 1 回に畳む。
+    # ⚠⚠ **streak だけ広い窓で読み、他の指標は sample_size で切る (#1558)。**
+    # しきい値をソース単位で `sample_size` より大きくすると窓が広がるが、
+    # **`noop_streak` / `duration_ms` / `shrieker_errors` まで一緒に広げてはいけない。**
+    # `/monitor/sample_size` の「統計の算出に使う直近 run 件数」という定義に反し、
+    # 🔴 **503 本文（`sample_size` 固定）と `/status.json` が同名フィールドで違う数字**
+    # を出す。4.8.0 で `last_attempted_count` で潰したのと同じ型の不具合。
+    # ⚠ 追加のクエリは打たない（`logs` を切るだけ）。#1472 の約 900ms を増やさない。
     def self.summary_for(source_id, limit: streak_window)
-      logs = recent_for(source_id, limit)
+      return summary_of(recent_for(source_id, limit))
+    end
+
+    # 取得済みの logs から出す版。⚠ **呼び出し側が logs を別の用途にも使うとき**
+    # （`entry_level_error?` の判定等）に、同じ行を 2 回引かないため (#1558)。
+    def self.summary_of(logs)
+      sample = logs.first(sample_size)
       return {
         error_streak: error_streak_of(logs),
-        noop_streak: noop_streak_of(logs),
-        duration_ms: duration_stats_of(logs),
-        shrieker_errors: shrieker_error_distribution_of(logs),
+        noop_streak: noop_streak_of(sample),
+        duration_ms: duration_stats_of(sample),
+        shrieker_errors: shrieker_error_distribution_of(sample),
       }
     end
 
@@ -225,6 +238,25 @@ module TomatoShrieker
     # 「単発で倒さない」は error_streak_threshold で調整する。
     def self.error_streak(source_id, limit: streak_window)
       return error_streak_of(recent_for(source_id, limit))
+    end
+
+    # 🔴🔴 **しきい値の緩和を効かせてよい失敗か (#1558)。**
+    #
+    # ⚠⚠ **エントリを読んだ後に落ちた失敗は、1 回で赤にしないとエントリを失う。**
+    # `Entry.insert` は配信より先に走るので、`create_record` / `create_template` /
+    # `enclosures` / `Entry#shriek` 以降で落ちた run のエントリは**unique 制約で
+    # 二度と取得されず恒久的に失われる**。しかもその失敗は `record_failure` 経由で
+    # `attempted_count` に載らないため、**`undelivered?` も `stale` も `silent` も
+    # 立たない**＝ `error_streak` が唯一のゲート（#1473 / DeliveryStats のコメント）。
+    #
+    # 📌 **run_log 上で 2 つの失敗族は既に区別できている。**フィード取得そのものの
+    # 失敗（#1558 の動機である YouTube の 404）は `entries` の評価中に抜けるので
+    # `shrieker_errors` が空。エントリ単位の失敗は `source#fetch` が載る。
+    #
+    # ⚠ **仕様は 1 行で言える: 「しきい値を緩められるのは、エントリを 1 件も
+    # 読めていない失敗だけ」。**取得が不安定な相手は許容するが、取りこぼしは許容しない。
+    def self.entry_level_error?(logs)
+      return logs.take_while(&:error?).any? {|log| log.shrieker_error_counts.present?}
     end
 
     def self.error_streak_of(logs)
@@ -297,8 +329,12 @@ module TomatoShrieker
 
     # error_streak_threshold が sample_size より大きいと、読む行数が足りず
     # しきい値に到達し得ない＝どれだけ連続で失敗しても健全のままになる。
-    def self.streak_window
-      return [sample_size, Config.instance['/monitor/error_streak_threshold']].max
+    #
+    # ⚠ **しきい値はソース単位で上書きできる (#1558)。**呼び出し側が解決した値を
+    # 渡す。⚠ 省略時はグローバル値で、ソースを持たない呼び出し（prune 等）向け。
+    def self.streak_window(threshold = nil)
+      threshold ||= Config.instance['/monitor/error_streak_threshold']
+      return [sample_size, threshold].max
     end
   end
 end
