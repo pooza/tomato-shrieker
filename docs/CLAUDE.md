@@ -818,21 +818,34 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず追跡ブランチから取り出す**（上記のとおり tomato は `origin/develop`、サテライトは `origin/HEAD`）。
 
+🔴🔴 **`ginseng-*` は版（タグ）で固定してある (pooza/ginseng-style#103)。**⚠⚠ **したがって `bundle update <gem>` では上がらない。**Bundler は `Gemfile` の要求を第一に見るので、`tag:` が古いままだといくら `bundle update` しても `Gemfile.lock` は動かない。⚠ **`.github/dependabot.yml` は `open-pull-requests-limit: 0`** なので通常の version-update PR も来ない。**追随は `Gemfile` の `tag:` を書き換える作業**で、`bundle update` はそのあとの lock 更新にすぎない。
+
+🔴 **比べる相手は `main` ではなく「最新のタグ」。**`main` と比べると、**上流がまだ版を切っていないぶん**まで「遅れ」に見える（実例: 2026-09-12 の `ginseng-style` は `v1.1.12` 固定で `main` から 4 コミット先だが、**新しいタグは無い** ＝ 追随できない・待ち）。
+
 ```sh
 for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
   # ⚠ tomato 自身だけ develop。origin/HEAD は main ＝ リリース済みの版 (#1550)
   ref=origin/HEAD; [ "$d" = tomato-shrieker ] && ref=origin/develop
   git -C ~/repos/$d fetch -q origin
-  git -C ~/repos/$d show $ref:Gemfile.lock |
-  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' |
-  while read -r gem rev; do
-    ahead=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
-    printf '%-16s %-18s %s\n' "$d" "$gem" "${ahead:-?}"
+  # Gemfile の tag: が正本。⚠ Gemfile.lock の revision: は結果なので読まない
+  # ⚠ 1 つの gem 宣言が 2 行に折られていることがあるので、継続行を畳んでから読む
+  git -C ~/repos/$d show $ref:Gemfile |
+  sed -e :a -e '/,$/N; s/\n[[:space:]]*/ /; ta' | tr -d "'" |
+  awk '/pooza\/ginseng-/{g=t="";for(i=1;i<=NF;i++){if($i=="github:")g=$(i+1);if($i=="tag:")t=$(i+1)}
+    sub(/.*\//,"",g); sub(/,$/,"",g); sub(/,$/,"",t); if(t!="")print g, t}' |
+  while read -r gem tag; do
+    latest=$(gh api repos/pooza/$gem/tags --jq '.[0].name' 2>/dev/null)
+    mark=$([ "$tag" = "$latest" ] && echo '' || echo '  <-- 追随する')
+    printf '%-16s %-18s %-10s latest=%-10s%s\n' "$d" "$gem" "$tag" "${latest:-?}" "$mark"
   done
 done
 ```
 
-遅れがあれば `bundle update <gem>` で追随する。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
+追随は **`Gemfile` の `tag:` を最新タグへ書き換えてから `bundle update <gem>`**。⚠ **両方やる。**`tag:` だけだと lock が古いまま、`bundle update` だけだと何も起きない。
+
+⚠ **ルーチンの追随は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
+
+📌 **「main より先だが新しいタグが無い」は待ち。**上流へ版を切るよう促すのは可だが、`ref:`/`branch:` へ戻して固定を外してはいけない（固定の意味が消える）。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
 

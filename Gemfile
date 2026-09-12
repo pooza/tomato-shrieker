@@ -1,11 +1,11 @@
 source 'https://rubygems.org'
 ruby '>= 3.4', '< 5.0'
 gem 'feedjira', '~>3.0'
-gem 'ginseng-core', github: 'pooza/ginseng-core', branch: 'main', require: 'ginseng'
-gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', branch: 'main',
+gem 'ginseng-core', github: 'pooza/ginseng-core', tag: 'v1.23.5', require: 'ginseng'
+gem 'ginseng-fediverse', github: 'pooza/ginseng-fediverse', tag: 'v1.8.31',
   require: 'ginseng/fediverse'
-gem 'ginseng-piefed', github: 'pooza/ginseng-piefed', branch: 'main', require: 'ginseng/piefed'
-gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', branch: 'main', require: 'ginseng/you_tube'
+gem 'ginseng-piefed', github: 'pooza/ginseng-piefed', tag: 'v0.1.1', require: 'ginseng/piefed'
+gem 'ginseng-youtube', github: 'pooza/ginseng-youtube', tag: 'v3.0.1', require: 'ginseng/you_tube'
 gem 'icalendar'
 gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
   ref: '396a2c3e6b5cf394c2416f39c05e948cccd4ea52'
