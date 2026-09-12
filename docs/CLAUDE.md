@@ -461,7 +461,31 @@ monitor:
 
 ⚠⚠ **緩めても「本当に死んだら赤くなる」ことは変えない。**`cron: '0,15,30,45 * * * *'` なら 4 連続＝**1 時間で赤**。エラー率 7.3% なら 4 連続失敗の確率は 0.003% で、偽陽性はほぼ消える。
 
-⚠ **読む行数（`streak_window`）も一緒に広がる。**`sample_size` より大きいしきい値を書いても窓が足りず到達し得ない、という穴を作らないため。
+⚠ **読む行数（`streak_window`）も一緒に広がる。**`sample_size` より大きいしきい値を書いても窓が足りず到達し得ない、という穴を作らないため。⚠ **`/status.json` の `error_streak` も同じ窓で数える。**片方だけだと `error_streak: 50 / 100` という自己矛盾した数字が出る。
+
+🔴🔴 **しきい値 × 実行間隔が `/monitor/retention_days` を超えてはいけない。**`error_streak` が数えるのは `source_run_log` の行で、その行は prune で消える。⚠⚠ **疎なソースでしきい値を上げると、必要な本数の error 行が揃う前に古い行が消えるので、どれだけ連続で失敗しても 503 にならない。**⚠ `stale` も助けにならない（run 自体は走っていて `executed_at` は前に進む）。
+
+```
+月次 cron × しきい値 3 → 必要 90 日 > retention 14 日 → 永久に緑
+15 分間隔 × しきい値 8 → 必要 2 時間 ≪ retention 14 日 → 問題なし
+```
+
+⚠ **`bin/shrieker source validate` が WARN で指摘する。**NG にしないのは、妥当かどうかの判定に実行間隔が要り、**スキーマでは表現できない**ため。
+
+#### 🔴 緩められるのは「エントリを 1 件も読めていない失敗」だけ
+
+⚠⚠ **しきい値をいくつにしても、エントリを読んだ後に落ちた失敗は 1 回で 503 になる。**
+
+```
+フィード取得そのものが失敗（shrieker_errors 空）      → しきい値が効く
+エントリを読んだ後に失敗（shrieker_errors に source#fetch）→ 1 回で赤
+```
+
+🔴 **これが無いとエントリが恒久的に失われる。**`Entry.insert` は配信より先に走るので、`create_record` / `create_template` / `enclosures` / `Entry#shriek` 以降で落ちた run のエントリは **unique 制約で二度と取得されない**。しかもその失敗は `record_failure` 経由で `attempted_count` に載らないため、⚠⚠ **`undelivered` も `stale` も `silent` も立たず、`error_streak` が唯一のゲート**になっている（#1473 / `DeliveryStats#record_failure` のコメント）。
+
+📌 **run_log 上で 2 つの失敗族は既に区別できている。**`/status.json` の `shrieker_errors` と 503 本文を見れば、どちらの失敗なのか運用者にも分かる。
+
+⚠ **`/status.json` の `error_streak_threshold` は実効値。**1 に倒されているときは `1` が出る（宣言値ではない）。
 
 ⚠ **opt-in なので「書き忘れ」と「意図的に検知しない」が設定上は区別できない。**`bin/shrieker source validate` は監視対象なのに `silence_tolerance` が無いソースを `WARN` として出す（スキーマ上は妥当なので `NG` にはせず、終了コードも倒さない）。年単位で静かなソースは意図的に未設定のままでよい。
 
@@ -894,6 +918,8 @@ diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[
 ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
   "select active, count(*) from monitor where name like \"tomato-shrieker %\" group by active;"'
 ```
+
+🔴 **ソース側へ `error_streak_threshold` を移したら、そのモニターの `maxretries` は 0 に戻す (#1558)。**⚠⚠ **両方残すと猶予が掛け算になる**（ソース側 N run × Kuma の再試行）。⚠ Kuma の登録は UI での手作業なので、移行は 1 セットで扱うこと。
 
 ⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。
 

@@ -406,6 +406,13 @@ module TomatoShrieker
     # （source edit / source validate だけ）ので実行時に来うる。
     def test_monitor_error_streak_threshold_rejects_non_positive
       global = Config.instance['/monitor/error_streak_threshold']
+      # ⚠ 文字列は受けない。silence_tolerance は Rufus の duration を受けるので
+      # 書き方が非対称だが、回数に単位は無いので整数だけに絞る
+      ['4', '3d', true].each do |value|
+        source = Source.new({'id' => 'test-streak-str', 'monitor' => {'error_streak_threshold' => value}})
+
+        assert_equal(global, source.monitor_error_streak_threshold, "value=#{value.inspect}")
+      end
       [0, -1].each do |value|
         source = Source.new({'id' => 'test-streak-bad', 'monitor' => {'error_streak_threshold' => value}})
 

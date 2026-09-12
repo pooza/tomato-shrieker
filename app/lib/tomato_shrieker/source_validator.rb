@@ -34,8 +34,58 @@ module TomatoShrieker
         params = params.deep_stringify_keys
         return [] if params['disable'] == true
         return [] if params.dig('schedule', 'at')
-        return [] if params.dig('monitor', 'silence_tolerance')
-        return ['/monitor/silence_tolerance が未設定です。無配信が続いても検知されません']
+        messages = []
+        unless params.dig('monitor', 'silence_tolerance')
+          messages.push('/monitor/silence_tolerance が未設定です。無配信が続いても検知されません')
+        end
+        return messages.concat(unreachable_streak_warnings(params))
+      end
+
+      private
+
+      # 🔴 **しきい値に到達できない組み合わせを弾く（Codex P1・#1558）。**
+      #
+      # `error_streak` は `source_run_log` の行を数えるが、その行は
+      # `/monitor/retention_days` で prune される。⚠⚠ **実行間隔が疎なソースで
+      # しきい値を上げると、必要な本数の error 行が揃う前に古い行が消える**ため、
+      # **どれだけ連続で失敗しても 503 にならない**。
+      #
+      # 例: 月次 cron のソースにしきい値 3 を置くと、retention 14 日では
+      # 保護行＋直近の error しか残らず、永久に 2 未満のまま。⚠ `stale` も
+      # 助けにならない（run 自体は走っていて `executed_at` は前に進む）。
+      #
+      # ⚠ **NG ではなく WARN にする。**妥当な設定（15 分間隔 × 8 = 2 時間）と
+      # 見分けるのに実行間隔が要り、それはスキーマでは表現できない。
+      def unreachable_streak_warnings(params)
+        threshold = params.dig('monitor', 'error_streak_threshold')
+        return [] unless threshold.is_a?(Numeric) && threshold.to_i > 1
+        return [] unless seconds = schedule_interval_seconds(params)
+        days = (threshold.to_i * seconds / 86_400.0).ceil
+        retention = Config.instance['/monitor/retention_days']
+        return [] if days <= retention
+        return [
+          "/monitor/error_streak_threshold (#{threshold.to_i}) に到達するには約 #{days} 日ぶんの" \
+            " run が必要ですが、/monitor/retention_days は #{retention} 日です。" \
+            'prune で先に消えるため、連続して失敗しても 503 になりません',
+        ]
+      end
+
+      # 2 回続けて発火する間隔。⚠ **`at` のソースはここへ来ない**（呼び出し側で除外済み）。
+      #
+      # ⚠ 壊れた cron / period は nil を返す。**警告を出す処理が例外で倒れて
+      # `source validate` 全体を止めるほうが害が大きい**し、書式そのものの誤りは
+      # スキーマと起動時の register が別に捕まえる。
+      def schedule_interval_seconds(params)
+        schedule = params['schedule']
+        return nil unless schedule
+        if (cron = schedule['cron'])
+          first = Rufus::Scheduler.parse(cron).next_time(Time.now).to_t
+          return Rufus::Scheduler.parse(cron).next_time(first).to_t - first
+        end
+        return Rufus::Scheduler.parse(schedule['every']).to_i if schedule['every']
+        return nil
+      rescue StandardError
+        return nil
       end
     end
   end

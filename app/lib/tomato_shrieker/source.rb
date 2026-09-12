@@ -400,13 +400,14 @@ module TomatoShrieker
     # 状態になるので、道具側に置く。
     def monitor_error_streak_threshold
       value = self['/monitor/error_streak_threshold']
-      return default_error_streak_threshold unless value.is_a?(Numeric)
-      return value.to_i if value.to_i.positive?
+      return default_error_streak_threshold if value.nil?
+      # ⚠ **回数に単位は無いので整数だけ受ける。**`silence_tolerance` は Rufus の
+      # duration を受けるが、ここで文字列を許す理由が無い。⚠ `'4'` を黙って
+      # 既定へ倒すと「4 にしたのに 1 回で赤い」を延々踏むので warn を出す。
+      return warn_threshold(value, 'not an integer') unless value.is_a?(Integer)
+      return value if value.positive?
       # 0 や負値は「1 回も失敗していなくても赤」になるだけなので、既定へ倒す
-      logger.warn(
-        source: id, key: 'monitor/error_streak_threshold', value:, message: 'not positive',
-      )
-      return default_error_streak_threshold
+      return warn_threshold(value, 'not positive')
     end
 
     # 無配信をどこまで許容するか (#1470)。
@@ -428,6 +429,13 @@ module TomatoShrieker
 
     def default_error_streak_threshold
       return Config.instance['/monitor/error_streak_threshold']
+    end
+
+    # ⚠ スキーマ (`type: integer` / `minimum: 1`) は load 時に当たらない
+    # （`source edit` / `source validate` だけ）ので、実行時に不正値が来うる。
+    def warn_threshold(value, message)
+      logger.warn(source: id, key: 'monitor/error_streak_threshold', value:, message:)
+      return default_error_streak_threshold
     end
 
     def parse_duration(value)
