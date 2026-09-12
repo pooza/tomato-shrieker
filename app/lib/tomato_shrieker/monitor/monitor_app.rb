@@ -67,12 +67,16 @@ module TomatoShrieker
     def source_checks(source, latest)
       next_run = source.next_run_at(latest.executed_at)
       # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
-      streak = SourceRunLog.error_streak(source.id)
+      # ⚠ **しきい値はソース単位で上書きできる (#1558)。**読む行数もそれに従わせないと、
+      # しきい値だけ大きくしても窓が足りず、到達し得ないまま健全扱いになる。
+      threshold = source.monitor_error_streak_threshold
+      streak = SourceRunLog.error_streak(source.id, limit: SourceRunLog.streak_window(threshold))
       return {
         next_run:,
         stale: Time.now > next_run + source.monitor_grace_seconds,
         streak:,
-        errored: streak >= error_streak_threshold,
+        threshold:,
+        errored: streak >= threshold,
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
         # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
@@ -93,7 +97,7 @@ module TomatoShrieker
       body << "next_run_at: #{checks[:next_run].iso8601}\n"
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
-      body << "error_streak: #{checks[:streak]}\n"
+      body << "error_streak: #{checks[:streak]} / #{checks[:threshold]}\n"
       body << failure_body(latest)
       body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]
@@ -230,11 +234,9 @@ module TomatoShrieker
         # false だが、それは健全だからではなく運用者が確認したから
         silence_acknowledged_at: SilenceAck.acknowledged_at(source.id)&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(source.id),
+        # #1558: 「なぜこのソースはまだ緑なのか」を外から説明できるようにする
+        error_streak_threshold: source.monitor_error_streak_threshold,
       )
-    end
-
-    def error_streak_threshold
-      return Config.instance['/monitor/error_streak_threshold']
     end
 
     def scheduler_alive?

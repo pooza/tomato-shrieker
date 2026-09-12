@@ -270,6 +270,16 @@ module TomatoShrieker
       assert_operator(SourceRunLog.streak_window, :>=, SourceRunLog.sample_size)
     end
 
+    # #1558: しきい値はソース単位で上書きできる。⚠ **窓も一緒に広げないと、
+    # しきい値だけ大きくしても到達し得ないまま健全扱いになる。**
+    def test_streak_window_covers_source_threshold
+      wide = SourceRunLog.sample_size + 10
+
+      assert_operator(SourceRunLog.streak_window(wide), :>=, wide)
+      # 小さい上書きで窓を狭めない（sample_size は他の集計も使う）
+      assert_equal(SourceRunLog.sample_size, SourceRunLog.streak_window(1))
+    end
+
     # #1470: 配信ゼロが続いた回数。エラー run も数に入れる
     def test_noop_streak
       create_logs(

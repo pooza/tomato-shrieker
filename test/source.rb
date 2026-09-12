@@ -390,6 +390,29 @@ module TomatoShrieker
       assert_equal(600, source.monitor_silence_tolerance_seconds)
     end
 
+    # #1558: error_streak_threshold は未指定ならグローバル値へ倒す。
+    # ⚠ silence_tolerance と違い opt-out ではなく「既定つきの上書き」。
+    def test_monitor_error_streak_threshold
+      global = Config.instance['/monitor/error_streak_threshold']
+
+      assert_equal(global, Source.new({'id' => 'test-streak-unset'}).monitor_error_streak_threshold)
+      source = Source.new({'id' => 'test-streak-set', 'monitor' => {'error_streak_threshold' => 4}})
+
+      assert_equal(4, source.monitor_error_streak_threshold)
+    end
+
+    # ⚠ 0 や負値は「1 回も失敗していなくても赤」になるだけなので既定へ倒す。
+    # スキーマ (minimum: 1) を通らない値だが、スキーマは load 時に当たらない
+    # （source edit / source validate だけ）ので実行時に来うる。
+    def test_monitor_error_streak_threshold_rejects_non_positive
+      global = Config.instance['/monitor/error_streak_threshold']
+      [0, -1].each do |value|
+        source = Source.new({'id' => 'test-streak-bad', 'monitor' => {'error_streak_threshold' => value}})
+
+        assert_equal(global, source.monitor_error_streak_threshold, "value=#{value}")
+      end
+    end
+
     SILENT_ID = '__test_source_silent__'.freeze
 
     def silent_source(extra = {})

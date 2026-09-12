@@ -261,7 +261,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 - 配信先が 1 つ以上ある (`dest_count > 0`)
 - 最終実行から `grace_seconds` 以内に走っている (stale でない)
-- 連続エラー回数が `/monitor/error_streak_threshold` 未満である
+- 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
 
@@ -378,6 +378,7 @@ bin/shrieker source ack ID
       "last_delivered_at": "2026-04-14T14:00:01+09:00",
       "last_delivered_at_origin": "run_log",
       "error_streak": 0,
+      "error_streak_threshold": 1,
       "noop_streak": 0,
       "silence_tolerance_seconds": null,
       "silent": false,
@@ -425,7 +426,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 | `/monitor/port` | `4567` | リッスンポート |
 | `/monitor/default_tolerance_seconds` | `7200` | ソース側の上書きが無いときの実行遅延の猶予 |
 | `/monitor/retention_days` | `14` | source_run_log の保持日数（自動 prune） |
-| `/monitor/error_streak_threshold` | `1` | `/healthz/source/:id` を 503 にする連続エラー回数 |
+| `/monitor/error_streak_threshold` | `1` | `/healthz/source/:id` を 503 にする連続エラー回数。**ソース側で上書き可** |
 | `/monitor/sample_size` | `50` | 統計・streak の算出に使う直近 run 件数 |
 
 ソース定義側で上書きできるキー:
@@ -434,6 +435,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 |------|------|
 | `/monitor/tolerance` | 実行遅延の猶予。文字列なら `'30m'` のような Rufus 形式、数値なら秒。既定は `/monitor/default_tolerance_seconds` |
 | `/monitor/silence_tolerance` | 無配信の許容期間。**未指定ならサイレント不発を検知しない**（opt-in） |
+| `/monitor/error_streak_threshold` | 503 にする連続エラー回数。既定は `/monitor/error_streak_threshold`（#1558） |
 
 `silence_tolerance` はソースの性格に合わせて宣言する。年単位で正常に静かなソースに短い値を置くと過検知になる。**過検知は監視の信頼を壊す**ので、観測された最大の無配信間隔を上回る側に丸める。
 
@@ -443,6 +445,23 @@ monitor:
   tolerance: 30m
   silence_tolerance: 30d
 ```
+
+#### `error_streak_threshold` の上書き (#1558)
+
+⚠ **外部の安定度はソースの性質。**YouTube の `feeds/videos.xml` は**チャンネルが生きていても 24h で 7〜10% 失敗する**一方、GitHub の `releases.atom` は 0%。グローバル値だけだと、上げれば安定したソースの検知が鈍り、下げようもない。
+
+🔴 **グローバル値だけだった間、この調整は Uptime Kuma の `maxretries` へ漏れ出していた。**⚠ **ソース定義を読んでも「何回で赤くなるか」が分からない**状態になるので、道具側に置く。
+
+```yaml
+# 取得元が間欠的に失敗するソース
+monitor:
+  error_streak_threshold: 4
+  silence_tolerance: 90d
+```
+
+⚠⚠ **緩めても「本当に死んだら赤くなる」ことは変えない。**`cron: '0,15,30,45 * * * *'` なら 4 連続＝**1 時間で赤**。エラー率 7.3% なら 4 連続失敗の確率は 0.003% で、偽陽性はほぼ消える。
+
+⚠ **読む行数（`streak_window`）も一緒に広がる。**`sample_size` より大きいしきい値を書いても窓が足りず到達し得ない、という穴を作らないため。
 
 ⚠ **opt-in なので「書き忘れ」と「意図的に検知しない」が設定上は区別できない。**`bin/shrieker source validate` は監視対象なのに `silence_tolerance` が無いソースを `WARN` として出す（スキーマ上は妥当なので `NG` にはせず、終了コードも倒さない）。年単位で静かなソースは意図的に未設定のままでよい。
 

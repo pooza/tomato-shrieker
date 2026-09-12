@@ -297,8 +297,12 @@ module TomatoShrieker
 
     # error_streak_threshold が sample_size より大きいと、読む行数が足りず
     # しきい値に到達し得ない＝どれだけ連続で失敗しても健全のままになる。
-    def self.streak_window
-      return [sample_size, Config.instance['/monitor/error_streak_threshold']].max
+    #
+    # ⚠ **しきい値はソース単位で上書きできる (#1558)。**呼び出し側が解決した値を
+    # 渡す。⚠ 省略時はグローバル値で、ソースを持たない呼び出し（prune 等）向け。
+    def self.streak_window(threshold = nil)
+      threshold ||= Config.instance['/monitor/error_streak_threshold']
+      return [sample_size, threshold].max
     end
   end
 end

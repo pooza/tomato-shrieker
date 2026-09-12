@@ -5,6 +5,8 @@ module TomatoShrieker
     FIXTURE_ID = '__test_monitor_app__'.freeze
     SILENT_ID = '__test_monitor_app_silent__'.freeze
     DISABLED_ID = '__test_monitor_app_disabled__'.freeze
+    # #1558: しきい値をソース単位で上書きしたソース
+    THRESHOLD_ID = '__test_monitor_app_threshold__'.freeze
 
     # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので取り残しは
     # git status にも出ず、次のスケジューラ起動で偽ソースとして登録されてしまう。
@@ -15,17 +17,19 @@ module TomatoShrieker
 
     def setup
       @app = MonitorApp.new
-      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
-      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
+      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, THRESHOLD_ID]).delete
+      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID, THRESHOLD_ID]).delete
       write_fixture(FIXTURE_ID, {})
       write_fixture(SILENT_ID, {'monitor' => {'silence_tolerance' => '1d'}})
+      write_fixture(THRESHOLD_ID, {'monitor' => {'error_streak_threshold' => 3}})
       config.reload
     end
 
     def teardown
-      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
-      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
-      [FIXTURE_ID, SILENT_ID, DISABLED_ID].each {|id| FileUtils.rm_f(fixture_path(id))}
+      ids = [FIXTURE_ID, SILENT_ID, DISABLED_ID, THRESHOLD_ID]
+      SourceRunLog.where(source_id: ids).delete
+      SilenceAck.where(source_id: ids).delete
+      ids.each {|id| FileUtils.rm_f(fixture_path(id))}
       super # TestCase#teardown が config.reload する
     end
 
@@ -161,6 +165,53 @@ module TomatoShrieker
       assert_include(body.first, 'error_streak: 1')
       # 「エラーメッセージの無い 503」を運用者に見せない
       assert_include(body.first, 'RuntimeError: boom')
+    end
+
+    # #1558: しきい値をソース単位で上げたソースは、下回るあいだ緑のまま。
+    # ⚠ **YouTube の /feeds/videos.xml は 24h で 7〜10% 失敗する**ので、グローバルの
+    # 1 では正常時も Kuma が頻繁に赤くなり、監視ごと信用されなくなる。
+    def test_healthz_source_tolerates_errors_below_threshold
+      # ⚠ **attempted_count は 0。**フィード取得の失敗は宛先へ試行する前に落ちるので、
+      # これが実際の YouTube の形。1 にすると undelivered (#1504) が別経路で 503 にする。
+      2.times do |i|
+        record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+          error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+      end
+      status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(2, SourceRunLog.error_streak(THRESHOLD_ID))
+      assert_equal(200, status)
+    end
+
+    # しきい値に届けば赤になる。⚠ **緩めても「本当に死んだら赤くなる」ことは変えない。**
+    def test_healthz_source_errored_at_source_threshold
+      3.times do |i|
+        record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+          error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+      end
+      status, _headers, body = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(503, status)
+      # 「何回で赤くなるのか」を本文で答える
+      assert_include(body.first, 'error_streak: 3 / 3')
+    end
+
+    # ⚠ 上書きしていないソースは従来どおりグローバル値（1）で倒れる
+    def test_healthz_source_threshold_does_not_leak_to_other_sources
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404')
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+    end
+
+    # #1558: 「なぜこのソースはまだ緑なのか」を /status.json から説明できること
+    def test_status_json_exposes_error_streak_threshold
+      assert_equal(3, source_status(THRESHOLD_ID)['error_streak_threshold'])
+      assert_equal(
+        Config.instance['/monitor/error_streak_threshold'],
+        source_status(FIXTURE_ID)['error_streak_threshold'],
+      )
     end
 
     # 配信できた success が来れば streak は切れて健全に戻る

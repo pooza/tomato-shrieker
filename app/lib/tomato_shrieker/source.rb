@@ -390,6 +390,25 @@ module TomatoShrieker
       return Config.instance['/monitor/default_tolerance_seconds']
     end
 
+    # 何回連続で失敗したら異常とみなすか (#1558)。未指定ならグローバル値へ倒す。
+    #
+    # ⚠ **外部の安定度はソースの性質。**YouTube の /feeds/videos.xml は 24h で
+    # 7〜10% 失敗する（チャンネルは生きている）一方、GitHub の releases.atom は 0%。
+    # 同じしきい値で見ると、上げれば安定したソースの検知が鈍り、下げようもない。
+    # 🔴 **グローバル値だけだった間、この調整は Uptime Kuma の maxretries へ
+    # 漏れ出していた。**ソース定義を読んでも「何回で赤くなるか」が分からない
+    # 状態になるので、道具側に置く。
+    def monitor_error_streak_threshold
+      value = self['/monitor/error_streak_threshold']
+      return default_error_streak_threshold unless value.is_a?(Numeric)
+      return value.to_i if value.to_i.positive?
+      # 0 や負値は「1 回も失敗していなくても赤」になるだけなので、既定へ倒す
+      logger.warn(
+        source: id, key: 'monitor/error_streak_threshold', value:, message: 'not positive',
+      )
+      return default_error_streak_threshold
+    end
+
     # 無配信をどこまで許容するか (#1470)。
     # 未指定なら検知しない。chikanan のように年単位で正常に静かなソースがあるため、
     # 一律のデフォルトは置かず opt-in とする。
@@ -405,6 +424,10 @@ module TomatoShrieker
       # 不正値でこのソースだけを黙って無効化する。監視全体を巻き添えにしない。
       logger.error(source: id, key: 'monitor/silence_tolerance', value:, error: e)
       return nil
+    end
+
+    def default_error_streak_threshold
+      return Config.instance['/monitor/error_streak_threshold']
     end
 
     def parse_duration(value)
