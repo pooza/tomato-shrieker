@@ -5,6 +5,8 @@ module TomatoShrieker
     FIXTURE_ID = '__test_monitor_app__'.freeze
     SILENT_ID = '__test_monitor_app_silent__'.freeze
     DISABLED_ID = '__test_monitor_app_disabled__'.freeze
+    # #1558: しきい値をソース単位で上書きしたソース
+    THRESHOLD_ID = '__test_monitor_app_threshold__'.freeze
 
     # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので取り残しは
     # git status にも出ず、次のスケジューラ起動で偽ソースとして登録されてしまう。
@@ -15,17 +17,19 @@ module TomatoShrieker
 
     def setup
       @app = MonitorApp.new
-      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
-      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID]).delete
+      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, THRESHOLD_ID]).delete
+      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID, THRESHOLD_ID]).delete
       write_fixture(FIXTURE_ID, {})
       write_fixture(SILENT_ID, {'monitor' => {'silence_tolerance' => '1d'}})
+      write_fixture(THRESHOLD_ID, {'monitor' => {'error_streak_threshold' => 3}})
       config.reload
     end
 
     def teardown
-      SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
-      SilenceAck.where(source_id: [FIXTURE_ID, SILENT_ID, DISABLED_ID]).delete
-      [FIXTURE_ID, SILENT_ID, DISABLED_ID].each {|id| FileUtils.rm_f(fixture_path(id))}
+      ids = [FIXTURE_ID, SILENT_ID, DISABLED_ID, THRESHOLD_ID]
+      SourceRunLog.where(source_id: ids).delete
+      SilenceAck.where(source_id: ids).delete
+      ids.each {|id| FileUtils.rm_f(fixture_path(id))}
       super # TestCase#teardown が config.reload する
     end
 
@@ -158,9 +162,145 @@ module TomatoShrieker
       status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(503, status)
-      assert_include(body.first, 'error_streak: 1')
+      assert_include(body.first, 'error_streak: 1 / 1')
       # 「エラーメッセージの無い 503」を運用者に見せない
       assert_include(body.first, 'RuntimeError: boom')
+    end
+
+    # #1558: しきい値をソース単位で上げたソースは、下回るあいだ緑のまま。
+    # ⚠ **YouTube の /feeds/videos.xml は 24h で 7〜10% 失敗する**ので、グローバルの
+    # 1 では正常時も Kuma が頻繁に赤くなり、監視ごと信用されなくなる。
+    def test_healthz_source_tolerates_errors_below_threshold
+      # ⚠ **attempted_count は 0。**フィード取得の失敗は宛先へ試行する前に落ちるので、
+      # これが実際の YouTube の形。1 にすると undelivered (#1504) が別経路で 503 にする。
+      2.times do |i|
+        record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+          error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+      end
+      status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(2, SourceRunLog.error_streak(THRESHOLD_ID))
+      assert_equal(200, status)
+    end
+
+    # しきい値に届けば赤になる。⚠ **緩めても「本当に死んだら赤くなる」ことは変えない。**
+    def test_healthz_source_errored_at_source_threshold
+      3.times do |i|
+        record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+          error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+      end
+      status, _headers, body = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(503, status)
+      # 「何回で赤くなるのか」を本文で答える
+      assert_include(body.first, 'error_streak: 3 / 3')
+    end
+
+    # ⚠ 上書きしていないソースは従来どおりグローバル値（1）で倒れる
+    def test_healthz_source_threshold_does_not_leak_to_other_sources
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404')
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+    end
+
+    # 🔴 **しきい値を広げたら読む行数も広がること（Codex P1 / レビュー R1）。**
+    # ⚠ これが無いと `limit: streak_window(threshold)` を消してもテストが通る。
+    # sample_size を一時的に小さくして、窓が sample_size 止まりでないことを見る。
+    def test_healthz_source_threshold_widens_streak_window
+      with_sample_size(2) do
+        3.times do |i|
+          record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+            error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+        end
+        status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+        assert_equal(503, status)
+      end
+    end
+
+    # /status.json 側も同じ窓で数えること。⚠ 片方だけだと 503 にしている当人が
+    # `error_streak: 2 / 3` という自己矛盾した数字を出す
+    def test_status_json_uses_source_threshold_window
+      with_sample_size(2) do
+        3.times do |i|
+          record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+            error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+        end
+
+        assert_equal(3, source_status(THRESHOLD_ID)['error_streak'])
+      end
+    end
+
+    # ⚠⚠ **streak 以外の指標は sample_size で切ること (#1558)。**広い窓のまま
+    # 数えると 503 本文（sample_size 固定）と /status.json が違う数字を出す
+    def test_status_json_keeps_sample_size_for_other_metrics
+      with_sample_size(2) do
+        3.times do |i|
+          record(THRESHOLD_ID, attempted_count: 0, at: Time.now - (120 - (i * 10)))
+        end
+
+        assert_equal(2, source_status(THRESHOLD_ID)['noop_streak'])
+      end
+    end
+
+    # 🔴🔴 **エントリを読んだ後に落ちた失敗は、しきい値を緩めていても 1 回で赤。**
+    # 緩めるとそのぶんのエントリが恒久的に失われるのに undelivered / stale / silent の
+    # どれも立たない (#1473)。run_log 上は shrieker_errors の有無で区別できる
+    def test_healthz_source_entry_level_failure_ignores_threshold
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken',
+        shrieker_errors: JSON.dump({'source#fetch' => 1}))
+      status, _headers, body = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(503, status)
+      # しきい値 3 を宣言していても 1 で倒す
+      assert_include(body.first, 'error_streak: 1 / 1')
+    end
+
+    # ⚠ 取得そのものの失敗（shrieker_errors 空）はこれまでどおり緩和が効く
+    def test_healthz_source_fetch_failure_keeps_threshold
+      2.times do |i|
+        record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+          error_message: 'Bad response 404', at: Time.now - (120 - (i * 10)))
+      end
+      status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(200, status)
+    end
+
+    # 🔴 **/status.json も実効値を出すこと（レビュー R1）。**宣言値を出すと
+    # /healthz が `1 / 1` で 503 なのに /status.json は `3` と言う
+    def test_status_json_exposes_effective_threshold
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken',
+        shrieker_errors: JSON.dump({'source#fetch' => 1}))
+      status = source_status(THRESHOLD_ID)
+
+      assert_equal(1, status['error_streak_threshold'])
+      assert_equal(1, status['error_streak'])
+    end
+
+    def with_sample_size(size)
+      key = config.basenames.find {|v| config.raw.key?(v)}
+      original = config.raw[key]['monitor']
+      config.raw[key]['monitor'] = (original || {}).deep_dup
+      config.raw[key]['monitor']['sample_size'] = size
+      config.reload
+      yield
+    ensure
+      config.raw[key]['monitor'] = original
+      config.reload
+    end
+
+    # #1558: 「なぜこのソースはまだ緑なのか」を /status.json から説明できること
+    def test_status_json_exposes_error_streak_threshold
+      assert_equal(3, source_status(THRESHOLD_ID)['error_streak_threshold'])
+      assert_equal(
+        Config.instance['/monitor/error_streak_threshold'],
+        source_status(FIXTURE_ID)['error_streak_threshold'],
+      )
     end
 
     # 配信できた success が来れば streak は切れて健全に戻る

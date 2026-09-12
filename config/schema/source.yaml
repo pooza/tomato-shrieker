@@ -66,6 +66,13 @@ properties:
             minimum: 1
           - type: string
             pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+      error_streak_threshold:
+        # /healthz/source/:id を 503 にする連続エラー回数。未指定なら
+        # /monitor/error_streak_threshold へ倒す（#1558）
+        # ⚠ 緩められるのはエントリを 1 件も読めていない失敗（取得失敗）だけ。
+        # エントリを読んだ後に落ちた失敗は、この値に関わらず 1 回で 503 になる
+        type: integer
+        minimum: 1
   keep:
     type: object
     additionalProperties: false
