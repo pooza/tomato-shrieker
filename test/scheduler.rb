@@ -185,6 +185,54 @@ module TomatoShrieker
       assert_equal(1, jobs(OTHER_ID).size)
     end
 
+    # 🔴 **#1572: 判別キーの typo を「削除」と読まない。**
+    #
+    # reload は意図的にスキーマ検証をしないので、YAML として妥当なまま
+    # `source/feed` を打ち間違える / 消すことができる。⚠ そうすると `Source.all` が
+    # その定義を 1 件も yield せず、`desired_sources` から id ごと消える。
+    # ⚠⚠ 素直に読むと `drop_removed` が**意図的な削除として unschedule** し、
+    # ログにも `removed` と出る＝**「消した覚えはないのに消えている」**になる。
+    def test_reload_keeps_jobs_when_source_class_does_not_match
+      job = jobs(FIXTURE_ID).first
+      File.write(fixture_path(FIXTURE_ID), YAML.dump(
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      result = @scheduler.reload
+
+      assert_include(result[:unmatched], FIXTURE_ID)
+      assert_not_include(result[:removed], FIXTURE_ID, 'typo が削除として扱われている')
+      assert_equal(1, jobs(FIXTURE_ID).size, '古いジョブが残っていない')
+      assert_equal(job.job_id, jobs(FIXTURE_ID).first.job_id)
+    end
+
+    # ⚠ **本当にファイルを消したときは、これまでどおり削除する。**上の fail safe が
+    # 「消しても消えない」に化けていないこと。
+    def test_reload_still_removes_deleted_source
+      FileUtils.rm_f(fixture_path(FIXTURE_ID))
+      result = @scheduler.reload
+
+      assert_include(result[:removed], FIXTURE_ID)
+      assert_empty(jobs(FIXTURE_ID))
+    end
+
+    # 🔴 **起動は fail closed。**定義は在るのに 1 件も yield されないものを飛ばすと、
+    # 「永久に走らないのに daemon は正常に見える」が残る（`failed` を倒す理由と同じ）。
+    def test_register_all_raises_when_source_class_does_not_match
+      File.write(fixture_path(OTHER_ID), YAML.dump(
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      config.reload
+      @scheduler.registry.clear
+
+      error = assert_raise(Ginseng::ConfigError) {@scheduler.send(:register_all)}
+
+      assert_include(error.message, OTHER_ID)
+      assert_include(error.message, 'no source class matched')
+    end
+
     # 🔴 **起動時の register 失敗は握らない (#1547 Codex P1)。**reload と違い、
     # ここで飛ばすとそのソースは二度と登録されないまま daemon が正常に見える
     # （総合 /healthz は無タグの maintenance ジョブがあれば通る）。倒しておけば

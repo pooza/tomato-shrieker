@@ -60,15 +60,23 @@ module TomatoShrieker
       @reload_mutex = Mutex.new
     end
 
+    # 🔴 **「ファイルを消した」と「ファイルは在るが壊れている」を混ぜない (#1572)。**
+    #
+    # ⚠⚠ 判別キーを打ち間違えた定義は `Source.all` を 1 件も通らないので、
+    # `desired` に id が現れない。それを素直に「消えた」と読むと **typo が静かな停止に
+    # 化ける**（しかもログには `removed` と出る）。**`unmatched` は `wanted` に混ぜて
+    # unschedule から守り、`failed` として報告する。**
     def apply(desired, action:)
       digests = desired.transform_values {|v| digest(v)}
-      removed = drop_removed(digests.keys)
+      unmatched = Source.unmatched_ids
+      removed = drop_removed(digests.keys + unmatched)
       stale = digests.reject {|id, d| @registry[id] == d}.keys
       added = stale - @registry.keys
       failed = swap_all(stale, desired, action)
       # ⚠ **失敗した id は registry を更新しない。**次の reload で必ずやり直す。
       (stale - failed).each {|id| @registry[id] = digests[id]}
-      result = {added: added - failed, removed:, changed: stale - added - failed, failed:}
+      result = {added: added - failed, removed:, changed: stale - added - failed,
+                failed:, unmatched:}
       logger.info({scheduler: action}.merge(result))
       return result
     end
@@ -118,8 +126,17 @@ module TomatoShrieker
     # 「誰かが YAML を打ち間違えた」で落とす理由は無い。
     def register_all
       result = @reload_mutex.synchronize {apply(desired_sources, action: 'register')}
-      return if result[:failed].empty?
-      raise Ginseng::ConfigError, "failed to register: #{result[:failed].join(', ')}"
+      # ⚠ **理由が違うので混ぜずに名指しする (#1572)。**`failed` は register が例外を
+      # 上げたもの、`unmatched` は判別キーが無く**そもそも 1 件も yield されなかった**もの。
+      # 🔴 **後者も起動は倒す。**飛ばすと「定義は在るのに永久に走らない」まま
+      # daemon が正常に見える（`failed` を倒す理由と同じ）。
+      messages = []
+      messages.push("failed to register: #{result[:failed].join(', ')}") if result[:failed].any?
+      if result[:unmatched].any?
+        messages.push("no source class matched: #{result[:unmatched].join(', ')}")
+      end
+      return if messages.empty?
+      raise Ginseng::ConfigError, messages.join(' / ')
     end
 
     # 有効なソースを id 単位でまとめる。⚠ 1 つの定義が複数のソースクラスに
