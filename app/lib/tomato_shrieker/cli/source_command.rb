@@ -43,8 +43,14 @@ module TomatoShrieker
       desc: "ソース種別 (#{SourceTemplates::ALL.keys.join('/')})"
     def add(id)
       raise Thor::Error, "invalid id: #{id}" unless id.match?(/\A[\w.-]+\z/)
+      # ⚠ **`.yml` も見る (#1571)。**読み込みは `*.{yaml,yml}` の両方なので、
+      # `<id>.yaml` の存在だけで判定すると **`<id>.yml` がある状態で同じ id の定義を
+      # 2 つ作れる**。そうなると `Source.create` は先頭しか返さず、`/healthz/source/:id`
+      # は片方を見ないまま緑になる。
+      if source_paths.any? {|v| source_id(v) == id}
+        raise Thor::Error, "source already exists: #{id}"
+      end
       path = new_source_path(id)
-      raise Thor::Error, "source already exists: #{id}" if File.exist?(path)
       template = SourceTemplates::ALL[options[:class]]
       unless template
         raise Thor::Error, "unknown class: #{options[:class]} (#{SourceTemplates::ALL.keys.join('/')})"

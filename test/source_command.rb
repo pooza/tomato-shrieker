@@ -1,6 +1,14 @@
 module TomatoShrieker
   class SourceCommandTest < TestCase
     ACK_ID = '__test_source_command_ack__'.freeze
+    ADD_ID = '__test_source_command_add__'.freeze
+
+    # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので
+    # 取り残しは git status にも出ず、次のスケジューラ起動で偽ソースとして登録される。
+    at_exit do
+      Dir.glob(File.join(Environment.dir, 'config/sources', '__test_source_command*'))
+        .each {|f| FileUtils.rm_f(f)}
+    end
 
     def setup
       @command = SourceCommand.new
@@ -58,6 +66,26 @@ module TomatoShrieker
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
+    # 🔴 **#1571: `<id>.yml` があるときに `<id>.yaml` を作らせないこと。**
+    #
+    # ⚠ 読み込みは `*.{yaml,yml}` の両方なので、`.yaml` の存在だけで判定していると
+    # **同じ id の定義を 2 つ作れる**。そうなると `Source.create` は先頭しか返さず、
+    # `/healthz/source/:id` は片方を見ないまま緑になる。
+    def test_add_rejects_duplicate_id_in_other_suffix
+      File.write(source_path(ADD_ID, 'yml'), "source:\n  feed: https://example.com/x\n")
+      # ⚠ ガードが壊れていると `add` は $EDITOR を開いて CI が止まる。必ず潰しておく。
+      @command.define_singleton_method(:edit_and_validate) {|_id, _path| nil}
+      @command.options = {class: 'feed'}
+
+      error = assert_raise(Thor::Error) {@command.add(ADD_ID)}
+
+      # ⚠ options 未設定による "unknown class" で通ってしまわないよう、理由まで見る。
+      assert_include(error.message, 'already exists')
+      assert_false(File.exist?(source_path(ADD_ID, 'yaml')), '重複した定義が作られている')
+    ensure
+      ['yml', 'yaml'].each {|suffix| FileUtils.rm_f(source_path(ADD_ID, suffix))}
+    end
+
     # 🔴 **#1570: 起動なら倒れる定義が残っているうちは HUP を送らないこと。**
     #
     # ⚠ 反映できずに終わるのは不便だが、**壊れた YAML をディスクに残したまま
@@ -102,6 +130,10 @@ module TomatoShrieker
     end
 
     private
+
+    def source_path(id, suffix)
+      return File.join(Environment.dir, 'config/sources', "#{id}.#{suffix}")
+    end
 
     # `SchedulerDaemon.new` に触れたら即失敗させる。⚠ 元の Method を保存して戻す。
     # `remove_method` で戻すと本物ごと消える（singleton class に生えているため）。

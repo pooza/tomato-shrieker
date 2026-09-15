@@ -128,6 +128,27 @@ module TomatoShrieker
       assert_empty(jobs(ICAL_ID).map(&:job_id) & before)
     end
 
+    # 🔴 **#1571: 同じ id の定義が 2 つある状態で片方を消したら、digest に差が出る。**
+    #
+    # ⚠ 以前は `sources.first` だけをハッシュしていたので、group が [A, B] → [A] に
+    # 縮んでも digest は SHA1(A) のまま＝ `stale` に入らず、**消したほうのジョブが
+    # unschedule されずに走り続ける**。⚠⚠ ログの `changed` / `removed` にも出ないので、
+    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
+    def test_reload_detects_shrinking_duplicate_id_group
+      # ⚠ ファイル名ではなくトップレベル `id:` で衝突させる（Config は `id` が
+      # 無いときだけファイル名を入れる）。
+      write_fixture(OTHER_ID, {'id' => FIXTURE_ID})
+      @scheduler.reload
+
+      assert_equal(2, jobs(FIXTURE_ID).size, '重複した id が 2 本のジョブとして立っていない')
+
+      FileUtils.rm_f(fixture_path(OTHER_ID))
+      result = @scheduler.reload
+
+      assert_include(result[:changed], FIXTURE_ID)
+      assert_equal(1, jobs(FIXTURE_ID).size, '消したほうのジョブが残っている')
+    end
+
     # 🔴 **register が失敗したソースは、古いジョブを残す (#1545 Codex P1)。**
     # reload はスキーマ検証をしないので、不正な cron 式はここまで来る。先に
     # unschedule する実装だと、失敗したソースが次の reload までジョブ 1 本無い
@@ -162,6 +183,54 @@ module TomatoShrieker
       assert_include(result[:failed], FIXTURE_ID)
       assert_include(result[:added], OTHER_ID)
       assert_equal(1, jobs(OTHER_ID).size)
+    end
+
+    # 🔴 **#1572: 判別キーの typo を「削除」と読まない。**
+    #
+    # reload は意図的にスキーマ検証をしないので、YAML として妥当なまま
+    # `source/feed` を打ち間違える / 消すことができる。⚠ そうすると `Source.all` が
+    # その定義を 1 件も yield せず、`desired_sources` から id ごと消える。
+    # ⚠⚠ 素直に読むと `drop_removed` が**意図的な削除として unschedule** し、
+    # ログにも `removed` と出る＝**「消した覚えはないのに消えている」**になる。
+    def test_reload_keeps_jobs_when_source_class_does_not_match
+      job = jobs(FIXTURE_ID).first
+      File.write(fixture_path(FIXTURE_ID), YAML.dump(
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      result = @scheduler.reload
+
+      assert_include(result[:unmatched], FIXTURE_ID)
+      assert_not_include(result[:removed], FIXTURE_ID, 'typo が削除として扱われている')
+      assert_equal(1, jobs(FIXTURE_ID).size, '古いジョブが残っていない')
+      assert_equal(job.job_id, jobs(FIXTURE_ID).first.job_id)
+    end
+
+    # ⚠ **本当にファイルを消したときは、これまでどおり削除する。**上の fail safe が
+    # 「消しても消えない」に化けていないこと。
+    def test_reload_still_removes_deleted_source
+      FileUtils.rm_f(fixture_path(FIXTURE_ID))
+      result = @scheduler.reload
+
+      assert_include(result[:removed], FIXTURE_ID)
+      assert_empty(jobs(FIXTURE_ID))
+    end
+
+    # 🔴 **起動は fail closed。**定義は在るのに 1 件も yield されないものを飛ばすと、
+    # 「永久に走らないのに daemon は正常に見える」が残る（`failed` を倒す理由と同じ）。
+    def test_register_all_raises_when_source_class_does_not_match
+      File.write(fixture_path(OTHER_ID), YAML.dump(
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      config.reload
+      @scheduler.registry.clear
+
+      error = assert_raise(Ginseng::ConfigError) {@scheduler.send(:register_all)}
+
+      assert_include(error.message, OTHER_ID)
+      assert_include(error.message, 'no source class matched')
     end
 
     # 🔴 **起動時の register 失敗は握らない (#1547 Codex P1)。**reload と違い、

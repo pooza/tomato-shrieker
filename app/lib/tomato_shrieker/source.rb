@@ -545,6 +545,29 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **どのソースクラスにもマッチしなかった定義の id (#1572)。**
+    #
+    # `Source.all` は判別キー（`source/feed` 等）で class を選ぶので、**その 1 キーを
+    # 打ち間違える / 消すと、その定義は 1 件も yield されない**。⚠⚠ そのまま
+    # `Scheduler#apply` へ渡すと `desired_sources` に id が現れず、**「ファイルを消した」
+    # と区別が付かないまま `removed` として unschedule される**。ログにも `removed` と
+    # 出るので、運用者は「消した覚えはないのに消えている」ことに気づけない。
+    #
+    # ⚠ **「ファイルを消した」と「ファイルは在るが壊れている」で挙動を分ける**ための情報。
+    # 前者は削除、後者は fail safe（古いジョブを残す）。
+    def self.unmatched_ids
+      keys = classes.map {|v| v[:config]}
+      return config['/sources'].filter_map do |entry|
+        entry_id(entry) unless entry.key_flatten.slice(*keys).any? {|_, v| v}
+      end
+    end
+
+    # ⚠ **`Source#id` と同じ導出。**`config/sources/*.yaml` には Config が必ず
+    # ファイル名由来の id を入れるが、`local.yaml` の `sources:` 形式には無いことがある。
+    def self.entry_id(entry)
+      return entry['id'] || Digest::SHA1.hexdigest(entry.to_json)
+    end
+
     def self.classes
       return config['/source/classes'].map do |entry|
         source_class = entry.deep_symbolize_keys
