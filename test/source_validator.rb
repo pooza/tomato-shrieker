@@ -80,6 +80,71 @@ module TomatoShrieker
       ))
     end
 
+    # 🔴 **#1570 の Codex P2: register が実際に使う 1 本だけを見ること。**
+    #
+    # ⚠ スキーマは複数キーを許す。`register` は `at` > `cron` > `every` の順で
+    # **最初の 1 本しか使わない**ので、`at` が妥当なら壊れた `cron` があっても起動する。
+    # ⚠⚠ 全部を見ると**「起動はできるのに reload は拒否される」**＝ #1570 が直した
+    # 食い違いを、向きだけ変えて自分で作ることになる。
+    def test_ignores_schedule_keys_register_never_uses
+      assert_empty(SourceValidator.schedule_errors(
+        'schedule' => {'at' => '2099-12-31 00:00', 'cron' => 'not a cron'},
+      ))
+    end
+
+    # 逆に、実際に使われるほうが壊れていれば拾う。
+    def test_reports_the_key_register_actually_uses
+      errors = SourceValidator.schedule_errors(
+        'schedule' => {'cron' => 'not a cron', 'every' => '5m'},
+      )
+
+      assert_true(errors.any? {|v| v.start_with?('/schedule/cron:')}, errors.inspect)
+    end
+
+    # 🔴 **#1570 の Codex P1: remind ジョブも起動を倒しうる。**
+    #
+    # ⚠ `IcalendarSource#register` は `schedule_remind` を**本体より先に**呼ぶ。
+    # ⚠⚠ `minutes: 0` は `parse_duration` では通る（0 を返すだけ）が、`every` が
+    # `cannot schedule ... with a frequency of 0` で倒れる。
+    def test_zero_remind_minutes_is_ng
+      errors = SourceValidator.schedule_errors(
+        'source' => {'ical' => 'https://example.com/c.ics'},
+        'schedule' => {'cron' => '0 0 * * *', 'remind' => {'enable' => true, 'minutes' => 0}},
+      )
+
+      assert_true(errors.any? {|v| v.start_with?('/schedule/remind/minutes:')}, errors.inspect)
+    end
+
+    # ⚠ **remind ジョブを立てるのは IcalendarSource だけ。**他のソースでは無視される
+    # 設定なので、ここで NG にすると「起動はできるのに reload は拒否される」になる。
+    def test_remind_ignored_for_sources_that_never_schedule_it
+      assert_empty(SourceValidator.schedule_errors(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'every' => '5m', 'remind' => {'enable' => true, 'minutes' => 0}},
+      ))
+    end
+
+    # 省略時の既定 (5 分) は妥当。⚠ ここが IcalendarSource#remind_minutes とずれると
+    # 「省略時は倒れないのに明示すると倒れる」（またはその逆）になる。
+    def test_default_remind_minutes_passes
+      assert_empty(SourceValidator.schedule_errors(
+        'source' => {'ical' => 'https://example.com/c.ics'},
+        'schedule' => {'cron' => '0 0 * * *', 'remind' => {'enable' => true}},
+      ))
+    end
+
+    # 📌 **スキーマと「起動が倒れるか」は別の線引き。**`minimum: 1` は authoring の
+    # ゲート（`validate` / `add` / `edit`）なので、remind を立てないソースでも NG にする。
+    # ⚠ 一方 `schedule_errors`（＝ `reload` の拒否条件）は起動が倒れるものだけ。
+    # **validate のほうが厳しい**のは意図どおり。
+    def test_schema_rejects_zero_remind_minutes_for_any_source
+      assert_false(SourceValidator.valid?(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'schedule' => {'every' => '5m', 'remind' => {'enable' => true, 'minutes' => 0}},
+      ))
+    end
+
     # ⚠ 型違いはスキーマの担当。同じ誤りを 2 通りのメッセージで出さない。
     def test_schedule_type_error_left_to_schema
       assert_empty(SourceValidator.schedule_errors('schedule' => {'cron' => 42}))

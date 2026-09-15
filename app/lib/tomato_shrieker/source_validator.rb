@@ -17,6 +17,10 @@ module TomatoShrieker
     # 取り違えを見逃す**。`register` と同じ分岐・同じパーサで引くこと。
     SCHEDULE_PARSERS = {'at' => :parse_at, 'cron' => :parse_cron, 'every' => :parse_duration}.freeze
 
+    # ⚠ `IcalendarSource#remind_minutes` の既定と同じ値。ずれると「省略時は倒れないのに
+    # 明示すると倒れる」（またはその逆）になる。
+    DEFAULT_REMIND_MINUTES = 5
+
     class << self
       def schema
         @schema ||= YAML.load_file(File.join(Environment.dir, SCHEMA_FILE))
@@ -51,9 +55,9 @@ module TomatoShrieker
         return [] if params['disable'] == true
         schedule = params['schedule']
         return [] unless schedule.is_a?(Hash)
-        return SCHEDULE_PARSERS.filter_map do |key, parser|
-          schedule_error(schedule[key], key, parser)
-        end
+        errors = [main_schedule_error(schedule)]
+        errors.push(remind_error(schedule)) if remind_scheduled?(params)
+        return errors.compact
       end
 
       def valid?(params)
@@ -75,6 +79,41 @@ module TomatoShrieker
       end
 
       private
+
+      # ⚠⚠ **`Source#register` の優先順（`at` > `cron` > `every`）に合わせて、
+      # 実際に使われる 1 本だけを見る（#1570 の Codex P2）。**スキーマは複数キーを
+      # 許すので、`{at: <妥当>, cron: 'not a cron'}` は **`at` で問題なく起動する**。
+      # 🔴 全部を見ると**「起動はできるのに reload は拒否される」**＝ #1570 が直した
+      # 食い違いを、向きだけ変えて自分で作ることになる。
+      def main_schedule_error(schedule)
+        key, parser = SCHEDULE_PARSERS.find {|k, _| schedule[k]}
+        return nil unless key
+        return schedule_error(schedule[key], key, parser)
+      end
+
+      # 🔴 **remind は本体のスケジュールと別に立つ（#1570 の Codex P1）。**
+      # `IcalendarSource#register` は `schedule_remind` を**本体より先に**呼び、
+      # `"#{minutes}m"` を `scheduler.every` へ渡す。⚠⚠ `minutes: 0` は
+      # `parse_duration` では通る（0 を返すだけ）が、`every` が
+      # `cannot schedule ... with a frequency of 0` で倒れる＝**起動が落ちる**。
+      def remind_error(schedule)
+        minutes = schedule.dig('remind', 'minutes') || DEFAULT_REMIND_MINUTES
+        return nil unless minutes.is_a?(Numeric)
+        return nil if minutes.positive?
+        return '/schedule/remind/minutes: cannot schedule with a frequency of' \
+          " #{minutes} (#{minutes}m)"
+      end
+
+      # ⚠ **remind ジョブを立てるクラスにマッチする定義だけを見る。**`schedule.remind` は
+      # スキーマ上どのソースにも書けるが、**立てるのは `IcalendarSource` だけ**。
+      # 他のソースでは無視される設定なので、ここで NG にすると上と同じ食い違いになる。
+      def remind_scheduled?(params)
+        return false unless params.dig('schedule', 'remind', 'enable') == true
+        flat = params.key_flatten
+        return Source.classes.any? do |entry|
+          flat[entry[:config]] && entry[:class].method_defined?(:remind)
+        end
+      end
 
       # ⚠ **型違いはスキーマの担当。**ここで拾うと、同じ 1 つの誤りが
       # 「type が string でない」と「パースできない」の 2 通りで出る。
