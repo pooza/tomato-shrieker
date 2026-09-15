@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/pooza/tomato-shrieker/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/pooza/tomato-shrieker/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/pooza/tomato-shrieker/releases.atom"/>
+  <title>Release notes from tomato-shrieker</title>
+  <updated>2026-09-12T06:25:34Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/108507119/v4.9.0</id>
+    <updated>2026-09-12T06:26:04Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/pooza/tomato-shrieker/releases/tag/v4.9.0"/>
+    <title>4.9.0</title>
+    <content type="html">&lt;h2&gt;監視のしきい値をソース単位で持てるようにしました&lt;/h2&gt;
+&lt;p&gt;取得元が不安定なソースで、&lt;strong&gt;正常時も監視が赤くなり続ける&lt;/strong&gt;問題への対応です。ソース定義に 1 行書けるようになりました。&lt;/p&gt;
+&lt;div class=&quot;highlight highlight-source-yaml notranslate position-relative overflow-auto&quot; data-snippet-clipboard-copy-content=&quot;monitor:
+  error_streak_threshold: 28
+  silence_tolerance: 90d&quot;&gt;&lt;pre&gt;&lt;span class=&quot;pl-ent&quot;&gt;monitor&lt;/span&gt;:
+  &lt;span class=&quot;pl-ent&quot;&gt;error_streak_threshold&lt;/span&gt;: &lt;span class=&quot;pl-c1&quot;&gt;28&lt;/span&gt;
+  &lt;span class=&quot;pl-ent&quot;&gt;silence_tolerance&lt;/span&gt;: &lt;span class=&quot;pl-c1&quot;&gt;90d&lt;/span&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;⚠ **未指定なら従来どおり &lt;code&gt;/monitor/error_streak_threshold&lt;/code&gt;（既定 &lt;code&gt;1&lt;/code&gt;）**です。アップグレードしただけでは挙動は変わりません。&lt;/p&gt;
+&lt;h3&gt;なぜ必要だったか&lt;/h3&gt;
+&lt;p&gt;YouTube の &lt;code&gt;feeds/videos.xml&lt;/code&gt; は&lt;strong&gt;毎日決まった時間帯（実測 10〜16 時 JST）に 25〜58% の確率で 404 を返し&lt;/strong&gt;、その時間帯の外では &lt;strong&gt;0%&lt;/strong&gt; でした。しきい値が 1 しか無いと、4 ソースで &lt;strong&gt;週 136 回&lt;/strong&gt; モニターが down し、「赤すぎて監視として役に立たない」状態になっていました。&lt;/p&gt;
+&lt;p&gt;この調整はこれまで Uptime Kuma の &lt;code&gt;maxretries&lt;/code&gt; に逃がすしかなく、&lt;strong&gt;ソース定義を読んでも「何回で赤くなるか」が分からない&lt;/strong&gt;状態でした。&lt;/p&gt;
+&lt;h3&gt;🔴 緩められるのは「エントリを 1 件も読めていない失敗」だけです&lt;/h3&gt;
+&lt;p&gt;しきい値をいくつにしても、&lt;strong&gt;エントリを読んだ後に落ちた失敗（テンプレートの異常、添付の取得失敗など）は 1 回で 503&lt;/strong&gt; になります。&lt;code&gt;Entry&lt;/code&gt; の登録は配信より先に行われるため、その run のエントリは二度と取得されず&lt;strong&gt;恒久的に失われる&lt;/strong&gt;からです。&lt;/p&gt;
+&lt;h3&gt;変更点&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;monitor.error_streak_threshold&lt;/code&gt; をソース定義で上書きできる&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/status.json&lt;/code&gt; に &lt;code&gt;error_streak_threshold&lt;/code&gt;（&lt;strong&gt;実効値&lt;/strong&gt;）を追加&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;/healthz/source/:id&lt;/code&gt; の 503 本文が &lt;code&gt;error_streak: N / M&lt;/code&gt; 形式に&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;bin/shrieker source validate&lt;/code&gt; が「しきい値 × 実行間隔が &lt;code&gt;retention_days&lt;/code&gt; を超える＝到達できない組み合わせ」を WARN で指摘&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;アップグレード&lt;/h3&gt;
+&lt;p&gt;マイグレーションはありません。&lt;code&gt;git pull&lt;/code&gt; → &lt;code&gt;bundle install&lt;/code&gt; → サービス再起動で完了します。&lt;/p&gt;
+&lt;p&gt;詳細は &lt;a href=&quot;https://github.com/pooza/tomato-shrieker/wiki/%E7%9B%A3%E8%A6%96&quot;&gt;Wiki の「監視」&lt;/a&gt; を参照してください。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;関連&lt;/strong&gt;: &lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5356720924&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1558&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1558/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1558&quot;&gt;#1558&lt;/a&gt; / &lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5431448559&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1582&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1582/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1582&quot;&gt;#1582&lt;/a&gt;（この時間帯の窓そのものの調査）&lt;/p&gt;</content>
+    <author>
+      <name>pooza</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/995262?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/108507119/v4.8.0</id>
+    <updated>2026-09-05T13:47:50Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/pooza/tomato-shrieker/releases/tag/v4.8.0"/>
+    <title>4.8.0</title>
+    <content type="html">&lt;p&gt;稼働中のソース定義 reload と、監視の「嘘をつかない化」がテーマ。&lt;/p&gt;
+&lt;h2&gt;目玉&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;稼働中にソース定義を reload できるようになりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;4637704833&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1459&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1459/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1459&quot;&gt;#1459&lt;/a&gt;)。&lt;code&gt;bin/shrieker source reload&lt;/code&gt;（SIGHUP）で、ソースの追加・編集・削除が daemon を止めずに反映されます
+&lt;ul&gt;
+&lt;li&gt;⚠ &lt;strong&gt;無変更のソースはジョブに触りません&lt;/strong&gt;（&lt;code&gt;every&lt;/code&gt; の位相がリセットされない）&lt;/li&gt;
+&lt;li&gt;⚠ **起動は fail closed、reload は fail safe。**起動時に 1 件でも登録に失敗すれば daemon は起動しません（systemd が再試行します）。稼働中の reload は壊れた 1 件だけを飛ばして走り続けます&lt;/li&gt;
+&lt;li&gt;⚠ **&lt;code&gt;config/local.yaml&lt;/code&gt; などの設定ファイルは読み直しません。**reload の対象は &lt;code&gt;config/sources/*.yaml&lt;/code&gt; だけで、マスク設定やトークンの差し替えには再起動が必要です&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;監視&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;silent&lt;/code&gt; が 3 値になりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5149380475&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1502&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1502/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1502&quot;&gt;#1502&lt;/a&gt;)。&lt;code&gt;true&lt;/code&gt; / &lt;code&gt;false&lt;/code&gt; に加えて &lt;strong&gt;&lt;code&gt;null&lt;/code&gt; = まだ判定できない&lt;/strong&gt;。⚠ &lt;strong&gt;これまで &lt;code&gt;false&lt;/code&gt; が「健全」と「判定不能」を兼ねていました。&lt;/strong&gt;&lt;code&gt;silence_baseline_origin&lt;/code&gt;（&lt;code&gt;delivery&lt;/code&gt; / &lt;code&gt;acknowledgement&lt;/code&gt; / &lt;code&gt;observation&lt;/code&gt;）で理由が読めます&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;bin/shrieker source ack&lt;/code&gt; が未達 (&lt;code&gt;undelivered&lt;/code&gt;) にも効くようになりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155854896&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1506&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1506/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1506&quot;&gt;#1506&lt;/a&gt;)。⚠ &lt;strong&gt;消えるのは「確認したその試行」だけ&lt;/strong&gt;で、後の試行で再び届かなければまた警告します。CLI は実際に効いた範囲だけを出力します&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;未達の 503 に理由が出るようになりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155856150&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1507&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1507/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1507&quot;&gt;#1507&lt;/a&gt;)。&lt;code&gt;partial&lt;/code&gt; の run でも &lt;code&gt;error:&lt;/code&gt; と &lt;code&gt;shrieker_errors:&lt;/code&gt; が出ます。no-op を挟んで直近の run が success になった場合は、直近の配信試行の行から &lt;code&gt;last_attempted_*&lt;/code&gt; として出します&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;FeedSource#fetch&lt;/code&gt; の失敗が Sentry へ届くようになりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5075652706&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1485&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1485/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1485&quot;&gt;#1485&lt;/a&gt;)。⚠ これまで **「&lt;code&gt;/healthz&lt;/code&gt; を 503 にするのに Sentry にイシューが立たないエラー」**が存在していました。&lt;code&gt;shrieker_errors&lt;/code&gt; のキーも &lt;code&gt;source#fetch&lt;/code&gt; に固定し、宛先別の分布と混ざらないようにしています&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;LineShrieker の初期化失敗の真因が healthz まで届くようになりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5075652943&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1487&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1487/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1487&quot;&gt;#1487&lt;/a&gt;)。これまでは症状の &lt;code&gt;NoMethodError&lt;/code&gt; だけが出ていました&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;無効にしたソースを監視対象から外しました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5149516334&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1503&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1503/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1503&quot;&gt;#1503&lt;/a&gt;)。⚠ **稼働後に &lt;code&gt;disable&lt;/code&gt; にしたソースの &lt;code&gt;/healthz/source/:id&lt;/code&gt; は、これまで恒久的に 503 でした。**このリリースで &lt;code&gt;OK (disabled)&lt;/code&gt; の 200 になります（Kuma のモニターが赤から緑に変わります）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;reload 中に空のソース一覧が見えることがある問題を修正&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5335313831&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1548&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1548/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1548&quot;&gt;#1548&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;scrub 失敗の報告が、壊れているのと同じ logger に依存しないようにしました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5335317028&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1549&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1549/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1549&quot;&gt;#1549&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;マスク設定を稼働中に変更したとき、Sentry へ送るイベントにも反映されるようになりました&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5243854369&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1538&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1538/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1538&quot;&gt;#1538&lt;/a&gt;・上流 ginseng-core の修正に追随)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;セキュリティ・依存&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;ginseng-core 1.23.5 / ginseng-youtube 3.0.1 / ginseng-style v1.1.12 に追随&lt;/strong&gt; (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5339718955&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1552&quot; data-hovercard-type=&quot;pull_request&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/pull/1552/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/pull/1552&quot;&gt;#1552&lt;/a&gt; / &lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5293278844&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1543&quot; data-hovercard-type=&quot;pull_request&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/pull/1543/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/pull/1543&quot;&gt;#1543&lt;/a&gt;)。⚠ &lt;strong&gt;ginseng-core の変更はマスク周りが大半&lt;/strong&gt;で、IPv6 リテラルや zone id 付き URL、userinfo のパスワードがマスクを素通りしていた問題が含まれます&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;開発者向け&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;sync 手順が tomato 自身の &lt;code&gt;Gemfile.lock&lt;/code&gt; を &lt;code&gt;develop&lt;/code&gt; から読むようになりました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5335317347&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1550&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1550/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1550&quot;&gt;#1550&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;Kuma のモニターと有効ソースの突き合わせ手順に、&lt;code&gt;active&lt;/code&gt; と &lt;code&gt;interval&lt;/code&gt; / &lt;code&gt;maxretries&lt;/code&gt; の確認を追加 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155858396&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1508&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1508/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1508&quot;&gt;#1508&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;docs/release-validation.md&lt;/code&gt; に稼働中 reload の検証手順を追加&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;⚠ アップグレード時の注意&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;**&lt;code&gt;/status.json&lt;/code&gt; の &lt;code&gt;silent&lt;/code&gt; が boolean から boolean|null に変わります。**外部のダッシュボード等で &lt;code&gt;silent == false&lt;/code&gt; を緑判定に使っている場合は影響します&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;/status.json&lt;/code&gt; に &lt;code&gt;silence_baseline&lt;/code&gt; / &lt;code&gt;silence_baseline_origin&lt;/code&gt; が増えます&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;稼働後に &lt;code&gt;disable&lt;/code&gt; にしたソースのモニターが赤から緑に変わります&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>pooza</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/995262?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/108507119/v4.7.0</id>
+    <updated>2026-08-25T08:50:04Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/pooza/tomato-shrieker/releases/tag/v4.7.0"/>
+    <title>4.7.0</title>
+    <content type="html">&lt;p&gt;マイルストーン 4.7.0（8 Issue）を消化したリリースです。&lt;strong&gt;security 3 件&lt;/strong&gt;を含みます。&lt;/p&gt;
+&lt;h2&gt;🔴 security&lt;/h2&gt;
+&lt;h3&gt;資格情報が 3 経路で漏れていました&lt;/h3&gt;
+&lt;p&gt;モロヘイヤの webhook は &lt;code&gt;POST /mulukhiya/webhook/{digest}&lt;/code&gt; で、&lt;strong&gt;digest を知っていれば誰でもそのアカウントで投稿できます&lt;/strong&gt;＝ &lt;strong&gt;URL そのものが資格情報&lt;/strong&gt;です。これが&lt;strong&gt;成功した POST のたびに平文で syslog へ&lt;/strong&gt;出ていました。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;経路&lt;/th&gt;
+&lt;th&gt;対応&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;syslog（毎リクエストの &lt;code&gt;url:&lt;/code&gt;）&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;mask_url&lt;/code&gt; が&lt;strong&gt;クエリしか見ておらず&lt;/strong&gt;、パスが秘密の URL は素通りでした（&lt;a href=&quot;https://github.com/pooza/ginseng-core/issues/580&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-core/issues/580/hovercard&quot;&gt;ginseng-core#580&lt;/a&gt;・1.21.0）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;syslog（例外メッセージに埋まった URL）&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;URL_PATTERN&lt;/code&gt; に &lt;code&gt;\A&lt;/code&gt; の錨があり、&lt;strong&gt;文字列全体が URL でないとマスクに届きませんでした&lt;/strong&gt;（&lt;a href=&quot;https://github.com/pooza/ginseng-core/issues/582&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-core/issues/582/hovercard&quot;&gt;ginseng-core#582&lt;/a&gt;・1.22.0）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Sentry&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;before_send&lt;/code&gt; が無く、ログでは伏せている値が例外イベントとして外部サービスへ出ていました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5034944557&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1467&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1467/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1467&quot;&gt;#1467&lt;/a&gt;)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;source_run_log&lt;/code&gt; / &lt;code&gt;/status.json&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;例外メッセージが素のまま保存・公開されていました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155861043&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1511&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1511/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1511&quot;&gt;#1511&lt;/a&gt;)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;⚠ &lt;strong&gt;&lt;code&gt;ginseng-core&lt;/code&gt; の 2 段目が入るまで、1 段目は「呼ばれないので効かない」状態でした。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3&gt;上流の追随 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5242656530&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1524&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1524/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1524&quot;&gt;#1524&lt;/a&gt;)&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;ginseng-core&lt;/code&gt; を &lt;strong&gt;1.19.0 → 1.22.0&lt;/strong&gt;、&lt;code&gt;ginseng-fediverse&lt;/code&gt; を &lt;strong&gt;1.8.28 → 1.8.31&lt;/strong&gt; へ追随しました。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;別オリジンへのリダイレクトで query / &lt;code&gt;basic_auth&lt;/code&gt; / &lt;code&gt;digest_auth&lt;/code&gt; / &lt;code&gt;cookies&lt;/code&gt; が渡っていた&lt;/strong&gt;穴 3 件&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;post&lt;/code&gt; / &lt;code&gt;put&lt;/code&gt; / &lt;code&gt;delete&lt;/code&gt; / &lt;code&gt;upload&lt;/code&gt; で &lt;code&gt;host_validator&lt;/code&gt; が効いていなかった穴&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;create_headers&lt;/code&gt; が渡された headers hash を破壊的に書き換え、&lt;strong&gt;設定のトークンが呼び側に残っていた&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;設定読み込みの原子性 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5242998195&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1530&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1530/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1530&quot;&gt;#1530&lt;/a&gt;)&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;config/sources/*.yaml&lt;/code&gt; を 1 件ずつ積んでいたため、🔴 &lt;strong&gt;途中で YAML が壊れると &lt;code&gt;/sources&lt;/code&gt; が半端な状態で残っていました&lt;/strong&gt;。ソース定義を 1 文字打ち間違えただけで稼働中の一覧が壊れる形です。読み切ってから 1 回で差し替えるようにしました。&lt;/p&gt;
+&lt;h2&gt;機能・修正&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;matrix-webhook 宛の CW が表示されるようになりました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5077021046&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1493&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1493/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1493&quot;&gt;#1493&lt;/a&gt;)&lt;/strong&gt; — matrix-webhook は &lt;code&gt;text&lt;/code&gt; / &lt;code&gt;channel&lt;/code&gt; / &lt;code&gt;room_id&lt;/code&gt; / &lt;code&gt;format&lt;/code&gt; しか見ないため、CW（&lt;code&gt;spoiler_text&lt;/code&gt;）は&lt;strong&gt;エラーにもならずに落ちていました&lt;/strong&gt;。&lt;code&gt;TsunagalWebhookShrieker&lt;/code&gt; を追加し、CW を本文の先頭へ畳んで送ります&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;PieFed の login を投稿時へ遅らせました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155961916&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1514&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1514/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1514&quot;&gt;#1514&lt;/a&gt;)&lt;/strong&gt; — 構築しただけで認証 API を叩かなくなり、レートリミットを踏みにくくなります&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;/status.json&lt;/code&gt; に Ruby ランタイム情報 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5040601652&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1471&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1471/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1471&quot;&gt;#1471&lt;/a&gt;)&lt;/strong&gt; — &lt;code&gt;version&lt;/code&gt; / &lt;code&gt;yjit_available&lt;/code&gt; / &lt;code&gt;yjit_enabled&lt;/code&gt;。⚠ YJIT は Rust の無い環境でビルド時に黙って外れ、24〜25% 遅いサーバーができあがるため&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;source ack&lt;/code&gt; の日数表示 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155862561&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1513&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1513/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1513&quot;&gt;#1513&lt;/a&gt;)&lt;/strong&gt; — &lt;code&gt;12h&lt;/code&gt; のような日未満の設定で「0日」と出ていました&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;/healthz/source&lt;/code&gt; の 503 本文 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5155862510&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1512&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1512/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1512&quot;&gt;#1512&lt;/a&gt;)&lt;/strong&gt; — 凍結予定のリテラルを破壊的更新しており、将来 &lt;code&gt;FrozenError&lt;/code&gt; で診断情報が丸ごと消える形でした&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;4.5.0 レビュー由来の整理 (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5075658141&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1490&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1490/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1490&quot;&gt;#1490&lt;/a&gt;)&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;⚠ 運用者向け&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;🔴 **matrix 系 3 ソースの hook に &lt;code&gt;type: tsunagal&lt;/code&gt; を 1 行足してください。**足すまで CW は落ちたままです（⚠ &lt;strong&gt;足さなくても壊れません&lt;/strong&gt;）&lt;/p&gt;
+&lt;div class=&quot;highlight highlight-source-yaml notranslate position-relative overflow-auto&quot; data-snippet-clipboard-copy-content=&quot;dest:
+  hooks:
+    - url: https://synapse.b-shock.org/webhook
+      type: tsunagal          # ← 追加
+      channel: &#39;#matrix-news:synapse.b-shock.org&#39;&quot;&gt;&lt;pre&gt;&lt;span class=&quot;pl-ent&quot;&gt;dest&lt;/span&gt;:
+  &lt;span class=&quot;pl-ent&quot;&gt;hooks&lt;/span&gt;:
+    - &lt;span class=&quot;pl-ent&quot;&gt;url&lt;/span&gt;: &lt;span class=&quot;pl-s&quot;&gt;https://synapse.b-shock.org/webhook&lt;/span&gt;
+      &lt;span class=&quot;pl-ent&quot;&gt;type&lt;/span&gt;: &lt;span class=&quot;pl-s&quot;&gt;tsunagal          &lt;/span&gt;&lt;span class=&quot;pl-c&quot;&gt;&lt;span class=&quot;pl-c&quot;&gt;#&lt;/span&gt; ← 追加&lt;/span&gt;
+      &lt;span class=&quot;pl-ent&quot;&gt;channel&lt;/span&gt;: &lt;span class=&quot;pl-s&quot;&gt;&lt;span class=&quot;pl-pds&quot;&gt;&#39;&lt;/span&gt;#matrix-news:synapse.b-shock.org&lt;span class=&quot;pl-pds&quot;&gt;&#39;&lt;/span&gt;&lt;/span&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;**設定の追加は不要です。**v4.6.1 の &lt;code&gt;/http/timeout/seconds&lt;/code&gt; のような必須キーの追加はありません&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;🔴 &lt;strong&gt;サテライト 3 本（loquat / shooby-do-bop / dqdai-anniv）も同時に pull してください。&lt;/strong&gt;&lt;code&gt;bundle install&lt;/code&gt; も本体・サテライトとも必ず実行してください&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;ログの内容が変わります&lt;/strong&gt; — webhook の digest と URL のクエリに埋まった資格情報が &lt;code&gt;[FILTERED]&lt;/code&gt; になります&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>pooza</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/995262?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/108507119/v4.6.2</id>
+    <updated>2026-08-25T06:39:56Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/pooza/tomato-shrieker/releases/tag/v4.6.2"/>
+    <title>4.6.2</title>
+    <content type="html">&lt;p&gt;上流 &lt;code&gt;ginseng-*&lt;/code&gt; の security 修正を取り込むためのパッチリリース。&lt;strong&gt;機能の変更はありません。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2&gt;security&lt;/h2&gt;
+&lt;h3&gt;🔴 資格情報が別オリジンへ渡る穴が 3 件塞がりました&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;ginseng-core&lt;/code&gt; を &lt;strong&gt;1.19.0 → 1.20.0&lt;/strong&gt; へ追随しました。リダイレクトを追うときに、初段のリクエストが持っていた資格情報が&lt;strong&gt;別オリジンへそのまま渡っていた&lt;/strong&gt;問題です。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;リダイレクト追従で初段の query を撃ち直さない（&lt;a href=&quot;https://github.com/pooza/ginseng-core/issues/527&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-core/issues/527/hovercard&quot;&gt;#527&lt;/a&gt;）&lt;/li&gt;
+&lt;li&gt;別オリジンへのリダイレクトで &lt;code&gt;basic_auth&lt;/code&gt; / &lt;code&gt;digest_auth&lt;/code&gt; を落とす（&lt;a href=&quot;https://github.com/pooza/ginseng-core/issues/568&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-core/issues/568/hovercard&quot;&gt;#568&lt;/a&gt;）&lt;/li&gt;
+&lt;li&gt;同じく &lt;code&gt;cookies:&lt;/code&gt; オプションを落とす（&lt;a href=&quot;https://github.com/pooza/ginseng-core/issues/576&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-core/issues/576/hovercard&quot;&gt;#576&lt;/a&gt;）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;⚠ &lt;strong&gt;認証付きフィード URL を購読している場合に該当しうる経路です。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3&gt;SSRF ガードの穴&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;post&lt;/code&gt; / &lt;code&gt;put&lt;/code&gt; / &lt;code&gt;delete&lt;/code&gt; / &lt;code&gt;upload&lt;/code&gt; でも &lt;code&gt;host_validator&lt;/code&gt; を効かせる（&lt;a href=&quot;https://github.com/pooza/ginseng-core/issues/569&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-core/issues/569/hovercard&quot;&gt;#569&lt;/a&gt;）。⚠ 本アプリは &lt;code&gt;host_validator&lt;/code&gt; を渡していないため実質 no-op です&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Location&lt;/code&gt; 付きの 304 を追わない&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;設定のトークンが呼び側に残っていた&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;ginseng-fediverse&lt;/code&gt; を &lt;strong&gt;1.8.28 → 1.8.31&lt;/strong&gt; へ追随しました。&lt;code&gt;create_headers&lt;/code&gt; が渡された headers hash を破壊的に書き換えていた問題（&lt;a href=&quot;https://github.com/pooza/ginseng-fediverse/issues/256&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-fediverse/issues/256/hovercard&quot;&gt;#256&lt;/a&gt; / &lt;a href=&quot;https://github.com/pooza/ginseng-fediverse/issues/258&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/ginseng-fediverse/issues/258/hovercard&quot;&gt;#258&lt;/a&gt;）を修正しています。&lt;/p&gt;
+&lt;h3&gt;そのほか&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;ginseng-piefed&lt;/code&gt; / &lt;code&gt;ginseng-youtube&lt;/code&gt; も上流の先頭へ追随しました。ログのブロック形式対応（&lt;code&gt;info&lt;/code&gt; / &lt;code&gt;error&lt;/code&gt;）と &lt;code&gt;TagContainer&lt;/code&gt; の UTF-8 保証も入っています。&lt;/p&gt;
+&lt;h2&gt;⚠ 運用者向け&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;**設定の追加は不要です。**v4.6.1 の &lt;code&gt;/http/timeout/seconds&lt;/code&gt; のような必須キーの追加はありません&lt;/li&gt;
+&lt;li&gt;🔴 **サテライト 3 本（loquat / shooby-do-bop / dqdai-anniv）も同時に pull してください。**本体だけ更新すると &lt;strong&gt;CommandSource の 7 ソースだけ古い gem で動き続けます&lt;/strong&gt;。3 本とも同じ追随をマージ済みです&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;bundle install&lt;/code&gt; は本体・サテライトとも必ず実行してください&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>pooza</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/995262?s=60&amp;v=4"/>
+  </entry>
+<entry>
+    <id>tag:github.com,2008:Repository/108507119/v4.6.1</id>
+    <updated>2026-08-21T02:17:49Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/pooza/tomato-shrieker/releases/tag/v4.6.1"/>
+    <title>4.6.1</title>
+    <content type="html">&lt;p&gt;上流 &lt;code&gt;ginseng-*&lt;/code&gt; の security 修正を取り込むためのパッチリリース。&lt;strong&gt;機能の変更はありません。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2&gt;security&lt;/h2&gt;
+&lt;p&gt;&lt;code&gt;ginseng-core&lt;/code&gt; を &lt;strong&gt;1.15.28 → 1.19.0&lt;/strong&gt; へ追随しました。82 コミットぶん遅れており、以下の修正が届いていませんでした。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;リダイレクトの各ホップでホストを検証する（SSRF 対策が初段のみだった）&lt;/li&gt;
+&lt;li&gt;検証で通した IP へ接続する（TOCTOU）&lt;/li&gt;
+&lt;li&gt;URL のクエリに埋まった資格情報をログから落とす&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;info&lt;/code&gt; / &lt;code&gt;error&lt;/code&gt; 以外の severity もマスク経路を通す&lt;/li&gt;
+&lt;li&gt;ログの 1 行が必ず妥当な UTF-8 になり、例外を上げない&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;ginseng-fediverse&lt;/code&gt; を 1.8.25 → 1.8.28、&lt;code&gt;ginseng-piefed&lt;/code&gt; / &lt;code&gt;ginseng-youtube&lt;/code&gt; も上流の先頭へ追随しています。&lt;/p&gt;
+&lt;h2&gt;その他&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;RuboCop 設定の正本を &lt;a href=&quot;https://github.com/pooza/ginseng-style&quot;&gt;pooza/ginseng-style&lt;/a&gt; へ移しました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5197643470&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1515&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1515/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1515&quot;&gt;#1515&lt;/a&gt;)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;rake cert:update&lt;/code&gt; / &lt;code&gt;rake cert:check&lt;/code&gt; が使えるようになりました (&lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;5208299148&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/pooza/tomato-shrieker/issues/1517&quot; data-hovercard-type=&quot;issue&quot; data-hovercard-url=&quot;/pooza/tomato-shrieker/issues/1517/hovercard&quot; href=&quot;https://github.com/pooza/tomato-shrieker/issues/1517&quot;&gt;#1517&lt;/a&gt; の一部)&lt;/li&gt;
+&lt;li&gt;リリース手順に Wiki の追従を明記しました&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;⚠ 運用者向け&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;config/application.yaml&lt;/code&gt; に &lt;code&gt;/http/timeout/seconds&lt;/code&gt; が必須&lt;/strong&gt;になりました（既定へ倒れません）。本リポジトリでは 30 秒を設定済みです&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;サテライト 3 本（loquat / shooby-do-bop / dqdai-anniv）も同時に追随が必要&lt;/strong&gt;です。デプロイ時は本体と両方を pull してください&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>pooza</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/995262?s=60&amp;v=4"/>
+  </entry>
+</feed>
