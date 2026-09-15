@@ -128,6 +128,27 @@ module TomatoShrieker
       assert_empty(jobs(ICAL_ID).map(&:job_id) & before)
     end
 
+    # 🔴 **#1571: 同じ id の定義が 2 つある状態で片方を消したら、digest に差が出る。**
+    #
+    # ⚠ 以前は `sources.first` だけをハッシュしていたので、group が [A, B] → [A] に
+    # 縮んでも digest は SHA1(A) のまま＝ `stale` に入らず、**消したほうのジョブが
+    # unschedule されずに走り続ける**。⚠⚠ ログの `changed` / `removed` にも出ないので、
+    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
+    def test_reload_detects_shrinking_duplicate_id_group
+      # ⚠ ファイル名ではなくトップレベル `id:` で衝突させる（Config は `id` が
+      # 無いときだけファイル名を入れる）。
+      write_fixture(OTHER_ID, {'id' => FIXTURE_ID})
+      @scheduler.reload
+
+      assert_equal(2, jobs(FIXTURE_ID).size, '重複した id が 2 本のジョブとして立っていない')
+
+      FileUtils.rm_f(fixture_path(OTHER_ID))
+      result = @scheduler.reload
+
+      assert_include(result[:changed], FIXTURE_ID)
+      assert_equal(1, jobs(FIXTURE_ID).size, '消したほうのジョブが残っている')
+    end
+
     # 🔴 **register が失敗したソースは、古いジョブを残す (#1545 Codex P1)。**
     # reload はスキーマ検証をしないので、不正な cron 式はここまで来る。先に
     # unschedule する実装だと、失敗したソースが次の reload までジョブ 1 本無い

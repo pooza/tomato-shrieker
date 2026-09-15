@@ -138,8 +138,14 @@ module TomatoShrieker
     end
 
     # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。
+    #
+    # 🔴 **group の全要素をハッシュする (#1571)。**⚠⚠ 以前は `sources.first` だけを
+    # 見ていたので、**同じ id を持つ定義が 2 つある状態で片方を消す / `disable` すると、
+    # group は縮むのに digest が変わらない**＝ `stale` に入らず、**消したほうのジョブが
+    # unschedule されずに走り続ける**。⚠ ログの `changed` / `removed` にも出ないので、
+    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
     def digest(sources)
-      return Digest::SHA1.hexdigest(sources.first.to_h.except('class').to_json)
+      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
     end
 
     def schedule_maintenance
