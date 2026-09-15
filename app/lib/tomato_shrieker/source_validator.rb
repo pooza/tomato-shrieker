@@ -11,6 +11,12 @@ module TomatoShrieker
 
     SCHEMA_FILE = 'config/schema/source.yaml'
 
+    # `Source#register` が rufus へ渡すキーと、起動時に実際に通るパーサの対応 (#1570)。
+    # ⚠ **総称の `Rufus::Scheduler.parse` を使ってはいけない。**cron 文字列を渡しても
+    # `Fugit::Cron` として通ってしまうので、`every: '0 0 * * *'` のような**キーと値の
+    # 取り違えを見逃す**。`register` と同じ分岐・同じパーサで引くこと。
+    SCHEDULE_PARSERS = {'at' => :parse_at, 'cron' => :parse_cron, 'every' => :parse_duration}.freeze
+
     class << self
       def schema
         @schema ||= YAML.load_file(File.join(Environment.dir, SCHEMA_FILE))
@@ -19,8 +25,35 @@ module TomatoShrieker
       # 検証エラーの配列を返す（空 = 妥当）。params は Hash（YAML ロード済みのソース定義）。
       # json-schema が付与する末尾の「 in schema <uuid>」は可読性のため除去する。
       def validate(params)
-        JSON::Validator.fully_validate(schema, params.deep_stringify_keys)
+        params = params.deep_stringify_keys
+        errors = JSON::Validator.fully_validate(schema, params)
           .map {|message| message.sub(/ in schema [0-9a-f-]+\z/, '')}
+        return errors.concat(schedule_errors(params))
+      end
+
+      # 🔴 **起動なら倒れる schedule を、起動と同じパーサで先に弾く (#1570)。**
+      #
+      # `config/schema/source.yaml` の `cron` / `every` / `at` は `type: string` しか
+      # 見ていないので、**スキーマだけでは書き間違いを通す**。2026-09-05 には
+      # `cron: '17,47 * * * *'` の `*` が**シェルの glob でリポジトリ直下のファイル一覧
+      # （338 文字）へ展開された**状態で YAML に入り、`register_all` が倒れて
+      # **7 回の再起動・約 50 秒 全ソース停止**した。
+      #
+      # ⚠ **完全な cron 正規表現は書けない**ので、スキーマの `pattern` では解けない。
+      # `Source#register` が渡す先と同じ `Rufus::Scheduler` のパーサを直接呼ぶ。
+      #
+      # ⚠⚠ **`disable: true` は検査しない。**`Scheduler#desired_sources` が弾くので
+      # rufus まで届かない＝**起動は倒れない**。🔴 **「直せないなら止めれば通る」は
+      # `source reload` の拒否 (#1570) の唯一の逃げ道**なので、ここを厳しくすると
+      # 逃げ道ごと塞ぐことになる。
+      def schedule_errors(params)
+        params = params.deep_stringify_keys
+        return [] if params['disable'] == true
+        schedule = params['schedule']
+        return [] unless schedule.is_a?(Hash)
+        return SCHEDULE_PARSERS.filter_map do |key, parser|
+          schedule_error(schedule[key], key, parser)
+        end
       end
 
       def valid?(params)
@@ -42,6 +75,16 @@ module TomatoShrieker
       end
 
       private
+
+      # ⚠ **型違いはスキーマの担当。**ここで拾うと、同じ 1 つの誤りが
+      # 「type が string でない」と「パースできない」の 2 通りで出る。
+      def schedule_error(value, key, parser)
+        return nil unless value.is_a?(String)
+        Rufus::Scheduler.public_send(parser, value)
+        return nil
+      rescue StandardError => e
+        return "/schedule/#{key}: #{e.message}"
+      end
 
       # 🔴 **しきい値に到達できない組み合わせを弾く（Codex P1・#1558）。**
       #
