@@ -58,7 +58,80 @@ module TomatoShrieker
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
+    # 🔴 **#1570: 起動なら倒れる定義が残っているうちは HUP を送らないこと。**
+    #
+    # ⚠ 反映できずに終わるのは不便だが、**壊れた YAML をディスクに残したまま
+    # reload が成功すると、次のデプロイ / 再起動 / OOM で全ソースが止まる**。
+    # 2026-09-05 に本番で 7 回の再起動・約 50 秒の全停止が起きている。
+    def test_reload_refuses_unstartable_source
+      said = []
+      @command.define_singleton_method(:say) {|message| said.push(message)}
+      @command.define_singleton_method(:unstartable_sources) do
+        [['broken-source', ['/schedule/cron: invalid cron string "17,47 CLAUDE.md"']]]
+      end
+
+      # ⚠ **HUP を送る手前で止まることまで見る。**メッセージだけ増やして送っていたら
+      # この issue は直っていない。daemon を組み立てもしないことで確かめる。
+      assert_raise(Thor::Error) {with_daemon_guard {@command.reload}}
+      assert_include(said.join("\n"), '/schedule/cron:')
+      assert_include(said.join("\n"), 'broken-source')
+    end
+
+    # ⚠ **スキーマ違反では止めないこと。**起動はスキーマを見ないので、ここで全 NG を
+    # 止めると「起動はできるのに reload は拒否される」定義が生まれる＝食い違いの向きが
+    # 変わるだけになる。
+    def test_unstartable_sources_ignores_schema_violation
+      broken = stub_schedule_source('schema-violation', 'dest' => {'lemmy' => {'host' => 'x'}})
+
+      assert_empty(unstartable_with(broken))
+    end
+
+    def test_unstartable_sources_reports_broken_cron
+      broken = stub_schedule_source('broken-cron', 'schedule' => {'cron' => 'not a cron'})
+
+      assert_equal(['broken-cron'], unstartable_with(broken).map(&:first))
+    end
+
+    # 止めたソースは daemon が登録しないので、起動は倒れない＝拒否の対象外。
+    def test_unstartable_sources_skips_disabled
+      broken = stub_schedule_source(
+        'disabled-broken', 'disable' => true, 'schedule' => {'cron' => 'not a cron'}
+      )
+
+      assert_empty(unstartable_with(broken))
+    end
+
     private
+
+    # `SchedulerDaemon.new` に触れたら即失敗させる。⚠ 元の Method を保存して戻す。
+    # `remove_method` で戻すと本物ごと消える（singleton class に生えているため）。
+    def with_daemon_guard
+      original = SchedulerDaemon.method(:new)
+      SchedulerDaemon.define_singleton_method(:new) do |*_args|
+        raise 'reload が拒否せずに daemon へ進んでいる'
+      end
+      yield
+    ensure
+      SchedulerDaemon.define_singleton_method(:new, original)
+    end
+
+    # ⚠ `Source.all` の差し替えは元の Method を保存して戻す。`remove_method` で
+    # 戻すと本物ごと消える（singleton class に生えているため）。
+    def unstartable_with(*sources)
+      original = Source.method(:all)
+      Source.define_singleton_method(:all) {sources}
+      return @command.send(:unstartable_sources)
+    ensure
+      Source.define_singleton_method(:all, original)
+    end
+
+    def stub_schedule_source(id, params)
+      source = Object.new
+      source.define_singleton_method(:id) {id}
+      source.define_singleton_method(:disable?) {params['disable'] == true}
+      source.define_singleton_method(:to_h) {params}
+      return source
+    end
 
     def ack_with(source)
       said = []

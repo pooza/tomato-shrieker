@@ -29,6 +29,62 @@ module TomatoShrieker
       ))
     end
 
+    # 🔴 **#1570: 起動なら倒れる cron を NG にすること。**
+    #
+    # ⚠ **これがスキーマを通っていたのが本番事故の入口。**`cron` は `type: string` しか
+    # 見ていないので、2026-09-05 に `*` がシェルの glob で展開された 338 文字が
+    # そのまま通り、次の起動で `register_all` が倒れて全ソースが 50 秒止まった。
+    def test_invalid_cron_is_ng
+      errors = SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'schedule' => {'cron' => '17,47 CLAUDE.md Gemfile Gemfile.lock README.md'},
+      )
+
+      assert_not_empty(errors)
+      assert_true(errors.any? {|v| v.start_with?('/schedule/cron:')}, errors.inspect)
+    end
+
+    def test_valid_cron_passes
+      assert_empty(SourceValidator.schedule_errors('schedule' => {'cron' => '17,47 * * * *'}))
+    end
+
+    def test_invalid_every_is_ng
+      errors = SourceValidator.schedule_errors('schedule' => {'every' => '5x'})
+
+      assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, errors.inspect)
+    end
+
+    # ⚠ **キーと値の取り違えを見逃さないこと。**総称の `Rufus::Scheduler.parse` は
+    # cron 文字列も `Fugit::Cron` として通すので、`every` に cron を書いても素通りする。
+    # `register` と同じパーサ（`parse_duration`）で引いていれば弾ける。
+    def test_cron_string_in_every_is_ng
+      errors = SourceValidator.schedule_errors('schedule' => {'every' => '0 0 * * *'})
+
+      assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, errors.inspect)
+    end
+
+    def test_invalid_at_is_ng
+      errors = SourceValidator.schedule_errors('schedule' => {'at' => 'not a time'})
+
+      assert_true(errors.any? {|v| v.start_with?('/schedule/at:')}, errors.inspect)
+    end
+
+    # 🔴 **止めたソースは検査しない。**`Scheduler#desired_sources` が弾くので起動は
+    # 倒れない。**「直せないなら disable すれば通る」が `source reload` の拒否 (#1570)
+    # の唯一の逃げ道**なので、ここが厳しいと逃げ道ごと塞ぐ。
+    def test_disabled_source_skips_schedule_check
+      assert_empty(SourceValidator.schedule_errors(
+        'disable' => true,
+        'schedule' => {'cron' => 'not a cron'},
+      ))
+    end
+
+    # ⚠ 型違いはスキーマの担当。同じ誤りを 2 通りのメッセージで出さない。
+    def test_schedule_type_error_left_to_schema
+      assert_empty(SourceValidator.schedule_errors('schedule' => {'cron' => 42}))
+    end
+
     def test_missing_required
       assert_not_empty(SourceValidator.validate('source' => {'feed' => 'https://example.com/feed'}))
       assert_false(SourceValidator.valid?('dest' => {'hooks' => ['https://example.com/x']}))

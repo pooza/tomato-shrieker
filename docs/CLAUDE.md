@@ -187,7 +187,11 @@ bin/shrieker source reload
 - 🔴 **起動は fail closed、reload は fail safe。**起動時に 1 件でも `register` に失敗したら**起動しない**（`Ginseng::ConfigError`）。⚠ ここで飛ばすと**そのソースは二度と登録されないのに daemon は正常に見える**（総合 `/healthz` は無タグの maintenance ジョブがあれば通る）。倒しておけば systemd の `Restart=always` が 5 秒後に再試行する。⚠ **一方 reload では倒さない。**稼働中の daemon を「誰かが YAML を打ち間違えた」で落とす理由は無い
 - 🔴 **新しいジョブを立ててから古いジョブを落とす。**`register` は失敗しうる（`CommandSource` は `bundle install` を走らせるし、reload はスキーマ検証をしないので**不正な cron 式**もここへ来る）。先に消すと、**失敗したソースが次の reload までジョブ 1 本無いまま放置される**。⚠ **失敗した id は registry を更新しない**ので、定義を直せば次の reload で必ず張り直る。⚠ 1 ソースの失敗は他のソースの反映を止めない（ログの `failed` に出る）
 - 🔴 **壊れた定義を掴んだら何も変えない。**`Config#load` は読み切ってから 1 回で差し替える（#1530）ので、YAML が 1 つでも壊れていれば例外だけが上がり、**ジョブも設定も前のまま**走り続ける
-- ⚠ **reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
+- ⚠ **daemon 側の reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
+- 🔴 **ただし CLI の `source reload` は、起動なら倒れる定義が残っているうちは HUP を送らない (#1570)。**⚠⚠ **止めるのは `schedule` のパース失敗だけ**（`at` / `cron` / `every` を `Rufus::Scheduler` の**それぞれのパーサ**で引く）。**スキーマ違反では止めない** — 起動はスキーマを見ないので、そこで止めると上の「起動はできるのに reload は拒否される」を自分で作ることになる
+  - ⚠ **逃げ道は `disable: true`。**止めたソースは `desired_sources` が弾く＝起動は倒れないので検査対象外。**直せないなら止めれば reload は通る**
+  - ⚠ **スキーマの `pattern` では解けない**（完全な cron 正規表現は書けない）ので、`Source#register` が渡す先と同じパーサを直接呼んでいる。⚠ **総称の `Rufus::Scheduler.parse` は使わない** — cron 文字列も通るので `every: '0 0 * * *'` のような取り違えを見逃す
+  - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**daemon 側へ結果を出す話は #1529
 
 ⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
 

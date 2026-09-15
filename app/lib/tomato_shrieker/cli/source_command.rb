@@ -96,7 +96,17 @@ module TomatoShrieker
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
+    # 🔴 **起動なら倒れる定義が残っているうちは reload しない (#1570)。**
+    #
+    # ⚠ **起動は fail closed、reload は fail safe** なので、reload は壊れた 1 件を
+    # 飛ばして走り続ける。**そのぶん壊れた YAML がディスクに残っても誰も気付けず、
+    # 次のデプロイ / 再起動 / OOM で `register_all` が倒れて全ソースが止まる**。
+    # 2026-09-05 に本番で実際に起きた（7 回の再起動・約 50 秒 全ソース停止）。
+    #
+    # ⚠ **逃げ道は `disable`。**直せないソースは止めれば検査対象から外れて reload は通る
+    # （`SourceValidator.schedule_errors` のコメント参照）。
     def reload
+      refuse_unless_startable!
       daemon = SchedulerDaemon.new
       case daemon.alive_state
       when :alive
@@ -139,6 +149,33 @@ module TomatoShrieker
     end
 
     private
+
+    # ⚠⚠ **スキーマ違反では止めない (#1570)。**起動はスキーマを見ない
+    # （`Scheduler#reload` のコメント）ので、ここで NG を全部止めると
+    # **「起動はできるのに reload は拒否される」定義が生まれる**＝ 食い違いの向きが
+    # 変わるだけで、この issue が直そうとしたものと同じ形になる。
+    # **止めるのは、起動が実際に倒れるもの＝ schedule のパース失敗だけ。**
+    def refuse_unless_startable!
+      unstartable = unstartable_sources
+      return if unstartable.empty?
+      unstartable.each do |id, errors|
+        say "NG\t#{id}"
+        errors.each {|v| say "    - #{v}"}
+      end
+      raise Thor::Error, "#{unstartable.size} source(s) invalid." \
+        ' 起動時に倒れる定義が残っているため reload しません。修正するか disable してください。'
+    end
+
+    # ⚠ **ファイルを glob せず `Source.all` を見る。**`local.yaml` の `sources:` 形式も
+    # まだ動く（#1429 で互換を残した）ので、`config/sources/*.yaml` だけを見ると
+    # **daemon が読むものと食い違う**。⚠ 1 つの定義が複数のクラスにマッチしうるので
+    # id で畳む（`Scheduler#desired_sources` と同じ理由）。
+    def unstartable_sources
+      Source.all.reject(&:disable?).uniq(&:id).filter_map do |source|
+        errors = SourceValidator.schedule_errors(source.to_h)
+        [source.id, errors] unless errors.empty?
+      end
+    end
 
     def nothing_to_ack_message(id)
       return "#{id} は silence_tolerance が未設定で、未達の警告も出ていません。確認するものがありません。"
