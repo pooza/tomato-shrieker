@@ -1,0 +1,15 @@
+# PieFed 宛先を持つテスト専用ソース (#1520 / #1593)
+# ⚠ 資格情報は書かない。⚠⚠ PiefedShrieker は #1514 以降、構築時に login しない。
+test: true
+source:
+  feed: https://feed.example.test/piefed.rss
+schedule:
+  every: 1d
+dest:
+  piefed:
+    host: piefed.example.test
+    user_id: dummy@example.test
+    password: dummy-password-not-a-credential
+    community_id: 1
+  tags:
+    - test

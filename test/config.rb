@@ -73,7 +73,39 @@ module TomatoShrieker
       assert_equal(before, config['/sources'].size, '壊れた YAML で一覧が欠けている')
     end
 
+    # 🔴 **テスト専用のソース定義が実際に読まれていること (#1593)。**
+    #
+    # ⚠⚠ `config/sources/` は git 管理外なので **CI にはソース定義が 1 件も無い**。
+    # その状態では `Source.all do |source| ... end` の形のテストは**ブロックが 1 度も
+    # 回らず、何も確かめずに緑になる**＝ **失敗しないのではなく実行されていない**。
+    # 🔴 **ここが外れても「落ちない」ので、保証そのものにテストを置く。**
+    def test_test_sources_are_loaded
+      ids = Source.all.map(&:id)
+
+      ['mastodon-dest', 'misskey-dest', 'line-dest', 'piefed-dest', 'webhook-dest'].each do |id|
+        assert_include(ids, id, "test/sources/#{id}.yaml が読まれていない")
+      end
+    end
+
+    # ⚠ **本番・開発では読まない。**`test/sources/` は検証用の宛先を持つので、
+    # 運用の実行に混ざると**実在しないホストへ配信しようとする**。
+    def test_test_sources_are_not_loaded_outside_test
+      dirs = with_test_env(false) {Config.instance.send(:source_dirs)}
+
+      assert_equal(1, dirs.size, dirs.inspect)
+      assert_not_include(dirs.first, 'test/sources')
+    end
+
     private
+
+    # ⚠ 元の `Method` を保存して戻す（`remove_method` だと本物ごと消える）。
+    def with_test_env(value)
+      original = Environment.method(:test?)
+      Environment.define_singleton_method(:test?) {value}
+      return yield
+    ensure
+      Environment.define_singleton_method(:test?, original)
+    end
 
     def write_sources(count)
       count.times do |i|

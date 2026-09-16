@@ -46,15 +46,36 @@ module TomatoShrieker
       return super
     end
 
-    # `config/sources/*.yaml` を読んで配列にする。⚠ self には触らない。
+    # ソース定義を読んで配列にする。⚠ self には触らない。
     def source_entries
-      return suffixes.flat_map do |suffix|
-        Dir.glob(File.join(Environment.dir, 'config/sources', "*#{suffix}")).map do |f|
-          values = YAML.load_file(f)
-          values['id'] ||= File.basename(f, suffix)
-          values
+      return source_dirs.flat_map do |dir|
+        suffixes.flat_map do |suffix|
+          Dir.glob(File.join(dir, "*#{suffix}")).map do |f|
+            values = YAML.load_file(f)
+            values['id'] ||= File.basename(f, suffix)
+            values
+          end
         end
       end
+    end
+
+    # 🔴 **テスト時だけ `test/sources/` も読む (#1593)。**
+    #
+    # ⚠⚠ `config/sources/` は **git 管理外**（`.gitignore` が `*`）なので、**CI には
+    # ソース定義が 1 件も無い**。その状態では `Source.all do |source| ... end` の形の
+    # テストは**ブロックが 1 度も回らず、何も確かめずに緑になる**
+    # ＝ **失敗しないのではなく、実行されていない**。⚠ 実測で CI の assertion は
+    # 手元の 56%（643 / 1142）しかなかった。
+    #
+    # ⚠ **`config/sources/` を git 管理に変える案は採らない。**あれは運用ホスト上の
+    # 実物で、資格情報が入る。**テスト専用の定義を別ディレクトリに置く。**
+    #
+    # ⚠ `Environment.test?` は `ENV['TEST']` の有無で、これを立てるのは `TestCase.load`
+    # だけ。本番・開発の実行では読まれない。
+    def source_dirs
+      dirs = [File.join(Environment.dir, 'config/sources')]
+      dirs.push(File.join(Environment.dir, 'test/sources')) if Environment.test?
+      return dirs
     end
 
     # Ginseng::Config の `alias reload load` は親の load を束縛するため、

@@ -1,0 +1,13 @@
+# LINE 宛先を持つテスト専用ソース (#1520 / #1593)
+# ⚠ 資格情報は書かない（上と同じ理由）。
+test: true
+source:
+  feed: https://feed.example.test/line.rss
+schedule:
+  every: 1d
+dest:
+  line:
+    user_id: dummy-user-id
+    token: dummy-token-not-a-credential
+  tags:
+    - test

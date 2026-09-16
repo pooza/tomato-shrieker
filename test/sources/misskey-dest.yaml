@@ -1,0 +1,14 @@
+# Misskey 宛先を持つテスト専用ソース (#1520 / #1593)
+# ⚠ 資格情報は書かない。Environment.test? の間は Source#deliver が配信を
+#    スキップするので、トークンは「形として存在する」だけでよい。
+test: true
+source:
+  feed: https://feed.example.test/misskey.rss
+schedule:
+  every: 1d
+dest:
+  misskey:
+    url: https://misskey.example.test
+    token: dummy-token-not-a-credential
+  tags:
+    - test
