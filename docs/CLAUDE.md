@@ -573,10 +573,29 @@ HTTP(s) Monitor:
 
 - `config/application.yaml` — デフォルト設定
 - `config/local.yaml` — ローカル上書き（git 管理外）
-- `config/sources/*.yaml` — ソース定義（動的読み込み）
+- `config/sources/*.yaml` — ソース定義（動的読み込み）。⚠ **git 管理外**（運用ホスト上の実物・資格情報が入る）
+- `test/sources/*.yaml` — **テスト専用のソース定義**。⚠ **`Environment.test?` の間だけ読む (#1593)**
 - `config/schema/base.yaml` — JSON Schema によるバリデーション
 
 設定アクセスは Ginseng のスラッシュ記法: `config['/path/to/key']`
+
+### テスト専用のソース定義 `test/sources/` (#1593)
+
+🔴 **`config/sources/` は git 管理外なので、CI にはソース定義が 1 件も無い。**その状態では
+`Source.all do |source| ... end` の形のテストは**ブロックが 1 度も回らず、何も確かめずに緑になる**
+＝ ⚠⚠ **失敗しないのではなく、実行されていない。**実測で CI の assertion は手元の **56%**
+（643 / 1142）しかなかった。
+
+- ⚠ **`config/sources/` を git 管理に変えてはいけない。**運用ホスト上の実物で、資格情報が入る
+- ⚠ **`test/sources/` に本物の資格情報を書かない。**`Environment.test?` の間は
+  `Source#deliver` が配信をスキップする（テンプレートだけ描画する）ので、トークンは
+  **「形として存在する」だけでよい**
+- ⚠ **Nostr 宛先は置いていない。**docs が「動作保証の対象外」としており、**秘密鍵を
+  リポジトリに置きたくない**ため。`NostrShriekerTest` は omission のままが正
+- 📌 **読み込みは `Config#source_dirs`。**`ENV['TEST']` を立てるのは `TestCase.load` だけなので、
+  本番・開発の実行では読まれない（`rake config:lint` や `bin/shrieker` でも読まれない）
+- 🔴 **この仕掛けが外れても「落ちない」ので、保証そのものにテストがある**
+  （`ConfigTest#test_test_sources_are_loaded` / `#test_test_sources_are_not_loaded_outside_test`）
 
 ### Schema 設計の指針 (required の意味論)
 

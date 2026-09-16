@@ -1,0 +1,11 @@
+# Webhook 宛先を持つテスト専用ソース (#1593)
+test: true
+source:
+  feed: https://feed.example.test/webhook.rss
+schedule:
+  every: 1d
+dest:
+  hooks:
+    - https://hook.example.test/endpoint
+  tags:
+    - test
