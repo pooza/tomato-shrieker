@@ -32,6 +32,50 @@ module TomatoShrieker
     end
   end
 
+  # 🔴 **#1468 の Codex P2: 汎用の `source/feed` を持つソースも塞がること。**
+  #
+  # ⚠⚠ サービス別のパターン（YouTube / GitHub / Google ニュース / ical）だけでは
+  # **どこを指しているか分からない汎用ソースが漏れる**。`config/sources` は git 管理外で
+  # **開発機ごとに中身が違う**ので、漏れると**その開発機でだけ `rake test` が落ちる**。
+  class WebMockGenericFeedTest < TestCase
+    FIXTURE_ID = '__test_webmock_generic__'.freeze
+    FEED_URL = 'https://generic.example.org/path/to/rss'.freeze
+
+    # teardown は異常終了で走らない。⚠ `config/sources/.gitignore` が `*` なので
+    # 取り残しは git status にも出ず、次のスケジューラ起動で偽ソースとして登録される。
+    at_exit do
+      FileUtils.rm_f(File.join(Environment.dir, 'config/sources', "#{FIXTURE_ID}.yaml"))
+    end
+
+    def test_generic_feed_source_is_stubbed
+      write_fixture
+      config.reload
+      # ⚠ setup の時点ではまだ存在しないソースなので、張り直してから確かめる。
+      stub_default_feeds
+
+      body = Net::HTTP.get(URI.parse(FEED_URL))
+
+      assert_include(body, '<rss')
+      assert_include(body, '<item>')
+    ensure
+      FileUtils.rm_f(path)
+    end
+
+    private
+
+    def path
+      return File.join(Environment.dir, 'config/sources', "#{FIXTURE_ID}.yaml")
+    end
+
+    def write_fixture
+      File.write(path, YAML.dump(
+        'source' => {'feed' => FEED_URL},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+    end
+  end
+
   # 🔴🔴 **サブクラスが `def setup` を書いても保護が外れないこと (#1468)。**
   #
   # ⚠⚠ 共通処理を `def setup` に置くと、**サブクラスが `setup` を定義して `super` を
