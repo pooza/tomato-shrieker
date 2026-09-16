@@ -109,10 +109,22 @@ module TomatoShrieker
       # 他のソースでは無視される設定なので、ここで NG にすると上と同じ食い違いになる。
       def remind_scheduled?(params)
         return false unless params.dig('schedule', 'remind', 'enable') == true
+        return matched_classes(params).any? {|klass| klass.method_defined?(:remind)}
+      end
+
+      # `Source.all` と同じ選び方。⚠ **判別キーは `/source/classes` が正本**なので、
+      # クラス名をここへ書き写さない。
+      def matched_classes(params)
         flat = params.key_flatten
-        return Source.classes.any? do |entry|
-          flat[entry[:config]] && entry[:class].method_defined?(:remind)
-        end
+        return Source.classes.select {|entry| flat[entry[:config]]}.map {|entry| entry[:class]}
+      end
+
+      # 🔴 **実体を作って `cron` / `period` を聞く (#1587)。**⚠⚠ params を直接読むと
+      # **`schedule` を省いた定義の既定（`Source#default_period` = `5m` /
+      # `IcalendarSource#default_cron` = `0 0 * * *`）を見落とす**。`register` が使うのと
+      # 同じアクセサを通せば、既定も優先順（`at` > `cron` > `every`）もそのまま効く。
+      def matched_sources(params)
+        return matched_classes(params).map {|klass| klass.new(params)}
       end
 
       # ⚠ **型違いはスキーマの担当。**ここで拾うと、同じ 1 つの誤りが
@@ -141,33 +153,50 @@ module TomatoShrieker
       def unreachable_streak_warnings(params)
         threshold = params.dig('monitor', 'error_streak_threshold')
         return [] unless threshold.is_a?(Numeric) && threshold.to_i > 1
-        return [] unless seconds = schedule_interval_seconds(params)
-        days = (threshold.to_i * seconds / 86_400.0).ceil
+        threshold = threshold.to_i
         retention = Config.instance['/monitor/retention_days']
-        return [] if days <= retention
+        runs = runs_within_retention(params, retention, threshold)
+        return [] if runs.nil? || runs >= threshold
         return [
-          "/monitor/error_streak_threshold (#{threshold.to_i}) に到達するには約 #{days} 日ぶんの" \
-            " run が必要ですが、/monitor/retention_days は #{retention} 日です。" \
-            'prune で先に消えるため、連続して失敗しても 503 になりません',
+          "/monitor/error_streak_threshold (#{threshold}) に到達するには run が #{threshold} 回" \
+            " 必要ですが、/monitor/retention_days (#{retention} 日) の間に発火するのは" \
+            " #{runs} 回だけです。prune で先に消えるため、連続して失敗しても 503 になりません",
         ]
       end
 
-      # 2 回続けて発火する間隔。⚠ **`at` のソースはここへ来ない**（呼び出し側で除外済み）。
+      # retention の窓に何回発火するか。⚠ `threshold` に届いた時点で打ち切る
+      # （`* * * * *` に大きなしきい値を置かれても走査が伸びない）。
+      #
+      # 🔴 **回数を実際に数える（Codex P2・#1587）。**⚠⚠ 以前は「次の 2 回の間隔」を
+      # 全体へ引き伸ばしていたので、**平日限定 cron のような不均一な指定で所要日数を
+      # 過小評価した**。しかも **`source validate` を叩いた曜日で結果が変わる**
+      # （月曜なら 1 日刻み、金曜なら 3 日刻み）。
       #
       # ⚠ 壊れた cron / period は nil を返す。**警告を出す処理が例外で倒れて
       # `source validate` 全体を止めるほうが害が大きい**し、書式そのものの誤りは
-      # スキーマと起動時の register が別に捕まえる。
-      def schedule_interval_seconds(params)
-        schedule = params['schedule']
-        return nil unless schedule
-        if (cron = schedule['cron'])
-          first = Rufus::Scheduler.parse(cron).next_time(Time.now).to_t
-          return Rufus::Scheduler.parse(cron).next_time(first).to_t - first
-        end
-        return Rufus::Scheduler.parse(schedule['every']).to_i if schedule['every']
-        return nil
+      # `schedule_errors` と起動時の register が別に捕まえる。
+      def runs_within_retention(params, retention, limit)
+        return nil unless source = matched_sources(params).first
+        return nil if source.post_at
+        deadline = Time.now + (retention * 86_400)
+        return count_cron_runs(source.cron, deadline, limit) if source.cron
+        return nil unless period = source.period
+        return nil unless (seconds = Rufus::Scheduler.parse_duration(period)).positive?
+        return [((deadline - Time.now) / seconds).floor, limit].min
       rescue StandardError
         return nil
+      end
+
+      def count_cron_runs(cron, deadline, limit)
+        parsed = Rufus::Scheduler.parse_cron(cron)
+        at = Time.now
+        count = 0
+        while count < limit
+          at = parsed.next_time(at).to_t
+          break if at > deadline
+          count += 1
+        end
+        return count
       end
     end
   end
