@@ -300,6 +300,59 @@ module TomatoShrieker
       ))
     end
 
+    # 🔴 **#1587 (Codex P2): 不均一な cron は「次の 2 回の間隔」で外挿できない。**
+    #
+    # `0 0 * * 1-5`（平日のみ）は retention 14 日の窓に **10 回**しか発火しないので、
+    # しきい値 12 には到達できない。⚠ 旧実装は**隣り合う 2 回の間隔**（月曜に叩けば
+    # 1 日）を全体へ引き伸ばしていたので、12 日 ≦ 14 日 と読んで見逃した。
+    #
+    # ⚠⚠ **`source validate` を叩いた曜日で結果が変わってはいけない。**月曜と金曜の
+    # 両方で固定して、どちらでも同じ結論になることまで見る（旧実装は金曜だと
+    # 3 日刻みと読むので警告が出た＝**同じ設定なのに曜日で答えが違った**）。
+    def test_warnings_count_actual_cron_occurrences_regardless_of_weekday
+      weekday_cron = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '0 0 * * 1-5'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 12},
+      }
+
+      # 2026-09-14 は月曜 / 2026-09-18 は金曜
+      ['2026-09-14 12:00:00', '2026-09-18 12:00:00'].each do |at|
+        warnings = with_time_frozen(Time.parse(at)) {SourceValidator.warnings(weekday_cron)}
+
+        assert_equal(1, warnings.size, "#{at} で結論が変わっている")
+        assert_match(/error_streak_threshold/, warnings.first)
+        assert_match(/10 回だけ/, warnings.first, warnings.first)
+      end
+    end
+
+    # 🔴 **#1587 (Codex P1): `schedule` を省いても実行時には既定で走る。**
+    #
+    # ⚠⚠ `IcalendarSource#default_cron` は `0 0 * * *`（日次）。旧実装は `schedule` が
+    # 無いと検査ごと飛ばしていたので、**retention に収まらないしきい値を素通し**した。
+    def test_warnings_use_default_cron_when_schedule_is_omitted
+      retention = Config.instance['/monitor/retention_days']
+      warnings = SourceValidator.warnings(
+        'source' => {'ical' => 'https://example.com/c.ics'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => retention + 1},
+      )
+
+      assert_equal(1, warnings.size, '既定 cron (0 0 * * *) が見えていない')
+      assert_match(/error_streak_threshold/, warnings.first)
+    end
+
+    # ⚠ 一方 `Source#default_period` は `5m` なので、こちらは大きめのしきい値でも収まる。
+    # **既定を見るようにしたせいで過剰に警告しない**ことまで押さえる。
+    def test_warnings_use_default_period_when_schedule_is_omitted
+      assert_empty(SourceValidator.warnings(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 100},
+      ))
+    end
+
     # 15 分間隔ならしきい値を大きくしても収まる（本番の YouTube 系がこれ）
     def test_warnings_frequent_source_tolerates_large_threshold
       source = {
@@ -339,6 +392,18 @@ module TomatoShrieker
       assert_empty(SourceValidator.warnings(
         base.merge('schedule' => {'at' => '2026-01-01T00:00:00+09:00'}),
       ))
+    end
+
+    private
+
+    # ⚠ **元の `Method` を保存して戻す。**`remove_method` で戻すと本物ごと消える
+    # （`Time.now` は singleton class に生えている）＝ `with_sentry_stub` と同じ形。
+    def with_time_frozen(time)
+      original = Time.method(:now)
+      Time.define_singleton_method(:now) {time}
+      return yield
+    ensure
+      Time.define_singleton_method(:now, original)
     end
   end
 end
