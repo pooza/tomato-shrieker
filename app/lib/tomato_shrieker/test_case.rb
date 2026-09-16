@@ -5,6 +5,16 @@ module TomatoShrieker
     include Package
     include WebMock::API
 
+    # ソースの種類ごとに返すフィクスチャ。⚠ 判定はクラス名の文字列ではなく実体の `is_a?`
+    # （サブクラスも拾う）。
+    FEED_FIXTURES = {
+      'YouTubeChannelSource' => 'youtube.xml',
+      'GoogleNewsSource' => 'google_news.rss',
+      'GitHubRepositorySource' => 'github.atom',
+      'IcalendarSource' => 'calendar.ics',
+    }.freeze
+    DEFAULT_FEED_FIXTURE = 'feed.rss'.freeze
+
     # 🔴 **`require` だけでは有効にならない (#1468)。**`WebMock.enable!` を呼ぶまで
     # `stub_request` も `disable_net_connect!` も**無言で素通りする**。⚠⚠ 書いたつもりで
     # 書けていない状態と、そもそも書いていない状態が、テスト結果から区別できない。
@@ -29,6 +39,13 @@ module TomatoShrieker
     # ⚠ テスト側で `stub_request` を書けば**後勝ちで上書きできる**
     # （WebMock は最後に登録した stub から見る）。
     def stub_default_feeds
+      stub_known_services
+      stub_configured_sources
+    end
+
+    # ⚠ **手元の `config/sources/*.yaml` は実サービスを指している**（GitHub / YouTube /
+    # Google カレンダー / google-news-rss-cleaner）。種類ごとにパターンで塞ぐ。
+    def stub_known_services
       stub_request(:get, %r{//www\.youtube\.com/feeds/videos\.xml})
         .to_return(status: 200, body: fixture('youtube.xml'))
       stub_request(:get, %r{//github\.com/.+\.atom})
@@ -39,6 +56,45 @@ module TomatoShrieker
         .to_return(status: 200, body: fixture('google_news.rss'))
       stub_request(:get, /\.ics(\?|\z)/)
         .to_return(status: 200, body: calendar_fixture)
+    end
+
+    # 🔴 **設定済みソースの「実際の取得先」を 1 件ずつ塞ぐ（#1468 の Codex P2）。**
+    #
+    # ⚠⚠ サービス別のパターンだけでは、**汎用の `source/feed` や `source/url` を持つ
+    # ソースが漏れる**。`config/sources` は git 管理外で開発機ごとに中身が違うので、
+    # **「どんな URL が入っていても塞がる」ようにしておかないと、その開発機でだけ
+    # `rake test` が落ちる**。
+    #
+    # ⚠ 上のパターンより**後に**登録する（WebMock は後勝ち）＝ より具体的なこちらが勝つ。
+    # ⚠ 1 件の失敗で全体を止めない。`uri` は設定次第で nil も例外もありうる。
+    def stub_configured_sources
+      Source.all do |source|
+        stub_source_feed(source)
+      rescue StandardError
+        next
+      end
+    rescue StandardError
+      nil
+    end
+
+    def stub_source_feed(source)
+      return unless source.respond_to?(:uri)
+      return unless uri = source.uri
+      # ⚠ `IcalendarSource#uri` は毎回 `?t=<時刻>` を付けるので、クエリを落として前方一致。
+      base = uri.to_s.sub(/\?.*\z/, '')
+      return if base.empty?
+      # ⚠⚠ **本文を先に組んでから登録する。**`stub_request(...).to_return(...)` の順だと、
+      # 本文の組み立てで例外が出たときに**「応答を定義していない stub」だけが残り、
+      # 空ボディの 200 を返す**（＝ パーサが「No valid parser for XML」で落ちる）。
+      # 呼び出し側の `rescue` が握るので、**気付けないまま全件が空になる**。
+      body = feed_fixture_for(source)
+      stub_request(:get, /\A#{Regexp.escape(base)}/).to_return(status: 200, body:)
+    end
+
+    def feed_fixture_for(source)
+      name = FEED_FIXTURES.find {|klass, _| source.is_a?(TomatoShrieker.const_get(klass))}&.last
+      return calendar_fixture if name == 'calendar.ics'
+      return fixture(name || DEFAULT_FEED_FIXTURE)
     end
 
     def fixture(name)
