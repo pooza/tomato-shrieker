@@ -11,12 +11,6 @@ module TomatoShrieker
 
     SCHEMA_FILE = 'config/schema/source.yaml'
 
-    # `Source#register` が rufus へ渡すキーと、起動時に実際に通るパーサの対応 (#1570)。
-    # ⚠ **総称の `Rufus::Scheduler.parse` を使ってはいけない。**cron 文字列を渡しても
-    # `Fugit::Cron` として通ってしまうので、`every: '0 0 * * *'` のような**キーと値の
-    # 取り違えを見逃す**。`register` と同じ分岐・同じパーサで引くこと。
-    SCHEDULE_PARSERS = {'at' => :parse_at, 'cron' => :parse_cron, 'every' => :parse_duration}.freeze
-
     # ⚠ `IcalendarSource#remind_minutes` の既定と同じ値。ずれると「省略時は倒れないのに
     # 明示すると倒れる」（またはその逆）になる。
     DEFAULT_REMIND_MINUTES = 5
@@ -121,7 +115,7 @@ module TomatoShrieker
       # `Source#schedule_spec` が `register` と同じアクセサで持っているので、ここへ書き写さない。
       def main_schedule_error(source)
         spec = source.schedule_spec
-        return schedule_error(spec[:value], spec[:type], SCHEDULE_PARSERS[spec[:type]])
+        return schedule_error(spec[:value], spec[:type])
       end
 
       # 🔴 **remind は本体のスケジュールと別に立つ（#1570 の Codex P1）。**
@@ -137,11 +131,7 @@ module TomatoShrieker
         # ⚠⚠ **型で弾かず、`schedule_remind` と同じ `"#{minutes}m"` を組んで引く（レビュー黄 0）。**
         # 型違いはスキーマの担当だが、**`source reload` は意図的にスキーマを見ない**ので、
         # 文字列の `'0'` を見送ると**誰も見ないまま起動だけが倒れる**。
-        spec = "#{minutes}m"
-        return nil if Rufus::Scheduler.parse_duration(spec).positive?
-        return "/schedule/remind/minutes: cannot schedule with a frequency of #{minutes} (#{spec})"
-      rescue StandardError => e
-        return "/schedule/remind/minutes: #{e.message}"
+        return schedule_error("#{minutes}m", 'every', label: '/schedule/remind/minutes')
       end
 
       # ⚠ **remind ジョブを立てるクラスにマッチする定義だけを見る。**`schedule.remind` は
@@ -172,19 +162,31 @@ module TomatoShrieker
         return "/source: no source class matched (#{keys.join(' / ')} のいずれかが必要です)"
       end
 
-      # ⚠ **型違いはスキーマの担当。**ここで拾うと、同じ 1 つの誤りが
-      # 「type が string でない」と「パースできない」の 2 通りで出る。
+      # 🔴 **`register` と同じ rufus の入口（`at` / `cron` / `every`）へ実際に通す（#1598 の Codex P1）。**
       #
-      # 🔴 **`every` はパースできても 0 以下なら倒れる（4.10.0 リリース前レビュー）。**
-      # `parse_duration('0s')` は例外を投げず 0 を返すだけだが、`scheduler.every` は
-      # `cannot schedule ... with a frequency of 0` で倒れる＝ `remind_error` と同じ穴。
-      def schedule_error(value, key, parser)
-        return nil unless value.is_a?(String)
-        parsed = Rufus::Scheduler.public_send(parser, value)
-        return nil unless key == 'every' && !parsed.positive?
-        return "/schedule/every: cannot schedule with a frequency of #{parsed} (#{value})"
+      # ⚠⚠ 以前はキーごとのパーサ（`parse_at` / `parse_cron` / `parse_duration`）を呼び、
+      # 文字列以外は「型違いはスキーマの担当」として見送っていた。**`source reload` は
+      # スキーマを見ない**ので、`every: 0`（YAML では数値）や `cron: 42` は誰も見ないまま
+      # 起動だけが倒れていた。しかもパーサだけでは入口の検査に届かない:
+      # - `parse_duration('0s')` は 0 を返すだけで、`every` の「頻度 0 以下」は弾かない
+      # - `every` は scheduler の frequency（既定 0.3 秒）より細かい指定も倒れる
+      # - `at` に数値を渡すと scheduler は `InJob` を立てる（`AtJob` の検査とは別の道）
+      # → **分岐を書き写さず、同じ入口に通して立ったジョブをすぐ消す。**
+      # ⚠ 総称の `Rufus::Scheduler.parse` を使ってはいけない（cron 文字列を `every` に
+      # 書いた取り違えを見逃す）。キーの名前のメソッドを呼ぶこと。
+      def schedule_error(value, key, label: "/schedule/#{key}")
+        job = validation_scheduler.public_send(key, value, job: true) {nil}
+        job&.unschedule
+        return nil
       rescue StandardError => e
-        return "/schedule/#{key}: #{e.message}"
+        return "#{label}: #{e.message}"
+      end
+
+      # ⚠ **検査専用の scheduler。**`Scheduler.instance` を使うと、daemon の中から呼ばれたときに
+      # 本物のジョブ表へ一瞬でも混ざる。
+      def validation_scheduler
+        @validation_scheduler ||= Rufus::Scheduler.new
+        return @validation_scheduler
       end
 
       # 🔴 **しきい値に到達できない組み合わせを弾く（Codex P1・#1558）。**
