@@ -244,9 +244,21 @@ module TomatoShrieker
       ))
     end
 
-    # ⚠ 型違いはスキーマの担当。同じ誤りを 2 通りのメッセージで出さない。
-    def test_schedule_type_error_left_to_schema
-      assert_empty(schedule_errors('schedule' => {'cron' => 42}))
+    # 🔴 **#1598 の Codex P1: 型違いでも起動が倒れるなら拾うこと。**
+    #
+    # ⚠⚠ 以前は「型違いはスキーマの担当」として見送っていたが、**`source reload` は
+    # スキーマを見ない**。YAML の `every: 0` は数値になり、`scheduler.every(0)` は倒れる。
+    # 一方 `every: 300`（数値の秒）や `at` の時刻オブジェクトは起動できるので拾わない。
+    def test_non_string_schedule_follows_scheduler
+      [{'every' => 0}, {'every' => -5}, {'cron' => 42}, {'every' => 0.1}].each do |schedule|
+        errors = schedule_errors('schedule' => schedule)
+
+        assert_true(errors.any? {|v| v.start_with?("/schedule/#{schedule.keys.first}:")},
+          "#{schedule}: #{errors}")
+      end
+      [{'every' => 300}, {'at' => Time.now + 86_400}].each do |schedule|
+        assert_empty(schedule_errors('schedule' => schedule), schedule.to_s)
+      end
     end
 
     def test_missing_required
