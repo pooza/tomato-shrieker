@@ -21,6 +21,10 @@ module TomatoShrieker
     # 明示すると倒れる」（またはその逆）になる。
     DEFAULT_REMIND_MINUTES = 5
 
+    # しきい値への到達性を見るとき、何日先までの発火を並べるか。⚠ 年次の cron でも
+    # 1 周期ぶんが入るように 1 年強を取る。
+    WINDOW_HORIZON_DAYS = 366
+
     class << self
       def schema
         @schema ||= YAML.load_file(File.join(Environment.dir, SCHEMA_FILE))
@@ -200,44 +204,74 @@ module TomatoShrieker
         return [] if runs.nil? || runs >= threshold
         return [
           "/monitor/error_streak_threshold (#{threshold}) に到達するには run が #{threshold} 回" \
-            " 必要ですが、/monitor/retention_days (#{retention} 日) の間に発火するのは" \
-            " #{runs} 回だけです。prune で先に消えるため、連続して失敗しても 503 になりません",
+            "必要ですが、/monitor/retention_days (#{retention} 日) のどの窓でも発火は" \
+            "最大 #{runs} 回だけです。prune で先に消えるため、連続して失敗しても 503 になりません",
         ]
       end
 
-      # retention の窓に何回発火するか。⚠ `threshold` に届いた時点で打ち切る
+      # retention 幅の窓に**最大で**何回発火するか。⚠ `limit` に届いた時点で打ち切る
       # （`* * * * *` に大きなしきい値を置かれても走査が伸びない）。
       #
       # 🔴 **回数を実際に数える（Codex P2・#1587）。**⚠⚠ 以前は「次の 2 回の間隔」を
       # 全体へ引き伸ばしていたので、**平日限定 cron のような不均一な指定で所要日数を
-      # 過小評価した**。しかも **`source validate` を叩いた曜日で結果が変わる**
-      # （月曜なら 1 日刻み、金曜なら 3 日刻み）。
+      # 過小評価した**。しかも **`source validate` を叩いた曜日で結果が変わる**。
+      #
+      # 🔴 **窓の起点を「今」に固定しない（#1594 の Codex P2）。**prune は「今から retention
+      # 日より古い行」を消すだけなので、**どこかの時点で窓に `limit` 回入れば 503 に届く**。
+      # ⚠⚠ `0 0 1,2 * *` にしきい値 2 は、月の半ばに数えると次の 14 日で 0 回だが、
+      # 1 日と 2 日の失敗は同じ窓に入る。→ **1 年ぶんの発火を並べて、窓をずらして最大を取る。**
+      #
+      # 🔴 **マッチした全インスタンスの発火を合わせる（#1594 の Codex P2）。**1 つの定義が
+      # 複数のクラスにマッチすると、scheduler はそのぶんジョブを立て、どれも同じソース ID の
+      # 行を書く。
       #
       # ⚠ 壊れた cron / period は nil を返す。**警告を出す処理が例外で倒れて
       # `source validate` 全体を止めるほうが害が大きい**し、書式そのものの誤りは
-      # `schedule_errors` と起動時の register が別に捕まえる。
+      # `startup_errors` と起動時の register が別に捕まえる。
       def runs_within_retention(params, retention, limit)
-        return nil unless source = matched_sources(params).first
-        return nil if source.post_at
-        deadline = Time.now + (retention * 86_400)
-        return count_cron_runs(source.cron, deadline, limit) if source.cron
-        return nil unless period = source.period
-        return nil unless (seconds = Rufus::Scheduler.parse_duration(period)).positive?
-        return [((deadline - Time.now) / seconds).floor, limit].min
+        streams = matched_sources(params).reject(&:post_at).map {|source| run_times(source)}
+        return nil if streams.empty? || streams.include?(nil)
+        return max_runs_in_window(streams, retention * 86_400, limit)
       rescue StandardError
         return nil
       end
 
-      def count_cron_runs(cron, deadline, limit)
-        parsed = Rufus::Scheduler.parse_cron(cron)
-        at = Time.now
-        count = 0
-        while count < limit
-          at = parsed.next_time(at).to_t
-          break if at > deadline
-          count += 1
+      def run_times(source)
+        if source.cron
+          parsed = Rufus::Scheduler.parse_cron(source.cron)
+          return Enumerator.new do |y|
+            at = Time.now
+            loop {y << (at = parsed.next_time(at).to_t)}
+          end
         end
-        return count
+        return nil unless period = source.period
+        return nil unless (seconds = Rufus::Scheduler.parse_duration(period)).positive?
+        return Enumerator.new do |y|
+          at = Time.now
+          loop {y << (at += seconds)}
+        end
+      end
+
+      # ⚠ 窓は `(t - width, t]`。prune は `executed_at < cutoff` を消すが、日次の cron を
+      # 「14 日で 15 回」と数えるのは境界ちょうどに prune が走る前提になるので、
+      # **境界の行は含めない**（日次 × retention 回が上限）。
+      def max_runs_in_window(streams, width, limit)
+        horizon = Time.now + ((WINDOW_HORIZON_DAYS * 86_400) + width)
+        window = []
+        max = 0
+        while (at = next_run_time(streams)) && at <= horizon
+          window.push(at)
+          window.shift while window.first <= at - width
+          max = [max, window.size].max
+          return limit if limit <= max
+        end
+        return max
+      end
+
+      # 複数の発火列から最も早いものを 1 つ取り出す。
+      def next_run_time(streams)
+        stream = streams.min_by(&:peek)
+        return stream&.next
       end
     end
   end

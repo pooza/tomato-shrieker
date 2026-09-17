@@ -406,6 +406,48 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **#1594 の Codex P2: 窓の起点を「今」に固定しないこと。**
+    #
+    # ⚠⚠ `0 0 1,2 * *` は月の半ばに数えると次の 14 日で 0 回だが、**1 日と 2 日の失敗は
+    # 同じ retention の窓に入る**のでしきい値 2 には届く。叩いた日で結論を変えない。
+    def test_warnings_clustered_cron_is_evaluated_over_any_window
+      clustered = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '0 0 1,2 * *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 2},
+      }
+      unreachable = clustered.merge(
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 3},
+      )
+
+      ['2026-09-15 12:00:00', '2026-09-01 12:00:00'].each do |at|
+        with_time_frozen(Time.parse(at)) do
+          assert_empty(SourceValidator.warnings(clustered), at)
+          warnings = SourceValidator.warnings(unreachable)
+
+          assert_equal(1, warnings.size, at)
+          assert_match(/最大 2 回だけ/, warnings.first)
+        end
+      end
+    end
+
+    # 🔴 **#1594 の Codex P2: 複数のクラスにマッチした定義は、全インスタンスの発火を数える。**
+    #
+    # `source.calendar` と `source.ical` を両方持つ定義は `IcalendarSource` のジョブが
+    # 2 本立ち、どちらも同じソース ID の行を書く＝ 日次でも 14 日で 28 行になる。
+    def test_warnings_count_runs_from_every_matched_source
+      retention = Config.instance['/monitor/retention_days']
+      params = {
+        'source' => {'calendar' => 'https://example.com/a.ics', 'ical' => 'https://example.com/b.ics'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => retention * 2},
+      }
+
+      assert_equal(2, SourceValidator.send(:matched_sources, params).size, '前提: 2 インスタンス')
+      assert_empty(SourceValidator.warnings(params))
+    end
+
     # 🔴 **#1587 (Codex P1): `schedule` を省いても実行時には既定で走る。**
     #
     # ⚠⚠ `IcalendarSource#default_cron` は `0 0 * * *`（日次）。旧実装は `schedule` が
