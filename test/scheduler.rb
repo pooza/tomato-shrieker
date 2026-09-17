@@ -207,6 +207,21 @@ module TomatoShrieker
       assert_equal(job.job_id, jobs(FIXTURE_ID).first.job_id)
     end
 
+    # 🔴 **4.10.0 リリース前レビュー: unmatched は `failed` と同じく Sentry へ出すこと。**
+    # 古いジョブが古い定義のまま走り続けるのに、以前は `logger.info` にしか出なかった。
+    def test_reload_reports_unmatched_to_sentry
+      File.write(fixture_path(FIXTURE_ID), YAML.dump(
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      captured = []
+      with_sentry_stub(captured) {@scheduler.reload}
+
+      assert_equal([FIXTURE_ID], captured.map {|v| v.dig(:tags, :source)})
+      assert_include(captured.first[:error].message, 'no source class matched')
+    end
+
     # ⚠ **本当にファイルを消したときは、これまでどおり削除する。**上の fail safe が
     # 「消しても消えない」に化けていないこと。
     def test_reload_still_removes_deleted_source
@@ -329,6 +344,19 @@ module TomatoShrieker
         'schedule' => {'cron' => cron, 'remind' => {'enable' => true}},
         'dest' => {'hooks' => ["https://example.com/#{ICAL_ID}/hook"]},
       }))
+    end
+
+    # ⚠ 元の Method を保存して差し戻す（`Sentry.initialized?` は Sentry 自身の singleton class に
+    # 生えているので、`remove_method` で戻すと本物ごと消える）。
+    def with_sentry_stub(captured)
+      originals = [:initialized?, :capture_exception].to_h {|name| [name, Sentry.method(name)]}
+      Sentry.define_singleton_method(:initialized?) {true}
+      Sentry.define_singleton_method(:capture_exception) do |error, **options|
+        captured.push({error:}.merge(options))
+      end
+      yield
+    ensure
+      originals&.each {|name, method| Sentry.define_singleton_method(name, method)}
     end
   end
 end
