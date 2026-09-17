@@ -32,7 +32,23 @@ module TomatoShrieker
         params = params.deep_stringify_keys
         errors = JSON::Validator.fully_validate(schema, params)
           .map {|message| message.sub(/ in schema [0-9a-f-]+\z/, '')}
-        return errors.concat(schedule_errors(params))
+        return errors.concat(startup_errors(params))
+      end
+
+      # 🔴 **起動なら倒れる定義の指摘を全部返す（4.10.0 リリース前レビュー）。**
+      # `source validate` と `source reload` の拒否が**同じこの 1 本**を見る。
+      #
+      # ⚠⚠ **判別キーの不一致（unmatched）もここで見る。**スキーマの `source` は
+      # `minProperties: 1` しか要求しないので `source: {keyword: ...}` も通るが、
+      # `register_all` は `no source class matched` で倒れる (#1572)。
+      # 以前は reload の拒否が `Source.all` を回していたので、**定義上 `Source.all` に
+      # 現れない unmatched を原理的に検査できず**、reload は通るのに次の再起動で
+      # 全ソースが止まる形になっていた。
+      def startup_errors(params)
+        params = params.deep_stringify_keys
+        return [] if params['disable'] == true
+        return [unmatched_error] unless Source.matched?(params)
+        return schedule_errors(params)
       end
 
       # 🔴 **起動なら倒れる schedule を、起動と同じパーサで先に弾く (#1570)。**
@@ -127,12 +143,22 @@ module TomatoShrieker
         return matched_classes(params).map {|klass| klass.new(params)}
       end
 
+      def unmatched_error
+        keys = Source.classes.map {|v| v[:config].delete_prefix('/')}
+        return "/source: no source class matched (#{keys.join(' / ')} のいずれかが必要です)"
+      end
+
       # ⚠ **型違いはスキーマの担当。**ここで拾うと、同じ 1 つの誤りが
       # 「type が string でない」と「パースできない」の 2 通りで出る。
+      #
+      # 🔴 **`every` はパースできても 0 以下なら倒れる（4.10.0 リリース前レビュー）。**
+      # `parse_duration('0s')` は例外を投げず 0 を返すだけだが、`scheduler.every` は
+      # `cannot schedule ... with a frequency of 0` で倒れる＝ `remind_error` と同じ穴。
       def schedule_error(value, key, parser)
         return nil unless value.is_a?(String)
-        Rufus::Scheduler.public_send(parser, value)
-        return nil
+        parsed = Rufus::Scheduler.public_send(parser, value)
+        return nil unless key == 'every' && !parsed.positive?
+        return "/schedule/every: cannot schedule with a frequency of #{parsed} (#{value})"
       rescue StandardError => e
         return "/schedule/#{key}: #{e.message}"
       end

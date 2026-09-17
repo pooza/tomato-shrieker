@@ -186,12 +186,14 @@ bin/shrieker source reload
 - ⚠ **実行中の run は殺さない。**`unschedule` は以後の発火を止めるだけなので、**進行中の run は古い定義のまま完走する**
 - 🔴 **起動は fail closed、reload は fail safe。**起動時に 1 件でも `register` に失敗したら**起動しない**（`Ginseng::ConfigError`）。⚠ ここで飛ばすと**そのソースは二度と登録されないのに daemon は正常に見える**（総合 `/healthz` は無タグの maintenance ジョブがあれば通る）。倒しておけば systemd の `Restart=always` が 5 秒後に再試行する。⚠ **一方 reload では倒さない。**稼働中の daemon を「誰かが YAML を打ち間違えた」で落とす理由は無い
 - 🔴 **新しいジョブを立ててから古いジョブを落とす。**`register` は失敗しうる（`CommandSource` は `bundle install` を走らせるし、reload はスキーマ検証をしないので**不正な cron 式**もここへ来る）。先に消すと、**失敗したソースが次の reload までジョブ 1 本無いまま放置される**。⚠ **失敗した id は registry を更新しない**ので、定義を直せば次の reload で必ず張り直る。⚠ 1 ソースの失敗は他のソースの反映を止めない（ログの `failed` に出る）
-- 🔴 **「ファイルを消した」と「ファイルは在るが壊れている」で挙動を分ける (#1572)。**判別キー（`source/feed` 等）を打ち間違えると `Source.all` がその定義を**1 件も yield しない**ので、素直に読むと `desired_sources` から消えて **`removed` として unschedule される**＝ typo が静かな停止に化ける。⚠ `Source.unmatched_ids` で拾い、**reload では古いジョブを残して `unmatched` に出す**（fail safe）。🔴 **起動は倒す**（`no source class matched: <id>`）＝ 定義は在るのに永久に走らないまま daemon が正常に見えるのを防ぐ
+- 🔴 **「ファイルを消した」と「ファイルは在るが壊れている」で挙動を分ける (#1572)。**判別キー（`source/feed` 等）を打ち間違えると `Source.all` がその定義を**1 件も yield しない**ので、素直に読むと `desired_sources` から消えて **`removed` として unschedule される**＝ typo が静かな停止に化ける。⚠ `Source.unmatched_ids` で拾い、**reload では古いジョブを残して `unmatched` に出す**（fail safe）。🔴 **起動は倒す**（`no source class matched: <id>`）＝ 定義は在るのに永久に走らないまま daemon が正常に見えるのを防ぐ。⚠ **`disable: true` の定義は unmatched に数えない**（止めた定義で起動を倒さない・reload では削除として扱う）
 - ⚠ **`digest` は group の全要素をハッシュする (#1571)。**⚠⚠ 先頭だけを見ていると、**同じ id の定義が 2 つある状態で片方を消す / `disable` しても digest が変わらず**、消したほうのジョブが走り続ける（`changed` / `removed` にも出ないので運用者は「反映済み」と読む）。⚠ 重複を作れる入口も塞いである＝ **`source add` は `.yml` / `.yaml` の両方を見る**
 - 🔴 **壊れた定義を掴んだら何も変えない。**`Config#load` は読み切ってから 1 回で差し替える（#1530）ので、YAML が 1 つでも壊れていれば例外だけが上がり、**ジョブも設定も前のまま**走り続ける
 - ⚠ **daemon 側の reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
-- 🔴 **ただし CLI の `source reload` は、起動なら倒れる定義が残っているうちは HUP を送らない (#1570)。**⚠⚠ **止めるのは `schedule` のパース失敗だけ**（`at` / `cron` / `every` を `Rufus::Scheduler` の**それぞれのパーサ**で引く）。**スキーマ違反では止めない** — 起動はスキーマを見ないので、そこで止めると上の「起動はできるのに reload は拒否される」を自分で作ることになる
-  - ⚠ **逃げ道は `disable: true`。**止めたソースは `desired_sources` が弾く＝起動は倒れないので検査対象外。**直せないなら止めれば reload は通る**
+- 🔴 **ただし CLI の `source reload` は、起動なら倒れる定義が残っているうちは HUP を送らない (#1570)。**⚠⚠ **止めるのは起動が実際に倒れるものだけ＝ `schedule` のパース失敗（`at` / `cron` / `every` を `Rufus::Scheduler` の**それぞれのパーサ**で引く・`every` は 0 以下も）と、判別キーがどのソースクラスにも一致しない定義（unmatched）**。判定は `SourceValidator.startup_errors` の 1 本で、`source validate` も同じものを NG にする。**スキーマ違反では止めない** — 起動はスキーマを見ないので、そこで止めると上の「起動はできるのに reload は拒否される」を自分で作ることになる
+  - ⚠ **逃げ道は `disable: true`。**止めたソースは `desired_sources` が弾く＝起動は倒れないので検査対象外。**直せないなら止めれば reload は通る**（unmatched でも同じ）
+  - 🔴 **`Source.all` を回して検査してはいけない。**unmatched な定義は定義上 `Source.all` に現れないので、**reload は通るのに次の起動で全ソースが止まる**（4.10.0 のリリース前レビューで検出）。`/sources` の生の定義を見る
+  - ⚠ **スキーマの `source` は `minProperties: 1` しか見ない**ので、`source: {keyword: ...}` / `source: {news: {}}` のような unmatched 形もスキーマは通る。判別キーの検査はスキーマではなく `startup_errors` の担当
   - ⚠ **スキーマの `pattern` では解けない**（完全な cron 正規表現は書けない）ので、`Source#register` が渡す先と同じパーサを直接呼んでいる。⚠ **総称の `Rufus::Scheduler.parse` は使わない** — cron 文字列も通るので `every: '0 0 * * *'` のような取り違えを見逃す
   - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**daemon 側へ結果を出す話は #1529
 

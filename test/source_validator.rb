@@ -64,6 +64,49 @@ module TomatoShrieker
       assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, errors.inspect)
     end
 
+    # 🔴 **4.10.0 リリース前レビュー 赤 C: 頻度 0 の `every` を NG にすること。**
+    #
+    # ⚠⚠ `parse_duration` は `'0s'` / `'0'` / `'0m'` で例外を投げず 0 を返すだけなので、
+    # パースの成否だけを見ると素通りする。`scheduler.every` は
+    # `cannot schedule ... with a frequency of 0` で倒れる＝ 2026-09-05 と同じ形の全停止。
+    def test_zero_every_is_ng
+      ['0s', '0', '0m', '-5m'].each do |value|
+        errors = SourceValidator.schedule_errors('schedule' => {'every' => value})
+
+        assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, "#{value}: #{errors.inspect}")
+      end
+    end
+
+    # 🔴 **赤 A: 判別キーがどのソースクラスにも一致しない定義を NG にすること。**
+    #
+    # ⚠ スキーマの `source` は `minProperties: 1` しか見ないので、`keyword` のような
+    # 未知のキーも通る。以前の `validate` は WARN どまりで、`register_all` だけが倒れた。
+    def test_unmatched_source_is_ng
+      sources = [
+        {'keyword' => 'プリキュア'},
+        {'github' => {'timeline' => 'releases'}},
+        {'news' => {}},
+        {'feeed' => 'https://example.com/feed'},
+      ]
+      sources.each do |source|
+        errors = SourceValidator.validate(
+          'source' => source,
+          'dest' => {'hooks' => ['https://example.com/x']},
+        )
+
+        assert_true(errors.any? {|v| v.start_with?('/source: no source class matched')},
+          "#{source}: #{errors.inspect}")
+      end
+    end
+
+    # 🔴 **赤 B: 止めた定義は unmatched でも検査しない。**`disable` が唯一の逃げ道。
+    def test_disabled_unmatched_source_skips_startup_check
+      assert_empty(SourceValidator.startup_errors(
+        'disable' => true,
+        'source' => {'feeed' => 'https://example.com/feed'},
+      ))
+    end
+
     def test_invalid_at_is_ng
       errors = SourceValidator.schedule_errors('schedule' => {'at' => 'not a time'})
 
