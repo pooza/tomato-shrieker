@@ -227,6 +227,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] **壊れた定義を 1 件置くと、`source reload` が HUP を送らずに exit 1 で拒否する**（#1570）。⚠ 壊し方は 3 通りとも確かめる: cron（`cron: 'not a cron'`）／判別キーの typo（`source: {feeed: ...}`）／頻度 0（`every: 0s`）。拒否メッセージに ID が出ること
 - [ ] **同じ定義に `disable: true` を足すと `source reload` が通る**（逃げ道。unmatched でも効くこと）
 - [ ] **壊れた定義を置いたまま HUP を直接送っても、他のソースが止まらない**（daemon 側の fail safe）。⚠⚠ **`source reload` は上のとおり拒否するので、ここは `kill -HUP "$(cat tmp/pids/SchedulerDaemon.pid)"` で送る。**ログの `failed`（cron）/ `unmatched`（判別キー）に ID が出て、古いジョブが残ること
+  - ⚠ **先に妥当な定義へ戻して `source reload` し、ジョブを立て直してから壊す。**直前の `disable: true` の reload でジョブは消えているので、そのまま HUP を送っても「残るべき古いジョブ」が無く、fail safe を確かめたことにならない
 - [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
 - [ ] `source reload` の後に **HUP をもう一度送っても効く**（ワーカースレッドが生きている）
 
