@@ -56,15 +56,28 @@ for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
   ref=origin/HEAD; [ "$d" = tomato-shrieker ] && ref=origin/develop
   git -C ~/repos/$d fetch -q origin
   git -C ~/repos/$d show $ref:Gemfile.lock |
-  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); f=1} f&&/revision:/{print g, $2; f=0}' |
-  while read -r gem rev; do
-    ahead=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
-    printf '%-16s %-18s %s\n' "$d" "$gem" "${ahead:-?}"
+  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); r=""; t="-"; f=1}
+       f&&/revision:/{r=$2} f&&/ tag:/{t=$2} f&&/specs:/{print g, r, t; f=0}' |
+  while read -r gem rev tag; do
+    if [ "$tag" != - ]; then
+      # ⚠ タグ固定の gem は main と比べない（main には未タグのコミットが常に積まれている）
+      # ⚠ 失敗したら空にして、下で ? と出す。gh api は HTTP エラーでも本文を標準出力へ
+      # 出すので、出力の有無ではなく終了コードで見る（矢印の形を作らない）
+      latest=$(gh api repos/pooza/$gem/tags --jq '.[0].name' 2>/dev/null) || latest=""
+      if [ -z "$latest" ]; then lag=""
+      elif [ "$tag" = "$latest" ]; then lag=0
+      else lag="$tag → $latest"; fi
+    else
+      lag=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null) || lag=""
+    fi
+    printf '%-16s %-18s %s\n' "$d" "$gem" "${lag:-?}"
   done
 done
 ```
 
-遅れがあれば `bundle update <gem>` で追随する。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
+⚠ **タグ固定の gem（`ginseng-style` は `tag: v1.1.12` など）は main と比べない。**main には未タグのコミットが常に積まれているので、比べると**追随済みでも「6 件遅れ」のように出る**（2026-09-17 まで実際にそう出ていた）。最新タグと比べ、違えば `v1.1.11 → v1.1.12` の形で出す。追随は Gemfile の `tag:` を書き換える。
+
+遅れがあれば `bundle update <gem> --patch` で追随する。⚠ **`--patch` を付ける。**付けないと ginseng の依存まで上がる（2026-09-17 の実測: net-protocol 0.3 → 0.4、サテライトでは json 2 → 3）。⚠ **`--conservative` は使わない。**git ソースの version 行が古いまま残って lock が壊れる（`Could not find ginseng-core-1.23.5 ... at main@b6e736d`）。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
 
