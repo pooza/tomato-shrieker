@@ -194,6 +194,26 @@ module TomatoShrieker
       assert_true(errors.any? {|v| v.start_with?('/schedule/remind/minutes:')}, errors.inspect)
     end
 
+    # ⚠ **4.10.0 リリース前レビュー 黄 0: 文字列の minutes も起動と同じ組み立てで判定すること。**
+    #
+    # `IcalendarSource#schedule_remind` は `"#{minutes}m"` を組むので、`'0'` は `0m` で倒れ、
+    # `'abc'` は `abcm` でパースに失敗する。⚠⚠ `source reload` はスキーマを見ないので、
+    # ここで型を理由に見送ると**誰も見ないまま起動だけが倒れる**。一方 `'5'` は `5m` で起動する。
+    def test_string_remind_minutes_follows_schedule_remind
+      ical = {'source' => {'ical' => 'https://example.com/c.ics'}}
+      ['0', 'abc'].each do |minutes|
+        errors = SourceValidator.schedule_errors(
+          ical.merge('schedule' => {'remind' => {'enable' => true, 'minutes' => minutes}}),
+        )
+
+        assert_true(errors.any? {|v| v.start_with?('/schedule/remind/minutes:')}, "#{minutes}: #{errors}")
+      end
+
+      assert_empty(SourceValidator.schedule_errors(
+        ical.merge('schedule' => {'remind' => {'enable' => true, 'minutes' => '5'}}),
+      ))
+    end
+
     # ⚠ **remind ジョブを立てるのは IcalendarSource だけ。**他のソースでは無視される
     # 設定なので、ここで NG にすると「起動はできるのに reload は拒否される」になる。
     def test_remind_ignored_for_sources_that_never_schedule_it
