@@ -66,14 +66,26 @@ module TomatoShrieker
       # rufus まで届かない＝**起動は倒れない**。🔴 **「直せないなら止めれば通る」は
       # `source reload` の拒否 (#1570) の唯一の逃げ道**なので、ここを厳しくすると
       # 逃げ道ごと塞ぐことになる。
+      #
+      # 🔴 **実体を作って、`register` が実際に使うスケジュールを見る（#1590 / #1600 の Codex P2）。**
+      # ⚠⚠ 生の params を読むと、`IcalendarSource` の既定 cron（`0 0 * * *`）が `every` より
+      # 優先されることを見落とし、**`every: '0s'` を書いた ical 定義を「起動はできるのに
+      # reload は拒否される」**にする。⚠ 実体の生成が例外になる定義は、起動の
+      # `Source.all` でも同じ例外で倒れるので、それ自体を指摘として返す。
+      # ⚠⚠ **rescue は実体の生成だけに掛ける（#1601 の Codex P2）。**検査側の不備
+      # （Hash でない `schedule` での `dig` など）まで拾うと、起動は既定の schedule で
+      # 通るのに reload を拒否する。
       def schedule_errors(params)
         params = params.deep_stringify_keys
         return [] if params['disable'] == true
-        schedule = params['schedule']
-        return [] unless schedule.is_a?(Hash)
-        errors = [main_schedule_error(schedule)]
-        errors.push(remind_error(schedule)) if remind_scheduled?(params)
-        return errors.compact
+        begin
+          sources = matched_sources(params)
+        rescue StandardError => e
+          return ["/source: #{e.message}"]
+        end
+        errors = sources.map {|source| main_schedule_error(source)}
+        errors.push(remind_error(params)) if remind_scheduled?(params)
+        return errors.compact.uniq
       end
 
       def valid?(params)
@@ -100,11 +112,11 @@ module TomatoShrieker
       # 実際に使われる 1 本だけを見る（#1570 の Codex P2）。**スキーマは複数キーを
       # 許すので、`{at: <妥当>, cron: 'not a cron'}` は **`at` で問題なく起動する**。
       # 🔴 全部を見ると**「起動はできるのに reload は拒否される」**＝ #1570 が直した
-      # 食い違いを、向きだけ変えて自分で作ることになる。
-      def main_schedule_error(schedule)
-        key, parser = SCHEDULE_PARSERS.find {|k, _| schedule[k]}
-        return nil unless key
-        return schedule_error(schedule[key], key, parser)
+      # 食い違いを、向きだけ変えて自分で作ることになる。⚠ 優先順も既定値も
+      # `Source#schedule_spec` が `register` と同じアクセサで持っているので、ここへ書き写さない。
+      def main_schedule_error(source)
+        spec = source.schedule_spec
+        return schedule_error(spec[:value], spec[:type], SCHEDULE_PARSERS[spec[:type]])
       end
 
       # 🔴 **remind は本体のスケジュールと別に立つ（#1570 の Codex P1）。**
@@ -112,8 +124,11 @@ module TomatoShrieker
       # `"#{minutes}m"` を `scheduler.every` へ渡す。⚠⚠ `minutes: 0` は
       # `parse_duration` では通る（0 を返すだけ）が、`every` が
       # `cannot schedule ... with a frequency of 0` で倒れる＝**起動が落ちる**。
-      def remind_error(schedule)
-        minutes = schedule.dig('remind', 'minutes') || DEFAULT_REMIND_MINUTES
+      #
+      # ⚠ **`key_flatten` で読む。**`IcalendarSource#remind_minutes` と同じ読み方にしておけば、
+      # スキーマ違反の `schedule: broken` でも起動と同じく「値が無い」になる（`dig` は倒れる）。
+      def remind_error(params)
+        minutes = params.key_flatten['/schedule/remind/minutes'] || DEFAULT_REMIND_MINUTES
         return nil unless minutes.is_a?(Numeric)
         return nil if minutes.positive?
         return '/schedule/remind/minutes: cannot schedule with a frequency of' \
@@ -124,7 +139,7 @@ module TomatoShrieker
       # スキーマ上どのソースにも書けるが、**立てるのは `IcalendarSource` だけ**。
       # 他のソースでは無視される設定なので、ここで NG にすると上と同じ食い違いになる。
       def remind_scheduled?(params)
-        return false unless params.dig('schedule', 'remind', 'enable') == true
+        return false unless params.key_flatten['/schedule/remind/enable'] == true
         return matched_classes(params).any? {|klass| klass.method_defined?(:remind)}
       end
 

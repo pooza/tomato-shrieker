@@ -46,11 +46,11 @@ module TomatoShrieker
     end
 
     def test_valid_cron_passes
-      assert_empty(SourceValidator.schedule_errors('schedule' => {'cron' => '17,47 * * * *'}))
+      assert_empty(schedule_errors('schedule' => {'cron' => '17,47 * * * *'}))
     end
 
     def test_invalid_every_is_ng
-      errors = SourceValidator.schedule_errors('schedule' => {'every' => '5x'})
+      errors = schedule_errors('schedule' => {'every' => '5x'})
 
       assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, errors.inspect)
     end
@@ -59,7 +59,7 @@ module TomatoShrieker
     # cron 文字列も `Fugit::Cron` として通すので、`every` に cron を書いても素通りする。
     # `register` と同じパーサ（`parse_duration`）で引いていれば弾ける。
     def test_cron_string_in_every_is_ng
-      errors = SourceValidator.schedule_errors('schedule' => {'every' => '0 0 * * *'})
+      errors = schedule_errors('schedule' => {'every' => '0 0 * * *'})
 
       assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, errors.inspect)
     end
@@ -71,7 +71,7 @@ module TomatoShrieker
     # `cannot schedule ... with a frequency of 0` で倒れる＝ 2026-09-05 と同じ形の全停止。
     def test_zero_every_is_ng
       ['0s', '0', '0m', '-5m'].each do |value|
-        errors = SourceValidator.schedule_errors('schedule' => {'every' => value})
+        errors = schedule_errors('schedule' => {'every' => value})
 
         assert_true(errors.any? {|v| v.start_with?('/schedule/every:')}, "#{value}: #{errors.inspect}")
       end
@@ -107,8 +107,44 @@ module TomatoShrieker
       ))
     end
 
+    # 🔴 **#1600 の Codex P2: 実際に使われるスケジュールで判定すること。**
+    #
+    # ⚠⚠ `IcalendarSource` は既定 cron（`0 0 * * *`）を持ち、`register` は `every` より
+    # cron を優先するので、**`every` に何を書いても起動は倒れない**。生の `every` を見て
+    # NG にすると「起動はできるのに reload は拒否される」になる。
+    def test_every_ignored_when_default_cron_wins
+      ['0s', '5x'].each do |value|
+        assert_empty(schedule_errors(
+          'source' => {'ical' => 'https://example.com/c.ics'},
+          'schedule' => {'every' => value},
+        ), value)
+      end
+    end
+
+    # ⚠ **実体の生成が例外になる定義は、起動の `Source.all` も同じ例外で倒れる。**
+    # validate / reload を例外で止めず、指摘として返すこと。
+    def test_source_construction_error_is_reported
+      errors = SourceValidator.schedule_errors('source' => {'feed' => 42})
+
+      assert_true(errors.any? {|v| v.start_with?('/source:')}, errors.inspect)
+    end
+
+    # ⚠ **#1601 の Codex P2: スキーマ違反の `schedule`（Hash でない）で reload を拒否しないこと。**
+    # 起動は `/schedule/*` が無いものとして既定の schedule で通る。型違いはスキーマの担当。
+    def test_non_hash_schedule_left_to_schema
+      keys = ['feed', 'ical']
+      ['broken', ['a']].each do |schedule|
+        keys.each do |key|
+          assert_empty(SourceValidator.schedule_errors(
+            'source' => {key => 'https://example.com/x'},
+            'schedule' => schedule,
+          ), "#{key}: #{schedule.inspect}")
+        end
+      end
+    end
+
     def test_invalid_at_is_ng
-      errors = SourceValidator.schedule_errors('schedule' => {'at' => 'not a time'})
+      errors = schedule_errors('schedule' => {'at' => 'not a time'})
 
       assert_true(errors.any? {|v| v.start_with?('/schedule/at:')}, errors.inspect)
     end
@@ -117,7 +153,7 @@ module TomatoShrieker
     # 倒れない。**「直せないなら disable すれば通る」が `source reload` の拒否 (#1570)
     # の唯一の逃げ道**なので、ここが厳しいと逃げ道ごと塞ぐ。
     def test_disabled_source_skips_schedule_check
-      assert_empty(SourceValidator.schedule_errors(
+      assert_empty(schedule_errors(
         'disable' => true,
         'schedule' => {'cron' => 'not a cron'},
       ))
@@ -130,14 +166,14 @@ module TomatoShrieker
     # ⚠⚠ 全部を見ると**「起動はできるのに reload は拒否される」**＝ #1570 が直した
     # 食い違いを、向きだけ変えて自分で作ることになる。
     def test_ignores_schedule_keys_register_never_uses
-      assert_empty(SourceValidator.schedule_errors(
+      assert_empty(schedule_errors(
         'schedule' => {'at' => '2099-12-31 00:00', 'cron' => 'not a cron'},
       ))
     end
 
     # 逆に、実際に使われるほうが壊れていれば拾う。
     def test_reports_the_key_register_actually_uses
-      errors = SourceValidator.schedule_errors(
+      errors = schedule_errors(
         'schedule' => {'cron' => 'not a cron', 'every' => '5m'},
       )
 
@@ -150,7 +186,7 @@ module TomatoShrieker
     # ⚠⚠ `minutes: 0` は `parse_duration` では通る（0 を返すだけ）が、`every` が
     # `cannot schedule ... with a frequency of 0` で倒れる。
     def test_zero_remind_minutes_is_ng
-      errors = SourceValidator.schedule_errors(
+      errors = schedule_errors(
         'source' => {'ical' => 'https://example.com/c.ics'},
         'schedule' => {'cron' => '0 0 * * *', 'remind' => {'enable' => true, 'minutes' => 0}},
       )
@@ -161,7 +197,7 @@ module TomatoShrieker
     # ⚠ **remind ジョブを立てるのは IcalendarSource だけ。**他のソースでは無視される
     # 設定なので、ここで NG にすると「起動はできるのに reload は拒否される」になる。
     def test_remind_ignored_for_sources_that_never_schedule_it
-      assert_empty(SourceValidator.schedule_errors(
+      assert_empty(schedule_errors(
         'source' => {'feed' => 'https://example.com/feed'},
         'schedule' => {'every' => '5m', 'remind' => {'enable' => true, 'minutes' => 0}},
       ))
@@ -170,7 +206,7 @@ module TomatoShrieker
     # 省略時の既定 (5 分) は妥当。⚠ ここが IcalendarSource#remind_minutes とずれると
     # 「省略時は倒れないのに明示すると倒れる」（またはその逆）になる。
     def test_default_remind_minutes_passes
-      assert_empty(SourceValidator.schedule_errors(
+      assert_empty(schedule_errors(
         'source' => {'ical' => 'https://example.com/c.ics'},
         'schedule' => {'cron' => '0 0 * * *', 'remind' => {'enable' => true}},
       ))
@@ -190,7 +226,7 @@ module TomatoShrieker
 
     # ⚠ 型違いはスキーマの担当。同じ誤りを 2 通りのメッセージで出さない。
     def test_schedule_type_error_left_to_schema
-      assert_empty(SourceValidator.schedule_errors('schedule' => {'cron' => 42}))
+      assert_empty(schedule_errors('schedule' => {'cron' => 42}))
     end
 
     def test_missing_required
@@ -447,6 +483,14 @@ module TomatoShrieker
       return yield
     ensure
       Time.define_singleton_method(:now, original)
+    end
+
+    # ⚠ **判別キーの無い定義はどのソースにもならず、schedule を検査する対象が無い。**
+    # schedule だけを見たいテストでは既定で feed を入れる。
+    def schedule_errors(params)
+      return SourceValidator.schedule_errors(
+        {'source' => {'feed' => 'https://example.com/feed'}}.merge(params),
+      )
     end
   end
 end
