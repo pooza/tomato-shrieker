@@ -65,10 +65,11 @@ module TomatoShrieker
     # ⚠⚠ 判別キーを打ち間違えた定義は `Source.all` を 1 件も通らないので、
     # `desired` に id が現れない。それを素直に「消えた」と読むと **typo が静かな停止に
     # 化ける**（しかもログには `removed` と出る）。**`unmatched` は `wanted` に混ぜて
-    # unschedule から守り、`failed` として報告する。**
+    # unschedule から守り、`unmatched` として報告する。**
     def apply(desired, action:)
       digests = desired.transform_values {|v| digest(v)}
       unmatched = Source.unmatched_ids
+      report_unmatched(unmatched, action)
       removed = drop_removed(digests.keys + unmatched)
       stale = digests.reject {|id, d| @registry[id] == d}.keys
       added = stale - @registry.keys
@@ -79,6 +80,23 @@ module TomatoShrieker
                 failed:, unmatched:}
       logger.info({scheduler: action}.merge(result))
       return result
+    end
+
+    # 🔴 **unmatched を `failed` と同じ声量で出す（4.10.0 リリース前レビュー）。**
+    #
+    # ⚠⚠ 以前は結果行の `logger.info` にしか出ず、Sentry にも何も届かなかった。unmatched は
+    # **古いジョブが古い定義のまま無期限に走り続ける**状態で、`/healthz/source/:id` も
+    # `Unknown source` の 404 になり、意図的な削除と区別が付かない。`source reload` は
+    # 拒否するようになった（#1599）が、**HUP を直接送る経路は素通りする**。
+    #
+    # ⚠ **起動時は出さない。**`register_all` が同じ内容で倒れ、daemon 側が捕まえて送る。
+    def report_unmatched(unmatched, action)
+      return if action == 'register'
+      unmatched.each do |id|
+        error = Ginseng::ConfigError.new("no source class matched: #{id}")
+        Sentry.capture_exception(error, tags: {source: id}) if Sentry.initialized?
+        logger.error(scheduler: action, source: id, error:)
+      end
     end
 
     def drop_removed(wanted)
