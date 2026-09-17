@@ -134,10 +134,14 @@ module TomatoShrieker
       # スキーマ違反の `schedule: broken` でも起動と同じく「値が無い」になる（`dig` は倒れる）。
       def remind_error(params)
         minutes = params.key_flatten['/schedule/remind/minutes'] || DEFAULT_REMIND_MINUTES
-        return nil unless minutes.is_a?(Numeric)
-        return nil if minutes.positive?
-        return '/schedule/remind/minutes: cannot schedule with a frequency of' \
-          " #{minutes} (#{minutes}m)"
+        # ⚠⚠ **型で弾かず、`schedule_remind` と同じ `"#{minutes}m"` を組んで引く（レビュー黄 0）。**
+        # 型違いはスキーマの担当だが、**`source reload` は意図的にスキーマを見ない**ので、
+        # 文字列の `'0'` を見送ると**誰も見ないまま起動だけが倒れる**。
+        spec = "#{minutes}m"
+        return nil if Rufus::Scheduler.parse_duration(spec).positive?
+        return "/schedule/remind/minutes: cannot schedule with a frequency of #{minutes} (#{spec})"
+      rescue StandardError => e
+        return "/schedule/remind/minutes: #{e.message}"
       end
 
       # ⚠ **remind ジョブを立てるクラスにマッチする定義だけを見る。**`schedule.remind` は

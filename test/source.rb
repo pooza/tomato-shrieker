@@ -289,6 +289,9 @@ module TomatoShrieker
     def test_shriek_collects_delivery_errors
       saved = ENV.fetch('TEST', nil)
       ENV.delete('TEST') # Environment.test? を false にし shrieker を実際に走らせる
+      # ⚠ 設定も読み直す。`TEST` だけ外すと `test/sources/` がメモリに残り、
+      # 「テストではない実行」の前提が半分しか成り立たない（ensure の後は teardown が戻す）。
+      config.reload
       shrieker = Object.new
       def shrieker.exec(_params)
         raise('simulated delivery failure')
@@ -317,6 +320,7 @@ module TomatoShrieker
     def test_shriek_counts_deliveries
       saved = ENV.fetch('TEST', nil)
       ENV.delete('TEST')
+      config.reload
       shrieker = Object.new
       def shrieker.exec(_params)
         # 何もせず成功する shrieker
