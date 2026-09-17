@@ -224,7 +224,10 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] 追加が反映される（`changed` にソース ID が出る）
 - [ ] 削除が反映される（`removed` にソース ID が出る）
 - [ ] **無変更のソースが貼り替わっていない**（`every` の位相がリセットされていない ＝ `next_run_at` が飛んでいない）
-- [ ] **壊れた定義を 1 件置いて reload しても、他のソースが止まらない**（fail safe）
+- [ ] **壊れた定義を 1 件置くと、`source reload` が HUP を送らずに exit 1 で拒否する**（#1570）。⚠ 壊し方は 3 通りとも確かめる: cron（`cron: 'not a cron'`）／判別キーの typo（`source: {feeed: ...}`）／頻度 0（`every: 0s`）。拒否メッセージに ID が出ること
+- [ ] **同じ定義に `disable: true` を足すと `source reload` が通る**（逃げ道。unmatched でも効くこと）
+- [ ] **壊れた定義を置いたまま HUP を直接送っても、他のソースが止まらない**（daemon 側の fail safe）。⚠⚠ **`source reload` は上のとおり拒否するので、ここは `kill -HUP "$(cat tmp/pids/SchedulerDaemon.pid)"` で送る。**ログの `failed`（cron）/ `unmatched`（判別キー）に ID が出て、古いジョブが残ること
+  - ⚠ **先に妥当な定義へ戻して `source reload` し、ジョブを立て直してから壊す。**直前の `disable: true` の reload でジョブは消えているので、そのまま HUP を送っても「残るべき古いジョブ」が無く、fail safe を確かめたことにならない
 - [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
 - [ ] `source reload` の後に **HUP をもう一度送っても効く**（ワーカースレッドが生きている）
 
@@ -234,7 +237,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] FeedSource (matrix-* 等)・IcalendarSource・YouTubeChannelSource・GitHubRepositorySource・GoogleNewsSource の `fetch` が成功
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
-- [ ] 稼働中の reload（上記の 6 項目・#1459）
+- [ ] 稼働中の reload（上記の 8 項目・#1459）
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと
 
 ## 後始末
