@@ -129,6 +129,20 @@ module TomatoShrieker
       assert_true(errors.any? {|v| v.start_with?('/source:')}, errors.inspect)
     end
 
+    # ⚠ **#1601 の Codex P2: スキーマ違反の `schedule`（Hash でない）で reload を拒否しないこと。**
+    # 起動は `/schedule/*` が無いものとして既定の schedule で通る。型違いはスキーマの担当。
+    def test_non_hash_schedule_left_to_schema
+      keys = ['feed', 'ical']
+      ['broken', ['a']].each do |schedule|
+        keys.each do |key|
+          assert_empty(SourceValidator.schedule_errors(
+            'source' => {key => 'https://example.com/x'},
+            'schedule' => schedule,
+          ), "#{key}: #{schedule.inspect}")
+        end
+      end
+    end
+
     def test_invalid_at_is_ng
       errors = schedule_errors('schedule' => {'at' => 'not a time'})
 

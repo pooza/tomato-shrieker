@@ -72,14 +72,20 @@ module TomatoShrieker
       # 優先されることを見落とし、**`every: '0s'` を書いた ical 定義を「起動はできるのに
       # reload は拒否される」**にする。⚠ 実体の生成が例外になる定義は、起動の
       # `Source.all` でも同じ例外で倒れるので、それ自体を指摘として返す。
+      # ⚠⚠ **rescue は実体の生成だけに掛ける（#1601 の Codex P2）。**検査側の不備
+      # （Hash でない `schedule` での `dig` など）まで拾うと、起動は既定の schedule で
+      # 通るのに reload を拒否する。
       def schedule_errors(params)
         params = params.deep_stringify_keys
         return [] if params['disable'] == true
-        errors = matched_sources(params).map {|source| main_schedule_error(source)}
-        errors.push(remind_error(params['schedule'])) if remind_scheduled?(params)
+        begin
+          sources = matched_sources(params)
+        rescue StandardError => e
+          return ["/source: #{e.message}"]
+        end
+        errors = sources.map {|source| main_schedule_error(source)}
+        errors.push(remind_error(params)) if remind_scheduled?(params)
         return errors.compact.uniq
-      rescue StandardError => e
-        return ["/source: #{e.message}"]
       end
 
       def valid?(params)
@@ -118,8 +124,11 @@ module TomatoShrieker
       # `"#{minutes}m"` を `scheduler.every` へ渡す。⚠⚠ `minutes: 0` は
       # `parse_duration` では通る（0 を返すだけ）が、`every` が
       # `cannot schedule ... with a frequency of 0` で倒れる＝**起動が落ちる**。
-      def remind_error(schedule)
-        minutes = schedule&.dig('remind', 'minutes') || DEFAULT_REMIND_MINUTES
+      #
+      # ⚠ **`key_flatten` で読む。**`IcalendarSource#remind_minutes` と同じ読み方にしておけば、
+      # スキーマ違反の `schedule: broken` でも起動と同じく「値が無い」になる（`dig` は倒れる）。
+      def remind_error(params)
+        minutes = params.key_flatten['/schedule/remind/minutes'] || DEFAULT_REMIND_MINUTES
         return nil unless minutes.is_a?(Numeric)
         return nil if minutes.positive?
         return '/schedule/remind/minutes: cannot schedule with a frequency of' \
@@ -130,7 +139,7 @@ module TomatoShrieker
       # スキーマ上どのソースにも書けるが、**立てるのは `IcalendarSource` だけ**。
       # 他のソースでは無視される設定なので、ここで NG にすると上と同じ食い違いになる。
       def remind_scheduled?(params)
-        return false unless params.dig('schedule', 'remind', 'enable') == true
+        return false unless params.key_flatten['/schedule/remind/enable'] == true
         return matched_classes(params).any? {|klass| klass.method_defined?(:remind)}
       end
 
