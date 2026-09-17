@@ -233,6 +233,37 @@ module TomatoShrieker
       assert_include(error.message, 'no source class matched')
     end
 
+    # 🔴 **4.10.0 リリース前レビュー 赤 B（#1589 Codex P1）: `disable: true` は
+    # unmatched の逃げ道として効くこと。**
+    #
+    # ⚠⚠ typo に気付いた運用者が `source disable` すると、以前は unmatched に数えられた
+    # ままで **reload は古いジョブを守り続け、起動は倒れた**。
+    def test_reload_removes_disabled_unmatched_source
+      File.write(fixture_path(FIXTURE_ID), YAML.dump(
+        'disable' => true,
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      result = @scheduler.reload
+
+      assert_not_include(result[:unmatched], FIXTURE_ID)
+      assert_include(result[:removed], FIXTURE_ID)
+      assert_empty(jobs(FIXTURE_ID))
+    end
+
+    def test_register_all_ignores_disabled_unmatched_source
+      File.write(fixture_path(OTHER_ID), YAML.dump(
+        'disable' => true,
+        'source' => {'feeed' => 'https://example.com/typo.rss'},
+        'dest' => {'hooks' => ['https://example.com/hook']},
+      ))
+      config.reload
+      @scheduler.registry.clear
+
+      assert_nothing_raised {@scheduler.send(:register_all)}
+    end
+
     # 🔴 **起動時の register 失敗は握らない (#1547 Codex P1)。**reload と違い、
     # ここで飛ばすとそのソースは二度と登録されないまま daemon が正常に見える
     # （総合 /healthz は無タグの maintenance ジョブがあれば通る）。倒しておけば

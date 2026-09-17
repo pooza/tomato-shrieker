@@ -129,6 +129,40 @@ module TomatoShrieker
       assert_empty(unstartable_with(broken))
     end
 
+    # 🔴 **4.10.0 リリース前レビュー 赤 A（#1589 Codex P1）: 判別キーが壊れた定義で
+    # reload を止めること。**
+    #
+    # ⚠⚠ 以前は `Source.all` を回していたので、**定義上そこに現れない unmatched を
+    # 原理的に検査できなかった**。reload は通るのに `register_all` は
+    # `no source class matched` で倒れる＝次の再起動で全ソースが止まる。
+    # ⚠ `feed` の typo だけではない。スキーマは `source` の中身を問わないので
+    # `source: {keyword: ...}` も通る。
+    def test_unstartable_sources_reports_unmatched_source
+      broken = stub_schedule_source('unmatched', 'source' => {'keyword' => 'プリキュア'})
+
+      result = unstartable_with(broken)
+
+      assert_equal(['unmatched'], result.map(&:first))
+      assert_include(result.first.last.join, 'no source class matched')
+    end
+
+    # 🔴 **赤 B: unmatched でも `disable` が逃げ道として効くこと。**拒否メッセージが
+    # 「修正するか disable してください」と案内しているので、ここが効かないと嘘になる。
+    def test_unstartable_sources_skips_disabled_unmatched
+      broken = stub_schedule_source(
+        'disabled-unmatched', 'disable' => true, 'source' => {'feeed' => 'https://example.com/x'}
+      )
+
+      assert_empty(unstartable_with(broken))
+    end
+
+    # 🔴 **赤 C: `every: '0s'` は `parse_duration` を通るが起動は倒れる。**
+    def test_unstartable_sources_reports_zero_every
+      broken = stub_schedule_source('zero-every', 'schedule' => {'every' => '0s'})
+
+      assert_equal(['zero-every'], unstartable_with(broken).map(&:first))
+    end
+
     private
 
     def source_path(id, suffix)
@@ -147,22 +181,15 @@ module TomatoShrieker
       SchedulerDaemon.define_singleton_method(:new, original)
     end
 
-    # ⚠ `Source.all` の差し替えは元の Method を保存して戻す。`remove_method` で
-    # 戻すと本物ごと消える（singleton class に生えているため）。
-    def unstartable_with(*sources)
-      original = Source.method(:all)
-      Source.define_singleton_method(:all) {sources}
+    def unstartable_with(*entries)
+      @command.define_singleton_method(:config) {{'/sources' => entries}}
       return @command.send(:unstartable_sources)
-    ensure
-      Source.define_singleton_method(:all, original)
     end
 
+    # ⚠ **`Source.all` の要素ではなく、`/sources` の生の定義を返す。**判別キーは
+    # 既定で妥当なものを入れておく（無いと unmatched として拾われる）。
     def stub_schedule_source(id, params)
-      source = Object.new
-      source.define_singleton_method(:id) {id}
-      source.define_singleton_method(:disable?) {params['disable'] == true}
-      source.define_singleton_method(:to_h) {params}
-      return source
+      return {'id' => id, 'source' => {'feed' => 'https://example.com/feed'}}.merge(params)
     end
 
     def ack_with(source)

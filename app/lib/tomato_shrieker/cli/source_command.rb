@@ -172,14 +172,17 @@ module TomatoShrieker
         ' 起動時に倒れる定義が残っているため reload しません。修正するか disable してください。'
     end
 
-    # ⚠ **ファイルを glob せず `Source.all` を見る。**`local.yaml` の `sources:` 形式も
-    # まだ動く（#1429 で互換を残した）ので、`config/sources/*.yaml` だけを見ると
-    # **daemon が読むものと食い違う**。⚠ 1 つの定義が複数のクラスにマッチしうるので
-    # id で畳む（`Scheduler#desired_sources` と同じ理由）。
+    # ⚠ **ファイルを glob せず、daemon と同じ `/sources` を見る。**`local.yaml` の
+    # `sources:` 形式もまだ動く（#1429 で互換を残した）ので、`config/sources/*.yaml`
+    # だけを見ると **daemon が読むものと食い違う**。
+    #
+    # 🔴 **`Source.all` を回してはいけない（4.10.0 リリース前レビュー・#1589 Codex P1）。**
+    # 判別キーが壊れた定義は `Source.all` に 1 件も現れないので、**unmatched を原理的に
+    # 検査できない**＝ reload は通るのに次の起動で全ソースが止まる。定義の生の形で見る。
     def unstartable_sources
-      Source.all.reject(&:disable?).uniq(&:id).filter_map do |source|
-        errors = SourceValidator.schedule_errors(source.to_h)
-        [source.id, errors] unless errors.empty?
+      config['/sources'].filter_map do |entry|
+        errors = SourceValidator.startup_errors(entry)
+        [Source.entry_id(entry), errors] unless errors.empty?
       end
     end
 
