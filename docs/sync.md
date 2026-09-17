@@ -61,10 +61,14 @@ for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
   while read -r gem rev tag; do
     if [ "$tag" != - ]; then
       # ⚠ タグ固定の gem は main と比べない（main には未タグのコミットが常に積まれている）
-      latest=$(gh api repos/pooza/$gem/tags --jq '.[0].name' 2>/dev/null)
-      [ "$tag" = "$latest" ] && lag=0 || lag="$tag → $latest"
+      # ⚠ 失敗したら空にして、下で ? と出す。gh api は HTTP エラーでも本文を標準出力へ
+      # 出すので、出力の有無ではなく終了コードで見る（矢印の形を作らない）
+      latest=$(gh api repos/pooza/$gem/tags --jq '.[0].name' 2>/dev/null) || latest=""
+      if [ -z "$latest" ]; then lag=""
+      elif [ "$tag" = "$latest" ]; then lag=0
+      else lag="$tag → $latest"; fi
     else
-      lag=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null)
+      lag=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null) || lag=""
     fi
     printf '%-16s %-18s %s\n' "$d" "$gem" "${lag:-?}"
   done
