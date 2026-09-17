@@ -60,17 +60,43 @@ module TomatoShrieker
       @reload_mutex = Mutex.new
     end
 
+    # 🔴 **「ファイルを消した」と「ファイルは在るが壊れている」を混ぜない (#1572)。**
+    #
+    # ⚠⚠ 判別キーを打ち間違えた定義は `Source.all` を 1 件も通らないので、
+    # `desired` に id が現れない。それを素直に「消えた」と読むと **typo が静かな停止に
+    # 化ける**（しかもログには `removed` と出る）。**`unmatched` は `wanted` に混ぜて
+    # unschedule から守り、`unmatched` として報告する。**
     def apply(desired, action:)
       digests = desired.transform_values {|v| digest(v)}
-      removed = drop_removed(digests.keys)
+      unmatched = Source.unmatched_ids
+      report_unmatched(unmatched, action)
+      removed = drop_removed(digests.keys + unmatched)
       stale = digests.reject {|id, d| @registry[id] == d}.keys
       added = stale - @registry.keys
       failed = swap_all(stale, desired, action)
       # ⚠ **失敗した id は registry を更新しない。**次の reload で必ずやり直す。
       (stale - failed).each {|id| @registry[id] = digests[id]}
-      result = {added: added - failed, removed:, changed: stale - added - failed, failed:}
+      result = {added: added - failed, removed:, changed: stale - added - failed,
+                failed:, unmatched:}
       logger.info({scheduler: action}.merge(result))
       return result
+    end
+
+    # 🔴 **unmatched を `failed` と同じ声量で出す（4.10.0 リリース前レビュー）。**
+    #
+    # ⚠⚠ 以前は結果行の `logger.info` にしか出ず、Sentry にも何も届かなかった。unmatched は
+    # **古いジョブが古い定義のまま無期限に走り続ける**状態で、`/healthz/source/:id` も
+    # `Unknown source` の 404 になり、意図的な削除と区別が付かない。`source reload` は
+    # 拒否するようになった（#1599）が、**HUP を直接送る経路は素通りする**。
+    #
+    # ⚠ **起動時は出さない。**`register_all` が同じ内容で倒れ、daemon 側が捕まえて送る。
+    def report_unmatched(unmatched, action)
+      return if action == 'register'
+      unmatched.each do |id|
+        error = Ginseng::ConfigError.new("no source class matched: #{id}")
+        Sentry.capture_exception(error, tags: {source: id}) if Sentry.initialized?
+        logger.error(scheduler: action, source: id, error:)
+      end
     end
 
     def drop_removed(wanted)
@@ -118,8 +144,17 @@ module TomatoShrieker
     # 「誰かが YAML を打ち間違えた」で落とす理由は無い。
     def register_all
       result = @reload_mutex.synchronize {apply(desired_sources, action: 'register')}
-      return if result[:failed].empty?
-      raise Ginseng::ConfigError, "failed to register: #{result[:failed].join(', ')}"
+      # ⚠ **理由が違うので混ぜずに名指しする (#1572)。**`failed` は register が例外を
+      # 上げたもの、`unmatched` は判別キーが無く**そもそも 1 件も yield されなかった**もの。
+      # 🔴 **後者も起動は倒す。**飛ばすと「定義は在るのに永久に走らない」まま
+      # daemon が正常に見える（`failed` を倒す理由と同じ）。
+      messages = []
+      messages.push("failed to register: #{result[:failed].join(', ')}") if result[:failed].any?
+      if result[:unmatched].any?
+        messages.push("no source class matched: #{result[:unmatched].join(', ')}")
+      end
+      return if messages.empty?
+      raise Ginseng::ConfigError, messages.join(' / ')
     end
 
     # 有効なソースを id 単位でまとめる。⚠ 1 つの定義が複数のソースクラスに
@@ -138,8 +173,14 @@ module TomatoShrieker
     end
 
     # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。
+    #
+    # 🔴 **group の全要素をハッシュする (#1571)。**⚠⚠ 以前は `sources.first` だけを
+    # 見ていたので、**同じ id を持つ定義が 2 つある状態で片方を消す / `disable` すると、
+    # group は縮むのに digest が変わらない**＝ `stale` に入らず、**消したほうのジョブが
+    # unschedule されずに走り続ける**。⚠ ログの `changed` / `removed` にも出ないので、
+    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
     def digest(sources)
-      return Digest::SHA1.hexdigest(sources.first.to_h.except('class').to_json)
+      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
     end
 
     def schedule_maintenance

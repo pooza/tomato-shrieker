@@ -198,19 +198,25 @@ JWT が `present` なら login 成功。`Ginseng::AuthError` が上がるなら�
 
 ## 稼働中の reload (#1459・4.8.0 以降)
 
-🔴 **実機でしか確かめられない唯一の経路。**手元のテストは `Scheduler#reload` を直接叩くので、**シグナル・pid ファイル・ワーカースレッドを通る経路は本番でしか通らない**。
+🔴 **実機でしか確かめられない唯一の経路。**手元のテストは `Scheduler#reload` を直接叩くので、**シグナル・pid ファイル・ワーカースレッドを通る経路はテストでは通らない**。
+
+🔴 **手元で daemon を起動して確かめる。本番でやらない。**下の項目には「壊れた定義を残したまま再起動して、起動が倒れることを見る」が含まれる＝本番でやると全ソースが止まる。4.10.0 では手元（miki）で実施した。
+
+- 起動は `bundle exec bin/scheduler_daemon.rb start`（フォアグラウンドで動くので別端末かバックグラウンドで）、停止は `bundle exec bin/scheduler_daemon.rb stop`。監視面は `http://127.0.0.1:4567`、ログは `journalctl -t tomato-shrieker`
+- ⚠ **先に `bin/shrieker source disable test-google-news-piefed` しておく。**`schedule` を持たないので既定の 5 分おきで走り、**daemon を動かしている間ずっと PieFed へ投稿する**。終わったら `enable` で戻す
+- ⚠ **`next_run_at` は直近の run から計算する**ので、一度も走っていないソースでは null。位相は run_log の `executed_at`（`/status.json` の `last_run_at`）で見る
 
 ```sh
-# 1. daemon が生きていること・pid がユニットの MainPID と一致すること
-systemctl show -p MainPID tomato-shrieker
+# 1. daemon が生きていること
 cat tmp/pids/SchedulerDaemon.pid
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4567/healthz
 
 # 2. ソースを 1 件足して reload
 bin/shrieker source add test-reload-probe
 bin/shrieker source reload
 
 # 3. ログで結果を見る（⚠ CLI は「要求した」までしか言えない = #1529）
-grep '"scheduler":"reload"' /var/log/tomato-shrieker.log | tail -3
+journalctl -t tomato-shrieker --since -1min --no-pager | grep '"scheduler":"reload"'
 
 # 4. 監視面に現れること
 curl -s http://127.0.0.1:4567/status.json | jq -r '.sources[].id' | grep test-reload-probe
@@ -221,11 +227,14 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 
 ⚠⚠ **「reload requested」は成功の証拠ではない。**必ず 3 と 4 で結果を確かめること。
 
-- [ ] 追加が反映される（`changed` にソース ID が出る）
+- [ ] 追加が反映される（`added` にソース ID が出る）
 - [ ] 削除が反映される（`removed` にソース ID が出る）
-- [ ] **無変更のソースが貼り替わっていない**（`every` の位相がリセットされていない ＝ `next_run_at` が飛んでいない）
-- [ ] **壊れた定義を 1 件置いて reload しても、他のソースが止まらない**（fail safe）
-- [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
+- [ ] **無変更のソースが貼り替わっていない**（`every` の位相がリセットされていない ＝ reload を挟んでも、5 分おきのソースが**起動時刻から数えた時刻**に発火する）
+- [ ] **壊れた定義を 1 件置くと、`source reload` が HUP を送らずに exit 1 で拒否する**（#1570）。⚠ 壊し方は 3 通りとも確かめる: cron（`cron: 'not a cron'`）／判別キーの typo（`source: {feeed: ...}`）／頻度 0（`every: 0s`）。拒否メッセージに ID が出ること
+- [ ] **同じ定義に `disable: true` を足すと `source reload` が通る**（逃げ道。unmatched でも効くこと）
+- [ ] **壊れた定義を置いたまま HUP を直接送っても、他のソースが止まらない**（daemon 側の fail safe）。⚠⚠ **`source reload` は上のとおり拒否するので、ここは `kill -HUP "$(cat tmp/pids/SchedulerDaemon.pid)"` で送る。**ログの `failed`（cron）/ `unmatched`（判別キー）に ID が出て、古いジョブが残ること
+  - ⚠ **先に妥当な定義へ戻して `source reload` し、ジョブを立て直してから壊す。**直前の `disable: true` の reload でジョブは消えているので、そのまま HUP を送っても「残るべき古いジョブ」が無く、fail safe を確かめたことにならない
+- [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ 倒れた後は pid ファイルが残るが、直して `start` すれば通る（4.10.0 で確認）。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
 - [ ] `source reload` の後に **HUP をもう一度送っても効く**（ワーカースレッドが生きている）
 
 ## チェックリスト
@@ -234,8 +243,8 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] FeedSource (matrix-* 等)・IcalendarSource・YouTubeChannelSource・GitHubRepositorySource・GoogleNewsSource の `fetch` が成功
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
-- [ ] 稼働中の reload（上記の 6 項目・#1459）
-- [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと
+- [ ] 稼働中の reload（上記の 8 項目・#1459）
+- [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
 
 ## 後始末
 

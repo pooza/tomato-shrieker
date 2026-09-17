@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>tomato-shrieker test fixture</title>
+    <link>https://example.com/</link>
+    <description>汎用 RSS のフィクスチャ (#1468)</description>
+    <language>ja</language>
+    <item>
+      <title>フィクスチャ記事 1</title>
+      <link>https://example.com/articles/1</link>
+      <guid isPermaLink="false">tomato-shrieker-fixture-1</guid>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 +0900</pubDate>
+      <description>フィクスチャの本文 1</description>
+    </item>
+    <item>
+      <title>フィクスチャ記事 2</title>
+      <link>https://example.com/articles/2</link>
+      <guid isPermaLink="false">tomato-shrieker-fixture-2</guid>
+      <pubDate>Mon, 14 Sep 2026 01:00:00 +0900</pubDate>
+      <description>フィクスチャの本文 2</description>
+    </item>
+    <item>
+      <title>フィクスチャ記事 3</title>
+      <link>https://example.com/articles/3</link>
+      <guid isPermaLink="false">tomato-shrieker-fixture-3</guid>
+      <pubDate>Mon, 14 Sep 2026 02:00:00 +0900</pubDate>
+      <description>フィクスチャの本文 3</description>
+    </item>
+    <item>
+      <title>フィクスチャ記事 4</title>
+      <link>https://example.com/articles/4</link>
+      <guid isPermaLink="false">tomato-shrieker-fixture-4</guid>
+      <pubDate>Mon, 14 Sep 2026 03:00:00 +0900</pubDate>
+      <description>フィクスチャの本文 4</description>
+    </item>
+    <item>
+      <title>フィクスチャ記事 5</title>
+      <link>https://example.com/articles/5</link>
+      <guid isPermaLink="false">tomato-shrieker-fixture-5</guid>
+      <pubDate>Mon, 14 Sep 2026 04:00:00 +0900</pubDate>
+      <description>フィクスチャの本文 5</description>
+    </item>
+  </channel>
+</rss>

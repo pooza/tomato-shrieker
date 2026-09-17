@@ -43,8 +43,14 @@ module TomatoShrieker
       desc: "ソース種別 (#{SourceTemplates::ALL.keys.join('/')})"
     def add(id)
       raise Thor::Error, "invalid id: #{id}" unless id.match?(/\A[\w.-]+\z/)
+      # ⚠ **`.yml` も見る (#1571)。**読み込みは `*.{yaml,yml}` の両方なので、
+      # `<id>.yaml` の存在だけで判定すると **`<id>.yml` がある状態で同じ id の定義を
+      # 2 つ作れる**。そうなると `Source.create` は先頭しか返さず、`/healthz/source/:id`
+      # は片方を見ないまま緑になる。
+      if source_paths.any? {|v| source_id(v) == id}
+        raise Thor::Error, "source already exists: #{id}"
+      end
       path = new_source_path(id)
-      raise Thor::Error, "source already exists: #{id}" if File.exist?(path)
       template = SourceTemplates::ALL[options[:class]]
       unless template
         raise Thor::Error, "unknown class: #{options[:class]} (#{SourceTemplates::ALL.keys.join('/')})"
@@ -96,7 +102,17 @@ module TomatoShrieker
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
+    # 🔴 **起動なら倒れる定義が残っているうちは reload しない (#1570)。**
+    #
+    # ⚠ **起動は fail closed、reload は fail safe** なので、reload は壊れた 1 件を
+    # 飛ばして走り続ける。**そのぶん壊れた YAML がディスクに残っても誰も気付けず、
+    # 次のデプロイ / 再起動 / OOM で `register_all` が倒れて全ソースが止まる**。
+    # 2026-09-05 に本番で実際に起きた（7 回の再起動・約 50 秒 全ソース停止）。
+    #
+    # ⚠ **逃げ道は `disable`。**直せないソースは止めれば検査対象から外れて reload は通る
+    # （`SourceValidator.schedule_errors` のコメント参照）。
     def reload
+      refuse_unless_startable!
       daemon = SchedulerDaemon.new
       case daemon.alive_state
       when :alive
@@ -139,6 +155,36 @@ module TomatoShrieker
     end
 
     private
+
+    # ⚠⚠ **スキーマ違反では止めない (#1570)。**起動はスキーマを見ない
+    # （`Scheduler#reload` のコメント）ので、ここで NG を全部止めると
+    # **「起動はできるのに reload は拒否される」定義が生まれる**＝ 食い違いの向きが
+    # 変わるだけで、この issue が直そうとしたものと同じ形になる。
+    # **止めるのは、起動が実際に倒れるもの＝ schedule のパース失敗だけ。**
+    def refuse_unless_startable!
+      unstartable = unstartable_sources
+      return if unstartable.empty?
+      unstartable.each do |id, errors|
+        say "NG\t#{id}"
+        errors.each {|v| say "    - #{v}"}
+      end
+      raise Thor::Error, "#{unstartable.size} source(s) invalid." \
+        ' 起動時に倒れる定義が残っているため reload しません。修正するか disable してください。'
+    end
+
+    # ⚠ **ファイルを glob せず、daemon と同じ `/sources` を見る。**`local.yaml` の
+    # `sources:` 形式もまだ動く（#1429 で互換を残した）ので、`config/sources/*.yaml`
+    # だけを見ると **daemon が読むものと食い違う**。
+    #
+    # 🔴 **`Source.all` を回してはいけない（4.10.0 リリース前レビュー・#1589 Codex P1）。**
+    # 判別キーが壊れた定義は `Source.all` に 1 件も現れないので、**unmatched を原理的に
+    # 検査できない**＝ reload は通るのに次の起動で全ソースが止まる。定義の生の形で見る。
+    def unstartable_sources
+      config['/sources'].filter_map do |entry|
+        errors = SourceValidator.startup_errors(entry)
+        [Source.entry_id(entry), errors] unless errors.empty?
+      end
+    end
 
     def nothing_to_ack_message(id)
       return "#{id} は silence_tolerance が未設定で、未達の警告も出ていません。確認するものがありません。"

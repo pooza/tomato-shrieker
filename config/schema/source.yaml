@@ -97,7 +97,10 @@ properties:
           enable:
             type: boolean
           minutes:
+            # 0 / 負値は IcalendarSource#schedule_remind が "0m" として
+            # scheduler.every へ渡し、起動時に ArgumentError で倒れる (#1570)
             type: integer
+            minimum: 1
   source:
     type: object
     additionalProperties: false

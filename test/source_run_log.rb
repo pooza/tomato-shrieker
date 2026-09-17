@@ -208,13 +208,18 @@ module TomatoShrieker
     # #1483: 未配信のソースは last_delivered_ids に引っかからないので、
     # 最古行を守らないと observed_since が retention_days 前に張り付く。
     def test_prune_keeps_first_run_row
+      # ⚠ **基準時刻は 1 回だけ取る (#1553)。**挿入時と assert 時で `Time.now` を
+      # 別々に呼ぶと、間で秒境界をまたいだときだけ 1 ずれて落ちる。
+      # 🔴 再実行で緑になるテストがあると、**本物の回帰まで「たぶんフレーク」で
+      # 流される**ようになる。`setup` の `@base` に揃える。
+      first = @base - (60 * 86_400)
       SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (60 * 86_400),
+        source_id: SOURCE_ID, executed_at: first,
         status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
         attempted_count: 0, delivered_count: 0
       )
       SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
+        source_id: SOURCE_ID, executed_at: @base - (19 * 86_400),
         status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
         attempted_count: 0, delivered_count: 0
       )
@@ -222,7 +227,7 @@ module TomatoShrieker
       remain = SourceRunLog.where(source_id: SOURCE_ID).all
 
       assert_equal(1, remain.size)
-      assert_equal((Time.now - (60 * 86_400)).to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
+      assert_equal(first.to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
     end
 
     def test_observed_since

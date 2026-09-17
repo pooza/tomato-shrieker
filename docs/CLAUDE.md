@@ -186,12 +186,20 @@ bin/shrieker source reload
 - ⚠ **実行中の run は殺さない。**`unschedule` は以後の発火を止めるだけなので、**進行中の run は古い定義のまま完走する**
 - 🔴 **起動は fail closed、reload は fail safe。**起動時に 1 件でも `register` に失敗したら**起動しない**（`Ginseng::ConfigError`）。⚠ ここで飛ばすと**そのソースは二度と登録されないのに daemon は正常に見える**（総合 `/healthz` は無タグの maintenance ジョブがあれば通る）。倒しておけば systemd の `Restart=always` が 5 秒後に再試行する。⚠ **一方 reload では倒さない。**稼働中の daemon を「誰かが YAML を打ち間違えた」で落とす理由は無い
 - 🔴 **新しいジョブを立ててから古いジョブを落とす。**`register` は失敗しうる（`CommandSource` は `bundle install` を走らせるし、reload はスキーマ検証をしないので**不正な cron 式**もここへ来る）。先に消すと、**失敗したソースが次の reload までジョブ 1 本無いまま放置される**。⚠ **失敗した id は registry を更新しない**ので、定義を直せば次の reload で必ず張り直る。⚠ 1 ソースの失敗は他のソースの反映を止めない（ログの `failed` に出る）
+- 🔴 **「ファイルを消した」と「ファイルは在るが壊れている」で挙動を分ける (#1572)。**判別キー（`source/feed` 等）を打ち間違えると `Source.all` がその定義を**1 件も yield しない**ので、素直に読むと `desired_sources` から消えて **`removed` として unschedule される**＝ typo が静かな停止に化ける。⚠ `Source.unmatched_ids` で拾い、**reload では古いジョブを残して `unmatched` に出す**（fail safe）。🔴 **起動は倒す**（`no source class matched: <id>`）＝ 定義は在るのに永久に走らないまま daemon が正常に見えるのを防ぐ。⚠ **`disable: true` の定義は unmatched に数えない**（止めた定義で起動を倒さない・reload では削除として扱う）
+- ⚠ **`digest` は group の全要素をハッシュする (#1571)。**⚠⚠ 先頭だけを見ていると、**同じ id の定義が 2 つある状態で片方を消す / `disable` しても digest が変わらず**、消したほうのジョブが走り続ける（`changed` / `removed` にも出ないので運用者は「反映済み」と読む）。⚠ 重複を作れる入口も塞いである＝ **`source add` は `.yml` / `.yaml` の両方を見る**
 - 🔴 **壊れた定義を掴んだら何も変えない。**`Config#load` は読み切ってから 1 回で差し替える（#1530）ので、YAML が 1 つでも壊れていれば例外だけが上がり、**ジョブも設定も前のまま**走り続ける
-- ⚠ **reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
+- ⚠ **daemon 側の reload ではスキーマ検証をしない。**起動時が検証していないのに reload だけ厳しいと「起動はできるのに reload は拒否される」定義が生まれる。検証は `source edit` / `source validate` の担当
+- 🔴 **ただし CLI の `source reload` は、起動なら倒れる定義が残っているうちは HUP を送らない (#1570)。**⚠⚠ **止めるのは起動が実際に倒れるものだけ＝ `schedule` のパース失敗（`at` / `cron` / `every` を `Rufus::Scheduler` の**それぞれのパーサ**で引く・`every` は 0 以下も）と、判別キーがどのソースクラスにも一致しない定義（unmatched）**。判定は `SourceValidator.startup_errors` の 1 本で、`source validate` も同じものを NG にする。**スキーマ違反では止めない** — 起動はスキーマを見ないので、そこで止めると上の「起動はできるのに reload は拒否される」を自分で作ることになる
+  - ⚠ **逃げ道は `disable: true`。**止めたソースは `desired_sources` が弾く＝起動は倒れないので検査対象外。**直せないなら止めれば reload は通る**（unmatched でも同じ）
+  - 🔴 **`Source.all` を回して検査してはいけない。**unmatched な定義は定義上 `Source.all` に現れないので、**reload は通るのに次の起動で全ソースが止まる**（4.10.0 のリリース前レビューで検出）。`/sources` の生の定義を見る
+  - ⚠ **スキーマの `source` は `minProperties: 1` しか見ない**ので、`source: {keyword: ...}` / `source: {news: {}}` のような unmatched 形もスキーマは通る。判別キーの検査はスキーマではなく `startup_errors` の担当
+  - ⚠ **スキーマの `pattern` では解けない**（完全な cron 正規表現は書けない）ので、`Source#register` が渡す先と同じパーサを直接呼んでいる。⚠ **総称の `Rufus::Scheduler.parse` は使わない** — cron 文字列も通るので `every: '0 0 * * *'` のような取り違えを見逃す
+  - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**daemon 側へ結果を出す話は #1529
 
 ⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
 
-⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
+⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...],"unmatched":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）。⚠ **`failed` は register が例外を上げたもの、`unmatched` は判別キーがどのソースクラスにも一致しなかったもの**で、どちらも古いジョブがあればそのまま残る（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
 ### デプロイ手順
 
@@ -463,14 +471,18 @@ monitor:
 
 ⚠ **読む行数（`streak_window`）も一緒に広がる。**`sample_size` より大きいしきい値を書いても窓が足りず到達し得ない、という穴を作らないため。⚠ **`/status.json` の `error_streak` も同じ窓で数える。**片方だけだと `error_streak: 50 / 100` という自己矛盾した数字が出る。
 
-🔴🔴 **しきい値 × 実行間隔が `/monitor/retention_days` を超えてはいけない。**`error_streak` が数えるのは `source_run_log` の行で、その行は prune で消える。⚠⚠ **疎なソースでしきい値を上げると、必要な本数の error 行が揃う前に古い行が消えるので、どれだけ連続で失敗しても 503 にならない。**⚠ `stale` も助けにならない（run 自体は走っていて `executed_at` は前に進む）。
+🔴🔴 **しきい値の回数ぶんの run が `/monitor/retention_days` の窓に収まらなければならない。**`error_streak` が数えるのは `source_run_log` の行で、その行は prune で消える。⚠⚠ **疎なソースでしきい値を上げると、必要な本数の error 行が揃う前に古い行が消えるので、どれだけ連続で失敗しても 503 にならない。**⚠ `stale` も助けにならない（run 自体は走っていて `executed_at` は前に進む）。
 
 ```
-月次 cron × しきい値 3 → 必要 90 日 > retention 14 日 → 永久に緑
-15 分間隔 × しきい値 8 → 必要 2 時間 ≪ retention 14 日 → 問題なし
+月次 cron（0 0 1 * *）× しきい値 3 → 14 日の窓に最大 1 回 → 永久に緑
+平日 cron（0 0 * * 1-5）× しきい値 12 → 14 日の窓に最大 10 回 → 永久に緑
+月初 2 日（0 0 1,2 * *）× しきい値 2 → 1 日と 2 日が同じ窓に入る → 届く
+15 分間隔 × しきい値 8 → 14 日の窓に 1344 回 → 問題なし
 ```
 
-⚠ **`bin/shrieker source validate` が WARN で指摘する。**NG にしないのは、妥当かどうかの判定に実行間隔が要り、**スキーマでは表現できない**ため。
+⚠ **「しきい値 × 実行間隔」で見積もらない。**不均一な cron（平日限定・月初だけ）で外れる。判定は**回数**で、**窓をどこに置いても最大いくつ入るか**で見る（#1587 / #1594）。
+
+⚠ **`bin/shrieker source validate` が WARN で指摘する。**NG にしないのは、妥当かどうかの判定に実行間隔が要り、**スキーマでは表現できない**ため。⚠ 1 つの定義が複数のクラスにマッチする場合は各インスタンスの最大の和で見る。密で長周期の cron（`* * * 1-11 *` など）は走査の上限で判定を諦め、警告しない
 
 #### 🔴 緩められるのは「エントリを 1 件も読めていない失敗」だけ
 
@@ -567,10 +579,29 @@ HTTP(s) Monitor:
 
 - `config/application.yaml` — デフォルト設定
 - `config/local.yaml` — ローカル上書き（git 管理外）
-- `config/sources/*.yaml` — ソース定義（動的読み込み）
+- `config/sources/*.yaml` — ソース定義（動的読み込み）。⚠ **git 管理外**（運用ホスト上の実物・資格情報が入る）
+- `test/sources/*.yaml` — **テスト専用のソース定義**。⚠ **`Environment.test?` の間だけ読む (#1593)**
 - `config/schema/base.yaml` — JSON Schema によるバリデーション
 
 設定アクセスは Ginseng のスラッシュ記法: `config['/path/to/key']`
+
+### テスト専用のソース定義 `test/sources/` (#1593)
+
+🔴 **`config/sources/` は git 管理外なので、CI にはソース定義が 1 件も無い。**その状態では
+`Source.all do |source| ... end` の形のテストは**ブロックが 1 度も回らず、何も確かめずに緑になる**
+＝ ⚠⚠ **失敗しないのではなく、実行されていない。**実測で CI の assertion は手元の **56%**
+（643 / 1142）しかなかった。
+
+- ⚠ **`config/sources/` を git 管理に変えてはいけない。**運用ホスト上の実物で、資格情報が入る
+- ⚠ **`test/sources/` に本物の資格情報を書かない。**`Environment.test?` の間は
+  `Source#deliver` が配信をスキップする（テンプレートだけ描画する）ので、トークンは
+  **「形として存在する」だけでよい**
+- ⚠ **Nostr 宛先は置いていない。**docs が「動作保証の対象外」としており、**秘密鍵を
+  リポジトリに置きたくない**ため。`NostrShriekerTest` は omission のままが正
+- 📌 **読み込みは `Config#source_dirs`。**`ENV['TEST']` を立てるのは `TestCase.load` だけなので、
+  本番・開発の実行では読まれない（`rake config:lint` や `bin/shrieker` でも読まれない）
+- 🔴 **この仕掛けが外れても「落ちない」ので、保証そのものにテストがある**
+  （`ConfigTest#test_test_sources_are_loaded` / `#test_test_sources_are_not_loaded_outside_test`）
 
 ### Schema 設計の指針 (required の意味論)
 
