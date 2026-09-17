@@ -432,6 +432,52 @@ module TomatoShrieker
       end
     end
 
+    # ⚠ **#1602 の Codex P2: 閏年にだけ窓に揃う cron を見落とさないこと。**
+    # `0 0 28,29 2 *` は平年だと 2 月 28 日の 1 回だけだが、閏年は 28 日と 29 日が同じ窓に入る。
+    # 2026-09 から 1 年だけ並べると 2028 年に届かない。
+    def test_warnings_leap_day_cron_is_reachable
+      leap = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '0 0 28,29 2 *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 2},
+      }
+
+      with_time_frozen(Time.parse('2026-09-15 12:00:00')) do
+        assert_empty(SourceValidator.warnings(leap))
+        warnings = SourceValidator.warnings(
+          leap.merge('monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 3}),
+        )
+
+        assert_match(/最大 2 回だけ/, warnings.first.to_s)
+      end
+    end
+
+    # ⚠ **#1602 の Codex P2: 固定間隔は発火を並べずに計算すること。**スキーマはしきい値に
+    # 上限を置いていないので、`every: 1s` に巨大な値を置くと数千万件を並べることになる。
+    def test_warnings_fixed_interval_is_computed
+      retention = Config.instance['/monitor/retention_days']
+      warnings = SourceValidator.warnings(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'every' => '1s'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 10_000_000},
+      )
+
+      assert_match(/最大 #{retention * 86_400} 回だけ/, warnings.first.to_s)
+    end
+
+    # ⚠ 密で長周期の cron は走査の上限で打ち切り、判定できないので警告しない
+    # （WARN は助言なので「出しすぎない」側に倒す）。
+    def test_warnings_give_up_on_dense_long_cycle_cron
+      assert_empty(SourceValidator.warnings(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '* * * 1-11 *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 1_000_000},
+      ))
+    end
+
     # 🔴 **#1594 の Codex P2: 複数のクラスにマッチした定義は、全インスタンスの発火を数える。**
     #
     # `source.calendar` と `source.ical` を両方持つ定義は `IcalendarSource` のジョブが
