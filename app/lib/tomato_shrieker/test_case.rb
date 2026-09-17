@@ -80,7 +80,7 @@ module TomatoShrieker
     def stub_source_feed(source)
       return unless source.respond_to?(:uri)
       return unless uri = source.uri
-      # ⚠ `IcalendarSource#uri` は毎回 `?t=<時刻>` を付けるので、クエリを落として前方一致。
+      # ⚠ `IcalendarSource#uri` は毎回 `?t=<時刻>` を付けるので、クエリを落として照合する。
       base = uri.to_s.sub(/\?.*\z/, '')
       return if base.empty?
       # ⚠⚠ **本文を先に組んでから登録する。**`stub_request(...).to_return(...)` の順だと、
@@ -88,7 +88,9 @@ module TomatoShrieker
       # 空ボディの 200 を返す**（＝ パーサが「No valid parser for XML」で落ちる）。
       # 呼び出し側の `rescue` が握るので、**気付けないまま全件が空になる**。
       body = feed_fixture_for(source)
-      stub_request(:get, /\A#{Regexp.escape(base)}/).to_return(status: 200, body:)
+      # ⚠ **後ろはクエリか終端だけ（#1595 の Codex P2）。**素の前方一致だと `/feed` の stub が
+      # `/feedback` や `/feed/admin` まで塞ぎ、**誤った取得先への GET が遮断されずに成功する**。
+      stub_request(:get, /\A#{Regexp.escape(base)}(\?|\z)/).to_return(status: 200, body:)
     end
 
     def feed_fixture_for(source)
@@ -122,8 +124,16 @@ module TomatoShrieker
       WebMock.reset!
     end
 
+    # 🔴 **`TEST` を立てたら設定を読み直す（#1596 の Codex P2）。**
+    #
+    # ⚠⚠ `require 'tomato_shrieker'` の時点で（Sentry の初期化などで）`Config.instance` は
+    # もう作られているので、`test/sources/` は**最初のテストの teardown が `config.reload`
+    # するまで読まれない**。全件実行では先に走る別のテストが読み直すので気付けないが、
+    # `bin/test.rb mastodon_shrieker` のように単体で走らせると `disable?` が定義を
+    # 見つけられず、**#1593 で走らせたかったテストが omit される**。
     def self.load(cases = nil)
       ENV['TEST'] = Package.full_name
+      Config.instance.reload
       names(cases).each do |name|
         puts "+ case: #{name}" if Environment.test?
         require File.join(dir, "#{name}.rb")

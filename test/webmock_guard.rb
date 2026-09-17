@@ -61,6 +61,25 @@ module TomatoShrieker
       FileUtils.rm_f(path)
     end
 
+    # ⚠ **#1595 の Codex P2: 設定済みソースの stub は、その URL だけを塞ぐこと。**
+    # 素の前方一致だと `/rss` の stub が `/rssfeedback` や `/rss/admin` まで成功させ、
+    # **誤った取得先への GET が遮断されない**。クエリ付きは同じ取得先として通す
+    # （`IcalendarSource#uri` は毎回 `?t=<時刻>` を付ける）。
+    def test_generic_feed_stub_is_bounded_to_source_url
+      write_fixture
+      config.reload
+      stub_default_feeds
+
+      assert_include(Net::HTTP.get(URI.parse("#{FEED_URL}?t=1")), '<rss')
+      ["#{FEED_URL}feedback", "#{FEED_URL}/admin"].each do |url|
+        assert_raise(WebMock::NetConnectNotAllowedError, url) do
+          Net::HTTP.get_response(URI.parse(url))
+        end
+      end
+    ensure
+      FileUtils.rm_f(path)
+    end
+
     private
 
     def path

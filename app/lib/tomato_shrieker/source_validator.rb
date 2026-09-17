@@ -21,6 +21,11 @@ module TomatoShrieker
     # 明示すると倒れる」（またはその逆）になる。
     DEFAULT_REMIND_MINUTES = 5
 
+    # しきい値への到達性を見るとき、cron の発火を最大何件まで並べるか。⚠ 1 件 80µs 前後
+    # （fugit の next_time）なので、`* * * 1-11 *` のような密で長周期の指定でも
+    # `source validate` が 1 秒ほどで返るように抑える。超えたら判定を諦めて警告しない。
+    MAX_CRON_SAMPLES = 10_000
+
     class << self
       def schema
         @schema ||= YAML.load_file(File.join(Environment.dir, SCHEMA_FILE))
@@ -200,44 +205,87 @@ module TomatoShrieker
         return [] if runs.nil? || runs >= threshold
         return [
           "/monitor/error_streak_threshold (#{threshold}) に到達するには run が #{threshold} 回" \
-            " 必要ですが、/monitor/retention_days (#{retention} 日) の間に発火するのは" \
-            " #{runs} 回だけです。prune で先に消えるため、連続して失敗しても 503 になりません",
+            "必要ですが、/monitor/retention_days (#{retention} 日) のどの窓でも発火は" \
+            "最大 #{runs} 回だけです。prune で先に消えるため、連続して失敗しても 503 になりません",
         ]
       end
 
-      # retention の窓に何回発火するか。⚠ `threshold` に届いた時点で打ち切る
-      # （`* * * * *` に大きなしきい値を置かれても走査が伸びない）。
+      # retention 幅の窓に**最大で**何回発火するか。⚠ `limit` に届いた時点で打ち切る。
       #
       # 🔴 **回数を実際に数える（Codex P2・#1587）。**⚠⚠ 以前は「次の 2 回の間隔」を
       # 全体へ引き伸ばしていたので、**平日限定 cron のような不均一な指定で所要日数を
-      # 過小評価した**。しかも **`source validate` を叩いた曜日で結果が変わる**
-      # （月曜なら 1 日刻み、金曜なら 3 日刻み）。
+      # 過小評価した**。しかも **`source validate` を叩いた曜日で結果が変わる**。
       #
-      # ⚠ 壊れた cron / period は nil を返す。**警告を出す処理が例外で倒れて
-      # `source validate` 全体を止めるほうが害が大きい**し、書式そのものの誤りは
-      # `schedule_errors` と起動時の register が別に捕まえる。
+      # 🔴 **窓の起点を「今」に固定しない（#1594 の Codex P2）。**prune は「今から retention
+      # 日より古い行」を消すだけなので、**どこかの時点で窓に `limit` 回入れば 503 に届く**。
+      # ⚠⚠ `0 0 1,2 * *` にしきい値 2 は、月の半ばに数えると次の 14 日で 0 回だが、
+      # 1 日と 2 日の失敗は同じ窓に入る。→ **発火を並べて、窓をずらして最大を取る。**
+      #
+      # 🔴 **マッチした全インスタンスの発火を合わせる（#1594 の Codex P2）。**1 つの定義が
+      # 複数のクラスにマッチすると、scheduler はそのぶんジョブを立て、どれも同じソース ID の
+      # 行を書く。⚠ 合わせ方は**各インスタンスの最大の和**（上限）。WARN は助言なので、
+      # 位相の重なりまで厳密に解くより「出しすぎない」側に倒す。
+      #
+      # ⚠ 壊れた cron / period や、走査の上限に達して最大を確定できないときは nil
+      # （＝ 警告しない）。**警告を出す処理が例外で倒れて `source validate` 全体を止めるほうが
+      # 害が大きい**し、書式そのものの誤りは `startup_errors` と起動時の register が別に捕まえる。
       def runs_within_retention(params, retention, limit)
-        return nil unless source = matched_sources(params).first
-        return nil if source.post_at
-        deadline = Time.now + (retention * 86_400)
-        return count_cron_runs(source.cron, deadline, limit) if source.cron
-        return nil unless period = source.period
-        return nil unless (seconds = Rufus::Scheduler.parse_duration(period)).positive?
-        return [((deadline - Time.now) / seconds).floor, limit].min
+        sources = matched_sources(params).reject(&:post_at)
+        return nil if sources.empty?
+        width = retention * 86_400
+        runs = sources.map {|source| max_source_runs(source, width, limit)}
+        return nil if runs.include?(nil)
+        return [runs.sum, limit].min
       rescue StandardError
         return nil
       end
 
-      def count_cron_runs(cron, deadline, limit)
-        parsed = Rufus::Scheduler.parse_cron(cron)
-        at = Time.now
-        count = 0
-        while count < limit
-          at = parsed.next_time(at).to_t
-          break if at > deadline
-          count += 1
-        end
-        return count
+      def max_source_runs(source, width, limit)
+        return max_cron_runs(Rufus::Scheduler.parse_cron(source.cron), width, limit) if source.cron
+        return nil unless period = source.period
+        return nil unless (seconds = Rufus::Scheduler.parse_duration(period)).positive?
+        # ⚠ **固定間隔は数えずに計算する（#1602 の Codex P2）。**`every: 1s` に巨大なしきい値を
+        # 置かれると、並べるだけで数千万件になる。窓 `(t - width, t]` に入るのは ceil 回。
+        return [(width / seconds).ceil, limit].min
+      end
+
+      # ⚠ **走査する範囲は cron の周期で決める。**日・月の指定が無ければ週で一巡するので
+      # 1 週間ぶんで足りる。あれば 1 年ぶんに加え、**次の 2 月 29 日の前後も見る**
+      # （#1602 の Codex P2: `0 0 28,29 2 *` は閏年にだけ 2 回が同じ窓に入る）。
+      def max_cron_runs(cron, width, limit)
+        samples = 0
+        return cron_ranges(cron, width).map do |from, to|
+          max = 0
+          window = []
+          at = from
+          while (at = cron.next_time(at).to_t) <= to
+            return nil if MAX_CRON_SAMPLES < (samples += 1)
+            window.push(at)
+            window.shift while window.first <= at - width
+            max = [max, window.size].max
+            break if limit <= max
+          end
+          max
+        end.max
+      end
+
+      def cron_ranges(cron, width)
+        now = Time.now
+        return [[now, now + (7 * 86_400) + width]] if weekly_cycle?(cron)
+        leap_day = next_leap_day(now)
+        return [[now, now + (366 * 86_400) + width], [leap_day - width, leap_day + width]]
+      end
+
+      # ⚠ `1#2`（第 2 月曜）や `5#-1`（最終金曜）は月で一巡するので週の周期に含めない。
+      def weekly_cycle?(cron)
+        return false if cron.months || cron.monthdays
+        return (cron.weekdays || []).all? {|v| v.size == 1}
+      end
+
+      def next_leap_day(now)
+        year = now.year
+        year += 1 until Date.leap?(year) && now < Time.new(year, 2, 29)
+        return Time.new(year, 2, 29)
       end
     end
   end

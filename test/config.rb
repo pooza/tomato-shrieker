@@ -96,6 +96,26 @@ module TomatoShrieker
       assert_not_include(dirs.first, 'test/sources')
     end
 
+    # 🔴 **#1596 の Codex P2: `TestCase.load` の時点で `test/sources/` が読まれていること。**
+    #
+    # ⚠⚠ `Config.instance` は `TEST` を立てる前に作られているので、読み直さないと
+    # 最初のテストの teardown まで `test/sources/` が見えない＝ 単体実行で
+    # `MastodonShriekerTest` などが `disable?` で omit される。
+    def test_test_case_load_reads_test_sources
+      saved = ENV.fetch('TEST', nil)
+      ENV.delete('TEST')
+      config.reload
+
+      assert_not_include(source_ids, 'mastodon-dest', '前提: TEST が無ければ読まれない')
+
+      TestCase.load('__no_such_case__')
+
+      assert_include(source_ids, 'mastodon-dest')
+    ensure
+      ENV['TEST'] = saved
+      config.reload
+    end
+
     private
 
     # ⚠ 元の `Method` を保存して戻す（`remove_method` だと本物ごと消える）。
@@ -125,6 +145,10 @@ module TomatoShrieker
       Dir.glob(File.join(Environment.dir, 'config/sources', "#{PREFIX}*")).each do |f|
         File.delete(f)
       end
+    end
+
+    def source_ids
+      return config['/sources'].map {|v| v['id']}
     end
   end
 end
