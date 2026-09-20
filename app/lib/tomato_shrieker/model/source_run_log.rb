@@ -372,13 +372,9 @@ module TomatoShrieker
       return Config.instance['/monitor/sample_size']
     end
 
-    def self.retention_days
-      return Config.instance['/monitor/retention_days']
-    end
-
     # prune の境界と streak の境界を 1 本にする (#1608)。
     # ⚠ **同じ値から出すこと。**別々に計算すると「消える行」と「数える行」がずれる。
-    def self.retention_cutoff(days = retention_days)
+    def self.retention_cutoff(days = Config.instance['/monitor/retention_days'])
       return Time.now - (days * 86_400)
     end
 
