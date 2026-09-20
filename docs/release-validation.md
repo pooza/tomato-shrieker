@@ -177,7 +177,60 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 注: `bin/shrieker source shriek` は初回（DB に Entry 履歴なし）のみ「最新 1 件のみ投稿」、2 回目以降は新規 entry を全て投稿する。連投したくない場合は事前に `clear` する。
 
-### 5. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
+### 5. ハッシュタグ無毒化の新旧差分（ginseng-fediverse のタグ判定が動いたリリースのみ）
+
+🔴 **`sanitize_status` の境界が変わるリリースでは、配信済みエントリを新旧の実装に通して差分を取る。**⚠⚠ **テストは通るのに、投稿先に出る文字列だけが変わる**ので自動では捕まらない（4.11.0 では `rake test` 371 tests が全部緑のまま 15 ソースの本文が変わった）。
+
+#### 手順
+
+`tmp/sanitize_diff.rb` を置く:
+
+```ruby
+# 配信済みエントリの title / summary を sanitize_status に通して 1 行 1 件で出す
+require 'ginseng/fediverse'
+require 'sequel'
+db = Sequel.connect(ENV.fetch('DSN'))
+db[:entry].order(:feed, :id).each do |e|
+  %i[title summary].each do |col|
+    src = e[col].to_s
+    next if src.empty?
+    out = (Ginseng::Fediverse::Service.sanitize_status(src.dup) rescue "!!#{$!.class}")
+    puts "#{e[:feed]}\t#{col}\t#{out.gsub(/\s+/, ' ')}"
+  end
+end
+```
+
+🔴 **旧版は `-I` で読む。**⚠⚠ **`git checkout v<前> -- Gemfile.lock && bundle install` は失敗する**（`Could not find ginseng-core-1.23.5 ... at main@d53a18b`）。git ソースの gem は **lock の version 行が実体とずれている**ことがあり、bundler が materialize できない。⚠ **bundler のチェックアウトはリビジョンごとに残る**ので、それを直接読ませればよい。
+
+```sh
+PREV=v4.10.0   # 前リリースのタグ
+REV=$(git show $PREV:Gemfile.lock | awk '/ginseng-fediverse.git/{f=1} f&&/revision:/{print substr($2,1,12); exit}')
+OLD=$(ls -d ~/.rbenv/versions/*/lib/ruby/gems/*/bundler/gems/ginseng-fediverse-$REV)
+# ⚠ 無ければ: git clone https://github.com/pooza/ginseng-fediverse.git /tmp/gf-old && git -C /tmp/gf-old checkout $REV && OLD=/tmp/gf-old
+
+export DSN="sqlite://$PWD/tmp/db/db.sqlite3"
+bundle exec ruby            tmp/sanitize_diff.rb >| tmp/sanitize-new.txt
+bundle exec ruby -I$OLD/lib tmp/sanitize_diff.rb >| tmp/sanitize-old.txt
+diff tmp/sanitize-old.txt tmp/sanitize-new.txt
+```
+
+⚠ **`>|` を使う。**この端末の zsh は `noclobber` なので `>` だと既存ファイルが**書き換わらないまま**古い内容が残る（実際に踏んだ）。
+
+#### 読み方
+
+差分が出たら、**直る側と新しく無毒化される側のどちらか**を 1 件ずつ投稿先で実視認する。4.11.0（`ginseng-fediverse` 1.8.31 → 3.1.0）の実績:
+
+| 入力 | 旧 | 新 | |
+|---|---|---|---|
+| `Merge pull request #26 from …` | `# 26` | `#26` | ✅ 直った |
+| `…のBE@RBRICKが登場！！` | `BE@ RBRICK` | `BE@RBRICK` | ✅ 直った |
+| `＃shorts ＃ぷちきゅあ` | そのまま | `＃ shorts ＃ ぷちきゅあ` | 🔴 新しく無毒化 |
+
+本番で配信中の 703 エントリでは **15 ソース**（直る側 11 / 新しく無毒化される側 2 ＝ `precure-petitcure` 系）で出力が変わった。
+
+⚠ **`fedi_sanitize?` が効くのは `sanitize: fedi` のソースだけ。**`sanitize: html` のソース（本番 8 件）は通らない。
+
+### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
 ⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
 
@@ -244,6 +297,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
+- [ ] ⚠ **`ginseng-fediverse` のタグ判定が動いたリリースでは、配信済みエントリの新旧差分を取る**（上記 5）。差分が出たら**全角 ＃ 系（`precure-petitcure`）と `#NNN` 系（GitHub releases）の投稿本文**を投稿先で実視認する
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
 
 ## 後始末
@@ -254,5 +308,5 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 
 ## 関連
 
-- [v4-plan.md](v4-plan.md) — 4.0 系のリリース計画
+- [archive/v4-plan.md](archive/v4-plan.md) — 4.0 系のリリース計画
 - [CLAUDE.md](CLAUDE.md) — リリースフロー全体（本手順は「セキュリティレビュー前」ステップに相当）
