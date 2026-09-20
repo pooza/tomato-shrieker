@@ -177,7 +177,34 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 注: `bin/shrieker source shriek` は初回（DB に Entry 履歴なし）のみ「最新 1 件のみ投稿」、2 回目以降は新規 entry を全て投稿する。連投したくない場合は事前に `clear` する。
 
-### 5. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
+### 5. ハッシュタグ無毒化の目視（ginseng-fediverse のタグ判定が動いたリリースのみ）
+
+🔴 **`sanitize_status` の境界が変わるリリースでは、投稿本文を目視すること。**⚠⚠ **テストは通るのに、投稿先に出る文字列だけが変わる**ので、自動では捕まらない。
+
+4.11.0（`ginseng-fediverse` 1.8.31 → 3.1.0）で実際に変わったもの:
+
+| 入力 | 旧 | 新 |
+|---|---|---|
+| `Merge pull request #26 from …` | `# 26` | `#26` |
+| `…のBE@RBRICKが登場！！` | `BE@ RBRICK` | `BE@RBRICK` |
+| `＃shorts ＃ぷちきゅあ` | そのまま | `＃ shorts ＃ ぷちきゅあ` |
+
+確かめ方。**本番でいま配信中のエントリを新旧の実装に通して差分を取る**のが確実:
+
+```sh
+bundle exec ruby -e '
+require "ginseng/fediverse"
+[
+  "Merge pull request #26 from pooza/chore",
+  "『魔法つかい〜』より「モフルン」のBE@RBRICKが登場！！",
+  "誕生日を…お祝い🎁 ＃shorts ＃ぷちきゅあ",
+].each {|s| puts "#{s}\n  => #{Ginseng::Fediverse::Service.sanitize_status(s.dup)}\n" }
+'
+```
+
+⚠ **`fedi_sanitize?` が効くのは `sanitize: fedi` のソースだけ。**`sanitize: html` のソース（本番 8 件）は通らない。
+
+### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
 ⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
 
@@ -244,6 +271,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
+- [ ] ⚠ **`ginseng-fediverse` のタグ判定が動いたリリースでは、ハッシュタグ無毒化の目視**（上記 5）。**全角 ＃ 系（`precure-petitcure`）と `#NNN` 系（GitHub releases）の投稿本文**を投稿先で実視認する
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
 
 ## 後始末
@@ -254,5 +282,5 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 
 ## 関連
 
-- [v4-plan.md](v4-plan.md) — 4.0 系のリリース計画
+- [archive/v4-plan.md](archive/v4-plan.md) — 4.0 系のリリース計画
 - [CLAUDE.md](CLAUDE.md) — リリースフロー全体（本手順は「セキュリティレビュー前」ステップに相当）
