@@ -67,6 +67,56 @@ module TomatoShrieker
       assert_equal(2, SourceRunLog.error_streak(SOURCE_ID))
     end
 
+    # 🔴 **#1608: prune が守る古い行をまたいで数えない。**
+    #
+    # ⚠⚠ `prune` はソースごとに `first_run_ids` / `last_attempted_ids` /
+    # `last_delivered_ids` の 3 行を**無期限に守る**。**疎なソース**では retention 内の
+    # 行が `limit` より少ないので、**守られた古い行がそのまま末尾に並ぶ**。間にあった
+    # 成功行は消えているので、**何か月も前の最初の run のエラーが直近のエラーと
+    # 地続きに見え、streak が水増しされる**＝ 実際には連続していない失敗で
+    # `/healthz/source/:id` が 503 を立てる。
+    def test_error_streak_stops_at_retention_cutoff
+      # 最初の run（error）。⚠ first_run_ids が守るので prune で消えない
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (90 * 86_400),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+        attempted_count: 1, delivered_count: 0
+      )
+      # ⚠ retention の外の success。**prune で消える**＝ streak を切る材料が無くなる
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (30 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      # retention 内の連続エラー 2 件
+      [2, 1].each do |days|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+          attempted_count: 1, delivered_count: 0
+        )
+      end
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(3, remain.size, '最初の run が保護行として残っている')
+      assert_equal(2, SourceRunLog.error_streak(SOURCE_ID), '保護行をまたいで数えない')
+    end
+
+    # ⚠ cutoff は**境界の外だけ**を落とす。retention 内の行は今までどおり数える
+    # （#1608 で streak が過小になっては意味がない）。
+    def test_error_streak_counts_whole_retention_window
+      [13, 12, 11].each do |days|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+          attempted_count: 1, delivered_count: 0
+        )
+      end
+
+      assert_equal(3, SourceRunLog.error_streak(SOURCE_ID))
+    end
+
     # migration 010 直後は既存行が attempted_count = 0 で backfill される。
     # ここで過去のエラーが生き返ると、デプロイ直後に健全なソースが一斉 503 になる。
     def test_error_streak_after_migration_backfill
