@@ -228,7 +228,11 @@ diff tmp/sanitize-old.txt tmp/sanitize-new.txt
 
 本番で配信中の 703 エントリでは **15 ソース**（直る側 11 / 新しく無毒化される側 2 ＝ `precure-petitcure` 系）で出力が変わった。
 
-⚠ **`fedi_sanitize?` が効くのは `sanitize: fedi` のソースだけ。**`sanitize: html` のソース（本番 8 件）は通らない。
+🔴 **無毒化を通るのは `FeedSource` 系と `IcalendarSource` だけ。**⚠⚠ `fedi_sanitize` は `Source` のメソッドだが、**呼んでいるのは `feed_source.rb:109`（`entry.title`）と `icalendar_source.rb:126-128`（`summary` / `description` / `location`）の 2 箇所だけ**で、**`TextSource` / `CommandSource` は通らない**。⚠ **`sanitize: fedi` を書いた TextSource で確かめようとしても何も起きない**（2026-09-21 に実際に踏んだ。投稿先に `＃ぷちきゅあ` がそのまま出て、無毒化が壊れたように見える）。
+
+⚠ **`sanitize: html` のソース（本番 8 件）も通らない**（`sanitize_mode` が `:fedi` のときだけ）。
+
+⚠ **投稿先で実視認するなら FeedSource を使う。**`test-youtube-channel` の定義に PieFed の `dest` と `keyword` を足した一時ソースを作ると、ハッシュタグを含むエントリだけを 1 件投稿できる。⚠ **一時ソースには PieFed のパスワードが入るので、確認したら消すこと。**
 
 ### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
@@ -265,7 +269,7 @@ cat tmp/pids/SchedulerDaemon.pid
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4567/healthz
 
 # 2. ソースを 1 件足して reload
-bin/shrieker source add test-reload-probe
+bin/shrieker source add test-reload-probe   # ⚠ $EDITOR が開く。非対話で流すなら config/sources/test-reload-probe.yaml を直接書く
 bin/shrieker source reload
 
 # 3. ログで結果を見る（⚠ CLI は「要求した」までしか言えない = #1529）
@@ -287,7 +291,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] **同じ定義に `disable: true` を足すと `source reload` が通る**（逃げ道。unmatched でも効くこと）
 - [ ] **壊れた定義を置いたまま HUP を直接送っても、他のソースが止まらない**（daemon 側の fail safe）。⚠⚠ **`source reload` は上のとおり拒否するので、ここは `kill -HUP "$(cat tmp/pids/SchedulerDaemon.pid)"` で送る。**ログの `failed`（cron）/ `unmatched`（判別キー）に ID が出て、古いジョブが残ること
   - ⚠ **先に妥当な定義へ戻して `source reload` し、ジョブを立て直してから壊す。**直前の `disable: true` の reload でジョブは消えているので、そのまま HUP を送っても「残るべき古いジョブ」が無く、fail safe を確かめたことにならない
-- [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ 倒れた後は pid ファイルが残るが、直して `start` すれば通る（4.10.0 で確認）。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
+- [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ **4.11.0（ginseng-core 1.24.0）から、倒れた後に pid ファイルは残らない。**代わりに **理由が syslog に 1 行出る**（`{"daemon":"SchedulerDaemon","message":"not started","reason":"start failed","error":"Ginseng::ConfigError","detail":"failed to register: <id>"}`）。⚠ **4.10.0 までは pid が残り、理由はどこにも出なかった**（`bin/scheduler_daemon.rb` が stderr を `/dev/null` へ付け替えているため）。直して `start` すれば通るのは従来どおり。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
 - [ ] `source reload` の後に **HUP をもう一度送っても効く**（ワーカースレッドが生きている）
 
 ## チェックリスト
