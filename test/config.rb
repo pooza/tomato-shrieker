@@ -82,7 +82,17 @@ module TomatoShrieker
     def test_test_sources_are_loaded
       ids = Source.all.map(&:id)
 
-      ['mastodon-dest', 'misskey-dest', 'line-dest', 'piefed-dest', 'webhook-dest'].each do |id|
+      # ⚠ `__entry_fixture__` は EntryTest がフィクスチャを紐づける先 (#1597)。
+      ids_to_check = [
+        'mastodon-dest',
+        'misskey-dest',
+        'line-dest',
+        'piefed-dest',
+        'webhook-dest',
+        '__entry_fixture__',
+      ]
+
+      ids_to_check.each do |id|
         assert_include(ids, id, "test/sources/#{id}.yaml が読まれていない")
       end
     end

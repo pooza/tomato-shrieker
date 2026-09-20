@@ -1,0 +1,16 @@
+# Entry のフィクスチャを紐づけるテスト専用ソース (#1597)
+# 🔴 **EntryTest はこのソースの ID でエントリを作って消す。**
+# ⚠⚠ **ファイル名がそのまま ID になる。**`EntryTest#clear_fixtures` はこの ID の行を
+#    無条件に消すので、**開発機の実ソースと衝突しない名前**にしてある
+#    （#1612 の Codex P2・`__test_feed_source__` と同じ命名）。
+# ⚠ 資格情報は書かない。Environment.test? の間は Source#deliver が配信をスキップする。
+test: true
+source:
+  feed: https://feed.example.test/entry.rss
+schedule:
+  every: 1d
+dest:
+  hooks:
+    - https://hook.example.test/entry
+  tags:
+    - test
