@@ -24,7 +24,18 @@ module TomatoShrieker
     def exec
       return if disable?
       in_threads = Parallel.processor_count * 2
-      Parallel.each(entries, in_threads:) do |entry|
+      # 🔴 **`entries` を取り出してから段を立てる (#1586)。**⚠ ical の取得に失敗した
+      # run は取得段。⚠⚠ 予定は時刻で 1 度しか流れないので、エントリ処理段で落ちた
+      # ぶんは**取り返せない**。
+      #
+      # 🔴🔴 **`to_a` で先に評価する (#1615 の Codex P1)。**⚠⚠ `entries` は
+      # `enum_for` ＝ **Enumerator なので、代入しただけでは ical を取りに行かない**。
+      # しかも Enumerator は `empty?` を持たないので `present?` が**中身を見ずに true**
+      # を返す。そのままだと**段を立てた後に `ical` の HTTP / パースが落ちる**ことに
+      # なり、取得段の失敗が `entry_stage: true` で保存される。
+      targets = entries.to_a
+      @delivery_stats&.enter_entry_stage! if targets.present?
+      Parallel.each(targets, in_threads:) do |entry|
         template = create_template
         template[:entry] = entry
         template[:remind] = false

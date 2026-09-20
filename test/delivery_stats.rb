@@ -15,6 +15,17 @@ module TomatoShrieker
       assert_true(@stats.noop?)
     end
 
+    # 🔴 #1586: エントリ処理段に入ったかを run_log へ渡すためのマーカー。
+    def test_entry_stage
+      assert_false(@stats.entry_stage?, '初期値は「まだ入っていない」')
+      @stats.enter_entry_stage!
+
+      assert_true(@stats.entry_stage?)
+      # ⚠ 段を立てるだけで件数には触らない（no-op 判定を壊さない）
+      assert_equal(0, @stats.attempted_count)
+      assert_true(@stats.noop?)
+    end
+
     def test_record_success
       @stats.record_success(@shrieker)
       @stats.record_success(@shrieker)

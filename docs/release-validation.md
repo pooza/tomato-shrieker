@@ -177,7 +177,64 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 注: `bin/shrieker source shriek` は初回（DB に Entry 履歴なし）のみ「最新 1 件のみ投稿」、2 回目以降は新規 entry を全て投稿する。連投したくない場合は事前に `clear` する。
 
-### 5. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
+### 5. ハッシュタグ無毒化の新旧差分（ginseng-fediverse のタグ判定が動いたリリースのみ）
+
+🔴 **`sanitize_status` の境界が変わるリリースでは、配信済みエントリを新旧の実装に通して差分を取る。**⚠⚠ **テストは通るのに、投稿先に出る文字列だけが変わる**ので自動では捕まらない（4.11.0 では `rake test` 371 tests が全部緑のまま 15 ソースの本文が変わった）。
+
+#### 手順
+
+`tmp/sanitize_diff.rb` を置く:
+
+```ruby
+# 配信済みエントリの title / summary を sanitize_status に通して 1 行 1 件で出す
+require 'ginseng/fediverse'
+require 'sequel'
+db = Sequel.connect(ENV.fetch('DSN'))
+db[:entry].order(:feed, :id).each do |e|
+  %i[title summary].each do |col|
+    src = e[col].to_s
+    next if src.empty?
+    out = (Ginseng::Fediverse::Service.sanitize_status(src.dup) rescue "!!#{$!.class}")
+    puts "#{e[:feed]}\t#{col}\t#{out.gsub(/\s+/, ' ')}"
+  end
+end
+```
+
+🔴 **旧版は `-I` で読む。**⚠⚠ **`git checkout v<前> -- Gemfile.lock && bundle install` は失敗する**（`Could not find ginseng-core-1.23.5 ... at main@d53a18b`）。git ソースの gem は **lock の version 行が実体とずれている**ことがあり、bundler が materialize できない。⚠ **bundler のチェックアウトはリビジョンごとに残る**ので、それを直接読ませればよい。
+
+```sh
+PREV=v4.10.0   # 前リリースのタグ
+REV=$(git show $PREV:Gemfile.lock | awk '/ginseng-fediverse.git/{f=1} f&&/revision:/{print substr($2,1,12); exit}')
+OLD=$(ls -d ~/.rbenv/versions/*/lib/ruby/gems/*/bundler/gems/ginseng-fediverse-$REV)
+# ⚠ 無ければ: git clone https://github.com/pooza/ginseng-fediverse.git /tmp/gf-old && git -C /tmp/gf-old checkout $REV && OLD=/tmp/gf-old
+
+export DSN="sqlite://$PWD/tmp/db/db.sqlite3"
+bundle exec ruby            tmp/sanitize_diff.rb >| tmp/sanitize-new.txt
+bundle exec ruby -I$OLD/lib tmp/sanitize_diff.rb >| tmp/sanitize-old.txt
+diff tmp/sanitize-old.txt tmp/sanitize-new.txt
+```
+
+⚠ **`>|` を使う。**この端末の zsh は `noclobber` なので `>` だと既存ファイルが**書き換わらないまま**古い内容が残る（実際に踏んだ）。
+
+#### 読み方
+
+差分が出たら、**直る側と新しく無毒化される側のどちらか**を 1 件ずつ投稿先で実視認する。4.11.0（`ginseng-fediverse` 1.8.31 → 3.1.0）の実績:
+
+| 入力 | 旧 | 新 | |
+|---|---|---|---|
+| `Merge pull request #26 from …` | `# 26` | `#26` | ✅ 直った |
+| `…のBE@RBRICKが登場！！` | `BE@ RBRICK` | `BE@RBRICK` | ✅ 直った |
+| `＃shorts ＃ぷちきゅあ` | そのまま | `＃ shorts ＃ ぷちきゅあ` | 🔴 新しく無毒化 |
+
+本番で配信中の 703 エントリでは **15 ソース**（直る側 11 / 新しく無毒化される側 2 ＝ `precure-petitcure` 系）で出力が変わった。
+
+🔴 **無毒化を通るのは `FeedSource` 系と `IcalendarSource` だけ。**⚠⚠ `fedi_sanitize` は `Source` のメソッドだが、**呼んでいるのは `feed_source.rb:109`（`entry.title`）と `icalendar_source.rb:126-128`（`summary` / `description` / `location`）の 2 箇所だけ**で、**`TextSource` / `CommandSource` は通らない**。⚠ **`sanitize: fedi` を書いた TextSource で確かめようとしても何も起きない**（2026-09-21 に実際に踏んだ。投稿先に `＃ぷちきゅあ` がそのまま出て、無毒化が壊れたように見える）。
+
+⚠ **`sanitize: html` のソース（本番 8 件）も通らない**（`sanitize_mode` が `:fedi` のときだけ）。
+
+⚠ **投稿先で実視認するなら FeedSource を使う。**`test-youtube-channel` の定義に PieFed の `dest` と `keyword` を足した一時ソースを作ると、ハッシュタグを含むエントリだけを 1 件投稿できる。⚠ **一時ソースには PieFed のパスワードが入るので、確認したら消すこと。**
+
+### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
 ⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
 
@@ -212,7 +269,7 @@ cat tmp/pids/SchedulerDaemon.pid
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4567/healthz
 
 # 2. ソースを 1 件足して reload
-bin/shrieker source add test-reload-probe
+bin/shrieker source add test-reload-probe   # ⚠ $EDITOR が開く。非対話で流すなら config/sources/test-reload-probe.yaml を直接書く
 bin/shrieker source reload
 
 # 3. ログで結果を見る（⚠ CLI は「要求した」までしか言えない = #1529）
@@ -234,7 +291,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] **同じ定義に `disable: true` を足すと `source reload` が通る**（逃げ道。unmatched でも効くこと）
 - [ ] **壊れた定義を置いたまま HUP を直接送っても、他のソースが止まらない**（daemon 側の fail safe）。⚠⚠ **`source reload` は上のとおり拒否するので、ここは `kill -HUP "$(cat tmp/pids/SchedulerDaemon.pid)"` で送る。**ログの `failed`（cron）/ `unmatched`（判別キー）に ID が出て、古いジョブが残ること
   - ⚠ **先に妥当な定義へ戻して `source reload` し、ジョブを立て直してから壊す。**直前の `disable: true` の reload でジョブは消えているので、そのまま HUP を送っても「残るべき古いジョブ」が無く、fail safe を確かめたことにならない
-- [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ 倒れた後は pid ファイルが残るが、直して `start` すれば通る（4.10.0 で確認）。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
+- [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ **4.11.0（ginseng-core 1.24.0）から、倒れた後に pid ファイルは残らない。**代わりに **理由が syslog に 1 行出る**（`{"daemon":"SchedulerDaemon","message":"not started","reason":"start failed","error":"Ginseng::ConfigError","detail":"failed to register: <id>"}`）。⚠ **4.10.0 までは pid が残り、理由はどこにも出なかった**（`bin/scheduler_daemon.rb` が stderr を `/dev/null` へ付け替えているため）。直して `start` すれば通るのは従来どおり。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
 - [ ] `source reload` の後に **HUP をもう一度送っても効く**（ワーカースレッドが生きている）
 
 ## チェックリスト
@@ -244,6 +301,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
+- [ ] ⚠ **`ginseng-fediverse` のタグ判定が動いたリリースでは、配信済みエントリの新旧差分を取る**（上記 5）。差分が出たら**全角 ＃ 系（`precure-petitcure`）と `#NNN` 系（GitHub releases）の投稿本文**を投稿先で実視認する
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
 
 ## 後始末
@@ -254,5 +312,5 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 
 ## 関連
 
-- [v4-plan.md](v4-plan.md) — 4.0 系のリリース計画
+- [archive/v4-plan.md](archive/v4-plan.md) — 4.0 系のリリース計画
 - [CLAUDE.md](CLAUDE.md) — リリースフロー全体（本手順は「セキュリティレビュー前」ステップに相当）

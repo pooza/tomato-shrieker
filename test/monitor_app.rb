@@ -247,7 +247,9 @@ module TomatoShrieker
 
     # 🔴🔴 **エントリを読んだ後に落ちた失敗は、しきい値を緩めていても 1 回で赤。**
     # 緩めるとそのぶんのエントリが恒久的に失われるのに undelivered / stale / silent の
-    # どれも立たない (#1473)。run_log 上は shrieker_errors の有無で区別できる
+    # どれも立たない (#1473)。
+    # ⚠ **この行は `entry_stage` を持たない＝ migration 013 より前の旧行を模している**
+    # （#1586）。旧行は従来どおり `shrieker_errors` の有無へ倒れること。
     def test_healthz_source_entry_level_failure_ignores_threshold
       record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
         error_message: 'RuntimeError: template broken',
@@ -257,6 +259,71 @@ module TomatoShrieker
       assert_equal(503, status)
       # しきい値 3 を宣言していても 1 で倒す
       assert_include(body.first, 'error_streak: 1 / 1')
+    end
+
+    # 🔴🔴 **#1613 の Codex P1: 緩和の判定も retention の cutoff で切る。**
+    #
+    # ⚠⚠ streak だけ cutoff で切って緩和判定を切らないと、**streak からは除いた
+    # 保護行を `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
+    # ＝ #1608 が無視したかった「連続していない過去の失敗」でそのまま赤くなる。
+    def test_healthz_source_threshold_ignores_protected_row_before_cutoff
+      # retention の外の保護行（エントリ処理段の失敗）。⚠ first_run_ids が守る
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken',
+        shrieker_errors: JSON.dump({'source#fetch' => 1}),
+        at: Time.now - (90 * 86_400))
+      # retention 内の取得段の失敗 1 件（しきい値 3 には届かない）
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404')
+      status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(200, status, '90 日前の保護行で緩和を潰さない')
+    end
+
+    # 🔴🔴 **#1586: `shrieker_errors` が空でも、エントリ処理段なら 1 回で赤。**
+    #
+    # ⚠⚠ **これが CommandSource / IcalendarSource の形。**`create_template` で落ちると
+    # `@delivery_stats` が空のまま rescue に入るので `shrieker_errors` は空になる。
+    # 代理（`shrieker_errors` の有無）のままでは**緩めたしきい値がそのまま残り、
+    # 取り返せないエントリを落としたまま緑**になっていた。
+    def test_healthz_source_entry_stage_failure_ignores_threshold
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken', entry_stage: true)
+      status, _headers, body = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'error_streak: 1 / 1', 'しきい値 3 を宣言していても 1 で倒す')
+      # 🔴 なぜ 1 なのかを本文から読めること
+      assert_include(body.first, 'entry_stage: true')
+    end
+
+    # 🔴🔴 **#1615 の Codex P2: 本文の `entry_stage` は streak 全体で見る。**
+    #
+    # ⚠⚠ 直近の行だけを出すと、**エントリ処理段の失敗の後に取得段の失敗が来たとき**
+    # `error_streak: 2 / 1` なのに `entry_stage: false` と出て、**しきい値が 1 に
+    # 倒れた理由が読めなくなる**。
+    def test_healthz_source_entry_stage_reported_for_whole_streak
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken', entry_stage: true,
+        at: Time.now - 120)
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404', entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'error_streak: 2 / 1')
+      assert_include(body.first, 'entry_stage: true', '直近の行は false だが streak には居る')
+    end
+
+    # ⚠ 取得段（entry_stage が false）はこれまでどおり緩和が効く
+    def test_healthz_source_fetch_stage_failure_keeps_threshold
+      2.times do |i|
+        record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+          error_message: 'Bad response 404', entry_stage: false, at: Time.now - (120 - (i * 10)))
+      end
+      status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(200, status)
     end
 
     # ⚠ 取得そのものの失敗（shrieker_errors 空）はこれまでどおり緩和が効く

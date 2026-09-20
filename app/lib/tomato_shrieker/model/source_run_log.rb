@@ -45,6 +45,19 @@ module TomatoShrieker
       return status == STATUS_PARTIAL
     end
 
+    # 🔴 **エントリ処理段まで進んでいた run か (#1586)。**
+    #
+    # ⚠⚠ **旧行は `entry_stage` が NULL。**migration 013 より前に書かれた行に
+    # 遡って段は入れられないので、**NULL の行だけ従来の代理**
+    # （`shrieker_errors` が空でない ＝ FeedSource でだけ成立していた見分け）
+    # へ倒す。⚠ ここを「NULL ＝ エントリ処理段」にすると、**デプロイ直後に
+    # 緩和を掛けている 5 ソースが一斉に 503** になる（migration 010 の
+    # backfill で踏んだのと同じ型）。
+    def entry_stage_error?
+      return entry_stage unless entry_stage.nil?
+      return shrieker_error_counts.present?
+    end
+
     # 配信を 1 件も試みずに完走した run。#1457 の「no-op run」。
     # run 自体が失敗した場合は試行ゼロでも no-op ではない。
     def noop?
@@ -109,11 +122,12 @@ module TomatoShrieker
         attempted_count: stats.attempted_count,
         delivered_count: stats.delivered_count,
         shrieker_errors: errors.empty? ? nil : JSON.dump(errors),
+        entry_stage: stats.entry_stage?,
       }
     end
 
     def self.prune(retention_days)
-      cutoff = Time.now - (retention_days * 86_400)
+      cutoff = retention_cutoff(retention_days)
       count = where(Sequel.lit('executed_at < ?', cutoff))
         .exclude(id: last_delivered_ids).exclude(id: first_run_ids)
         .exclude(id: last_attempted_ids).delete
@@ -249,23 +263,54 @@ module TomatoShrieker
     # `attempted_count` に載らないため、**`undelivered?` も `stale` も `silent` も
     # 立たない**＝ `error_streak` が唯一のゲート（#1473 / DeliveryStats のコメント）。
     #
-    # 📌 **run_log 上で 2 つの失敗族は既に区別できている。**フィード取得そのものの
-    # 失敗（#1558 の動機である YouTube の 404）は `entries` の評価中に抜けるので
-    # `shrieker_errors` が空。エントリ単位の失敗は `source#fetch` が載る。
+    # 🔴🔴 **段は run_log の `entry_stage` が直接持つ (#1586)。**
+    #
+    # ⚠⚠ **4.9.0 までは `shrieker_errors` が空であることを「取得段の失敗」の代理に
+    # していたが、その代理が成立するのは FeedSource だけだった。**
+    # `CommandSource#exec` / `IcalendarSource#exec` は `create_template` で落ちると
+    # `@delivery_stats` が空のまま `exec_with_run_log` の rescue に入り、
+    # **`shrieker_errors` が空の error 行**になる。＝ **エントリ処理段の失敗が
+    # 「取得段の失敗」と誤読され、緩めたしきい値がそのまま残っていた**
+    # （#1583 の Codex P1）。⚠ 代理をやめて事実を書く、という差分。
+    #
+    # 📌 **緩和が効いてよいのは取得段だけ**（#1558 の動機である YouTube の 404 は
+    # `entries` の評価中に抜けるので、そもそも段が立たない）。
     #
     # ⚠ **仕様は 1 行で言える: 「しきい値を緩められるのは、エントリを 1 件も
     # 読めていない失敗だけ」。**取得が不安定な相手は許容するが、取りこぼしは許容しない。
-    def self.entry_level_error?(logs)
-      return logs.take_while(&:error?).any? {|log| log.shrieker_error_counts.present?}
+    def self.entry_level_error?(logs, cutoff = retention_cutoff)
+      return streak_logs(logs, cutoff).any?(&:entry_stage_error?)
     end
 
-    def self.error_streak_of(logs)
-      streak = 0
-      logs.each do |log|
-        break unless log.error?
-        streak += 1
-      end
-      return streak
+    # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**
+    #
+    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 3 行
+    # （`first_run_ids` / `last_attempted_ids` / `last_delivered_ids`）を**無期限に守る**。
+    # **疎なソース**では retention 内の行が `limit` より少ないので、**守られた古い行が
+    # そのまま末尾に並ぶ**。間にあった成功行は prune で消えているので、
+    # **「直近のエラー」と「何か月も前の最初の run のエラー」が連続して見え、streak が
+    # 水増しされる**。
+    #
+    # 例: `0 0 1,2 * *`・retention 14 日・最初の run が error。その後ずっと成功していても、
+    # 今月の 1 日・2 日が error になると **streak = 3** になり、**実際には連続していない
+    # 失敗で `/healthz/source/:id` が 503 を立てる**。
+    #
+    # ⚠ 守られた行は `last_delivered_at` / `observed_since` の**根拠行**であって、
+    # **連続性の根拠ではない**。
+    # ⚠ `source validate` のしきい値到達性 WARN (#1587 / #1594) は retention の窓だけで
+    # 数えるので、ここを揃えないと**警告と実際の判定がずれる**。
+    def self.error_streak_of(logs, cutoff = retention_cutoff)
+      return streak_logs(logs, cutoff).size
+    end
+
+    # 🔴🔴 **「いま連続している失敗」の実体 (#1613 の Codex P1)。**
+    #
+    # ⚠⚠ **streak の本数と、しきい値の緩和判定は同じ範囲を見なければならない。**
+    # 片方だけ cutoff で切ると、**streak からは除いた保護行を
+    # `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
+    # （＝ この修正が無視したかった「連続していない過去の失敗」で赤くなる）。
+    def self.streak_logs(logs, cutoff = retention_cutoff)
+      return logs.take_while {|log| log.executed_at >= cutoff && log.error?}
     end
 
     # 何も配信しないまま連続した run の回数 (#1470)。
@@ -325,6 +370,12 @@ module TomatoShrieker
 
     def self.sample_size
       return Config.instance['/monitor/sample_size']
+    end
+
+    # prune の境界と streak の境界を 1 本にする (#1608)。
+    # ⚠ **同じ値から出すこと。**別々に計算すると「消える行」と「数える行」がずれる。
+    def self.retention_cutoff(days = Config.instance['/monitor/retention_days'])
+      return Time.now - (days * 86_400)
     end
 
     # error_streak_threshold が sample_size より大きいと、読む行数が足りず

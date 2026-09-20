@@ -3,7 +3,12 @@ module TomatoShrieker
     def exec
       Bundler.with_unbundled_env {command.exec}
       raise command.stderr || command.stdout unless command.status.zero?
-      command.stdout.split(delimiter).map(&:strip).select(&:present?).each do |status|
+      # 🔴 **ここから先はエントリ処理段 (#1586)。**⚠⚠ コマンドの出力は日付に依存する
+      # ものがあり（dqdai-anniv 等）、落ちたぶんは**次の run で取り返せない**。
+      # ⚠ 上の `raise command.stderr` までは取得段なので段を立てない。
+      statuses = command.stdout.split(delimiter).map(&:strip).select(&:present?)
+      @delivery_stats&.enter_entry_stage! if statuses.present?
+      statuses.each do |status|
         template = create_template(:default, status)
         shriek(template:, visibility:)
       end

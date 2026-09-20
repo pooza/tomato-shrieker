@@ -79,6 +79,11 @@ module TomatoShrieker
         stale: Time.now > next_run + source.monitor_grace_seconds,
         streak:,
         threshold:,
+        # 🔴 **しきい値を決めたのと同じ述語を持ち回る (#1615 の Codex P2)。**
+        # ⚠⚠ **直近の行だけを見て本文に出すと嘘になる。**エントリ処理段の失敗の後に
+        # 取得段の失敗が来ると `error_streak: 2 / 1` なのに `entry_stage: false` と
+        # 出て、**しきい値が 1 に倒れた理由が読めなくなる**。
+        entry_stage: SourceRunLog.entry_level_error?(logs),
         errored: streak >= threshold,
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
@@ -115,6 +120,11 @@ module TomatoShrieker
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
       body << "error_streak: #{checks[:streak]} / #{checks[:threshold]}\n"
+      # 🔴 **なぜそのしきい値なのかを読めるようにする (#1586)。**⚠ ソース側で 28 に
+      # 緩めていても、エントリ処理段で落ちた run があれば 1 に戻る。理由が出ないと
+      # 運用者は「設定が効いていない」と読む。
+      # ⚠ **いま連続している失敗のどれかが該当すれば true**（#1615 の Codex P2）。
+      body << "entry_stage: #{checks[:entry_stage]}\n"
       body << failure_body(latest)
       body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]
