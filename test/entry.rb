@@ -12,7 +12,11 @@ module TomatoShrieker
     # ⚠ **開発機の実エントリを見に行かない。**`Entry.dataset.all` から条件に合う
     # エントリを `find` する作りだと、当たるかどうかが開発機ごとに変わり、
     # **assertion が 1 つも走らないまま緑になる**ケースが残る。
-    FEED_ID = 'entry-fixture'.freeze
+    # ⚠⚠ **衝突しにくい ID にする（#1612 の Codex P2）。**`clear_fixtures` は
+    # この ID の行を無条件に消すので、**開発機に同名の実ソースがあると実データを
+    # 消してしまう**（`bin/test.rb` は運用と同じ永続 DB を使う）。
+    # ⚠ `__test_feed_source__` / `__test_source_run_log__` と同じ命名に揃える。
+    FEED_ID = '__entry_fixture__'.freeze
 
     # ⚠ **1 件目はエンクロージャあり、2 件目は無し。**どちらの経路も必ず通す。
     # ⚠ `entry` テーブルの unique index は (feed, title, url) なので両方ずらす。
