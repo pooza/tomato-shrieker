@@ -255,8 +255,8 @@ module TomatoShrieker
     #
     # ⚠ **仕様は 1 行で言える: 「しきい値を緩められるのは、エントリを 1 件も
     # 読めていない失敗だけ」。**取得が不安定な相手は許容するが、取りこぼしは許容しない。
-    def self.entry_level_error?(logs)
-      return logs.take_while(&:error?).any? {|log| log.shrieker_error_counts.present?}
+    def self.entry_level_error?(logs, cutoff = retention_cutoff)
+      return streak_logs(logs, cutoff).any? {|log| log.shrieker_error_counts.present?}
     end
 
     # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**
@@ -277,13 +277,17 @@ module TomatoShrieker
     # ⚠ `source validate` のしきい値到達性 WARN (#1587 / #1594) は retention の窓だけで
     # 数えるので、ここを揃えないと**警告と実際の判定がずれる**。
     def self.error_streak_of(logs, cutoff = retention_cutoff)
-      streak = 0
-      logs.each do |log|
-        break if log.executed_at < cutoff
-        break unless log.error?
-        streak += 1
-      end
-      return streak
+      return streak_logs(logs, cutoff).size
+    end
+
+    # 🔴🔴 **「いま連続している失敗」の実体 (#1613 の Codex P1)。**
+    #
+    # ⚠⚠ **streak の本数と、しきい値の緩和判定は同じ範囲を見なければならない。**
+    # 片方だけ cutoff で切ると、**streak からは除いた保護行を
+    # `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
+    # （＝ この修正が無視したかった「連続していない過去の失敗」で赤くなる）。
+    def self.streak_logs(logs, cutoff = retention_cutoff)
+      return logs.take_while {|log| log.executed_at >= cutoff && log.error?}
     end
 
     # 何も配信しないまま連続した run の回数 (#1470)。
