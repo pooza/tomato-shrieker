@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: b6e736db820caca781890fb134b937e7e37ca61c
+  revision: 39e2421fdd19e80de4c273ee2bd0735c5c48a6e5
   branch: main
   specs:
-    ginseng-core (1.23.7)
+    ginseng-core (1.24.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -34,32 +34,32 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 4bc0d965167214c2747733a951661e7c74420c4f
+  revision: e9f802eee7144b726ab1095a76b23ffd27c6c98b
   branch: main
   specs:
-    ginseng-fediverse (2.0.0)
+    ginseng-fediverse (3.1.0)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: afddcdace7ae524cfba4967e5f7de97637bbea32
+  revision: a09ccd4f733fb6fb0d49bcf23c57064fcd89ca2f
   branch: main
   specs:
     ginseng-piefed (0.1.1)
 
 GIT
   remote: https://github.com/pooza/ginseng-style.git
-  revision: ed862dcf9550d704ee670f65a30a333a694b883a
-  tag: v1.1.12
+  revision: 05a9e5c997082bd75bd913190e0c947fdaff082d
+  tag: v1.1.13
   specs:
-    ginseng-style (1.1.12)
-      rubocop (~> 1.90.0)
+    ginseng-style (1.1.13)
+      rubocop (~> 1.91.0)
       rubocop-minitest (~> 0.40.0)
       rubocop-performance (~> 1.27.0)
       rubocop-rake (~> 0.7.1)
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: 71415a45d291f7a823e1b51c397e4651d9625237
+  revision: 916dc688e4fddc382b32fb8baec0da9330869134
   branch: main
   specs:
     ginseng-youtube (3.0.1)
@@ -222,7 +222,7 @@ GEM
     regexp_parser (2.12.0)
     rexml (3.4.4)
     ricecream (0.2.1)
-    rubocop (1.90.0)
+    rubocop (1.91.0)
       json (>= 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
