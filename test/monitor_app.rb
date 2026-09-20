@@ -297,6 +297,24 @@ module TomatoShrieker
       assert_include(body.first, 'entry_stage: true')
     end
 
+    # 🔴🔴 **#1615 の Codex P2: 本文の `entry_stage` は streak 全体で見る。**
+    #
+    # ⚠⚠ 直近の行だけを出すと、**エントリ処理段の失敗の後に取得段の失敗が来たとき**
+    # `error_streak: 2 / 1` なのに `entry_stage: false` と出て、**しきい値が 1 に
+    # 倒れた理由が読めなくなる**。
+    def test_healthz_source_entry_stage_reported_for_whole_streak
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken', entry_stage: true,
+        at: Time.now - 120)
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404', entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'error_streak: 2 / 1')
+      assert_include(body.first, 'entry_stage: true', '直近の行は false だが streak には居る')
+    end
+
     # ⚠ 取得段（entry_stage が false）はこれまでどおり緩和が効く
     def test_healthz_source_fetch_stage_failure_keeps_threshold
       2.times do |i|

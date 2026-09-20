@@ -10,6 +10,49 @@ module TomatoShrieker
       end
     end
 
+    # 🔴🔴 **#1615 の Codex P1: ical の取得が落ちた run は取得段。**
+    #
+    # ⚠⚠ `entries` は `enum_for` ＝ **Enumerator なので、代入しただけでは ical を
+    # 取りに行かない**。しかも Enumerator は `empty?` を持たないので `present?` が
+    # **中身を見ずに true** を返す。`to_a` で先に評価しないと、**取得の失敗が
+    # `entry_stage: true` で保存され**、しきい値を緩めているソースが
+    # **一過性の取得失敗 1 回で 503** になる。
+    def test_entry_stage_not_marked_when_ical_fetch_fails
+      source = build_entry_stage_source
+      stats = attach_stats(source)
+      stub_request(:get, %r{//ical\.example\.test/}).to_return(status: 500)
+
+      assert_raise(Ginseng::GatewayError) {source.exec}
+      assert_false(stats.entry_stage?)
+    end
+
+    # ⚠ 予定を読んだ後に落ちたら段が立つ（そのぶんは時刻で 1 度しか流れず取り返せない）。
+    def test_entry_stage_marked_after_reading_entries
+      source = build_entry_stage_source
+      stats = attach_stats(source)
+      def source.create_template(*)
+        raise 'template broken'
+      end
+
+      assert_raise(RuntimeError) {source.exec}
+      assert_true(stats.entry_stage?)
+    end
+
+    def build_entry_stage_source
+      return IcalendarSource.new(
+        'id' => '__test_icalendar_entry_stage__',
+        'source' => {'calendar' => 'https://ical.example.test/test.ics'},
+        'schedule' => {'cron' => '0 0 * * *'},
+        'dest' => {'hooks' => ['https://hook.example.test/ical']},
+      )
+    end
+
+    def attach_stats(source)
+      stats = DeliveryStats.new
+      source.instance_variable_set(:@delivery_stats, stats)
+      return stats
+    end
+
     def test_keyword
       IcalendarSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)
