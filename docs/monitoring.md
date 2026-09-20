@@ -244,13 +244,18 @@ monitor:
 ⚠⚠ **しきい値をいくつにしても、エントリを読んだ後に落ちた失敗は 1 回で 503 になる。**
 
 ```
-フィード取得そのものが失敗（shrieker_errors 空）      → しきい値が効く
-エントリを読んだ後に失敗（shrieker_errors に source#fetch）→ 1 回で赤
+取得そのものが失敗（entry_stage: false）  → しきい値が効く
+エントリを読んだ後に失敗（entry_stage: true）→ 1 回で赤
 ```
 
 🔴 **これが無いとエントリが恒久的に失われる。**`Entry.insert` は配信より先に走るので、`create_record` / `create_template` / `enclosures` / `Entry#shriek` 以降で落ちた run のエントリは **unique 制約で二度と取得されない**。しかもその失敗は `record_failure` 経由で `attempted_count` に載らないため、⚠⚠ **`undelivered` も `stale` も `silent` も立たず、`error_streak` が唯一のゲート**になっている（#1473 / `DeliveryStats#record_failure` のコメント）。
 
-📌 **run_log 上で 2 つの失敗族は既に区別できている。**`/status.json` の `shrieker_errors` と 503 本文を見れば、どちらの失敗なのか運用者にも分かる。
+🔴🔴 **段は `source_run_log.entry_stage` が直接持つ (#1586)。**⚠⚠ 4.9.0 までは **`shrieker_errors` が空であること**を「取得段の失敗」の**代理**にしていたが、**その代理が成立するのは FeedSource だけだった**。`CommandSource#exec` / `IcalendarSource#exec` は `create_template` で落ちると `@delivery_stats` が空のまま `exec_with_run_log` の rescue に入るので、**`shrieker_errors` が空の error 行**になる ＝ **エントリ処理段の失敗が「取得段の失敗」と誤読され、緩めたしきい値がそのまま残っていた**。代理をやめて事実を書く、という差分。
+
+- 段を立てるのは **`DeliveryStats#enter_entry_stage!`**。各 Source が**エントリの一覧を取り出した直後**に 1 回だけ呼ぶ（取得の失敗はここへ到達しない／エントリ 0 件なら呼ばない）
+- ⚠ `TextSource` は立てない。本文は設定の固定文字列で、落ちても次の run が同じものを流す
+- ⚠⚠ **migration 013 より前の行は `entry_stage` が NULL。**NULL の行だけ従来の代理へ倒す。**「NULL ＝ エントリ処理段」にするとデプロイ直後に緩和を掛けているソースが一斉 503** になる（migration 010 の backfill と同じ型）
+- 📌 **503 本文に `entry_stage:` が出る。**しきい値を 28 に緩めていても `error_streak: 1 / 1` になる理由がそこで読める
 
 ⚠ **`/status.json` の `error_streak_threshold` は実効値。**1 に倒されているときは `1` が出る（宣言値ではない）。
 
@@ -262,6 +267,7 @@ monitor:
 
 - `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
+- `entry_stage` — エントリ処理段まで進んでいた run か（`migration/013`・#1586）。⚠ 旧行は NULL
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
   - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
   - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま

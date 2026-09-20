@@ -1,5 +1,7 @@
 module TomatoShrieker
   class TextSource < Source
+    # ⚠ **エントリ処理段 (#1586) は立てない。**本文は設定に書かれた固定文字列で、
+    # 落ちても失うものが無い（次の run が同じものを流す）。
     def exec
       shriek(template: create_template, visibility:)
     end
