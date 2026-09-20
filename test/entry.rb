@@ -1,27 +1,79 @@
 module TomatoShrieker
   class EntryTest < TestCase
-    def disable?
-      return true if Entry.dataset.empty?
-      return super
-    end
+    # 🔴 **エントリはフィクスチャで作る。`disable?` は持たない (#1597)。**
+    #
+    # ⚠⚠ 以前は `return true if Entry.dataset.empty?` で `disable?` していたので、
+    # **まっさらな DB では 7 件が丸ごと omission** だった。CI は毎回まっさらなので
+    # **この 7 件は CI で一度も走っていない**。手元では前の run が残したエントリの
+    # 有無で結果が変わり、同じコミットで omission 数が振れた
+    # ＝ **失敗しないのではなく、実行されていない**（しかも実行されないこと自体が
+    # run ごとに変わるので、omission 数を目印にもできない）。
+    #
+    # ⚠ **開発機の実エントリを見に行かない。**`Entry.dataset.all` から条件に合う
+    # エントリを `find` する作りだと、当たるかどうかが開発機ごとに変わり、
+    # **assertion が 1 つも走らないまま緑になる**ケースが残る。
+    FEED_ID = 'entry-fixture'.freeze
+
+    # ⚠ **1 件目はエンクロージャあり、2 件目は無し。**どちらの経路も必ず通す。
+    # ⚠ `entry` テーブルの unique index は (feed, title, url) なので両方ずらす。
+    FIXTURES = [
+      {
+        title: 'フィクスチャ 1（エンクロージャあり）',
+        summary: 'エンクロージャを 2 件持つエントリ',
+        url: 'https://feed.example.test/entries/1',
+        enclosure_url: [
+          'https://feed.example.test/pic/1.png',
+          'https://feed.example.test/pic/2.png',
+        ].to_json,
+        extra_tags: ['fixture'].to_json,
+      },
+      {
+        title: 'フィクスチャ 2（エンクロージャなし）',
+        summary: 'エンクロージャを持たないエントリ',
+        url: 'https://feed.example.test/entries/2',
+        enclosure_url: [].to_json,
+        extra_tags: [].to_json,
+      },
+    ].freeze
 
     def setup
-      @entries = Entry.dataset.all.select(&:feed)
+      clear_fixtures
+      @entries = FIXTURES.map do |values|
+        Entry[Entry.insert(values.merge(feed: FEED_ID, published: Time.now))]
+      end
     end
 
-    test '1レコード以上のエントリが存在するか' do
-      assert_predicate(@entries, :present?)
+    # ⚠ **`super` を呼ぶ。**`TestCase#teardown` が `config.reload` と
+    # `WebMock.reset!` を持っている。
+    def teardown
+      clear_fixtures
+      super
+    end
+
+    # 🔴 **落ちた run の残骸も消す。**`setup` の手前でも消しておかないと、
+    # teardown まで到達しなかった run の行が unique 制約に当たって
+    # **次の run が丸ごと error になる**。
+    def clear_fixtures
+      Entry.where(feed: FEED_ID).delete
+    end
+
+    test 'フィクスチャのエントリが作られているか' do
+      assert_equal(FIXTURES.size, @entries.size)
+      assert_equal(FIXTURES.size, Entry.where(feed: FEED_ID).count)
     end
 
     def test_feed
-      assert_kind_of(FeedSource, @entries.sample.feed) if @entries.present?
+      @entries.each do |entry|
+        assert_kind_of(FeedSource, entry.feed)
+        assert_equal(FEED_ID, entry.feed.id)
+      end
     end
 
     def test_create_template
-      return unless entry = @entries.find(&:create_template)
-
-      assert_kind_of(Template, entry.create_template)
-      assert_kind_of(Template, entry.create_template(:default))
+      @entries.each do |entry|
+        assert_kind_of(Template, entry.create_template)
+        assert_kind_of(Template, entry.create_template(:default))
+      end
     end
 
     # #1473: 握り潰して nil を返すと FeedSource#fetch が `next` で読み飛ばし、
@@ -33,26 +85,33 @@ module TomatoShrieker
     end
 
     def test_uri
-      return unless entry = @entries.find(&:uri)
-
-      assert_kind_of(Ginseng::URI, entry.uri)
+      @entries.each do |entry|
+        assert_kind_of(Ginseng::URI, entry.uri)
+        assert_predicate(entry.uri, :absolute?)
+      end
     end
 
     def test_enclosures
-      return unless entry = @entries.find(&:enclosures)
+      with_enclosures, without_enclosures = @entries
 
-      assert_kind_of(Array, entry.enclosures)
-      entry.enclosures.each do |uri|
+      assert_equal(2, with_enclosures.enclosures.size)
+      with_enclosures.enclosures.each do |uri|
         assert_kind_of(Ginseng::URI, uri)
+        assert_predicate(uri, :absolute?)
       end
+      assert_empty(without_enclosures.enclosures)
     end
 
     def test_tags
-      return unless entry = @entries.find {|v| v.tags.any?}
+      # ⚠ ソース側の `dest/tags` と `extra_tags` が合流する。どちらも落とさない。
+      # ⚠⚠ `TagContainer#create_tags` が返すのは **`#` 付きの表記**。素の 'test' で
+      # 照合すると通らない（`disable?` を外して初めて分かった）。
+      tags = @entries.first.tags
 
-      entry.tags.each do |tag|
-        assert_kind_of(String, tag)
-      end
+      assert_predicate(tags, :present?)
+      tags.each {|tag| assert_kind_of(String, tag)}
+      assert_include(tags, '#test')
+      assert_include(tags, '#fixture')
     end
   end
 end

@@ -1,0 +1,14 @@
+# Entry のフィクスチャを紐づけるテスト専用ソース (#1597)
+# 🔴 **EntryTest はこのソースの ID でエントリを作って消す。**⚠ 開発機の
+#    `config/sources/` 由来の実エントリと混ざらないよう、専用の ID を持たせている。
+# ⚠ 資格情報は書かない。Environment.test? の間は Source#deliver が配信をスキップする。
+test: true
+source:
+  feed: https://feed.example.test/entry.rss
+schedule:
+  every: 1d
+dest:
+  hooks:
+    - https://hook.example.test/entry
+  tags:
+    - test
