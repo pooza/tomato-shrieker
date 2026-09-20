@@ -113,7 +113,12 @@ module TomatoShrieker
     def fetch
       return enum_for(__method__) unless block_given?
       in_threads = Parallel.processor_count * 2
-      Parallel.each(entries.reject {|v| ignore_entry?(v)}, in_threads:) do |entry|
+      # 🔴 **`entries` を取り出してから段を立てる (#1586)。**⚠⚠ `entries` の評価自体が
+      # 落ちる run（YouTube の 404 等）は**取得段**なので、ここへは到達しない
+      # ＝ しきい値の緩和が効いてよい側。
+      targets = entries.reject {|v| ignore_entry?(v)}
+      @delivery_stats&.enter_entry_stage! if targets.present?
+      Parallel.each(targets, in_threads:) do |entry|
         next unless record = create_record(entry)
         yield record
       rescue => e

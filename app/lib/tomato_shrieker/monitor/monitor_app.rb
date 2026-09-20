@@ -115,6 +115,10 @@ module TomatoShrieker
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
       body << "error_streak: #{checks[:streak]} / #{checks[:threshold]}\n"
+      # 🔴 **なぜそのしきい値なのかを読めるようにする (#1586)。**⚠ ソース側で 28 に
+      # 緩めていても、エントリ処理段で落ちた run があれば 1 に戻る。理由が出ないと
+      # 運用者は「設定が効いていない」と読む。
+      body << "entry_stage: #{latest.entry_stage_error?}\n"
       body << failure_body(latest)
       body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]

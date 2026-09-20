@@ -45,6 +45,19 @@ module TomatoShrieker
       return status == STATUS_PARTIAL
     end
 
+    # 🔴 **エントリ処理段まで進んでいた run か (#1586)。**
+    #
+    # ⚠⚠ **旧行は `entry_stage` が NULL。**migration 013 より前に書かれた行に
+    # 遡って段は入れられないので、**NULL の行だけ従来の代理**
+    # （`shrieker_errors` が空でない ＝ FeedSource でだけ成立していた見分け）
+    # へ倒す。⚠ ここを「NULL ＝ エントリ処理段」にすると、**デプロイ直後に
+    # 緩和を掛けている 5 ソースが一斉に 503** になる（migration 010 の
+    # backfill で踏んだのと同じ型）。
+    def entry_stage_error?
+      return entry_stage unless entry_stage.nil?
+      return shrieker_error_counts.present?
+    end
+
     # 配信を 1 件も試みずに完走した run。#1457 の「no-op run」。
     # run 自体が失敗した場合は試行ゼロでも no-op ではない。
     def noop?
@@ -109,6 +122,7 @@ module TomatoShrieker
         attempted_count: stats.attempted_count,
         delivered_count: stats.delivered_count,
         shrieker_errors: errors.empty? ? nil : JSON.dump(errors),
+        entry_stage: stats.entry_stage?,
       }
     end
 
@@ -249,14 +263,23 @@ module TomatoShrieker
     # `attempted_count` に載らないため、**`undelivered?` も `stale` も `silent` も
     # 立たない**＝ `error_streak` が唯一のゲート（#1473 / DeliveryStats のコメント）。
     #
-    # 📌 **run_log 上で 2 つの失敗族は既に区別できている。**フィード取得そのものの
-    # 失敗（#1558 の動機である YouTube の 404）は `entries` の評価中に抜けるので
-    # `shrieker_errors` が空。エントリ単位の失敗は `source#fetch` が載る。
+    # 🔴🔴 **段は run_log の `entry_stage` が直接持つ (#1586)。**
+    #
+    # ⚠⚠ **4.9.0 までは `shrieker_errors` が空であることを「取得段の失敗」の代理に
+    # していたが、その代理が成立するのは FeedSource だけだった。**
+    # `CommandSource#exec` / `IcalendarSource#exec` は `create_template` で落ちると
+    # `@delivery_stats` が空のまま `exec_with_run_log` の rescue に入り、
+    # **`shrieker_errors` が空の error 行**になる。＝ **エントリ処理段の失敗が
+    # 「取得段の失敗」と誤読され、緩めたしきい値がそのまま残っていた**
+    # （#1583 の Codex P1）。⚠ 代理をやめて事実を書く、という差分。
+    #
+    # 📌 **緩和が効いてよいのは取得段だけ**（#1558 の動機である YouTube の 404 は
+    # `entries` の評価中に抜けるので、そもそも段が立たない）。
     #
     # ⚠ **仕様は 1 行で言える: 「しきい値を緩められるのは、エントリを 1 件も
     # 読めていない失敗だけ」。**取得が不安定な相手は許容するが、取りこぼしは許容しない。
     def self.entry_level_error?(logs, cutoff = retention_cutoff)
-      return streak_logs(logs, cutoff).any? {|log| log.shrieker_error_counts.present?}
+      return streak_logs(logs, cutoff).any?(&:entry_stage_error?)
     end
 
     # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**

@@ -12,6 +12,28 @@ module TomatoShrieker
       @failure_count = 0
       @shrieker_errors = Hash.new(0)
       @errors = []
+      @entry_stage = false
+    end
+
+    # 🔴🔴 **エントリ処理段に入った (#1586)。**
+    #
+    # ⚠⚠ **ここから先で落ちた失敗は、しきい値を緩めてはいけない。**エントリを
+    # 読んだ後の失敗はそのぶんのエントリを**恒久的に失う**（FeedSource は
+    # `Entry.insert` が配信より先で unique 制約により再取得されない／
+    # CommandSource・IcalendarSource は出力が日付に依存して取り返せない）のに、
+    # `undelivered?` も `stale` も `silent` も立たないため **`error_streak` が
+    # 唯一のゲート**になっている（#1473 / #1558）。
+    #
+    # ⚠ **取得そのものの失敗（YouTube の 404 等）では呼ばない。**緩和が効いてよい
+    # のはそちらだけ。
+    # ⚠ **エントリが 0 件なら呼ばない。**失うものが無い run で緩和を潰さない。
+    def enter_entry_stage!
+      @mutex.synchronize {@entry_stage = true}
+      return nil
+    end
+
+    def entry_stage?
+      return @mutex.synchronize {@entry_stage}
     end
 
     def record_success(shrieker)
