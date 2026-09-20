@@ -259,6 +259,25 @@ module TomatoShrieker
       assert_include(body.first, 'error_streak: 1 / 1')
     end
 
+    # 🔴🔴 **#1613 の Codex P1: 緩和の判定も retention の cutoff で切る。**
+    #
+    # ⚠⚠ streak だけ cutoff で切って緩和判定を切らないと、**streak からは除いた
+    # 保護行を `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
+    # ＝ #1608 が無視したかった「連続していない過去の失敗」でそのまま赤くなる。
+    def test_healthz_source_threshold_ignores_protected_row_before_cutoff
+      # retention の外の保護行（エントリ処理段の失敗）。⚠ first_run_ids が守る
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'RuntimeError: template broken',
+        shrieker_errors: JSON.dump({'source#fetch' => 1}),
+        at: Time.now - (90 * 86_400))
+      # retention 内の取得段の失敗 1 件（しきい値 3 には届かない）
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404')
+      status, = call("/healthz/source/#{THRESHOLD_ID}")
+
+      assert_equal(200, status, '90 日前の保護行で緩和を潰さない')
+    end
+
     # ⚠ 取得そのものの失敗（shrieker_errors 空）はこれまでどおり緩和が効く
     def test_healthz_source_fetch_failure_keeps_threshold
       2.times do |i|

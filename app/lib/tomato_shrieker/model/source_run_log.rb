@@ -113,7 +113,7 @@ module TomatoShrieker
     end
 
     def self.prune(retention_days)
-      cutoff = Time.now - (retention_days * 86_400)
+      cutoff = retention_cutoff(retention_days)
       count = where(Sequel.lit('executed_at < ?', cutoff))
         .exclude(id: last_delivered_ids).exclude(id: first_run_ids)
         .exclude(id: last_attempted_ids).delete
@@ -255,17 +255,39 @@ module TomatoShrieker
     #
     # ⚠ **仕様は 1 行で言える: 「しきい値を緩められるのは、エントリを 1 件も
     # 読めていない失敗だけ」。**取得が不安定な相手は許容するが、取りこぼしは許容しない。
-    def self.entry_level_error?(logs)
-      return logs.take_while(&:error?).any? {|log| log.shrieker_error_counts.present?}
+    def self.entry_level_error?(logs, cutoff = retention_cutoff)
+      return streak_logs(logs, cutoff).any? {|log| log.shrieker_error_counts.present?}
     end
 
-    def self.error_streak_of(logs)
-      streak = 0
-      logs.each do |log|
-        break unless log.error?
-        streak += 1
-      end
-      return streak
+    # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**
+    #
+    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 3 行
+    # （`first_run_ids` / `last_attempted_ids` / `last_delivered_ids`）を**無期限に守る**。
+    # **疎なソース**では retention 内の行が `limit` より少ないので、**守られた古い行が
+    # そのまま末尾に並ぶ**。間にあった成功行は prune で消えているので、
+    # **「直近のエラー」と「何か月も前の最初の run のエラー」が連続して見え、streak が
+    # 水増しされる**。
+    #
+    # 例: `0 0 1,2 * *`・retention 14 日・最初の run が error。その後ずっと成功していても、
+    # 今月の 1 日・2 日が error になると **streak = 3** になり、**実際には連続していない
+    # 失敗で `/healthz/source/:id` が 503 を立てる**。
+    #
+    # ⚠ 守られた行は `last_delivered_at` / `observed_since` の**根拠行**であって、
+    # **連続性の根拠ではない**。
+    # ⚠ `source validate` のしきい値到達性 WARN (#1587 / #1594) は retention の窓だけで
+    # 数えるので、ここを揃えないと**警告と実際の判定がずれる**。
+    def self.error_streak_of(logs, cutoff = retention_cutoff)
+      return streak_logs(logs, cutoff).size
+    end
+
+    # 🔴🔴 **「いま連続している失敗」の実体 (#1613 の Codex P1)。**
+    #
+    # ⚠⚠ **streak の本数と、しきい値の緩和判定は同じ範囲を見なければならない。**
+    # 片方だけ cutoff で切ると、**streak からは除いた保護行を
+    # `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
+    # （＝ この修正が無視したかった「連続していない過去の失敗」で赤くなる）。
+    def self.streak_logs(logs, cutoff = retention_cutoff)
+      return logs.take_while {|log| log.executed_at >= cutoff && log.error?}
     end
 
     # 何も配信しないまま連続した run の回数 (#1470)。
@@ -325,6 +347,16 @@ module TomatoShrieker
 
     def self.sample_size
       return Config.instance['/monitor/sample_size']
+    end
+
+    def self.retention_days
+      return Config.instance['/monitor/retention_days']
+    end
+
+    # prune の境界と streak の境界を 1 本にする (#1608)。
+    # ⚠ **同じ値から出すこと。**別々に計算すると「消える行」と「数える行」がずれる。
+    def self.retention_cutoff(days = retention_days)
+      return Time.now - (days * 86_400)
     end
 
     # error_streak_threshold が sample_size より大きいと、読む行数が足りず
