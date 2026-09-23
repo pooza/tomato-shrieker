@@ -120,6 +120,33 @@ module TomatoShrieker
       assert_equal(1, SourceRunLog.error_streak(SOURCE_ID), '直近の run が error なら窓の外でも数える')
     end
 
+    # 🔴🔴 **#1621 の Codex P2: 先頭行は「本当に最新の run」でなければならない。**
+    #
+    # ⚠⚠ `prune` が守る 3 系統（配信できた run / 最古の run / 配信を試みた run）に
+    # **no-op success は掛からない**。疎なソースで「最初の run が error → その後の
+    # 成功は no-op」だと、**成功行だけ刈られて古い error が先頭に来る**。
+    # 先頭行の cutoff を免除すると、**一度直ったソースが永久に赤いまま**になる。
+    # ⇒ 最新行も prune から守る。
+    def test_error_streak_zero_when_latest_run_succeeded_long_ago
+      # 90 日前の最初の run（error）。⚠ 最古行として守られる
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (90 * 86_400),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+        attempted_count: 1, delivered_count: 0
+      )
+      # 30 日前の no-op success。⚠ 配信も試行もしていないので他の保護には掛からない
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (30 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(2, remain.size, '最新行が刈られている')
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID), '直った後の成功 run が消えて赤いまま')
+    end
+
     # ⚠ **免除は先頭行だけ。**2 行目以降まで免除すると #1608 が戻る
     # （保護された古い行をまたいで数え、実際には連続していない失敗で 503 が立つ）。
     def test_error_streak_exempts_only_the_latest_row
@@ -241,8 +268,9 @@ module TomatoShrieker
       SourceRunLog.prune(14)
       remain = SourceRunLog.where(source_id: SOURCE_ID).all
 
-      assert_equal(1, remain.size)
-      assert_true(remain.first.delivered?)
+      # ⚠ #1621 から最新行も守るので、期限切れでも 2 行残る（配信行＋最新の no-op）
+      assert_equal(2, remain.size)
+      assert_true(remain.any?(&:delivered?))
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
@@ -365,7 +393,8 @@ module TomatoShrieker
       SourceRunLog.prune(14)
       remain = SourceRunLog.where(source_id: SOURCE_ID).all
 
-      assert_equal(1, remain.size)
+      # ⚠ #1621 から最新行も守るので、期限切れでも 2 行残る（最古行＋最新行）
+      assert_equal(2, remain.size)
       assert_equal(first.to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
     end
 

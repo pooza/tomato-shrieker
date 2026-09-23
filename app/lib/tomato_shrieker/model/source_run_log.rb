@@ -129,15 +129,15 @@ module TomatoShrieker
     def self.prune(retention_days)
       cutoff = retention_cutoff(retention_days)
       count = where(Sequel.lit('executed_at < ?', cutoff))
-        .exclude(id: last_delivered_ids).exclude(id: first_run_ids)
-        .exclude(id: last_attempted_ids).delete
+        .exclude(id: boundary_run_ids(:min)).exclude(id: boundary_run_ids(:max))
+        .exclude(id: last_delivered_ids).exclude(id: last_attempted_ids).delete
       redact_expired(cutoff)
       return count
     end
 
     # 🔴 **retention を過ぎても残す保護行から error_message を落とす (#1511)。**
     #
-    # 保護行は 3 系統に増え、**ソースあたり最大 3 行が retention_days を超えて
+    # 保護行は 4 系統に増え、**ソースあたり最大 4 行が retention_days を超えて
     # 無期限に残る**ようになった。⚠ とくに `last_attempted_ids` が守る行は
     # 「直近の配信試行」＝ `partial` / `error` で `error_message` を持つ可能性が
     # 最も高い。`/monitor/retention_days` が担保していた「例外メッセージは
@@ -161,12 +161,19 @@ module TomatoShrieker
           .select(Sequel.function(:max, :id))
     end
 
-    # 「いつから観測しているか」の根拠行もソースごとに 1 行だけ守る (#1483)。
-    # 未配信のソースは last_delivered_ids に引っかからないので、これが無いと
-    # observed_since が常に retention_days 前に張り付き、それより長い
-    # silence_tolerance が永久に成立しない。
-    def self.first_run_ids
-      return group(:source_id).select(Sequel.function(:min, :id))
+    # ソースごとの**最古行 (`:min`) と最新行 (`:max`)** を prune から守る。
+    #
+    # - `:min` ＝ 「いつから観測しているか」の根拠行 (#1483)。未配信のソースは
+    #   `last_delivered_ids` に引っかからないので、これが無いと `observed_since` が
+    #   常に `retention_days` 前に張り付き、それより長い `silence_tolerance` が
+    #   永久に成立しない。
+    # - 🔴🔴 `:max` ＝ 「直近の run」の根拠行 (#1621 の Codex P2)。⚠⚠ `streak_logs` は
+    #   **先頭行だけ cutoff を免除する**ので、**先頭行が本当に最新の run でなければ
+    #   ならない**。no-op success（新着が無く配信ゼロで完走した run）は他の系統の
+    #   どれにも掛からないため、これが無いと**疎なソースで「最新の成功 run だけ刈られ、
+    #   `:min` が守る古い error が先頭に来る」**＝ **一度直ったソースが永久に赤いまま**になる。
+    def self.boundary_run_ids(func)
+      return group(:source_id).select(Sequel.function(func, :id))
     end
 
     # 「直近の配信試行」の根拠行もソースごとに 1 行だけ守る (#1504)。
