@@ -253,6 +253,8 @@ monitor:
 🔴🔴 **段は `source_run_log.entry_stage` が直接持つ (#1586)。**⚠⚠ 4.9.0 までは **`shrieker_errors` が空であること**を「取得段の失敗」の**代理**にしていたが、**その代理が成立するのは FeedSource だけだった**。`CommandSource#exec` / `IcalendarSource#exec` は `create_template` で落ちると `@delivery_stats` が空のまま `exec_with_run_log` の rescue に入るので、**`shrieker_errors` が空の error 行**になる ＝ **エントリ処理段の失敗が「取得段の失敗」と誤読され、緩めたしきい値がそのまま残っていた**。代理をやめて事実を書く、という差分。
 
 - 段を立てるのは **`DeliveryStats#enter_entry_stage!`**。各 Source が**エントリの一覧を取り出した直後**に 1 回だけ呼ぶ（取得の失敗はここへ到達しない／エントリ 0 件なら呼ばない）
+- 🔴🔴 **`FeedSource` だけは「一覧を取り出した直後」ではなく `create_record` が行を作った直後 (#1622)。**⚠⚠ 一覧（`targets`）は `ignore_entry?` で絞っただけの**生のフィード項目**で、**重複判定を通していない**。重複判定は `Entry.create` が `Sequel::UniqueConstraintViolation` を掴んで nil を返すところで初めて起きるので、一覧の時点で立てると**既知エントリしか無い run（＝平常時のほぼ全 run）でも `entry_stage: true`** になる。⚠ **失うものが 1 件も無いのに `error_streak_threshold` が 28 → 1 に潰れ、一過性の失敗 1 回で 503** になる
+- ⚠⚠ **`CommandSource` は非ゼロ終了でもエントリを失っていることがある。**`raise command.stderr unless command.status.zero?` までを取得段としているが、**子プロセスが落ちる前にキャッシュを進めている**ことがある（`precure-reserve` は `-n`（保存しない）が無いので `loquat reserves` が `tmp/cache/reserves-*.json` を更新する。`dqdai-reserve` には `-n` がある）。この形で落ちるとエントリは失われるのに `entry_stage: false` ＝ **緩和が効く側**に分類される。✅ 両者とも `error_streak_threshold` が 1 なので今は無害だが、**CommandSource でしきい値を緩めるときはこれを踏まえること**
 - ⚠ `TextSource` は立てない。本文は設定の固定文字列で、落ちても次の run が同じものを流す
 - ⚠⚠ **migration 013 より前の行は `entry_stage` が NULL。**NULL の行だけ従来の代理へ倒す。**「NULL ＝ エントリ処理段」にするとデプロイ直後に緩和を掛けているソースが一斉 503** になる（migration 010 の backfill と同じ型）
 - 📌 **503 本文に `entry_stage:` が出る。**しきい値を 28 に緩めていても `error_streak: 1 / 1` になる理由がそこで読める
