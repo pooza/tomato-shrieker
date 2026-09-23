@@ -103,6 +103,39 @@ module TomatoShrieker
       assert_equal(2, SourceRunLog.error_streak(SOURCE_ID), '保護行をまたいで数えない')
     end
 
+    # 🔴🔴 **#1621: 最新行まで cutoff で切ってはいけない。**
+    #
+    # 実行間隔が `/monitor/retention_days` より長いソースでは、**その run が error の
+    # まま次の run を待つ間に `executed_at < cutoff` へ落ちる**。先頭行まで切ると
+    # streak が 0 になり、⚠⚠ **失敗したまま `/healthz/source/:id` が 200 OK を返す**。
+    # ⚠ `next_run_at` は先なので `stale` も立たず、`silent` は opt-in ＝ 誰も気づかない。
+    def test_error_streak_keeps_latest_error_outside_retention
+      # 月次ソースの「今月の唯一の run」が error で、それが 20 日前＝ retention 14 日の外
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+        attempted_count: 1, delivered_count: 0
+      )
+
+      assert_equal(1, SourceRunLog.error_streak(SOURCE_ID), '直近の run が error なら窓の外でも数える')
+    end
+
+    # ⚠ **免除は先頭行だけ。**2 行目以降まで免除すると #1608 が戻る
+    # （保護された古い行をまたいで数え、実際には連続していない失敗で 503 が立つ）。
+    def test_error_streak_exempts_only_the_latest_row
+      # 90 日前の最初の run（error・first_run_ids が守る）と、20 日前の error。
+      # どちらも cutoff の外だが、数えてよいのは先頭の 1 件だけ
+      [90, 20].each do |days|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+          attempted_count: 1, delivered_count: 0
+        )
+      end
+
+      assert_equal(1, SourceRunLog.error_streak(SOURCE_ID), '2 行目以降は cutoff で切る')
+    end
+
     # ⚠ cutoff は**境界の外だけ**を落とす。retention 内の行は今までどおり数える
     # （#1608 で streak が過小になっては意味がない）。
     def test_error_streak_counts_whole_retention_window

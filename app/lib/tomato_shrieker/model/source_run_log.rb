@@ -309,8 +309,19 @@ module TomatoShrieker
     # 片方だけ cutoff で切ると、**streak からは除いた保護行を
     # `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
     # （＝ この修正が無視したかった「連続していない過去の失敗」で赤くなる）。
+    #
+    # 🔴🔴 **先頭行だけ cutoff を免除する (#1621)。**⚠⚠ **免除しないと、実行間隔が
+    # `/monitor/retention_days` より長いソースが「失敗したまま緑」になる**。
+    # 月次 cron × しきい値 1 × retention 14 日で、その月の唯一の run が error だと、
+    # **15 日目までは 503 なのに 16 日目に `executed_at < cutoff` になって
+    # streak が 0 へ落ち、次の run までずっと 200 OK** になる（#1608 で新しくできた穴）。
+    # ⚠ `next_run_at` は翌月なので `stale` も立たず、`silent` は opt-in。
+    #
+    # ⚠ **免除してよいのは先頭行だけ。**先頭行は「直近の run の結果」そのもので、
+    # 連続性を仮定せずに数えられる。#1608 が消したかった水増しは**保護された古い行を
+    # またいで数えること**なので、2 行目以降で cutoff が効けば目的は損なわれない。
     def self.streak_logs(logs, cutoff = retention_cutoff)
-      return logs.take_while {|log| log.executed_at >= cutoff && log.error?}
+      return logs.take_while.with_index {|v, i| v.error? && (i.zero? || v.executed_at >= cutoff)}
     end
 
     # 何も配信しないまま連続した run の回数 (#1470)。
