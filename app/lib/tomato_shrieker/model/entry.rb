@@ -76,16 +76,24 @@ module TomatoShrieker
 
     alias post shriek
 
+    # insert は通ったが**意図して流さない**行を落とす。⚠ 行は残るが取りこぼしではない
+    # （まだ touch していない / feed.time より古い / keep_years の外）。
+    def self.deliverable(entry, feed)
+      return nil unless feed&.touched?
+      return nil if entry.published < feed.time
+      return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
+      return entry
+    end
+
     def self.create(entry, feed = nil)
       retry_count = 0
+      inserted = false
       begin
         parser = EntryParser.new(entry)
         parser.feed = feed if feed
-        entry = Entry[Entry.insert(parser.parse)]
-        return nil unless feed&.touched?
-        return nil if entry.published < feed.time
-        return nil if feed.keep_years && entry.published < feed.keep_years.years.ago
-        return entry
+        id = Entry.insert(parser.parse)
+        inserted = true
+        return deliverable(Entry[id], feed)
       rescue SQLite3::BusyException
         retry_count += 1
         raise if retry_count >= 5
@@ -95,6 +103,14 @@ module TomatoShrieker
         # 既知のエントリ＝異常ではないので nil を返して読み飛ばす
         return nil
       rescue => e
+        # 🔴🔴 **insert が通った後に落ちたら段を立てる (#1622 の Codex P2)。**
+        #
+        # ⚠⚠ ここまで来ると**行は残る**ので、そのエントリは次の run で
+        # `Sequel::UniqueConstraintViolation` に化けて**二度と配信されない**。
+        # 呼び出し元の rescue は `enter_entry_stage!` の手前なので、ここで立てないと
+        # **恒久的な取りこぼしが「取得段の失敗」＝緩和が効く側**に分類される。
+        # ⚠ insert より前で落ちた場合（パース失敗）は立てない。**失うものが無い。**
+        feed&.enter_entry_stage! if inserted
         # ⚠ 握り潰して nil を返すと、呼び出し元の FeedSource#fetch が
         # `next unless record` で読み飛ばすため record_failure に到達しない。
         # 全エントリがパース失敗しても attempted=0 の no-op success になる (#1473)。

@@ -88,6 +88,75 @@ module TomatoShrieker
       end
     end
 
+    # 🔴🔴 **#1622 の Codex P2: insert が通った後に落ちたら段を立てる。**
+    #
+    # ⚠⚠ ここまで来ると**行は残る**ので、そのエントリは次の run で
+    # `Sequel::UniqueConstraintViolation` に化けて**二度と配信されない**。
+    # `FeedSource#fetch` の rescue は `enter_entry_stage!` の手前なので、ここで
+    # 立てないと**恒久的な取りこぼしが「取得段の失敗」＝緩和が効く側**に分類され、
+    # `error_streak_threshold` を緩めているソースでは 503 が立たない。
+    def test_create_marks_entry_stage_when_it_fails_after_insert
+      stats = DeliveryStats.new
+      source = stage_source(stats)
+
+      with_deliverable_stub(-> {raise 'boom after insert'}) do
+        assert_raise(RuntimeError) {Entry.create(stage_values, source)}
+      end
+
+      assert_true(stats.entry_stage?, '行は残るのに緩和が効く側に落ちている')
+      assert_equal(FIXTURES.size + 1, Entry.where(feed: FEED_ID).count, '行が残っていない')
+    end
+
+    # ⚠ insert より手前（パース失敗）で落ちたら立てない。**失うものが無い。**
+    def test_create_does_not_mark_entry_stage_when_it_fails_before_insert
+      stats = DeliveryStats.new
+      source = stage_source(stats)
+
+      assert_raise(NoMethodError) {Entry.create(Object.new, source)}
+      assert_false(stats.entry_stage?, 'insert していない run で緩和を潰している')
+    end
+
+    # ⚠ 既知のエントリ（unique 制約）は insert が通っていないので立てない。
+    def test_create_does_not_mark_entry_stage_for_duplicates
+      stats = DeliveryStats.new
+      source = stage_source(stats)
+      values = stage_values
+
+      Entry.create(values, source)
+      stats2 = DeliveryStats.new
+      Entry.create(values, stage_source(stats2))
+
+      assert_false(stats2.entry_stage?, '重複で緩和を潰している')
+    end
+
+    def stage_source(stats)
+      source = FeedSource.new(
+        'id' => FEED_ID,
+        'source' => {'feed' => 'https://feed.example.test/f.rss'},
+      )
+      source.instance_variable_set(:@delivery_stats, stats)
+      return source
+    end
+
+    def stage_values
+      return {
+        title: '#1622 の段のテスト',
+        summary: 'insert は通るが直後に落ちる',
+        url: 'https://feed.example.test/entries/entry-stage',
+        published: Time.now,
+      }
+    end
+
+    # ⚠⚠ **`remove_method` で戻さない。**元の Method を保存して差し戻す
+    # （test/feed_source.rb の `with_sentry_stub` と同じ理由）。
+    def with_deliverable_stub(body)
+      original = Entry.method(:deliverable)
+      Entry.define_singleton_method(:deliverable) {|*| body.call}
+      yield
+    ensure
+      Entry.define_singleton_method(:deliverable, original) if original
+    end
+
     def test_uri
       @entries.each do |entry|
         assert_kind_of(Ginseng::URI, entry.uri)
