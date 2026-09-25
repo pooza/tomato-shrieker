@@ -103,6 +103,66 @@ module TomatoShrieker
       assert_equal(2, SourceRunLog.error_streak(SOURCE_ID), '保護行をまたいで数えない')
     end
 
+    # 🔴🔴 **#1621: 最新行まで cutoff で切ってはいけない。**
+    #
+    # 実行間隔が `/monitor/retention_days` より長いソースでは、**その run が error の
+    # まま次の run を待つ間に `executed_at < cutoff` へ落ちる**。先頭行まで切ると
+    # streak が 0 になり、⚠⚠ **失敗したまま `/healthz/source/:id` が 200 OK を返す**。
+    # ⚠ `next_run_at` は先なので `stale` も立たず、`silent` は opt-in ＝ 誰も気づかない。
+    def test_error_streak_keeps_latest_error_outside_retention
+      # 月次ソースの「今月の唯一の run」が error で、それが 20 日前＝ retention 14 日の外
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+        attempted_count: 1, delivered_count: 0
+      )
+
+      assert_equal(1, SourceRunLog.error_streak(SOURCE_ID), '直近の run が error なら窓の外でも数える')
+    end
+
+    # 🔴🔴 **#1621 の Codex P2: 先頭行は「本当に最新の run」でなければならない。**
+    #
+    # ⚠⚠ `prune` が守る 3 系統（配信できた run / 最古の run / 配信を試みた run）に
+    # **no-op success は掛からない**。疎なソースで「最初の run が error → その後の
+    # 成功は no-op」だと、**成功行だけ刈られて古い error が先頭に来る**。
+    # 先頭行の cutoff を免除すると、**一度直ったソースが永久に赤いまま**になる。
+    # ⇒ 最新行も prune から守る。
+    def test_error_streak_zero_when_latest_run_succeeded_long_ago
+      # 90 日前の最初の run（error）。⚠ 最古行として守られる
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (90 * 86_400),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+        attempted_count: 1, delivered_count: 0
+      )
+      # 30 日前の no-op success。⚠ 配信も試行もしていないので他の保護には掛からない
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (30 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+      remain = SourceRunLog.where(source_id: SOURCE_ID).all
+
+      assert_equal(2, remain.size, '最新行が刈られている')
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID), '直った後の成功 run が消えて赤いまま')
+    end
+
+    # ⚠ **免除は先頭行だけ。**2 行目以降まで免除すると #1608 が戻る
+    # （保護された古い行をまたいで数え、実際には連続していない失敗で 503 が立つ）。
+    def test_error_streak_exempts_only_the_latest_row
+      # 90 日前の最初の run（error・first_run_ids が守る）と、20 日前の error。
+      # どちらも cutoff の外だが、数えてよいのは先頭の 1 件だけ
+      [90, 20].each do |days|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
+          attempted_count: 1, delivered_count: 0
+        )
+      end
+
+      assert_equal(1, SourceRunLog.error_streak(SOURCE_ID), '2 行目以降は cutoff で切る')
+    end
+
     # ⚠ cutoff は**境界の外だけ**を落とす。retention 内の行は今までどおり数える
     # （#1608 で streak が過小になっては意味がない）。
     def test_error_streak_counts_whole_retention_window
@@ -195,21 +255,25 @@ module TomatoShrieker
     # #1470: retention_days を超えて沈黙しても、根拠行が残って検知が続く。
     # 刈ってしまうと沈黙が長引くほど検知できなくなる。
     def test_prune_keeps_last_delivered_row
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
-        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
-        attempted_count: 1, delivered_count: 1
-      )
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
-        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
-        attempted_count: 0, delivered_count: 0
-      )
+      # ⚠ 根拠行を**他の保護と兼ねさせない**。兼ねると、この保護を外しても別の系統が
+      # 守ってしまい、テストが空振りする。最古行 (`:min`)・直近の試行
+      # (`last_attempted_ids`)・最新行 (`:max`) をそれぞれ別の行に置く
+      [
+        [30, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最古行
+        [20, SourceRunLog::STATUS_SUCCESS, 1, 1], # 最後に配信できた run（検証対象）
+        [19, SourceRunLog::STATUS_ERROR, 1, 0], # 直近の配信試行
+        [18, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最新行
+      ].each do |days, status, attempted, delivered|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status:, duration_ms: 10,
+          attempted_count: attempted, delivered_count: delivered
+        )
+      end
       SourceRunLog.prune(14)
       remain = SourceRunLog.where(source_id: SOURCE_ID).all
 
-      assert_equal(1, remain.size)
-      assert_true(remain.first.delivered?)
+      assert_true(remain.any?(&:delivered?))
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
 
@@ -252,16 +316,20 @@ module TomatoShrieker
     # 🔴 #1504: 取りこぼしの根拠行を刈ると、赤くなったソースが retention_days の
     # 経過だけで黙って緑に戻る。「次に配信できたときだけ解除する」が壊れる。
     def test_prune_keeps_last_attempted_row
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
-        status: SourceRunLog::STATUS_PARTIAL, duration_ms: 10,
-        attempted_count: 2, delivered_count: 1
-      )
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
-        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
-        attempted_count: 0, delivered_count: 0
-      )
+      # ⚠ 根拠行を**他の保護と兼ねさせない**。⚠ `partial` は `delivered_count > 0` で
+      # `last_delivered_ids` にも掛かるので、全滅 (`error`) で試行した行を使う。
+      # 最古行 (`:min`)・最新行 (`:max`) も別の行に置く
+      [
+        [30, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最古行
+        [20, SourceRunLog::STATUS_ERROR, 2, 0], # 直近の配信試行（検証対象）
+        [19, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最新行
+      ].each do |days, status, attempted, delivered|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status:, duration_ms: 10,
+          attempted_count: attempted, delivered_count: delivered
+        )
+      end
       SourceRunLog.prune(14)
 
       assert_true(SourceRunLog.undelivered?(SOURCE_ID))
@@ -332,7 +400,8 @@ module TomatoShrieker
       SourceRunLog.prune(14)
       remain = SourceRunLog.where(source_id: SOURCE_ID).all
 
-      assert_equal(1, remain.size)
+      # ⚠ #1621 から最新行も守るので、期限切れでも 2 行残る（最古行＋最新行）
+      assert_equal(2, remain.size)
       assert_equal(first.to_i, SourceRunLog.observed_since(SOURCE_ID).to_i)
     end
 
