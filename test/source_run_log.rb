@@ -255,21 +255,24 @@ module TomatoShrieker
     # #1470: retention_days を超えて沈黙しても、根拠行が残って検知が続く。
     # 刈ってしまうと沈黙が長引くほど検知できなくなる。
     def test_prune_keeps_last_delivered_row
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
-        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
-        attempted_count: 1, delivered_count: 1
-      )
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
-        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
-        attempted_count: 0, delivered_count: 0
-      )
+      # ⚠ 根拠行を**他の保護と兼ねさせない**。兼ねると、この保護を外しても別の系統が
+      # 守ってしまい、テストが空振りする。最古行 (`:min`)・直近の試行
+      # (`last_attempted_ids`)・最新行 (`:max`) をそれぞれ別の行に置く
+      [
+        [30, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最古行
+        [20, SourceRunLog::STATUS_SUCCESS, 1, 1], # 最後に配信できた run（検証対象）
+        [19, SourceRunLog::STATUS_ERROR, 1, 0], # 直近の配信試行
+        [18, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最新行
+      ].each do |days, status, attempted, delivered|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status:, duration_ms: 10,
+          attempted_count: attempted, delivered_count: delivered
+        )
+      end
       SourceRunLog.prune(14)
       remain = SourceRunLog.where(source_id: SOURCE_ID).all
 
-      # ⚠ #1621 から最新行も守るので、期限切れでも 2 行残る（配信行＋最新の no-op）
-      assert_equal(2, remain.size)
       assert_true(remain.any?(&:delivered?))
       assert_not_nil(SourceRunLog.last_delivered_at(SOURCE_ID))
     end
@@ -313,16 +316,20 @@ module TomatoShrieker
     # 🔴 #1504: 取りこぼしの根拠行を刈ると、赤くなったソースが retention_days の
     # 経過だけで黙って緑に戻る。「次に配信できたときだけ解除する」が壊れる。
     def test_prune_keeps_last_attempted_row
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (20 * 86_400),
-        status: SourceRunLog::STATUS_PARTIAL, duration_ms: 10,
-        attempted_count: 2, delivered_count: 1
-      )
-      SourceRunLog.create(
-        source_id: SOURCE_ID, executed_at: Time.now - (19 * 86_400),
-        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
-        attempted_count: 0, delivered_count: 0
-      )
+      # ⚠ 根拠行を**他の保護と兼ねさせない**。⚠ `partial` は `delivered_count > 0` で
+      # `last_delivered_ids` にも掛かるので、全滅 (`error`) で試行した行を使う。
+      # 最古行 (`:min`)・最新行 (`:max`) も別の行に置く
+      [
+        [30, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最古行
+        [20, SourceRunLog::STATUS_ERROR, 2, 0], # 直近の配信試行（検証対象）
+        [19, SourceRunLog::STATUS_SUCCESS, 0, 0], # 最新行
+      ].each do |days, status, attempted, delivered|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status:, duration_ms: 10,
+          attempted_count: attempted, delivered_count: delivered
+        )
+      end
       SourceRunLog.prune(14)
 
       assert_true(SourceRunLog.undelivered?(SOURCE_ID))
