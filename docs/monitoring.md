@@ -242,14 +242,16 @@ monitor:
 
 ⚠ **`bin/shrieker source validate` が WARN で指摘する。**NG にしないのは、妥当かどうかの判定に実行間隔が要り、**スキーマでは表現できない**ため。⚠ 1 つの定義が複数のクラスにマッチする場合は各インスタンスの最大の和で見る。密で長周期の cron（`* * * 1-11 *` など）は走査の上限で判定を諦め、警告しない
 
-#### 🔴 緩められるのは「エントリを 1 件も読めていない失敗」だけ
+#### 🔴 緩められるのは「エントリを 1 件も失っていない失敗」だけ
 
-⚠⚠ **しきい値をいくつにしても、エントリを読んだ後に落ちた失敗は 1 回で 503 になる。**
+⚠⚠ **しきい値をいくつにしても、エントリを失いうる段まで進んでから落ちた失敗は 1 回で 503 になる。**
 
 ```
-取得そのものが失敗（entry_stage: false）  → しきい値が効く
-エントリを読んだ後に失敗（entry_stage: true）→ 1 回で赤
+取得そのものが失敗・パース失敗（entry_stage: false）→ しきい値が効く
+エントリの行を作った後に失敗（entry_stage: true）   → 1 回で赤
 ```
+
+⚠ 「読んだかどうか」ではなく「**取り返せるかどうか**」で分ける。FeedSource のパース失敗は `Entry.insert` の手前なので行が無く、次の run で読み直される＝緩和が効いてよい側（#1622）。
 
 🔴 **これが無いとエントリが恒久的に失われる。**`Entry.insert` は配信より先に走るので、`create_record` / `create_template` / `enclosures` / `Entry#shriek` 以降で落ちた run のエントリは **unique 制約で二度と取得されない**。しかもその失敗は `record_failure` 経由で `attempted_count` に載らないため、⚠⚠ **`undelivered` も `stale` も `silent` も立たず、`error_streak` が唯一のゲート**になっている（#1473 / `DeliveryStats#record_failure` のコメント）。
 
@@ -274,10 +276,12 @@ monitor:
 - `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
 - `entry_stage` — エントリ処理段まで進んでいた run か（`migration/013`・#1586）。⚠ 旧行は NULL
+  - ⚠ **4.12.0 で FeedSource の意味が狭まった (#1622)。**「新しいエントリの行を作った run（insert 後の失敗を含む）」だけが true。⚠⚠ **4.11.0 で書かれた行は既知エントリしか無い run でも true**（本番 14 日で約 3 万行）なので、**デプロイ前後で集計が不連続**になる
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
   - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
   - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
+  - ⚠ 保護行（上の「prune はソースごとに 4 行を守る」）は残るが、**retention を過ぎると `error_message` は消える (#1511)**。⚠ そのため**実行間隔が retention より長いソースが error のまま 503 を立て続けると、15 日目以降の 503 本文には `error:` 行が出ない (#1621)**。原文は Sentry に残っている
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
 

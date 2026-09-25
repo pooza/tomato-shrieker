@@ -69,14 +69,14 @@ module TomatoShrieker
 
     # 🔴 **#1608: prune が守る古い行をまたいで数えない。**
     #
-    # ⚠⚠ `prune` はソースごとに `first_run_ids` / `last_attempted_ids` /
-    # `last_delivered_ids` の 3 行を**無期限に守る**。**疎なソース**では retention 内の
+    # ⚠⚠ `prune` はソースごとに `boundary_run_ids(:min)` / `boundary_run_ids(:max)` /
+    # `last_attempted_ids` / `last_delivered_ids` の 4 行を**無期限に守る**。**疎なソース**では retention 内の
     # 行が `limit` より少ないので、**守られた古い行がそのまま末尾に並ぶ**。間にあった
     # 成功行は消えているので、**何か月も前の最初の run のエラーが直近のエラーと
     # 地続きに見え、streak が水増しされる**＝ 実際には連続していない失敗で
     # `/healthz/source/:id` が 503 を立てる。
     def test_error_streak_stops_at_retention_cutoff
-      # 最初の run（error）。⚠ first_run_ids が守るので prune で消えない
+      # 最初の run（error）。⚠ `boundary_run_ids(:min)` が守るので prune で消えない
       SourceRunLog.create(
         source_id: SOURCE_ID, executed_at: Time.now - (90 * 86_400),
         status: SourceRunLog::STATUS_ERROR, duration_ms: 10,
@@ -150,7 +150,7 @@ module TomatoShrieker
     # ⚠ **免除は先頭行だけ。**2 行目以降まで免除すると #1608 が戻る
     # （保護された古い行をまたいで数え、実際には連続していない失敗で 503 が立つ）。
     def test_error_streak_exempts_only_the_latest_row
-      # 90 日前の最初の run（error・first_run_ids が守る）と、20 日前の error。
+      # 90 日前の最初の run（error・`boundary_run_ids(:min)` が守る）と、20 日前の error。
       # どちらも cutoff の外だが、数えてよいのは先頭の 1 件だけ
       [90, 20].each do |days|
         SourceRunLog.create(

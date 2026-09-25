@@ -219,7 +219,7 @@ module TomatoShrieker
 
     # このソースの run を観測し始めた時刻 (#1483)。
     # 一度も配信していないソースでは、ここからの経過が無配信期間の下限になる。
-    # first_run_ids が根拠行を prune から守るので retention_days では消えない。
+    # `boundary_run_ids(:min)` が根拠行を prune から守るので retention_days では消えない。
     def self.observed_since(source_id)
       row = where(source_id:).order(:executed_at, :id).first
       return row&.executed_at
@@ -291,8 +291,9 @@ module TomatoShrieker
 
     # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**
     #
-    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 3 行
-    # （`first_run_ids` / `last_attempted_ids` / `last_delivered_ids`）を**無期限に守る**。
+    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 4 行
+    # （`boundary_run_ids(:min)` / `boundary_run_ids(:max)` / `last_attempted_ids` /
+    # `last_delivered_ids`）を**無期限に守る**。
     # **疎なソース**では retention 内の行が `limit` より少ないので、**守られた古い行が
     # そのまま末尾に並ぶ**。間にあった成功行は prune で消えているので、
     # **「直近のエラー」と「何か月も前の最初の run のエラー」が連続して見え、streak が
