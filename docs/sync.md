@@ -81,6 +81,16 @@ done
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
 
+🔴 **ただしサテライト 2 本はローカルでは緑にならない。**⚠⚠ **この赤を「追随で壊した」と読み違えないこと。**
+
+| リポジトリ | ローカルの結果 | 理由 |
+| --- | --- | --- |
+| `loquat` | **10 errors** | `localhost:8888` の録画サーバが開発機に無い |
+| `shooby-do-bop` | **3 errors** | `/google/api/key`（YouTube API キー）が開発機に無い |
+| `dqdai-anniv` | 0 errors | ローカルで完結する |
+
+⚠ **切り分け方は「bump 前の lock で同じ数の error が出るか」。**`git stash` → `bundle install` → `rake test` で突き合わせれば、環境依存か追随起因かが分かる（2026-09-23 に実施し、両方とも bump 前と同数＝環境依存と確認）。**最終的な担保は push 後の CI**（4 本とも default ブランチで走る）。
+
 #### サテライト 3 本の open PR / issue と CI
 
 🔴 **毎回実行する。**`loquat` / `shooby-do-bop` / `dqdai-anniv` は **CommandSource の 7 ソースの実体**だが、tomato 側からは見えないので**放置されても誰も気づかない**。⚠ **上流（`ginseng-style` / `ginseng-*`）はこちらへ PR / Issue を送ってくるので、受け取りが止まると横断の変更がここで詰まる。**

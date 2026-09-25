@@ -27,6 +27,15 @@ module TomatoShrieker
     # ⚠ **取得そのものの失敗（YouTube の 404 等）では呼ばない。**緩和が効いてよい
     # のはそちらだけ。
     # ⚠ **エントリが 0 件なら呼ばない。**失うものが無い run で緩和を潰さない。
+    #
+    # 🔴 **FeedSource だけは「一覧を取り出した直後」ではない (#1622)。**
+    # - `create_record` が**配信対象の行を返した直後**に呼ぶ。一覧は重複判定の前なので、
+    #   そこで呼ぶと既知エントリしか無い run（平常時のほぼ全 run）でも段が立つ。
+    #   ⚠ insert はしたが意図して流さない行（未 touch / `feed.time` より古い /
+    #   `keep_years` の外）は nil が返るので立たない＝失うものが無い
+    # - `Entry.create` が `Entry.insert` を**通した後**に落ちたときも呼ぶ。行が残るので
+    #   そのエントリは二度と配信されない
+    # - ⚠ insert より手前（パース失敗）では呼ばない。行が無いので次の run で読み直す
     def enter_entry_stage!
       @mutex.synchronize {@entry_stage = true}
       return nil

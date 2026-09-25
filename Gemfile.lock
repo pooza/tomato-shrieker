@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 39e2421fdd19e80de4c273ee2bd0735c5c48a6e5
+  revision: 394f90fb962ea203ae2ffdd6c0c2185a242242ed
   branch: main
   specs:
-    ginseng-core (1.24.0)
+    ginseng-core (1.25.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -41,10 +41,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: a09ccd4f733fb6fb0d49bcf23c57064fcd89ca2f
+  revision: 697502fea58a9c9dbba9527347b02198d3dbdfe9
   branch: main
   specs:
-    ginseng-piefed (0.1.1)
+    ginseng-piefed (0.1.2)
 
 GIT
   remote: https://github.com/pooza/ginseng-style.git

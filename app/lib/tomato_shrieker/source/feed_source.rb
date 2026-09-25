@@ -117,9 +117,23 @@ module TomatoShrieker
       # 落ちる run（YouTube の 404 等）は**取得段**なので、ここへは到達しない
       # ＝ しきい値の緩和が効いてよい側。
       targets = entries.reject {|v| ignore_entry?(v)}
-      @delivery_stats&.enter_entry_stage! if targets.present?
       Parallel.each(targets, in_threads:) do |entry|
+        # 🔴🔴 **段は `create_record` が配信対象の行を返してから立てる (#1622)。**
+        #
+        # ⚠⚠ `targets` は `ignore_entry?` で絞っただけの**生のフィード項目**で、
+        # **まだ重複判定を通していない**。重複判定は `Entry.create` が
+        # `Sequel::UniqueConstraintViolation` を掴んで nil を返すここで初めて起きる。
+        # ループの外で立てると、**既知エントリしか無い run（＝平常時のほぼ全 run）でも
+        # `entry_stage: true`** になり、`DeliveryStats#enter_entry_stage!` の
+        # 「エントリが 0 件なら呼ばない。失うものが無い run で緩和を潰さない」という
+        # 宣言と食い違う。⚠ **失うものが 1 件も無いのに `error_streak_threshold` が
+        # 28 → 1 に潰れ、一過性の失敗 1 回で 503** になる。
+        #
+        # ⚠ `yield` の手前なので `create_template` / `enclosures` 由来の失敗 (#1473) は
+        # これまでどおり段の中側。⚠ `@mutex` 保護済みなので `Parallel.each` の
+        # スレッドから呼んで安全。
         next unless record = create_record(entry)
+        @delivery_stats&.enter_entry_stage!
         yield record
       rescue => e
         # create_record / create_template / enclosures 由来の失敗は Entry#shriek に

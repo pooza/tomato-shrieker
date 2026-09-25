@@ -133,6 +133,44 @@ module TomatoShrieker
         '報告が落ちると計上まで落ちている')
     end
 
+    # 🔴🔴 **#1622: 重複だけの run で段を立てない。**
+    #
+    # ⚠⚠ `targets` は `ignore_entry?` で絞っただけの**生のフィード項目**で、まだ重複判定を
+    # 通していない。重複判定は `Entry.create` が `Sequel::UniqueConstraintViolation` を
+    # 掴んで nil を返すところで初めて起きる。ループの外で段を立てると、**既知エントリ
+    # しか無い run（＝平常時のほぼ全 run）でも `entry_stage: true`** になり、
+    # **失うものが 1 件も無いのに `error_streak_threshold` が 28 → 1 に潰れて
+    # 一過性の失敗 1 回で 503** になる。
+    def test_entry_stage_not_marked_when_all_entries_are_known
+      stats = DeliveryStats.new
+      source = stub_entries(FeedSource.new(fixture_params), stats)
+      # `Entry.create` が既知エントリで nil を返すのと同じ形
+      source.define_singleton_method(:create_record) {|_entry| nil}
+      source.fetch {|_record| nil}
+
+      assert_false(stats.entry_stage?, '重複だけの run で緩和を潰している')
+    end
+
+    # ⚠ 新しいエントリが 1 件でも作られたら段は立つ（insert 済み＝取り返せない）。
+    def test_entry_stage_marked_when_record_created
+      stats = DeliveryStats.new
+      source = stub_entries(FeedSource.new(fixture_params), stats)
+      source.define_singleton_method(:create_record) {|_entry| :record}
+      source.fetch {|_record| nil}
+
+      assert_true(stats.entry_stage?)
+    end
+
+    # ⚠ `yield` の手前で立てるので、配信段の失敗 (#1473) はこれまでどおり段の中側。
+    def test_entry_stage_marked_when_delivery_fails
+      stats = DeliveryStats.new
+      source = stub_entries(FeedSource.new(fixture_params), stats)
+      source.define_singleton_method(:create_record) {|_entry| :record}
+      source.fetch {|_record| raise 'template broken'}
+
+      assert_true(stats.entry_stage?)
+    end
+
     private
 
     def fixture_params
@@ -143,13 +181,19 @@ module TomatoShrieker
       stub_failing(klass.new(fixture_params), stats).fetch {|_record| nil}
     end
 
-    # ⚠ ネットワークへ出ない。`entries` と `create_record` を差し替えて、
-    # 「配信手前でエントリが落ちる」経路だけを通す。
-    def stub_failing(source, stats)
+    # ⚠ ネットワークへ出ない。`entries` だけ差し替えて `fetch` のループを通す。
+    # `create_record` は呼び出し側が用途ごとに差し替える。
+    def stub_entries(source, stats)
       source.define_singleton_method(:entries) {|&block| block ? [:entry].each(&block) : [:entry].each}
       source.define_singleton_method(:ignore_entry?) {|_entry| false}
-      source.define_singleton_method(:create_record) {|_entry| raise 'boom'}
       source.instance_variable_set(:@delivery_stats, stats)
+      return source
+    end
+
+    # ⚠ 「配信手前でエントリが落ちる」経路だけを通す。
+    def stub_failing(source, stats)
+      stub_entries(source, stats)
+      source.define_singleton_method(:create_record) {|_entry| raise 'boom'}
       return source
     end
 

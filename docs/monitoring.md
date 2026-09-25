@@ -59,7 +59,9 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 ⚠ **no-op を読み飛ばす実装にしてはいけない。**新着の少ないソースは配信が起きるまで no-op が続くため、一過性エラー 1 回で `/healthz/source/:id` が次の配信まで 503 に貼り付く。何回の連続エラーで倒すかは `/monitor/error_streak_threshold` で調整する。
 
-🔴 **streak は `/monitor/retention_days` の cutoff より古い行で止まる (#1608)。**⚠⚠ prune は下の「prune から守る 3 系統」をソースごとに**無期限に残す**ので、**疎なソース**では retention 内の行が読む件数より少なく、**守られた古い行がそのまま末尾に並ぶ**。間にあった成功行は消えているため、これを止めないと**何か月も前の最初の run のエラーが直近のエラーと地続きに見え、実際には連続していない失敗で 503 が立つ**。⚠ 守られた行は `last_delivered_at` / `observed_since` の**根拠行**であって、**連続性の根拠ではない**。
+🔴 **streak は `/monitor/retention_days` の cutoff より古い行で止まる (#1608)。**⚠⚠ prune は下の「prune から守る 4 系統」をソースごとに**無期限に残す**ので、**疎なソース**では retention 内の行が読む件数より少なく、**守られた古い行がそのまま末尾に並ぶ**。間にあった成功行は消えているため、これを止めないと**何か月も前の最初の run のエラーが直近のエラーと地続きに見え、実際には連続していない失敗で 503 が立つ**。⚠ 守られた行は `last_delivered_at` / `observed_since` の**根拠行**であって、**連続性の根拠ではない**。
+
+🔴🔴 **ただし先頭行（直近の run）だけは cutoff を免除する (#1621)。**⚠⚠ **免除しないと、実行間隔が `retention_days` より長いソースが「失敗したまま緑」になる**。月次 cron × しきい値 1 × retention 14 日で、その月の唯一の run が error だと、**15 日目までは 503 なのに 16 日目に `executed_at < cutoff` へ落ちて streak が 0 になり、次の run までずっと 200 OK** になる。⚠ `next_run_at` は翌月なので `stale` も立たず、`silence_tolerance` は opt-in ＝ **誰も気づかない**。⚠ 免除してよいのは先頭行だけで、これは「直近の run の結果」そのもの＝連続性を仮定せずに数えられる。#1608 が消したかった水増しは**保護された古い行をまたいで数えること**なので、2 行目以降で cutoff が効けば目的は損なわれない。
 
 **サイレント不発の判定 (#1470)** は `silence_tolerance` を宣言したソースだけが対象（opt-in）。`chikanan` のように年単位で正常に静かなソースがあるため、一律の既定値は置かない。
 
@@ -168,13 +170,14 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 ⚠ **`fallback` は人間が読むための参考値で、`silent?` は使わない (#1483)。**`entry.published` は上流フィードが自称する公開時刻で、`Entry` の行は配信の成否と無関係に INSERT される。**配信できていなくても上流に新着があるかぎり前進し続ける**ので、判定に使うと「配信していないのに健全」になる（Google News の pubDate が信用できない件と同根）。一次情報は `run_log` 側。
 
-⚠ **prune はソースごとに 3 行を守る。**
+⚠ **prune はソースごとに 4 行を守る。**
 
 | 守る行 | 理由 |
 |------|------|
 | 最後に配信できた run | 刈ると沈黙が `retention_days` を超えた瞬間に `last_delivered_at` が nil に化け、**沈黙が長引くほど検知できなくなる** (#1470) |
 | 最古の run | 未配信のソースは上の保護に引っかからない。刈ると `observed_since` が常に `retention_days` 前に張り付き、それより長い `silence_tolerance` が永久に成立しない (#1483) |
 | 最後に配信を試みた run | 刈ると未達で赤くなったソースが `retention_days` の経過だけで黙って緑に戻る。**次に配信できたときだけ解除する**という仕様が壊れる (#1504) |
+| 直近の run | 🔴🔴 streak は**先頭行だけ cutoff を免除する**ので、**先頭行が本当に最新の run でなければならない** (#1621)。⚠⚠ no-op success（新着が無く配信ゼロで完走した run）は上の 3 系統のどれにも掛からないため、これが無いと**疎なソースで「最新の成功 run だけ刈られ、最古行として守られた古い error が先頭に来る」**＝ **一度直ったソースが永久に赤いまま**になる |
 
 `silence_tolerance` に `retention_days` より大きい値を書けるのはこの保護があるため。
 
@@ -239,20 +242,25 @@ monitor:
 
 ⚠ **`bin/shrieker source validate` が WARN で指摘する。**NG にしないのは、妥当かどうかの判定に実行間隔が要り、**スキーマでは表現できない**ため。⚠ 1 つの定義が複数のクラスにマッチする場合は各インスタンスの最大の和で見る。密で長周期の cron（`* * * 1-11 *` など）は走査の上限で判定を諦め、警告しない
 
-#### 🔴 緩められるのは「エントリを 1 件も読めていない失敗」だけ
+#### 🔴 緩められるのは「エントリを 1 件も失っていない失敗」だけ
 
-⚠⚠ **しきい値をいくつにしても、エントリを読んだ後に落ちた失敗は 1 回で 503 になる。**
+⚠⚠ **しきい値をいくつにしても、エントリを失いうる段まで進んでから落ちた失敗は 1 回で 503 になる。**
 
 ```
-取得そのものが失敗（entry_stage: false）  → しきい値が効く
-エントリを読んだ後に失敗（entry_stage: true）→ 1 回で赤
+取得そのものが失敗・パース失敗（entry_stage: false）→ しきい値が効く
+エントリの行を作った後に失敗（entry_stage: true）   → 1 回で赤
 ```
+
+⚠ 「読んだかどうか」ではなく「**取り返せるかどうか**」で分ける。FeedSource のパース失敗は `Entry.insert` の手前なので行が無く、次の run で読み直される＝緩和が効いてよい側（#1622）。
 
 🔴 **これが無いとエントリが恒久的に失われる。**`Entry.insert` は配信より先に走るので、`create_record` / `create_template` / `enclosures` / `Entry#shriek` 以降で落ちた run のエントリは **unique 制約で二度と取得されない**。しかもその失敗は `record_failure` 経由で `attempted_count` に載らないため、⚠⚠ **`undelivered` も `stale` も `silent` も立たず、`error_streak` が唯一のゲート**になっている（#1473 / `DeliveryStats#record_failure` のコメント）。
 
 🔴🔴 **段は `source_run_log.entry_stage` が直接持つ (#1586)。**⚠⚠ 4.9.0 までは **`shrieker_errors` が空であること**を「取得段の失敗」の**代理**にしていたが、**その代理が成立するのは FeedSource だけだった**。`CommandSource#exec` / `IcalendarSource#exec` は `create_template` で落ちると `@delivery_stats` が空のまま `exec_with_run_log` の rescue に入るので、**`shrieker_errors` が空の error 行**になる ＝ **エントリ処理段の失敗が「取得段の失敗」と誤読され、緩めたしきい値がそのまま残っていた**。代理をやめて事実を書く、という差分。
 
 - 段を立てるのは **`DeliveryStats#enter_entry_stage!`**。各 Source が**エントリの一覧を取り出した直後**に 1 回だけ呼ぶ（取得の失敗はここへ到達しない／エントリ 0 件なら呼ばない）
+- 🔴🔴 **`FeedSource` だけは「一覧を取り出した直後」ではなく `create_record` が配信対象の行を返した直後 (#1622)。**⚠⚠ 一覧（`targets`）は `ignore_entry?` で絞っただけの**生のフィード項目**で、**重複判定を通していない**。重複判定は `Entry.create` が `Sequel::UniqueConstraintViolation` を掴んで nil を返すところで初めて起きるので、一覧の時点で立てると**既知エントリしか無い run（＝平常時のほぼ全 run）でも `entry_stage: true`** になる。⚠ **失うものが 1 件も無いのに `error_streak_threshold` が 28 → 1 に潰れ、一過性の失敗 1 回で 503** になる
+- ⚠⚠ **`Entry.create` が `Entry.insert` を通した後に落ちた場合も段を立てる (#1622)。**行は残るのでそのエントリは次の run で `Sequel::UniqueConstraintViolation` に化けて**二度と配信されない**。`FeedSource#fetch` の rescue は段を立てる手前なので、ここで立てないと**恒久的な取りこぼしが「取得段の失敗」＝緩和が効く側**に分類される。⚠ insert より手前（パース失敗）で落ちたら立てない ＝ **失うものが無い**
+- ⚠⚠ **`CommandSource` は非ゼロ終了でもエントリを失っていることがある。**`raise command.stderr unless command.status.zero?` までを取得段としているが、**子プロセスが落ちる前にキャッシュを進めている**ことがある（`precure-reserve` は `-n`（保存しない）が無いので `loquat reserves` が `tmp/cache/reserves-*.json` を更新する。`dqdai-reserve` には `-n` がある）。この形で落ちるとエントリは失われるのに `entry_stage: false` ＝ **緩和が効く側**に分類される。✅ 両者とも `error_streak_threshold` が 1 なので今は無害だが、**CommandSource でしきい値を緩めるときはこれを踏まえること**
 - ⚠ `TextSource` は立てない。本文は設定の固定文字列で、落ちても次の run が同じものを流す
 - ⚠⚠ **migration 013 より前の行は `entry_stage` が NULL。**NULL の行だけ従来の代理へ倒す。**「NULL ＝ エントリ処理段」にするとデプロイ直後に緩和を掛けているソースが一斉 503** になる（migration 010 の backfill と同じ型）
 - 📌 **503 本文に `entry_stage:` が出る。**しきい値を 28 に緩めていても `error_streak: 1 / 1` になる理由がそこで読める
@@ -268,10 +276,12 @@ monitor:
 - `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数
 - `entry_stage` — エントリ処理段まで進んでいた run か（`migration/013`・#1586）。⚠ 旧行は NULL
+  - ⚠ **4.12.0 で FeedSource の意味が狭まった (#1622)。**「**配信対象の**新しいエントリの行を作った run（insert 後の失敗を含む）」だけが true。⚠ insert はしたが意図して流さない行（まだ touch していない／`feed.time` より古い／`keep_years` の外）は `create_record` が nil を返すので立たない＝失うものが無い。⚠⚠ **4.11.0 で書かれた行は既知エントリしか無い run でも true**（本番 14 日で約 3 万行）なので、**デプロイ前後で集計が不連続**になる
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
   - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
   - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
+  - ⚠ 保護行（上の「prune はソースごとに 4 行を守る」）は残るが、**retention を過ぎると `error_message` は消える (#1511)**。⚠ そのため**実行間隔が retention より長いソースが error のまま 503 を立て続けると、15 日目以降の 503 本文には `error:` 行が出ない (#1621)**。原文は Sentry かログに残る。⚠⚠ **ただし宛先を組み立てられなかった失敗（`UnavailableDest`）は Sentry へ送らず `logger.error` だけ**で、ログは 7 世代でローテーションされる＝**retention を過ぎると原文はどこにも残らない**
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
 
