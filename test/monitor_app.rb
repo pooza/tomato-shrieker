@@ -267,7 +267,7 @@ module TomatoShrieker
     # 保護行を `entry_level_error?` が拾い、緩和だけ潰れて 503 が立つ**
     # ＝ #1608 が無視したかった「連続していない過去の失敗」でそのまま赤くなる。
     def test_healthz_source_threshold_ignores_protected_row_before_cutoff
-      # retention の外の保護行（エントリ処理段の失敗）。⚠ first_run_ids が守る
+      # retention の外の保護行（エントリ処理段の失敗）。⚠ `boundary_run_ids(:min)` が守る
       record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
         error_message: 'RuntimeError: template broken',
         shrieker_errors: JSON.dump({'source#fetch' => 1}),
