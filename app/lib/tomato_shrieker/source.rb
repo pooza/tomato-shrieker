@@ -40,6 +40,14 @@ module TomatoShrieker
       return schedule(:every, every)
     end
 
+    # 🔴 **エントリ処理段に入ったことを記録する (#1586 / #1622)。**
+    #
+    # ⚠ `Entry.create` からも呼ぶので、`@delivery_stats` を直接触らせずここへ通す。
+    # 段の意味と「いつ呼ぶか」は `DeliveryStats#enter_entry_stage!` のコメントが正本。
+    def enter_entry_stage!
+      return @delivery_stats&.enter_entry_stage!
+    end
+
     # 配信できた宛先の件数を返す。呼び出し側がログに実績を出せるようにするため (#1473)。
     def shriek(template: nil, visibility: nil, attachments: nil, stats: @delivery_stats)
       params = {template:, visibility:, attachments:}.compact
