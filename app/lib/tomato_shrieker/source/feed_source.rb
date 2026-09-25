@@ -118,7 +118,7 @@ module TomatoShrieker
       # ＝ しきい値の緩和が効いてよい側。
       targets = entries.reject {|v| ignore_entry?(v)}
       Parallel.each(targets, in_threads:) do |entry|
-        # 🔴🔴 **段は `create_record` が行を作ってから立てる (#1622)。**
+        # 🔴🔴 **段は `create_record` が配信対象の行を返してから立てる (#1622)。**
         #
         # ⚠⚠ `targets` は `ignore_entry?` で絞っただけの**生のフィード項目**で、
         # **まだ重複判定を通していない**。重複判定は `Entry.create` が
