@@ -148,6 +148,23 @@ ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
 - `docs/CLAUDE.md` と MEMORY.md に記載された次期マイルストーンの Issue が、実際の GitHub 上の状態（open/closed）と一致しているか確認
 - クローズ済みの Issue があれば MEMORY.md から除外し、`docs/CLAUDE.md` も必要に応じて更新
 
+#### 未割当と保留の確認
+
+🔴 **毎回実行する。open issue は必ずどこかのマイルストーンに振る**（遠いマイナーでよい）。⚠⚠ **「意図して止めている」と「振り忘れ」がどちらも「マイルストーン無し」に見えると、振り忘れが止めているふりをして残り続ける。**2026-09-26 には未割当が 38 件溜まり、うち意図して止めていたのは 2 件だけ。しかもその 1 件（#1585「#1586 の後」）は**条件がとうに満たされていたのに誰も気づけなかった**。
+
+- **未割当は「振り忘れ」だけを意味する。**起票したらその場でマイルストーンとサイズラベルを振る
+- **意図して止めるものは `on-hold` ラベルを付け、「止めている理由」と「再開条件」をコメントに書く。**理由の無い保留は作らない。マイルストーンは外さない
+
+```sh
+# 1. 未割当が 0 件であること（出たら振る）
+gh issue list --state open --limit 200 --json number,title,milestone \
+  --jq '.[] | select(.milestone == null) | "#\(.number) \(.title)"'
+
+# 2. 保留の再開条件が満たされていないか読む
+gh issue list --state open --label on-hold --json number,title,milestone \
+  --jq '.[] | "#\(.number) [\(.milestone.title)] \(.title)"'
+```
+
 ### 8. MEMORY.md の更新
 
 - 上記で検出した差分（Issue 状態、リリース日の誤り、件数のズレ等）を反映
