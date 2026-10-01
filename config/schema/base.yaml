@@ -52,16 +52,6 @@ properties:
         type: array
         items:
           type: string
-  slack:
-    type: object
-    required:
-      - hooks
-    properties:
-      hooks:
-        type: array
-        items:
-          type: string
-          format: uri
   sources:
     type: array
     items:
