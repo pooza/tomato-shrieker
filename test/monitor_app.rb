@@ -878,6 +878,21 @@ module TomatoShrieker
       assert_not_include(ids, DISABLED_ID)
     end
 
+    # 🔴 **Codex P2（#1638 の 2 巡目）: 組み立てに失敗しても、無効ソースは `--problems` に出さない。**
+    # ⚠ healthz は組み立てる前に無効ソースを 200 で返すので、例外の経路でも免除を保つ。
+    def test_source_status_problems_excludes_disabled_build_failure
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      original = SourceStatus.method(:build)
+      SourceStatus.define_singleton_method(:build) {|_source| raise 'boom'}
+      ids = JSON.parse(run_source_status(json: true, problems: true, all: true)).map {|v| v['id']}
+
+      assert_not_include(ids, DISABLED_ID)
+      assert_include(ids, FIXTURE_ID) # 監視対象の組み立て失敗は出す
+    ensure
+      SourceStatus.define_singleton_method(:build, original)
+    end
+
     def test_source_status_sort_by_streak
       record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0)
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)

@@ -235,7 +235,10 @@ module TomatoShrieker
     rescue => e
       return {
         status: {id: source.id, class: source.class.to_s, error: Package.error_message(e)},
-        problems: [:build_failed],
+        # ⚠ **無効・監視対象外は例外の経路でも免除する（#1638 の Codex P2）。**healthz は
+        # 組み立てる前にこれらを 200 で返すので、ここで問題にすると食い違う。
+        problems: source.disable? || !source.monitored? ? [] : [:build_failed],
+        disabled: source.disable?,
       }
     end
 
