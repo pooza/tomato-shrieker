@@ -38,8 +38,14 @@ module TomatoShrieker
         status[:error_streak] ? "#{status[:error_streak]}/#{status[:error_streak_threshold]}" : '-',
         status[:error_rate_24h] ? "#{(status[:error_rate_24h] * 100).round}%" : '-',
         status[:last_delivered_at] ? format_time(Time.parse(status[:last_delivered_at])) : '-',
-        row[:problems].any? ? row[:problems].join(',') : '-',
+        marks(row),
       ]
+    end
+
+    # 問題に加えて無効の目印も出す。⚠ 目印は `problems` には入れない（`--problems` の判定を汚す）
+    def self.marks(row)
+      marks = row[:problems] + (row[:disabled] ? [:disabled] : [])
+      return marks.any? ? marks.join(',') : '-'
     end
 
     def self.format_time(time)

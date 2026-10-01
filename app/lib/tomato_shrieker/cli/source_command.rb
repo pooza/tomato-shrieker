@@ -229,9 +229,9 @@ module TomatoShrieker
     # （`MonitorApp#source_status` と同じ形の行を返す）。
     def status_row(source)
       status = SourceStatus.build(source)
-      problems = SourceStatus.problems(source)
-      problems.push(:disabled) if source.disable?
-      return {status:, problems:}
+      # ⚠ **`disabled` は表示用の目印で、`problems` に混ぜない（#1638 の Codex P2）。**
+      # 無効ソースの healthz は 200 なので、混ぜると `--problems --all` が 200 のものを出す。
+      return {status:, problems: SourceStatus.problems(source), disabled: source.disable?}
     rescue => e
       return {
         status: {id: source.id, class: source.class.to_s, error: Package.error_message(e)},

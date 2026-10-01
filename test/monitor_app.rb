@@ -868,6 +868,16 @@ module TomatoShrieker
       assert_include(JSON.parse(run_source_status(json: true, all: true)).map {|v| v['id']}, DISABLED_ID)
     end
 
+    # 🔴 **Codex P2（#1638）: 無効の目印で `--problems` に混ざらないこと。**
+    # ⚠ 無効ソースの healthz は 200 なので、`--all` と併せても出してはいけない。
+    def test_source_status_problems_excludes_disabled
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      ids = JSON.parse(run_source_status(json: true, problems: true, all: true)).map {|v| v['id']}
+
+      assert_not_include(ids, DISABLED_ID)
+    end
+
     def test_source_status_sort_by_streak
       record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0)
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)

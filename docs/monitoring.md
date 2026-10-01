@@ -197,7 +197,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
 
-`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印。
+`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印で、**`--problems` には出ない**（無効ソースの healthz は 200）。
 
 ⚠ `collisions` は**定義ではなく run_log の実績**から見る。`every` の位相は起動時刻で決まるので、定義を突き合わせても同時発火は分からない。
 
