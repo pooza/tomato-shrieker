@@ -25,9 +25,22 @@
 
 ### 4. Codexレビューコメントの確認
 
-- 最近マージされたPR（`gh pr list --state merged --limit 5`）を取得
-- 各PRに対して `gh api repos/pooza/tomato-shrieker/pulls/{number}/comments` でCodex（`chatgpt-codex-connector[bot]`）のコメントを確認
-- 未返信のコメントがあれば内容を確認し、対応が必要か判断
+⚠ **採否の判断・返信の作法・待ち方の正本は [ginseng-style の codex-review スキル](https://github.com/pooza/ginseng-style/blob/main/plugins/ginseng/skills/codex-review/SKILL.md)。**ここに書き写さない。sync で見るのは「取り残しが無いか」だけ。
+
+- 最近マージされたPR（`gh pr list --state merged --limit 5`）を取得し、各 PR について下の 4 経路を読む
+- 🔴 **返信と 👍 / 👎 の両方が付いていないものは未処理。**内容を確認し、対応が必要か判断する
+
+🔴 **Codex の結果は 4 経路で来る。全部読む (#1618)。**⚠⚠ **「指摘なし」はコメントでも review でもなく、PR 本体への 👍 リアクションで来る。**`pulls/{n}/comments`（インライン）だけを見ていると、**走査済みなのに「まだ来ていない」と読んで待ち続ける**（#1617 で 50 分待った）うえ、review 本文や issue コメントで来た指摘を取りこぼす。
+
+```sh
+n=<PR番号>; r=repos/pooza/tomato-shrieker; bot='select(.user.login=="chatgpt-codex-connector[bot]")'
+gh api $r/pulls/$n/reviews --jq ".[]|$bot|\"review \(.submitted_at) \(.commit_id[0:7])\""
+gh api $r/pulls/$n/comments --jq ".[]|$bot|\"inline \(.id) \(.path):\(.line)\""
+gh api $r/issues/$n/comments --jq ".[]|$bot|\"comment \(.created_at)\""
+gh api $r/issues/$n/reactions --jq ".[]|$bot|\"reaction \(.content) \(.created_at)\""
+```
+
+⚠ **👍 は「この PR に指摘が無かった」ではなく「ある巡が指摘なしで終わった」だけ。**指摘が出た PR にも後の巡で付くので、インラインは別に見る。2 巡目以降を待つときの基点の採り方はスキル側にある。
 
 ### 5. Sentry の新規イシュー確認
 
@@ -78,6 +91,24 @@ done
 ⚠ **タグ固定の gem（`ginseng-style` は `tag: v1.1.12` など）は main と比べない。**main には未タグのコミットが常に積まれているので、比べると**追随済みでも「6 件遅れ」のように出る**（2026-09-17 まで実際にそう出ていた）。最新タグと比べ、違えば `v1.1.11 → v1.1.12` の形で出す。追随は Gemfile の `tag:` を書き換える。
 
 遅れがあれば `bundle update <gem> --patch` で追随する。⚠ **`--patch` を付ける。**付けないと ginseng の依存まで上がる（2026-09-17 の実測: net-protocol 0.3 → 0.4、サテライトでは json 2 → 3）。⚠ **`--conservative` は使わない。**git ソースの version 行が古いまま残って lock が壊れる（`Could not find ginseng-core-1.23.5 ... at main@b6e736d`）。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
+
+🔴 **`--patch` は `branch:` の git ソースを抑えない (#1618)。**⚠⚠ git ソースは常にブランチ先頭を取るので、**メジャーを跨いでも止まらない**。しかも上の棚卸しの出力は**コミット数**なので、**メジャーを跨いだことはどこにも出ない**（2026-09-21 に `ginseng-fediverse` が 2.0.0 → 3.1.0 になり、出力は `7` だった）。**追随したら新旧の version を必ず読む。**
+
+```sh
+git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
+```
+
+メジャーが動いていたら、**跨いだリリースノートを全部**読み（「破壊的変更」「breaking」の節）、利用側の追随が要るかを判断してから push する。⚠⚠ **最新の 1 件だけ読んではいけない。**2.0.0 → 3.1.0 なら破壊的変更は間の **3.0.0** に書いてある。⚠ リリースは作成順に並び、旧系列の修正版（2.0.x）が間に挟まるので、**版の範囲で絞る**。
+
+```sh
+gem=ginseng-fediverse old=2.0.0 new=3.1.0  # 上の差分の - と + の版
+for t in $(gh api --paginate repos/pooza/$gem/releases --jq '.[].tag_name' | sed 's/^v//' | sort -V); do
+  [ "$t" != "$old" ] && [ "$(printf '%s\n' "$old" "$t" | sort -V | tail -1)" = "$t" ] &&
+  [ "$(printf '%s\n' "$t" "$new" | sort -V | tail -1)" = "$new" ] &&
+  gh api repos/pooza/$gem/releases/tags/v$t --jq '"## \(.tag_name)\n\(.body)"'
+done
+```
+⚠ **追随前に分かるなら先に読む。**`gh api repos/pooza/<gem>/releases --jq '.[0:3][]|.tag_name'` で最新タグを見れば、棚卸しの段階でメジャーの有無は分かる。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
 
