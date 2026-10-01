@@ -45,6 +45,12 @@ properties:
       sample_size:
         type: integer
         minimum: 1
+  ruby:
+    type: object
+    properties:
+      jit:
+        # CommandSource の子プロセスに RUBY_YJIT_ENABLE=yes を渡すか (#1614)
+        type: boolean
   feed:
     type: object
     properties:

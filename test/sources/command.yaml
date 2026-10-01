@@ -1,0 +1,12 @@
+# CommandSource のテスト専用ソース (#1614)
+# ⚠ `/ruby/jit` に既定値が入るまでは、置くと CI が ConfigError で赤くなっていた
+test: true
+source:
+  command:
+    - echo
+    - command source fixture
+schedule:
+  every: 1d
+dest:
+  hooks:
+    - https://hook.example.test/command
