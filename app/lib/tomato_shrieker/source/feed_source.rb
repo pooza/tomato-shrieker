@@ -174,10 +174,6 @@ module TomatoShrieker
       return false
     end
 
-    def present?
-      return entries.present?
-    end
-
     def uri
       uri = Ginseng::URI.parse(self['/source/feed'])
       uri ||= Ginseng::URI.parse(self['/source/url'])
