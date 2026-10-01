@@ -13,6 +13,9 @@ module TomatoShrieker
     def teardown
       FileUtils.rm_f(@path)
       FileUtils.rm_f(@pid_path)
+      # ginseng-core 1.25.0 から pid の排他は `<pid_file>.lock` への flock で取り、
+      # `.lock` は消さない設計（上流 #650）。テスト用の名前は回すたびに溜まるので消す (#1632)
+      FileUtils.rm_f("#{@pid_path}.lock")
       @daemon.instance_variable_get(:@reload_queue)&.close
       @daemon.instance_variable_get(:@reload_ready)&.close
       @daemon.instance_variable_get(:@reload_thread)&.join(5)
