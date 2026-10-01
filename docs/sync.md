@@ -27,15 +27,17 @@
 
 ⚠ **採否の判断・返信の作法・待ち方の正本は [ginseng-style の codex-review スキル](https://github.com/pooza/ginseng-style/blob/main/plugins/ginseng/skills/codex-review/SKILL.md)。**ここに書き写さない。sync で見るのは「取り残しが無いか」だけ。
 
-- 最近マージされたPR（`gh pr list --state merged --limit 5`）を取得
-- 各PRに対して `gh api repos/pooza/tomato-shrieker/pulls/{number}/comments` でCodex（`chatgpt-codex-connector[bot]`）のコメントを確認
+- 最近マージされたPR（`gh pr list --state merged --limit 5`）を取得し、各 PR について下の 4 経路を読む
 - 🔴 **返信と 👍 / 👎 の両方が付いていないものは未処理。**内容を確認し、対応が必要か判断する
 
-🔴 **Codex の「指摘なし」はコメントでも review でもなく、PR 本体への 👍 リアクションで来る (#1618)。**⚠⚠ `comments` / `reviews` / issue comments だけを見ていると、**走査済みなのに「まだ来ていない」と読んで待ち続ける**（#1617 で 50 分待った）。結果は 4 経路（review・インラインコメント・issue コメント・PR への 👍）の OR で見る。
+🔴 **Codex の結果は 4 経路で来る。全部読む (#1618)。**⚠⚠ **「指摘なし」はコメントでも review でもなく、PR 本体への 👍 リアクションで来る。**`pulls/{n}/comments`（インライン）だけを見ていると、**走査済みなのに「まだ来ていない」と読んで待ち続ける**（#1617 で 50 分待った）うえ、review 本文や issue コメントで来た指摘を取りこぼす。
 
 ```sh
-gh api repos/pooza/tomato-shrieker/issues/<n>/reactions \
-  --jq '.[]|select(.user.login=="chatgpt-codex-connector[bot]")|"\(.content) \(.created_at)"'
+n=<PR番号>; r=repos/pooza/tomato-shrieker; bot='select(.user.login=="chatgpt-codex-connector[bot]")'
+gh api $r/pulls/$n/reviews --jq ".[]|$bot|\"review \(.submitted_at) \(.commit_id[0:7])\""
+gh api $r/pulls/$n/comments --jq ".[]|$bot|\"inline \(.id) \(.path):\(.line)\""
+gh api $r/issues/$n/comments --jq ".[]|$bot|\"comment \(.created_at)\""
+gh api $r/issues/$n/reactions --jq ".[]|$bot|\"reaction \(.content) \(.created_at)\""
 ```
 
 ⚠ **👍 は「この PR に指摘が無かった」ではなく「ある巡が指摘なしで終わった」だけ。**指摘が出た PR にも後の巡で付くので、インラインは別に見る。2 巡目以降を待つときの基点の採り方はスキル側にある。
@@ -96,7 +98,17 @@ done
 git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 ```
 
-メジャーが動いていたら `gh api repos/pooza/<gem>/releases --jq '.[0].body'` でリリースノートの「破壊的変更」を読み、利用側の追随が要るかを判断してから push する。⚠ **追随前に分かるなら先に読む。**`gh api repos/pooza/<gem>/releases --jq '.[0:3][]|.tag_name'` で最新タグを見れば、棚卸しの段階でメジャーの有無は分かる。
+メジャーが動いていたら、**跨いだリリースノートを全部**読み（「破壊的変更」「breaking」の節）、利用側の追随が要るかを判断してから push する。⚠⚠ **最新の 1 件だけ読んではいけない。**2.0.0 → 3.1.0 なら破壊的変更は間の **3.0.0** に書いてある。⚠ リリースは作成順に並び、旧系列の修正版（2.0.x）が間に挟まるので、**版の範囲で絞る**。
+
+```sh
+gem=ginseng-fediverse old=2.0.0 new=3.1.0  # 上の差分の - と + の版
+for t in $(gh api --paginate repos/pooza/$gem/releases --jq '.[].tag_name' | sed 's/^v//' | sort -V); do
+  [ "$t" != "$old" ] && [ "$(printf '%s\n' "$old" "$t" | sort -V | tail -1)" = "$t" ] &&
+  [ "$(printf '%s\n' "$t" "$new" | sort -V | tail -1)" = "$new" ] &&
+  gh api repos/pooza/$gem/releases/tags/v$t --jq '"## \(.tag_name)\n\(.body)"'
+done
+```
+⚠ **追随前に分かるなら先に読む。**`gh api repos/pooza/<gem>/releases --jq '.[0:3][]|.tag_name'` で最新タグを見れば、棚卸しの段階でメジャーの有無は分かる。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
 
