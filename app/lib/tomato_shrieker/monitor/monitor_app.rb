@@ -65,38 +65,11 @@ module TomatoShrieker
     end
 
     def source_checks(source, latest)
-      next_run = source.next_run_at(latest.executed_at)
-      # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
-      # ⚠ **しきい値はソース単位で上書きできる (#1558)。**読む行数もそれに従わせないと、
-      # しきい値だけ大きくしても窓が足りず、到達し得ないまま健全扱いになる。
-      logs = SourceRunLog.recent_for(
-        source.id, SourceRunLog.streak_window(source.monitor_error_streak_threshold)
-      )
-      streak = SourceRunLog.error_streak_of(logs)
-      threshold = SourceStatus.effective_error_streak_threshold(source, logs)
-      return {
-        next_run:,
-        stale: Time.now > next_run + source.monitor_grace_seconds,
-        streak:,
-        threshold:,
-        # 🔴 **しきい値を決めたのと同じ述語を持ち回る (#1615 の Codex P2)。**
-        # ⚠⚠ **直近の行だけを見て本文に出すと嘘になる。**エントリ処理段の失敗の後に
-        # 取得段の失敗が来ると `error_streak: 2 / 1` なのに `entry_stage: false` と
-        # 出て、**しきい値が 1 に倒れた理由が読めなくなる**。
-        entry_stage: SourceRunLog.entry_level_error?(logs),
-        errored: streak >= threshold,
-        silent: source.silent?,
-        # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
-        # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
-        # ⚠ opt-in の silent? と違い、しきい値の設定なしに常時有効。
-        # 判定は Source 側に寄せてある。
-        undelivered: (source.undelivered_log if source.undelivered?),
-      }
+      return SourceStatus.checks(source, latest)
     end
 
     def unhealthy?(checks)
-      return true if checks[:stale] || checks[:errored] || checks[:silent]
-      return !checks[:undelivered].nil?
+      return SourceStatus.problems_of(checks).any?
     end
 
     def unhealthy_body(source, latest, checks)

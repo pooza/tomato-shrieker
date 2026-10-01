@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
+require 'json'
 require 'shellwords'
 
 module TomatoShrieker
-  class SourceCommand < Thor
+  class SourceCommand < Thor # rubocop:disable Metrics/ClassLength
     include Package
 
     desc 'list', 'ソース一覧 (id とクラス名) を表示'
@@ -11,6 +12,36 @@ module TomatoShrieker
       Source.all do |source|
         puts [source.id, source.class.name.split('::').last].join("\t")
       end
+    end
+
+    desc 'status [ID]', 'ソースの監視状態を 1 ソース 1 行で表示'
+    # 🔴 **組み立ても判定も `/status.json` / `/healthz/source/:id` と同じものを通す (#1561)。**
+    # ⚠ CLI 用に計算を書き直すと、2 つの出口が同名フィールドで違う数字を出す
+    # （`last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直した型）。
+    # 📌 HTTP を経由せずプロセス内で DB を読むので、daemon が止まっていても答えられる。
+    method_option :sort, type: :string, enum: SourceStatusTable::SORTS.keys, desc: '並べ替え'
+    method_option :problems, type: :boolean, default: false, desc: '緑でないソースだけ'
+    method_option :json, type: :boolean, default: false, desc: '/status.json の sources[] と同じキーで出す'
+    method_option :all, type: :boolean, default: false, desc: '無効ソースも出す'
+    def status(id = nil)
+      rows = status_sources(id).map {|source| status_row(source)}
+      rows.select! {|v| v[:problems].any?} if options[:problems]
+      rows = SourceStatusTable.sort(rows, options[:sort]) if options[:sort]
+      return puts(JSON.pretty_generate(rows.map {|v| v[:status]})) if options[:json]
+      print_table(SourceStatusTable.lines(rows))
+    end
+
+    desc 'collisions', '同じ秒に発火したソースの群を run_log の実績から表示'
+    # ⚠ 定義ではなく実績から見る。`every` の位相は起動時刻で決まるので、定義を
+    # 突き合わせても同時発火は分からない。
+    method_option :hours, type: :numeric, default: 24, desc: '遡る時間'
+    def collisions
+      hours = options[:hours]
+      rows = SourceCollisions.find(hours:)
+      return say("直近 #{hours} 時間に同じ秒の発火はありません。") if rows.empty?
+      print_table([['COUNT', 'LAST', 'SOURCES']] + rows.map do |v|
+        [v[:count], SourceStatusTable.format_time(v[:last_at]), v[:source_ids].join(' ')]
+      end)
     end
 
     desc 'fetch ID', 'ソースのサマリーを表示'
@@ -184,6 +215,28 @@ module TomatoShrieker
         errors = SourceValidator.startup_errors(entry)
         [Source.entry_id(entry), errors] unless errors.empty?
       end
+    end
+
+    # ⚠ **無効ソースは既定で出さない**（`/status.json` と同じ扱い）。ID を指定したら
+    # 無効でも出す（止めたことの確認に使う）。
+    def status_sources(id)
+      return [find_source!(id)] if id
+      return Source.all if options[:all]
+      return Source.all.reject(&:disable?)
+    end
+
+    # 1 ソースの失敗で全体を落とさない。壊れた側は `build_failed` として見せる
+    # （`MonitorApp#source_status` と同じ形の行を返す）。
+    def status_row(source)
+      status = SourceStatus.build(source)
+      problems = SourceStatus.problems(source)
+      problems.push(:disabled) if source.disable?
+      return {status:, problems:}
+    rescue => e
+      return {
+        status: {id: source.id, class: source.class.to_s, error: Package.error_message(e)},
+        problems: [:build_failed],
+      }
     end
 
     def nothing_to_ack_message(id)

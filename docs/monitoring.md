@@ -183,6 +183,24 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 **腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
+### CLI で横断して問い合わせる (#1561)
+
+`/status.json` を全部舐めなくても、本番で次のように引ける（⚠ 本番では `sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && bin/shrieker ..."`）。HTTP を経由せずプロセス内で DB を読むので、**daemon が止まっていても答えられる**。
+
+```sh
+bin/shrieker source status                    # 1 ソース 1 行（無効ソースは --all で出る）
+bin/shrieker source status --problems         # /healthz/source/:id が 503 になるものだけ
+bin/shrieker source status --sort=error_rate  # error_rate / last_delivered / streak
+bin/shrieker source status --json             # /status.json の sources[] と同じキー
+bin/shrieker source collisions --hours=24     # 同じ秒に発火したソースの群
+```
+
+🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
+
+`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印。
+
+⚠ `collisions` は**定義ではなく run_log の実績**から見る。`every` の位相は起動時刻で決まるので、定義を突き合わせても同時発火は分からない。
+
 ### 設定
 
 | キー | 既定値 | 意味 |
