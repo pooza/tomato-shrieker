@@ -7,10 +7,10 @@
 | [monitoring.md](monitoring.md) | 🔴 **`/healthz` / `/status.json` / `source_run_log` / `monitor:` 設定に触れるとき。**監視が赤い・緑すぎる話もここ |
 | [sources.md](sources.md) | 🔴 **`config/sources/*.yaml` を読む・書くとき。**⚠ 実体は gitignore で **oscura にしかない** |
 | [daemon.md](daemon.md) | 🔴 **daemon の起動・停止・`source reload` / `bin/shrieker` を叩くとき、本番へデプロイするとき** |
-| [sync.md](sync.md) | 🔴 **「進捗を同期してください」と言われたとき**（#1577 でスキル化予定） |
+| [sync スキル](../.claude/skills/sync/SKILL.md) | 🔴 **「進捗を同期してください」と言われたとき**（#1577 で `docs/sync.md` から移した。同梱スクリプトは `scripts/`） |
 | [release-validation.md](release-validation.md) | 🔴 **リリース直前の手動検証** |
 
-⚠ **迷ったら `grep -rn <語> docs/` でまとめて引く。**
+⚠ **迷ったら `grep -rn <語> docs/ .claude/skills/` でまとめて引く。**
 
 ## プロジェクト概要
 
@@ -305,7 +305,7 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 ⚠ **「課題・タスクは Issue で管理する」「docs に書くだけでは管理されていない扱い」は [workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**tomato 固有はこの 2 つ。
 
 - **プロジェクト共有すべき知見** → `docs/` 配下の git 管理下のファイルに記載する。⚠ **メモリにだけ置かない**
-- 🔴 **書く先を間違えない。**`CLAUDE.md` は**毎回読む必要があるもの**だけに絞る（自動ロードされる唯一のファイルなので、太らせると毎回のコストになる）。領域ごとの詳細は [monitoring.md](monitoring.md) / [sources.md](sources.md) / [daemon.md](daemon.md) / [sync.md](sync.md) へ。⚠ **どちらか迷うなら「この話を知らずに作業を始めると事故るか」で決める**
+- 🔴 **書く先を間違えない。**`CLAUDE.md` は**毎回読む必要があるもの**だけに絞る（自動ロードされる唯一のファイルなので、太らせると毎回のコストになる）。領域ごとの詳細は [monitoring.md](monitoring.md) / [sources.md](sources.md) / [daemon.md](daemon.md) / [sync スキル](../.claude/skills/sync/SKILL.md) へ。⚠ **どちらか迷うなら「この話を知らずに作業を始めると事故るか」で決める**
 - **進捗の同期** → `MEMORY.md` だけでなく `docs/` 側も更新すること。特にリリース済みバージョンの反映（「開発中」→「リリース済み」への変更）を忘れないこと
 
 ## 関連リポジトリ

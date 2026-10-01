@@ -1,16 +1,22 @@
+---
+name: sync
+description: セッション開始時の進捗同期。「進捗を同期してください」「同期して」などで起動する。リモート・Dependabot・Codex レビュー・Sentry・ginseng-* のピン・サテライト 3 本・Kuma との突き合わせ・マイルストーンを確認して報告する。
+---
+
 # セッション開始時の同期手順
 
 🔴 **会話の最初に「進捗を同期してください」等の指示があったら、この手順を実行する。**
 
-📌 **#1577 でスキル化する予定。**それまではこのファイルが正本。
+⚠ **この手順の正本はこのファイル**（#1577 で `docs/sync.md` から移した）。手順の中のコマンドは `scripts/` に同梱してあり、**リポジトリのルートから `.claude/skills/sync/scripts/<名前>.sh` で実行する**。
+⚠ 読むだけの手順なので自動起動にしてある（[ginseng-style の docs/skills.md](https://github.com/pooza/ginseng-style/blob/main/docs/skills.md)）。**途中で外へ書くもの（Sentry へのコメント・Issue 起票・`Gemfile.lock` の追随の push）は、報告して判断を仰いでから行う。**
 
-### 1. プロジェクトガイドの読み込み
+## 1. プロジェクトガイドの読み込み
 
 - `docs/CLAUDE.md` を読む（プロジェクトのルール・構造・履歴の正本）
-- 🔴 **`docs/` は 1 本ではない。**触る領域に応じて [monitoring.md](monitoring.md) / [sources.md](sources.md) / [daemon.md](daemon.md) も開く。⚠⚠ **自動ロードされるのは `CLAUDE.md` と `MEMORY.md` だけ**なので、**「書いていない」と判断する前に `grep -rn <語> docs/` でまとめて引く**
+- 🔴 **`docs/` は 1 本ではない。**触る領域に応じて [monitoring.md](../../../docs/monitoring.md) / [sources.md](../../../docs/sources.md) / [daemon.md](../../../docs/daemon.md) も開く。⚠⚠ **自動ロードされるのは `CLAUDE.md` と `MEMORY.md` だけ**なので、**「書いていない」と判断する前に `grep -rn <語> docs/` でまとめて引く**
 - `MEMORY.md` は自動ロードされるので、両者の整合性を意識する
 
-### 2. リモートとの同期・状態確認
+## 2. リモートとの同期・状態確認
 
 - `git fetch origin` — **最初に必ず実行**。リモートが正本であり、ローカルの状態を信用しない
 - `git log HEAD..origin/develop --oneline` — リモートに未取り込みのコミットがないか確認。差分があればpullを検討
@@ -18,31 +24,23 @@
 - `gh issue list --state open` — open Issue一覧
 - `gh pr list --state open` — open PR一覧
 
-### 3. Dependabotセキュリティアラート
+## 3. Dependabotセキュリティアラート
 
 - `gh api repos/pooza/tomato-shrieker/dependabot/alerts` で open アラートを確認
 - 0件なら対応不要、あれば提案
 
-### 4. Codexレビューコメントの確認
+## 4. Codexレビューコメントの確認
 
 ⚠ **採否の判断・返信の作法・待ち方の正本は [ginseng-style の codex-review スキル](https://github.com/pooza/ginseng-style/blob/main/plugins/ginseng/skills/codex-review/SKILL.md)。**ここに書き写さない。sync で見るのは「取り残しが無いか」だけ。
 
-- 最近マージされたPR（`gh pr list --state merged --limit 5`）を取得し、各 PR について下の 4 経路を読む
+- `.claude/skills/sync/scripts/codex_channels.sh` で、最近マージされた PR 5 本について下の 4 経路を読む（PR 番号を渡せばその PR だけ）
 - 🔴 **返信と 👍 / 👎 の両方が付いていないものは未処理。**内容を確認し、対応が必要か判断する
 
 🔴 **Codex の結果は 4 経路で来る。全部読む (#1618)。**⚠⚠ **「指摘なし」はコメントでも review でもなく、PR 本体への 👍 リアクションで来る。**`pulls/{n}/comments`（インライン）だけを見ていると、**走査済みなのに「まだ来ていない」と読んで待ち続ける**（#1617 で 50 分待った）うえ、review 本文や issue コメントで来た指摘を取りこぼす。
 
-```sh
-n=<PR番号>; r=repos/pooza/tomato-shrieker; bot='select(.user.login=="chatgpt-codex-connector[bot]")'
-gh api $r/pulls/$n/reviews --jq ".[]|$bot|\"review \(.submitted_at) \(.commit_id[0:7])\""
-gh api $r/pulls/$n/comments --jq ".[]|$bot|\"inline \(.id) \(.path):\(.line)\""
-gh api $r/issues/$n/comments --jq ".[]|$bot|\"comment \(.created_at)\""
-gh api $r/issues/$n/reactions --jq ".[]|$bot|\"reaction \(.content) \(.created_at)\""
-```
+⚠ **👍 は「この PR に指摘が無かった」ではなく「ある巡が指摘なしで終わった」だけ。**指摘が出た PR にも後の巡で付くので、インラインは別に見る。2 巡目以降を待つときの基点の採り方は codex-review スキルの側にある。
 
-⚠ **👍 は「この PR に指摘が無かった」ではなく「ある巡が指摘なしで終わった」だけ。**指摘が出た PR にも後の巡で付くので、インラインは別に見る。2 巡目以降を待つときの基点の採り方はスキル側にある。
-
-### 5. Sentry の新規イシュー確認
+## 5. Sentry の新規イシュー確認
 
 - `sentry-cli issues list` で未解決イシューを確認する（`~/.sentryclirc` に認証トークンとデフォルトプロジェクトが設定済み）
 - 各イシューの過去コメント（対応経緯）を確認する: `curl -sH "Authorization: Bearer $TOKEN" https://sentry.io/api/0/issues/{issue_id}/comments/ | python3 -m json.tool`
@@ -51,9 +49,9 @@ gh api $r/issues/$n/reactions --jq ".[]|$bot|\"reaction \(.content) \(.created_a
 - `$TOKEN` は `~/.sentryclirc` の `[auth]` セクションから取得する
 - Sentry 未導入のプロジェクトではこのステップをスキップする
 
-### 6. 外部リポジトリ・外部システムの同期確認
+## 6. 外部リポジトリ・外部システムの同期確認
 
-#### ginseng-* のピン棚卸し
+### ginseng-* のピン棚卸し
 
 🔴 **毎回必ず実行する。**`Gemfile.lock` は git 参照のリビジョンを固定するので、**放っておくと何ヶ月も進まず、security 修正だけが届かない状態になる**。2026-08-21 の sync では `ginseng-core` が **82 コミット遅れ**（1.15.28 → 1.19.0）で、SSRF 対策・ログの資格情報スクラブが丸ごと未達だった。⚠ **この手順が空だったことが原因**。
 
@@ -64,28 +62,7 @@ gh api $r/issues/$n/reactions --jq ".[]|$bot|\"reaction \(.content) \(.created_a
 🔴 **作業ツリーの `Gemfile.lock` を読んではいけない。**チェックアウトが古い feature ブランチに乗っていると、**そのブランチのピンを現状と誤読する**。2026-08-25 の sync では、サテライト 3 本が `chore/*-ginseng-style` に乗っていたせいで **ahead=103（実際は 21）** と出て、追随済みのものを未追随と誤判定しかけた。**必ず追跡ブランチから取り出す**（上記のとおり tomato は `origin/develop`、サテライトは `origin/HEAD`）。
 
 ```sh
-for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
-  # ⚠ tomato 自身だけ develop。origin/HEAD は main ＝ リリース済みの版 (#1550)
-  ref=origin/HEAD; [ "$d" = tomato-shrieker ] && ref=origin/develop
-  git -C ~/repos/$d fetch -q origin
-  git -C ~/repos/$d show $ref:Gemfile.lock |
-  awk '/github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); r=""; t="-"; f=1}
-       f&&/revision:/{r=$2} f&&/ tag:/{t=$2} f&&/specs:/{print g, r, t; f=0}' |
-  while read -r gem rev tag; do
-    if [ "$tag" != - ]; then
-      # ⚠ タグ固定の gem は main と比べない（main には未タグのコミットが常に積まれている）
-      # ⚠ 失敗したら空にして、下で ? と出す。gh api は HTTP エラーでも本文を標準出力へ
-      # 出すので、出力の有無ではなく終了コードで見る（矢印の形を作らない）
-      latest=$(gh api repos/pooza/$gem/tags --jq '.[0].name' 2>/dev/null) || latest=""
-      if [ -z "$latest" ]; then lag=""
-      elif [ "$tag" = "$latest" ]; then lag=0
-      else lag="$tag → $latest"; fi
-    else
-      lag=$(gh api repos/pooza/$gem/compare/$rev...main --jq .ahead_by 2>/dev/null) || lag=""
-    fi
-    printf '%-16s %-18s %s\n' "$d" "$gem" "${lag:-?}"
-  done
-done
+.claude/skills/sync/scripts/ginseng_pin_drift.sh
 ```
 
 ⚠ **タグ固定の gem（`ginseng-style` は `tag: v1.1.12` など）は main と比べない。**main には未タグのコミットが常に積まれているので、比べると**追随済みでも「6 件遅れ」のように出る**（2026-09-17 まで実際にそう出ていた）。最新タグと比べ、違えば `v1.1.11 → v1.1.12` の形で出す。追随は Gemfile の `tag:` を書き換える。
@@ -101,13 +78,9 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 メジャーが動いていたら、**跨いだリリースノートを全部**読み（「破壊的変更」「breaking」の節）、利用側の追随が要るかを判断してから push する。⚠⚠ **最新の 1 件だけ読んではいけない。**2.0.0 → 3.1.0 なら破壊的変更は間の **3.0.0** に書いてある。⚠ リリースは作成順に並び、旧系列の修正版（2.0.x）が間に挟まるので、**版の範囲で絞る**。
 
 ```sh
-gem=ginseng-fediverse old=2.0.0 new=3.1.0  # 上の差分の - と + の版
-for t in $(gh api --paginate repos/pooza/$gem/releases --jq '.[].tag_name' | sed 's/^v//' | sort -V); do
-  [ "$t" != "$old" ] && [ "$(printf '%s\n' "$old" "$t" | sort -V | tail -1)" = "$t" ] &&
-  [ "$(printf '%s\n' "$t" "$new" | sort -V | tail -1)" = "$new" ] &&
-  gh api repos/pooza/$gem/releases/tags/v$t --jq '"## \(.tag_name)\n\(.body)"'
-done
+.claude/skills/sync/scripts/release_notes.sh ginseng-fediverse 2.0.0 3.1.0  # 上の差分の - と + の版
 ```
+
 ⚠ **追随前に分かるなら先に読む。**`gh api repos/pooza/<gem>/releases --jq '.[0:3][]|.tag_name'` で最新タグを見れば、棚卸しの段階でメジャーの有無は分かる。
 
 ⚠ **追随で「必須の設定キー」が増えていることがある。**実例: ginseng-core 1.19.0 の `HTTP#initialize` は `/http/timeout/seconds` を読み、`/http/retry/max_seconds` と違って**既定へ倒れない**。無いと HTTP を作った時点で `ConfigError` になる（本体・サテライトとも `30` を設定済み）。**必ずローカルで `rake test` を通してから push する。**
@@ -122,45 +95,32 @@ done
 
 ⚠ **切り分け方は「bump 前の lock で同じ数の error が出るか」。**`git stash` → `bundle install` → `rake test` で突き合わせれば、環境依存か追随起因かが分かる（2026-09-23 に実施し、両方とも bump 前と同数＝環境依存と確認）。**最終的な担保は push 後の CI**（4 本とも default ブランチで走る）。
 
-#### サテライト 3 本の open PR / issue と CI
+### サテライト 3 本の open PR / issue と CI
 
 🔴 **毎回実行する。**`loquat` / `shooby-do-bop` / `dqdai-anniv` は **CommandSource の 7 ソースの実体**だが、tomato 側からは見えないので**放置されても誰も気づかない**。⚠ **上流（`ginseng-style` / `ginseng-*`）はこちらへ PR / Issue を送ってくるので、受け取りが止まると横断の変更がここで詰まる。**
 
 ```sh
-for d in loquat shooby-do-bop dqdai-anniv; do
-  b=$(gh repo view pooza/$d --json defaultBranchRef --jq .defaultBranchRef.name)
-  echo "=== $d ($b) ==="
-  gh pr list -R pooza/$d --state open
-  gh issue list -R pooza/$d --state open
-  gh run list -R pooza/$d -b $b -L 1 --json conclusion,headSha --jq '.[]|"CI \(.conclusion) \(.headSha[0:7])"'
-done
+.claude/skills/sync/scripts/satellites.sh
 ```
 
 🔴 **2026-08-25 の実測では 3 本とも default ブランチの CI が赤で、上流からの PR が 6 日間止まっていた。**⚠ **`dqdai-anniv` は TZ 依存のバグ（[#32](https://github.com/pooza/dqdai-anniv/issues/32)）で 4 日以上赤のまま**で、それが上流の PR まで巻き添えにしていた。
 
 ⚠ **上流から届いた PR がブランチを切った時点より default が進んでいることがある。**`chore/*-ginseng-style` は `/http/timeout/seconds` の設定より前から出ていたので、**そのままでは CI が `ConfigError` で落ちる**。**default をマージしてから通す。**
 
-#### Kuma のモニターと有効ソースの突き合わせ
+### Kuma のモニターと有効ソースの突き合わせ
 
 🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。
 
 📌 **2026-09-05 時点で 56 ソース / 56 モニターが一致し、全部 active。**（2026-08-21 は 39 に対し 24＝15 ソースが不可視だった。）**「登録を義務づける運用」で塞ぐ**という #1508 の案 A が成立している状態なので、**この突き合わせがその唯一の担保**になる。
 
 ```sh
-diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
-     <(ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
-        "select name from monitor where name like \"tomato-shrieker %\";"' | sed 's/^tomato-shrieker //' | sort)
+.claude/skills/sync/scripts/kuma_diff.sh
 ```
 
 - `<` の行 ＝ **Kuma に登録されていないソース**
 - `>` の行 ＝ **Kuma にあるが本番に無いソース**（消したソースのモニターが残っている）
 
-⚠⚠ **名前が揃っているだけでは足りない。一時停止したモニターは「登録されているが盲目」**で、上の diff には出ない。**`active` も見ること。**
-
-```sh
-ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
-  "select active, count(*) from monitor where name like \"tomato-shrieker %\" group by active;"'
-```
+⚠⚠ **名前が揃っているだけでは足りない。一時停止したモニターは「登録されているが盲目」**で、diff には出ない。**スクリプトが続けて出す `active` の内訳も見ること。**
 
 🔴 **ソース側へ `error_streak_threshold` を移したら、そのモニターの `maxretries` は 0 に戻す (#1558)。**⚠⚠ **両方残すと猶予が掛け算になる**（ソース側 N run × Kuma の再試行）。⚠ Kuma の登録は UI での手作業なので、移行は 1 セットで扱うこと。
 
@@ -168,18 +128,18 @@ ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
 
 ⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
 
-#### 上流への差し戻し
+### 上流への差し戻し
 
 ⚠ **アプリ側で回避策を持たない。**gem を直せば済むと分かったら、**該当 gem のリポジトリに Issue を立てる**。横断の話（RuboCop 設定・規約・CI）は [pooza/ginseng-style](https://github.com/pooza/ginseng-style) へ。ginseng-* は自走しており、Issue / PR は埋もれない。
 
 > **TODO**: chubo2 インフラノート（`pooza/chubo2` の `docs/infra-note.md`）との連携が整ったタイミングで手順を追加する。
 
-### 7. マイルストーンの状態確認
+## 7. マイルストーンの状態確認
 
 - `docs/CLAUDE.md` と MEMORY.md に記載された次期マイルストーンの Issue が、実際の GitHub 上の状態（open/closed）と一致しているか確認
 - クローズ済みの Issue があれば MEMORY.md から除外し、`docs/CLAUDE.md` も必要に応じて更新
 
-#### 未割当と保留の確認
+### 未割当と保留の確認
 
 🔴 **毎回実行する。open issue は必ずどこかのマイルストーンに振る**（遠いマイナーでよい）。⚠⚠ **「意図して止めている」と「振り忘れ」がどちらも「マイルストーン無し」に見えると、振り忘れが止めているふりをして残り続ける。**2026-09-26 には未割当が 38 件溜まり、うち意図して止めていたのは 2 件だけ。しかもその 1 件（#1585「#1586 の後」）は**条件がとうに満たされていたのに誰も気づけなかった**。
 
@@ -187,19 +147,15 @@ ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
 - **意図して止めるものは `on-hold` ラベルを付け、「止めている理由」と「再開条件」をコメントに書く。**理由の無い保留は作らない。マイルストーンは外さない
 
 ```sh
-# 1. 未割当が 0 件であること（出たら振る）
-gh issue list --state open --limit 200 --json number,title,milestone \
-  --jq '.[] | select(.milestone == null) | "#\(.number) \(.title)"'
-
-# 2. 保留の再開条件が満たされていないか読む
-gh issue list --state open --label on-hold --json number,title,milestone \
-  --jq '.[] | "#\(.number) [\(.milestone.title)] \(.title)"'
+.claude/skills/sync/scripts/unassigned_issues.sh
 ```
 
-### 8. MEMORY.md の更新
+「未割当」が 0 件であること（出たら振る）。「on-hold」は再開条件が満たされていないかを読む。
+
+## 8. MEMORY.md の更新
 
 - 上記で検出した差分（Issue 状態、リリース日の誤り、件数のズレ等）を反映
 
-### 9. 同期結果の報告
+## 9. 同期結果の報告
 
 - 現在のブランチ・状態、マイルストーンの状況、各確認項目の結果をまとめて報告する
