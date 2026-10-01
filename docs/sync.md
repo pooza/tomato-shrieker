@@ -164,7 +164,7 @@ ssh mucor 'sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \
 
 🔴 **ソース側へ `error_streak_threshold` を移したら、そのモニターの `maxretries` は 0 に戻す (#1558)。**⚠⚠ **両方残すと猶予が掛け算になる**（ソース側 N run × Kuma の再試行）。⚠ Kuma の登録は UI での手作業なので、移行は 1 セットで扱うこと。
 
-⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。
+⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。📌 **YouTube 4 本は 2026-10-01 に 0 へ戻した（#1584）**＝しきい値はソース側の `error_streak_threshold: 28` に一本化。いまの `maxretries` は **0×39 / 2×17**。⚠ **残り 17 本は GitHub の `releases.atom`（エラー率 0%）なので漏れ出しではなく単なる余裕**＝触らない。
 
 ⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
 
