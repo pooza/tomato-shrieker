@@ -112,10 +112,6 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 - `/crypt/password` — アクセストークン等の暗号化用パスワード（PieFedShrieker で使用）
 - `bin/crypt.rb` で暗号化、`bin/decrypt.rb` で復号
 
-### 例外通知
-
-- `/slack/hooks` — 例外発生時の通知先（Slack 互換 Webhook URL の配列）
-
 ### スケジュール形式
 
 3形式から選択。指定方法は [rufus-scheduler](https://github.com/jmettraux/rufus-scheduler) に準じる。

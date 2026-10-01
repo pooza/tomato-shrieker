@@ -69,8 +69,6 @@ scheduler: {}
 sentry:
   dsn: null
   traces_sample_rate: 0
-slack:
-  hooks: []
 source:
   classes:
     - class: FeedSource
