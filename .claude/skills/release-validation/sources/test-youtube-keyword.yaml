@@ -1,0 +1,8 @@
+source:
+  youtube:
+    channel:
+      id: UCM4y31BLBY-E8TNOmy3zPeQ
+  keyword: 'ダイの大冒険'
+dest:
+  tags:
+    - test

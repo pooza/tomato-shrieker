@@ -1,0 +1,15 @@
+source:
+  news:
+    phrase: プリキュア
+    cleaner:
+      url: http://scylla.b-shock.local:3000/clean
+keep:
+  years: 1
+dest:
+  piefed:
+    host: pf.korako.me
+    user_id: tkoishi+test@b-shock.co.jp
+    password: <テストアカウントのパスワード>
+    community_id: 82
+  tags:
+    - test

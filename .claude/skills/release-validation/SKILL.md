@@ -1,4 +1,13 @@
+---
+name: release-validation
+description: リリース前の手動検証。開発環境でテスト用ソースを使い、各 Source / Shrieker の fetch・PieFed への実投稿・稼働中の reload を確かめる。ユーザーが「リリース前検証をしましょう」などと明示したときだけ使う。
+disable-model-invocation: true
+---
+
 # リリース前検証手順
+
+⚠ **この手順の正本はこのファイル**（#1577 で `docs/release-validation.md` から移した）。テンプレートは `sources/`、コマンドは `scripts/` に同梱してあり、**リポジトリのルートから `.claude/skills/release-validation/scripts/<名前>` で実行する**。
+⚠ **外へ書く step を含む**（PieFed のテストコミュニティへの実投稿）ので明示呼び出しに限ってある（[ginseng-style の docs/skills.md](https://github.com/pooza/ginseng-style/blob/main/docs/skills.md)）。
 
 RC や正式版リリース前に、開発環境で各 Source / Shrieker が動くことを手動検証する手順。CI のテストスイートでは捕まえきれない統合上のリグレッション（外部 API・gem 連携・設定読込）を発見する目的で実施する。
 
@@ -14,124 +23,26 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 
 `config/sources/` は `.gitignore` で `*` 除外されているため、テスト用 YAML は commit されない。手元にだけ配置する。
 
-下記テンプレートを `config/sources/test-*.yaml` として保存し、`bin/shrieker source list` で全 ID が認識されることを確認する。
+同梱のテンプレートを `config/sources/test-*.yaml` として置き、`bin/shrieker source list` で全 ID が認識されることを確認する。
+
+```sh
+.claude/skills/release-validation/scripts/install_sources.sh
+```
+
+⚠ **既にあるファイルは上書きしない。**`test-google-news-piefed.yaml` はテンプレートの `password` が置き換え前のままなので、**新しく置いたときだけ**手でテストアカウントのパスワードを入れる。
 
 ⚠ **`test-google-news-piefed.yaml` 以外は `bin/shrieker source validate` が NG を返す。これは想定どおりで、検証手順上は正常。**4.5.0 (#1473) でスキーマに「有効なソースは `dest` に配信先を 1 つ以上持つ」を入れたため、意図的に投稿先を持たないこれらのテンプレートは契約違反になる。⚠ **検証を邪魔しないよう `source validate` はチェックリストに入れていない**が、他の目的で流したときに新規の不具合と誤読しないこと。宛先をステージングに向けて解消する作業は #1481。
 
-### test-ical-schedule.yaml — IcalendarSource (cron + days)
-
-```yaml
-source:
-  ical: https://calendar.google.com/calendar/ical/c_21d8cc4216f2385ba8eb2f04a61c1a29b3298c814882956d8635f98542423466%40group.calendar.google.com/public/basic.ics
-  days: 7
-schedule:
-  cron: '4 0 * * *'
-dest:
-  tags:
-    - test
-```
-
-### test-ical-remind.yaml — IcalendarSource (remind)
-
-```yaml
-source:
-  ical: https://calendar.google.com/calendar/ical/c_b7c1e56a53f76253c22d0bbf0c95056f4d10753889ea91e917030dcb2a49c82e%40group.calendar.google.com/public/basic.ics
-schedule:
-  cron: '10 0 * * *'
-  remind:
-    enable: true
-dest:
-  sanitize: html
-  tags:
-    - test
-```
-
-### test-youtube-channel.yaml — YouTubeChannelSource (URL 指定)
-
-```yaml
-source:
-  youtube:
-    channel:
-      url: https://www.youtube.com/channel/UCSsjL41NsyqSNNbanuI0htg
-dest:
-  tags:
-    - test
-```
-
-### test-youtube-keyword.yaml — YouTubeChannelSource (ID + keyword フィルタ)
-
-```yaml
-source:
-  youtube:
-    channel:
-      id: UCM4y31BLBY-E8TNOmy3zPeQ
-  keyword: 'ダイの大冒険'
-dest:
-  tags:
-    - test
-```
-
-### test-github.yaml — GitHubRepositorySource
-
-```yaml
-source:
-  github:
-    repos: pooza/tomato-shrieker
-dest:
-  tags:
-    - test
-```
-
-### test-text.yaml — TextSource
-
-```yaml
-source:
-  text: |
-    これは tomato-shrieker 検証用のテストテキストです。
-    https://github.com/pooza/tomato-shrieker
-dest:
-  tags:
-    - test
-```
-
-### test-google-news-cleaner.yaml — GoogleNewsSource + cleaner（認証不要）
-
-PieFed の認証情報が無くても cleaner 連携だけは検証できる。`dest` に投稿先を持たないので `fetch` しか通らないが、チェックリストの「実 publisher URL が取れている」はこれで満たせる。
-
-```yaml
-source:
-  news:
-    phrase: プリキュア
-    cleaner:
-      url: http://scylla.b-shock.local:3000/clean
-keep:
-  years: 1
-dest:
-  tags:
-    - test
-```
-
-### test-google-news-piefed.yaml — GoogleNewsSource + cleaner + PieFed
-
-PieFed 投稿の経路を実投稿で検証するための唯一のソース。`dest.piefed` を持つ。
-
-```yaml
-source:
-  news:
-    phrase: プリキュア
-    cleaner:
-      url: http://scylla.b-shock.local:3000/clean
-keep:
-  years: 1
-dest:
-  piefed:
-    host: pf.korako.me
-    user_id: tkoishi+test@b-shock.co.jp
-    password: <テストアカウントのパスワード>
-    community_id: 82
-  tags:
-    - test
-```
+| テンプレート | 対象 | 備考 |
+| --- | --- | --- |
+| [test-ical-schedule.yaml](sources/test-ical-schedule.yaml) | IcalendarSource (cron + days) |  |
+| [test-ical-remind.yaml](sources/test-ical-remind.yaml) | IcalendarSource (remind) |  |
+| [test-youtube-channel.yaml](sources/test-youtube-channel.yaml) | YouTubeChannelSource (URL 指定) |  |
+| [test-youtube-keyword.yaml](sources/test-youtube-keyword.yaml) | YouTubeChannelSource (ID + keyword フィルタ) |  |
+| [test-github.yaml](sources/test-github.yaml) | GitHubRepositorySource |  |
+| [test-text.yaml](sources/test-text.yaml) | TextSource |  |
+| [test-google-news-cleaner.yaml](sources/test-google-news-cleaner.yaml) | GoogleNewsSource + cleaner（認証不要） | PieFed の認証情報が無くても cleaner 連携だけは検証できる。`dest` に投稿先を持たないので `fetch` しか通らないが、チェックリストの「実 publisher URL が取れている」はこれで満たせる。 |
+| [test-google-news-piefed.yaml](sources/test-google-news-piefed.yaml) | GoogleNewsSource + cleaner + PieFed | PieFed 投稿の経路を実投稿で検証するための唯一のソース。`dest.piefed` を持つ。 |
 
 ## 検証コマンド
 
@@ -148,13 +59,10 @@ bundle exec bin/shrieker source list
 `source fetch` は upstream を取得して summary を出すだけで、Shrieker（投稿先）は呼ばない。
 
 ```sh
-for id in test-ical-schedule test-ical-remind test-youtube-channel test-youtube-keyword test-github test-google-news-piefed; do
-  echo "===== $id ====="
-  bundle exec bin/shrieker source fetch $id 2>&1 | head -20
-done
+.claude/skills/release-validation/scripts/fetch_all.sh
 ```
 
-各ソースで `entries:` が取得できていればパス。`test-google-news-piefed` の entry URL が Google News のリダイレクト URL ではなく実 publisher URL になっていれば cleaner 連携も動いている。
+各ソースで `entries:` が取得できていればパス。`test-google-news-cleaner` / `test-google-news-piefed` の entry URL が Google News のリダイレクト URL ではなく実 publisher URL になっていれば cleaner 連携も動いている。
 
 ### 3. TextSource のスモークテスト
 
@@ -183,38 +91,13 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 #### 手順
 
-`tmp/sanitize_diff.rb` を置く:
-
-```ruby
-# 配信済みエントリの title / summary を sanitize_status に通して 1 行 1 件で出す
-require 'ginseng/fediverse'
-require 'sequel'
-db = Sequel.connect(ENV.fetch('DSN'))
-db[:entry].order(:feed, :id).each do |e|
-  %i[title summary].each do |col|
-    src = e[col].to_s
-    next if src.empty?
-    out = (Ginseng::Fediverse::Service.sanitize_status(src.dup) rescue "!!#{$!.class}")
-    puts "#{e[:feed]}\t#{col}\t#{out.gsub(/\s+/, ' ')}"
-  end
-end
-```
-
-🔴 **旧版は `-I` で読む。**⚠⚠ **`git checkout v<前> -- Gemfile.lock && bundle install` は失敗する**（`Could not find ginseng-core-1.23.5 ... at main@d53a18b`）。git ソースの gem は **lock の version 行が実体とずれている**ことがあり、bundler が materialize できない。⚠ **bundler のチェックアウトはリビジョンごとに残る**ので、それを直接読ませればよい。
-
 ```sh
-PREV=v4.10.0   # 前リリースのタグ
-REV=$(git show $PREV:Gemfile.lock | awk '/ginseng-fediverse.git/{f=1} f&&/revision:/{print substr($2,1,12); exit}')
-OLD=$(ls -d ~/.rbenv/versions/*/lib/ruby/gems/*/bundler/gems/ginseng-fediverse-$REV)
-# ⚠ 無ければ: git clone https://github.com/pooza/ginseng-fediverse.git /tmp/gf-old && git -C /tmp/gf-old checkout $REV && OLD=/tmp/gf-old
-
-export DSN="sqlite://$PWD/tmp/db/db.sqlite3"
-bundle exec ruby            tmp/sanitize_diff.rb >| tmp/sanitize-new.txt
-bundle exec ruby -I$OLD/lib tmp/sanitize_diff.rb >| tmp/sanitize-old.txt
-diff tmp/sanitize-old.txt tmp/sanitize-new.txt
+.claude/skills/release-validation/scripts/sanitize_diff.sh v4.10.0   # 前リリースのタグ
 ```
 
-⚠ **`>|` を使う。**この端末の zsh は `noclobber` なので `>` だと既存ファイルが**書き換わらないまま**古い内容が残る（実際に踏んだ）。
+配信済みエントリの title / summary を新旧の `sanitize_status` に通し、`tmp/cache/sanitize-old.txt` / `tmp/cache/sanitize-new.txt` に書いて diff を出す。
+
+🔴 **旧版は `-I` で読む。**⚠⚠ **`git checkout v<前> -- Gemfile.lock && bundle install` は失敗する**（`Could not find ginseng-core-1.23.5 ... at main@d53a18b`）。git ソースの gem は **lock の version 行が実体とずれている**ことがあり、bundler が materialize できない。⚠ **bundler のチェックアウトはリビジョンごとに残る**ので、スクリプトはそれを直接読ませる（無ければ `tmp/cache/` へ clone する）。
 
 #### 読み方
 
@@ -241,14 +124,7 @@ diff tmp/sanitize-old.txt tmp/sanitize-new.txt
 ⚠ **4.7.0 (#1514) から login は遅延する。**構築しただけでは `@jwt` は `absent` のままなので、**明示的に `login` を呼んでから見る**こと。
 
 ```sh
-bundle exec ruby -Iapp/lib -rtomato_shrieker -e '
-include TomatoShrieker
-Sequel.connect(Environment.dsn)
-src = Source.create("test-google-news-piefed")
-shr = src.piefed
-shr.login
-puts "JWT: #{shr.instance_variable_get(:@jwt) ? "present" : "absent"}"
-'
+bundle exec ruby -Iapp/lib -rtomato_shrieker .claude/skills/release-validation/scripts/piefed_login.rb
 ```
 
 JWT が `present` なら login 成功。`Ginseng::AuthError` が上がるなら認証情報が古い等の可能性。
@@ -312,5 +188,5 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 
 ## 関連
 
-- [archive/v4-plan.md](archive/v4-plan.md) — 4.0 系のリリース計画
-- [CLAUDE.md](CLAUDE.md) — リリースフロー全体（本手順は「セキュリティレビュー前」ステップに相当）
+- [release スキル](../release/SKILL.md) — リリース手順の全体（本手順はその 3.）
+- [docs/archive/v4-plan.md](../../../docs/archive/v4-plan.md) — 4.0 系のリリース計画
