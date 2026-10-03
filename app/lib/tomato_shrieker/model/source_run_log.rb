@@ -157,8 +157,7 @@ module TomatoShrieker
     # 刈ってしまうと沈黙が retention_days を超えた瞬間に last_delivered_at が nil に化け、
     # 長期の沈黙ほど検知できなくなる (#1470)。
     def self.last_delivered_ids
-      return where(Sequel.lit('delivered_count > 0')).group(:source_id)
-          .select(Sequel.function(:max, :id))
+      return boundary_run_ids(:max, where(Sequel.lit('delivered_count > 0')))
     end
 
     # ソースごとの**最古行 (`:min`) と最新行 (`:max`)** を prune から守る。
@@ -172,16 +171,25 @@ module TomatoShrieker
     #   ならない**。no-op success（新着が無く配信ゼロで完走した run）は他の系統の
     #   どれにも掛からないため、これが無いと**疎なソースで「最新の成功 run だけ刈られ、
     #   `:min` が守る古い error が先頭に来る」**＝ **一度直ったソースが永久に赤いまま**になる。
-    def self.boundary_run_ids(func)
-      return group(:source_id).select(Sequel.function(func, :id))
+    #
+    # 🔴 **ソースごとの端の行を、読む側と同じ `executed_at, id` の順で選ぶ (#1635 の Codex P2)。**
+    #
+    # ⚠⚠ **`min(id)` / `max(id)` で選んではいけない。**行は run の**終了時**に insert
+    # されるので、同じ source_id の run が重なると（reload で差し替えた直後・
+    # IcalendarSource の追加ジョブ）**`id` の順と `executed_at`（開始時刻）の順が逆になる**。
+    # 読む側（`recent_for` / `last_attempted` / `observed_since`）は `executed_at` 順なので、
+    # `id` で守ると**最新でない行を守り、本当の根拠行を刈る**。
+    def self.boundary_run_ids(func, dataset = self)
+      order = func == :min ? [:executed_at, :id] : [Sequel.desc(:executed_at), Sequel.desc(:id)]
+      rank = Sequel.function(:row_number).over(partition: :source_id, order:)
+      return dataset.select(:id, rank.as(:edge_rank)).from_self.where(edge_rank: 1).select(:id)
     end
 
     # 「直近の配信試行」の根拠行もソースごとに 1 行だけ守る (#1504)。
     # ⚠ これを刈ると、取りこぼしを検知して赤くなったソースが retention_days の経過だけで
     # 黙って緑に戻る。**次に配信できたときだけ解除する**という仕様が壊れる。
     def self.last_attempted_ids
-      return where(Sequel.lit('attempted_count > 0')).group(:source_id)
-          .select(Sequel.function(:max, :id))
+      return boundary_run_ids(:max, where(Sequel.lit('attempted_count > 0')))
     end
 
     def self.duration_ms(started_at)
@@ -192,7 +200,7 @@ module TomatoShrieker
     # 一度でも配信していれば消えない (#1470)。
     def self.last_delivered_at(source_id)
       row = where(source_id:).where(Sequel.lit('delivered_count > 0'))
-        .order(Sequel.desc(:executed_at)).first
+        .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
       return row&.executed_at
     end
 

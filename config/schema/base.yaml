@@ -45,6 +45,12 @@ properties:
       sample_size:
         type: integer
         minimum: 1
+  ruby:
+    type: object
+    properties:
+      jit:
+        # CommandSource の子プロセスに RUBY_YJIT_ENABLE=yes を渡すか (#1614)
+        type: boolean
   feed:
     type: object
     properties:
@@ -52,16 +58,6 @@ properties:
         type: array
         items:
           type: string
-  slack:
-    type: object
-    required:
-      - hooks
-    properties:
-      hooks:
-        type: array
-        items:
-          type: string
-          format: uri
   sources:
     type: array
     items:

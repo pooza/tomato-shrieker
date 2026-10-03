@@ -814,6 +814,102 @@ module TomatoShrieker
       assert_include(body.first, 'テーブル「台詞」が無い')
     end
 
+    # 🔴 **#1561: `source status --problems` の判定が `/healthz/source/:id` と食い違わないこと。**
+    #
+    # ⚠ 2 つの出口が違う答えを出すと、Kuma が赤いのに CLI は緑と言う（またはその逆）。
+    # 判定は `SourceStatus` に 1 つだけ置いたので、それを両方が通っていることを状態ごとに見る。
+    def test_problems_agree_with_healthz_source
+      {
+        no_run: proc {},
+        healthy: proc {record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)},
+        errored: proc {record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)},
+        undelivered: proc do
+          record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2,
+            delivered_count: 1)
+        end,
+        stale: proc {record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 86_400)},
+      }.each do |label, scenario|
+        SourceRunLog.where(source_id: FIXTURE_ID).delete
+        scenario.call
+        status, = call("/healthz/source/#{FIXTURE_ID}")
+        problems = SourceStatus.problems(Source.create(FIXTURE_ID))
+
+        assert_equal(status == 200, problems.empty?, "#{label}: healthz=#{status} problems=#{problems}")
+      end
+    end
+
+    # 無効ソースは「壊れている」と混同しない (#1503)。healthz は 200、problems は空。
+    def test_problems_ignore_disabled_source
+      write_fixture(DISABLED_ID, {'disable' => true, 'dest' => {}})
+      config.reload
+
+      assert_empty(SourceStatus.problems(Source.create(DISABLED_ID)))
+    end
+
+    # 🔴 **#1561: `source status --json` が `/status.json` の `sources[]` と同じ行を出すこと。**
+    def test_source_status_json_matches_status_json
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+      expected = source_status(FIXTURE_ID)
+      rows = JSON.parse(run_source_status(json: true))
+
+      assert_equal(expected, rows.find {|v| v['id'] == FIXTURE_ID})
+    end
+
+    # `--problems` は緑でないものだけ。⚠ 無効ソースは既定で出さず、`--all` で出す
+    def test_source_status_problems_and_all
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      problems = JSON.parse(run_source_status(json: true, problems: true)).map {|v| v['id']}
+
+      assert_not_include(problems, FIXTURE_ID)
+      assert_include(problems, SILENT_ID) # run が 1 本も無い
+      assert_not_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, DISABLED_ID)
+      assert_include(JSON.parse(run_source_status(json: true, all: true)).map {|v| v['id']}, DISABLED_ID)
+    end
+
+    # 🔴 **Codex P2（#1638）: 無効の目印で `--problems` に混ざらないこと。**
+    # ⚠ 無効ソースの healthz は 200 なので、`--all` と併せても出してはいけない。
+    def test_source_status_problems_excludes_disabled
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      ids = JSON.parse(run_source_status(json: true, problems: true, all: true)).map {|v| v['id']}
+
+      assert_not_include(ids, DISABLED_ID)
+    end
+
+    # 🔴 **Codex P2（#1638 の 2 巡目）: 組み立てに失敗しても、無効ソースは `--problems` に出さない。**
+    # ⚠ healthz は組み立てる前に無効ソースを 200 で返すので、例外の経路でも免除を保つ。
+    def test_source_status_problems_excludes_disabled_build_failure
+      write_fixture(DISABLED_ID, {'disable' => true})
+      config.reload
+      original = SourceStatus.method(:build)
+      SourceStatus.define_singleton_method(:build) {|_source| raise 'boom'}
+      ids = JSON.parse(run_source_status(json: true, problems: true, all: true)).map {|v| v['id']}
+
+      assert_not_include(ids, DISABLED_ID)
+      assert_include(ids, FIXTURE_ID) # 監視対象の組み立て失敗は出す
+    ensure
+      SourceStatus.define_singleton_method(:build, original)
+    end
+
+    def test_source_status_sort_by_streak
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0)
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+      ids = JSON.parse(run_source_status(json: true, sort: 'streak')).map {|v| v['id']}
+
+      assert_operator(ids.index(THRESHOLD_ID), :<, ids.index(FIXTURE_ID))
+    end
+
+    def run_source_status(**options)
+      out = []
+      command = SourceCommand.new
+      command.options = options
+      command.define_singleton_method(:puts) {|v| out.push(v)}
+      command.status
+      return out.join("\n")
+    end
+
     # 保存時の正規化を迂回して、正規化前に書かれた行を再現する
     def record_with_binary_error(source_id, message)
       record(source_id, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)

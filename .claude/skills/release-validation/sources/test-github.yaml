@@ -1,0 +1,6 @@
+source:
+  github:
+    repos: pooza/tomato-shrieker
+dest:
+  tags:
+    - test

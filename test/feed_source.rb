@@ -73,10 +73,16 @@ module TomatoShrieker
       end
     end
 
-    def test_present?
-      FeedSource.all do |source|
-        assert_boolean(source.present?)
-      end
+    # 🔴 **#1616: `present?` で取得しに行かないこと。**
+    #
+    # ⚠ 以前は `entries.present?` を上書きしていたが、`entries` は Enumerator なので
+    # **中身を見ずに常に true** で、呼び出し元も無かった。直すと `source.present?` という
+    # ありふれた書き方がネットワーク取得になるので、上書きごと消した（Object#present? に戻る）。
+    def test_present_does_not_fetch
+      source = FeedSource.new(fixture_params)
+      source.define_singleton_method(:entries) {raise 'present? がフィードを取りに行った'}
+
+      assert_predicate(source, :present?)
     end
 
     def test_uri

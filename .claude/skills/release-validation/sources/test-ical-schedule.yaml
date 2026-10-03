@@ -1,0 +1,8 @@
+source:
+  ical: https://calendar.google.com/calendar/ical/c_21d8cc4216f2385ba8eb2f04a61c1a29b3298c814882956d8635f98542423466%40group.calendar.google.com/public/basic.ics
+  days: 7
+schedule:
+  cron: '4 0 * * *'
+dest:
+  tags:
+    - test

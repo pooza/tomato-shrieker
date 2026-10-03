@@ -147,6 +147,37 @@ module TomatoShrieker
       assert_equal(0, SourceRunLog.error_streak(SOURCE_ID), '直った後の成功 run が消えて赤いまま')
     end
 
+    # 🔴 **#1635 の Codex P2: 守る行は `id` ではなく `executed_at` の順で選ぶ。**
+    #
+    # ⚠⚠ 行は run の**終了時**に insert されるので、同じ source_id の run が重なると
+    # （reload で差し替えた直後・IcalendarSource の追加ジョブ）**`id` の順と
+    # `executed_at` の順が逆になる**。読む側（`recent_for`）は `executed_at` 順なので、
+    # `max(id)` で守ると**最新でない行を守り、本当の最新行を刈る**。
+    def test_prune_keeps_latest_by_executed_at_when_finished_out_of_order
+      # 90 日前の最初の run（最古行として守られる）
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (90 * 86_400),
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      # 後から始まって先に終わった no-op success（＝本当の最新 run・id は小さい）
+      latest = SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (30 * 86_400) + 30,
+        status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+        attempted_count: 0, delivered_count: 0
+      )
+      # 先に始まって後から終わった error（id は大きい）。⚠ 取得段の失敗＝試行ゼロ
+      SourceRunLog.create(
+        source_id: SOURCE_ID, executed_at: Time.now - (30 * 86_400),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 60_000,
+        attempted_count: 0, delivered_count: 0
+      )
+      SourceRunLog.prune(14)
+
+      assert_equal(latest.id, SourceRunLog.recent_for(SOURCE_ID, 1).first.id, '本当の最新行が刈られている')
+      assert_equal(0, SourceRunLog.error_streak(SOURCE_ID), '古い error が先頭に来て赤いまま')
+    end
+
     # ⚠ **免除は先頭行だけ。**2 行目以降まで免除すると #1608 が戻る
     # （保護された古い行をまたいで数え、実際には連続していない失敗で 503 が立つ）。
     def test_error_streak_exempts_only_the_latest_row

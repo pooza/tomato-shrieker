@@ -1,0 +1,10 @@
+source:
+  news:
+    phrase: プリキュア
+    cleaner:
+      url: http://scylla.b-shock.local:3000/clean
+keep:
+  years: 1
+dest:
+  tags:
+    - test

@@ -107,14 +107,15 @@ dest:
 
 WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}` で、digest = `SHA256(SNS URI + OAuth トークン + 暗号化 salt)`。**3 要素のいずれかが変わると全 Webhook URL が無効になる** (モロヘイヤ #4106 / v5.2.1 で `/crypt/salt` 廃止試行 → 全投稿 404 のインシデント)。回帰テストはモロヘイヤ側の `test/unit/model/webhook_digest.rb`。
 
+### CommandSource
+
+- `/ruby/jit` — `true` なら CommandSource の子プロセスに `RUBY_YJIT_ENABLE=yes` を渡す。既定は `false`（本番は `local.yaml` で `yes`）
+- ⚠ **v4.13.0 より前は既定値が無く、`local.yaml` に書いていない環境では CommandSource に触れた時点で `ConfigError` になっていた (#1614)**
+
 ### 暗号化
 
 - `/crypt/password` — アクセストークン等の暗号化用パスワード（PieFedShrieker で使用）
 - `bin/crypt.rb` で暗号化、`bin/decrypt.rb` で復号
-
-### 例外通知
-
-- `/slack/hooks` — 例外発生時の通知先（Slack 互換 Webhook URL の配列）
 
 ### スケジュール形式
 

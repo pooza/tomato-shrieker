@@ -1,5 +1,16 @@
 module TomatoShrieker
   class CommandSourceTest < TestCase
+    # 🔴 **#1614: CI でも 1 本は回ること。**`test/sources/command.yaml` が無いと
+    # 下のループは 1 度も回らず、何も確かめずに緑になる（#1593 の族）。
+    def test_fixture_loaded
+      assert_predicate(CommandSource.all.count {|v| !v.disable?}, :positive?)
+    end
+
+    # #1614: `/ruby/jit` が既定値を持つこと。未宣言だと `command` が ConfigError になる
+    def test_ruby_jit_declared
+      assert_boolean(config['/ruby/jit'])
+    end
+
     def test_command
       CommandSource.all.reject(&:disable?).each do |source|
         assert_kind_of(Ginseng::CommandLine, source.command)
@@ -16,8 +27,8 @@ module TomatoShrieker
     # なる。`shrieker_errors` の有無を「取得段の失敗」の代理にしていた 4.9.0 までは、
     # この失敗で**緩めたしきい値がそのまま残っていた**（#1583 の Codex P1）。
     #
-    # ⚠ **`command` は差し替える。**`CommandSource#command` は `/ruby/jit` を読むが
-    # これが未宣言の必須キーで、設定していない環境では `ConfigError` になる（#1614）。
+    # ⚠ **`command` は差し替える。**実コマンドを走らせると、この run の結果が
+    # コマンドの成否に左右される。
     def test_entry_stage_marked_after_reading_output
       source = build_source
       stub_command(source, ['echo', 'フィクスチャ 1'])

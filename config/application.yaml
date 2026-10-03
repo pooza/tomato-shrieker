@@ -55,7 +55,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.12.0
+  version: 4.13.0
 nostr:
   relays:
     - wss://relay.damus.io
@@ -65,12 +65,12 @@ piefed:
   subject:
     max_length: 50
   verify_peer: true
+ruby:
+  jit: false
 scheduler: {}
 sentry:
   dsn: null
   traces_sample_rate: 0
-slack:
-  hooks: []
 source:
   classes:
     - class: FeedSource
