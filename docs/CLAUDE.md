@@ -1,14 +1,14 @@
 # tomato-shrieker 開発ガイド
 
-🔴🔴 **このファイルは自動ロードされるが、下の 5 本はされない。**⚠⚠ **「書いていない」と判断する前に、該当するファイルを開くこと。**
+🔴🔴 **このファイルは自動ロードされるが、下のファイルはされない。**⚠⚠ **「書いていない」と判断する前に、該当するファイルを開くこと。**
 
 | 読むファイル | いつ読むか |
 | --- | --- |
 | [monitoring.md](monitoring.md) | 🔴 **`/healthz` / `/status.json` / `source_run_log` / `monitor:` 設定に触れるとき。**監視が赤い・緑すぎる話もここ |
 | [sources.md](sources.md) | 🔴 **`config/sources/*.yaml` を読む・書くとき。**⚠ 実体は gitignore で **oscura にしかない** |
-| [daemon.md](daemon.md) | 🔴 **daemon の起動・停止・`source reload` / `bin/shrieker` を叩くとき、本番へデプロイするとき** |
+| [daemon.md](daemon.md) | 🔴 **daemon の起動・停止・`source reload` / `bin/shrieker` を叩くとき、本番を操作するとき** |
 | [sync スキル](../.claude/skills/sync/SKILL.md) | 🔴 **「進捗を同期してください」と言われたとき**（#1577 で `docs/sync.md` から移した。同梱スクリプトは `scripts/`） |
-| [release-validation.md](release-validation.md) | 🔴 **リリース直前の手動検証** |
+| [release](../.claude/skills/release/SKILL.md) / [release-review](../.claude/skills/release-review/SKILL.md) / [release-validation](../.claude/skills/release-validation/SKILL.md) / [deploy](../.claude/skills/deploy/SKILL.md) スキル | 🔴 **リリースするとき・本番へデプロイするとき**（#1577 で移した。明示呼び出しのみ） |
 
 ⚠ **迷ったら `grep -rn <語> docs/ .claude/skills/` でまとめて引く。**
 
@@ -32,23 +32,17 @@
 
 ### リリースフロー
 
-1. `develop` で開発・コミット
-2. リリース時に `develop` → `main` へPRを作成しマージ
-3. `main` でタグを打ちリリース: `gh release create vX.Y.Z --target main --title "X.Y.Z"`
-4. `config/application.yaml` の `/shrieker/version` がバージョンの正本。リリース前に更新する
-5. リリース直前に [release-validation.md](release-validation.md) の手順で各 Source / Shrieker の動作を手動検証する（CI では捕まらない統合系のリグレッション検出用）
-6. 各マイルストーンの Issue をすべて消化した後、リリース直前に下記「リリース前レビュー」の 5 観点並列レビューを実施する。必修（赤）のみ本リリースで対応し、残り（黄・緑）は Issue 起票して次リリース以降へ送る
-7. `docs/CLAUDE.md` のリリース済みセクションを更新する
-8. **[Wiki](https://github.com/pooza/tomato-shrieker/wiki) を追従させる**（クローンは `~/repos/tomato-shrieker.wiki`・ブランチは `master`）。⚠ **Wiki は利用者向けの正本。**`docs/CLAUDE.md` は開発者向けなので、両方を更新しないと利用者から見た仕様が古いまま残る
+🔴 **手順の正本はスキル**（#1577 で移した。どれも外へ書く step を含むので**明示呼び出しのみ**）。
 
-⚠ **Wiki の更新漏れは溜まりやすい。**4.6.0 の時点で「監視」ページが **4.2.0 相当**のまま放置されており、4.4.0（配信計測・サイレント不発）と 4.5.0 の変更がまるごと欠落していた。**機能を追加・変更したリリースでは、対応するページを必ず開いて確認すること。**目安:
+| スキル | 中身 |
+| --- | --- |
+| [release](../.claude/skills/release/SKILL.md) | 全体の手順（develop → main の PR・タグ・リリース・docs と Wiki の追従） |
+| [release-review](../.claude/skills/release-review/SKILL.md) | リリース前の 5 観点並列レビュー |
+| [release-validation](../.claude/skills/release-validation/SKILL.md) | リリース直前の手動検証（テンプレートとスクリプトを同梱） |
+| [deploy](../.claude/skills/deploy/SKILL.md) | 本番（oscura）へのデプロイと確認 |
 
-| 変更した領域 | 追従するページ |
-|------|------|
-| `/healthz` `/status.json` `source_run_log` 監視設定 | 監視 |
-| `bin/shrieker` のサブコマンド | コマンドラインツール |
-| マイグレーション・デプロイ順序・移行作業 | アップデート手順 |
-| ソース種別・投稿先・スケジュール | 各ソース／Shrieker のページ |
+- `config/application.yaml` の `/package/version` がバージョンの正本。**マイルストーンの着手時に bump する**
+- ⚠ **本番に出す＝リリースする。**タグを打っていない版を本番へ出さない
 
 ### マイルストーンのサイズ
 
@@ -66,24 +60,6 @@ gh issue list --state open --limit 60 --json number,milestone,labels \
   | awk '{w = $2=="size:S" ? 1 : $2=="size:M" ? 3 : $2=="size:L" ? 8 : 0; n[$1]++; c[$1]+=w} \
          END {for (k in c) printf "%s: %d 件 / 重み %d\n", k, n[k], c[k]}' | sort
 ```
-
-### リリース前レビュー
-
-各マイルストーンの Issue が消化済みになった後、バージョンバンプに入る前に実施する。**単一のセキュリティレビューだけでは実用上の問題が取りこぼされる**ため、以下 5 観点を独立したサブエージェントで並列に走らせ、指摘を合流させる（モロヘイヤ／capsicum で先行運用しているプラクティスの移植）。
-
-| 観点 | 焦点 |
-| --- | --- |
-| セキュリティ | `/security-review` スキル。Webhook URL/トークン取り扱い・暗号化・Sentry/ログのシークレット scrub・フィード入力（RSS/nokogiri パース）の検証 |
-| 設定・宛先契約 | ソース定義 YAML スキーマ整合（`config/schema/source.yaml`・`base.yaml`）・各 Shrieker の dest 解釈・ginseng-fediverse/piefed/youtube interface・本家 API（Mastodon/Misskey/Nostr/LINE/Matrix/PieFed）呼び出しの正確性・ソース定義リファレンスや `/healthz` 仕様との齟齬 |
-| スケジューラ・ライフサイクル | rufus-scheduler の cron 駆動・`scheduler_daemon`・`source_run_log`・FeedItem 重複判定/entry 管理・Sequel 接続・CommandSource 子プロセス実行・seas(FreeBSD) daemon 駆動 |
-| エラー処理・観測性 | Sentry 計装（source/shrieker タグ）・`Ginseng::GatewayError` の scrub・`/healthz` の error_streak / WARN/NG 判定・ログの本文/個人情報漏洩チェック |
-| コーディングスタイル・規約整合性 | rubocop（+rubocop-sequel）・`rake config:lint`・設定のスラッシュ記法・2 スペースインデント・廃止語（lemmy 等） |
-
-対象範囲は `v<前リリース>..develop` の差分。Codex（`chatgpt-codex-connector[bot]`）は PR ready 時に走るので併走させ、重複しない指摘だけを拾う。
-
-⚠ **指摘の分類（赤＝必修 / 黄＝余力があれば / 緑＝送り）とその扱いは [workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) が正本。**必要最小限のみ本リリースで対応し、残りは Issue 起票して次リリース以降へ送る。
-
-⚠ **上の 5 観点のうち共通なのは「セキュリティ」「エラー処理・観測性」「コーディングスタイル・規約整合性」の 3 つ**で、正本にも同じものがある。**「設定・宛先契約」「スケジューラ・ライフサイクル」が tomato 固有**の観点。
 
 ### リリースノート
 
@@ -135,7 +111,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | NostrShrieker | (独自実装) | Nostr イベント ⚠ **動作保証対象外** |
 | WebhookShrieker | SlackService | Webhook (Slack, Discord等) |
 
-⚠ **NostrShrieker は動作保証の対象外。**運用者が使っておらず、実運用での検証経路が無いため。リリース前検証（[release-validation.md](release-validation.md)）にも含めない。
+⚠ **NostrShrieker は動作保証の対象外。**運用者が使っておらず、実運用での検証経路が無いため。リリース前検証（[release-validation スキル](../.claude/skills/release-validation/SKILL.md)）にも含めない。
 
 **ただし打ち切りではなく「報告があったら対応する」ステータス。**こちらから能動的に検証したり先回りして直したりはしない、という意味であって、報告された不具合を放置するわけではない。対応のトリガーは **issue での報告**と **Codex レビューの指摘**の 2 つ。
 
@@ -148,7 +124,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 `Bundler.with_unbundled_env` で囲む（親の RUBYOPT, GEM_HOME 等の漏洩防止）。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（with_unbundled_env で一掃された後、子プロセスに正しい Gemfile 位置を教える役割）。
 
-⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[daemon.md の デプロイ手順](daemon.md#デプロイ手順) 参照）。
+⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
 
 ⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。
 

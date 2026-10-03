@@ -74,38 +74,7 @@ bin/shrieker source reload
 
 ### デプロイ手順
 
-本番は oscura（Ubuntu / systemd）、実行ユーザー `deploy`、チェックアウトは `/home/deploy/repos/tomato-shrieker`。デプロイ対象は **`main` ブランチ**（develop は本番へデプロイしない）。
-
-```sh
-# 本体
-ssh oscura 'sudo -H -u deploy bash -lc "cd ~/repos/tomato-shrieker && git pull origin main && bundle install"'
-
-# サテライト 3 本（CommandSource の実行対象。それぞれ独立した Gemfile を持つ）
-ssh oscura 'sudo -H -u deploy bash -lc "
-  RV=\$(cat ~/repos/tomato-shrieker/.ruby-version)
-  for d in loquat:main shooby-do-bop:master dqdai-anniv:main; do
-    cd ~/repos/\${d%%:*} && git pull origin \${d##*:} && RBENV_VERSION=\$RV bundle install
-  done"'
-
-ssh oscura 'sudo systemctl restart tomato-shrieker'
-```
-
-🔴 **`bundle install` は本体・サテライトとも毎回必ず実行する。**冪等なので無駄打ちのコストはほぼ無い。省くと以下で壊れる。
-
-- **Ruby のマイナー更新**（例: 4.0.5 → 4.0.6）で gem ディレクトリが総入れ替えになる。本体だけ `bundle install` してサテライトを忘れると、**サテライトだけが `Bundler::GemNotFound` で全滅**する（2026-08-03 に実際に発生。`loquat` / `shooby-do-bop` / `dqdai-anniv` の 7 ソースが `timecop` 欠落で 24 時間エラー）
-- ginseng-\* gem は `branch: main` 追いなので、`Gemfile.lock` が同じでも中身が動く
-
-⚠ **サテライトの `.ruby-version` は当てにならない。**scheduler_daemon の環境には `RBENV_VERSION` が入っており、それが子プロセスへそのまま継承される。つまりサテライトは自分の `.ruby-version` ではなく **本体と同じ Ruby で動く**（[CommandSource の子プロセス実行](CLAUDE.md#commandsource-の子プロセス実行) 参照）。`bundle install` も同じバージョンを明示して実行すること。
-
-⚠ `git pull` を引数なしで打つと `There is no tracking information for the current branch.` で止まる。itamae の `git` リソースが upstream 追跡を持たないローカルブランチ `deploy` に着地させるため。本体は必ず **`git pull origin main`** と書く（ブランチ名が実行ユーザー名と同じなのは偶然）。
-
-⚠ `shooby-do-bop` の既定ブランチは `master`（他は `main`）。
-
-⚠ `config/local.yaml` と `config/sources/` は gitignore 配下＝git では上がってこない。ソース定義の正本は本番の実体で、手元の `config/sources` は dev 用。
-
-⚠ `rake migrate` は不要（起動時に自動適用される。上記「起動時マイグレーション」参照）。
-
-⚠ **順序は「pull → 再起動 → CLI」で固定する。**マイグレーションを走らせるのは `SchedulerDaemon#start` だけで、`bin/shrieker` は `Sequel.connect` しかしない。再起動前に新テーブルを触るサブコマンド（`source ack` → `silence_ack`）を叩くと、Thor のエラーではなく生の `Sequel::DatabaseError: no such table` で落ちる。
+🔴 **正本は [deploy スキル](../.claude/skills/deploy/SKILL.md)**（#1577 で移した。`/deploy` で呼ぶ・明示呼び出しのみ）。
 
 ### 本番操作の注意
 

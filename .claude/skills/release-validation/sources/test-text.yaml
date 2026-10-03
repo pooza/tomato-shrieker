@@ -1,0 +1,7 @@
+source:
+  text: |
+    これは tomato-shrieker 検証用のテストテキストです。
+    https://github.com/pooza/tomato-shrieker
+dest:
+  tags:
+    - test

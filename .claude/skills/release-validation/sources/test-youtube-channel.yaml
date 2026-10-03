@@ -1,0 +1,7 @@
+source:
+  youtube:
+    channel:
+      url: https://www.youtube.com/channel/UCSsjL41NsyqSNNbanuI0htg
+dest:
+  tags:
+    - test
