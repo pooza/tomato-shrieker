@@ -8,9 +8,12 @@ ssh oscura 'curl -s -o /dev/null -w "healthz %{http_code}\n" http://127.0.0.1:45
 ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | python3 -c '
 import collections, json, sys
 sources = json.load(sys.stdin)["sources"]
-print(len(sources), dict(collections.Counter(str(v["last_status"]) for v in sources)))
+print(len(sources), dict(collections.Counter(str(v.get("last_status", "broken")) for v in sources)))
 for v in sources:
-    if v["last_status"] not in ("success", None) or v["silent"] or v["undelivered"]:
+    # ⚠ 組み立てに失敗したソースは {id, class, error} だけの行になる
+    if "last_status" not in v:
+        print(v["id"], "broken", v.get("error"))
+    elif v["last_status"] not in ("success", None) or v["silent"] or v["undelivered"]:
         print(v["id"], v["last_status"], "streak", v["error_streak"], "/", v["error_streak_threshold"],
               "silent", v["silent"], "undelivered", v["undelivered"])
 '
