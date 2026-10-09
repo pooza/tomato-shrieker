@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 394f90fb962ea203ae2ffdd6c0c2185a242242ed
+  revision: 19ef86b3e05f44f351a79a530b295befb4886831
   branch: main
   specs:
-    ginseng-core (1.25.0)
+    ginseng-core (2.3.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -23,6 +23,7 @@ GIT
       nokogiri (>= 1.19.4)
       optparse
       rake (>= 12.3.3, != 13.4.0)
+      resolv (>= 0.7.2)
       sanitize (>= 6.0.2)
       securerandom
       set
@@ -34,35 +35,37 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: e9f802eee7144b726ab1095a76b23ffd27c6c98b
+  revision: 8279d5a647ff4342491ac733453810c559b83369
   branch: main
   specs:
-    ginseng-fediverse (3.1.0)
+    ginseng-fediverse (4.0.0)
+      ginseng-core (>= 2.0.0)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 697502fea58a9c9dbba9527347b02198d3dbdfe9
+  revision: 6b4db1b816c1b04179a94dcb94e028004a0d6c29
   branch: main
   specs:
-    ginseng-piefed (0.1.2)
+    ginseng-piefed (0.3.0)
+      ginseng-core (>= 2.0.0)
 
 GIT
   remote: https://github.com/pooza/ginseng-style.git
-  revision: 05a9e5c997082bd75bd913190e0c947fdaff082d
-  tag: v1.1.13
+  revision: 2818c5618476302e4a10454f1b621502a053f492
+  tag: v1.1.14
   specs:
-    ginseng-style (1.1.13)
+    ginseng-style (1.1.14)
       rubocop (~> 1.91.0)
-      rubocop-minitest (~> 0.40.0)
+      rubocop-minitest (~> 0.41.0)
       rubocop-performance (~> 1.27.0)
       rubocop-rake (~> 0.7.1)
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: 916dc688e4fddc382b32fb8baec0da9330869134
+  revision: a9f5e5186565c0be25a4f9b69e4e3eeb1453d915
   branch: main
   specs:
-    ginseng-youtube (3.0.1)
+    ginseng-youtube (3.0.2)
 
 GIT
   remote: https://github.com/pooza/icalendar-rrule.git
@@ -77,7 +80,7 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (8.1.3.1)
+    activesupport (8.1.4)
       base64
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.3.1)
@@ -132,7 +135,7 @@ GEM
       et-orbi (~> 1.4)
       raabro (~> 1.4)
     hashdiff (1.2.1)
-    httparty (0.24.2)
+    httparty (0.24.3)
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
@@ -145,7 +148,7 @@ GEM
       ostruct
     ice_cube (0.17.0)
     json (2.21.2)
-    json-schema (6.2.0)
+    json-schema (6.2.1)
       addressable (~> 2.8)
       bigdecimal (>= 3.1, < 5)
     language_server-protocol (3.17.0.6)
@@ -175,7 +178,7 @@ GEM
       net-protocol
     net-protocol (0.3.0)
       timeout
-    net-smtp (0.5.1)
+    net-smtp (0.5.2)
       net-protocol
     nio4r (2.7.5)
     nokogiri (1.19.4)
@@ -220,6 +223,7 @@ GEM
     rainbow (3.1.1)
     rake (13.4.2)
     regexp_parser (2.12.0)
+    resolv (0.8.1)
     rexml (3.4.4)
     ricecream (0.2.1)
     rubocop (1.91.0)
@@ -236,9 +240,9 @@ GEM
     rubocop-ast (1.50.0)
       parser (>= 3.3.7.2)
       prism (~> 1.7)
-    rubocop-minitest (0.40.0)
+    rubocop-minitest (0.41.0)
       lint_roller (~> 1.1)
-      rubocop (>= 1.75.0, < 2.0)
+      rubocop (>= 1.89.0, < 2.0)
       rubocop-ast (>= 1.38.0, < 2.0)
     rubocop-performance (1.27.0)
       lint_roller (~> 1.1)
@@ -288,7 +292,7 @@ GEM
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
-    uri (1.1.1)
+    uri (1.1.2)
     webmock (3.26.2)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
@@ -299,7 +303,7 @@ GEM
     websocket-extensions (0.1.5)
     yajl-ruby (1.4.3)
     zeitwerk (2.8.3)
-    zlib (3.2.3)
+    zlib (3.2.4)
 
 PLATFORMS
   aarch64-linux-gnu
