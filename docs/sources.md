@@ -32,6 +32,8 @@ sources:
 | YouTubeChannelSource | `/source/youtube_channel/channel_id` | `/source/youtube_channel/keyword` |
 | GitHubRepositorySource | `/source/github/repository` | `/source/github/timeline`（releases 等） |
 
+🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ 8 文字未満の値は伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。
+
 ### キーワードフィルタ（FeedSource 系共通）
 
 - `/source/keyword` — 含むエントリのみ対象（正規表現可）

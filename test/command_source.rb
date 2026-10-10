@@ -63,6 +63,50 @@ module TomatoShrieker
       assert_false(stats.entry_stage?)
     end
 
+    # 🔴 **#1623: 引数・env に渡した資格情報が、ログに出す文字列から伏せられること。**
+    # ⚠ `Ginseng::CommandLine` の伏せ字は opt-in。`secrets` を渡さないと素通しになる。
+    # ⚠ env のキー名は `PUSH_URL`（上流の `Masking#mask` がキー名では拾えない形）にしてある。
+    def test_command_masks_secrets
+      command = build_secret_source.command
+
+      [SECRET_ENV, SECRET_HOOK, SECRET_TOKEN].each do |secret|
+        assert_include(command.secrets, secret)
+        assert_not_include(command.masked(command.to_s), secret)
+      end
+      assert_not_include(command.send(:masked_env).values.join, SECRET_ENV)
+    end
+
+    # ⚠ 短い値まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる。
+    def test_command_secrets_skips_short_values
+      assert_not_include(build_secret_source.command.secrets, '1')
+    end
+
+    # 失敗したコマンドが stderr に書き返した資格情報を、例外メッセージに載せない。
+    def test_exec_masks_secrets_in_error
+      source = build_secret_source('echo "denied: $PUSH_URL" >&2; exit 1')
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_include(error.message, 'denied')
+      assert_not_include(error.message, SECRET_ENV)
+    end
+
+    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456'.freeze
+    SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
+    SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
+
+    def build_secret_source(script = nil)
+      script ||= "notify #{SECRET_HOOK} #{SECRET_TOKEN} #{SECRET_ENV}"
+      return CommandSource.new(
+        'id' => '__test_command_secrets__',
+        'source' => {'command' => script, 'env' => {'PUSH_URL' => SECRET_ENV, 'DEBUG' => '1'}},
+        'schedule' => {'every' => '1d'},
+        'dest' => {
+          'hooks' => [{'url' => SECRET_HOOK}],
+          'mastodon' => {'url' => 'https://mastodon.example.test', 'token' => SECRET_TOKEN},
+        },
+      )
+    end
+
     def build_source
       return CommandSource.new(
         'id' => '__test_command_entry_stage__',
