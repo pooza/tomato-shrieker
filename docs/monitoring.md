@@ -183,6 +183,15 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 **腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
+### `Bad response 3xx` の読み方
+
+4.14.0 から、宛先（Webhook / LINE / PieFed / Mastodon / Misskey）はリダイレクトを追わない。宛先が 3xx を返すと、run_log・`/healthz/source/:id`・`/status.json`・Sentry には **`Ginseng::GatewayError: Bad response 301`**（302 / 307 / 308 も同じ形）としか出ない。再送はしない。
+
+- **転送先はログにだけ出る。**同じ時刻の `{"error":"redirect refused",…,"location":"…"}` の行を見る。⚠ この行に `source:` は無いので、直後の `{"source":…,"shrieker":…,"error":…}` の行と時刻で結ぶ
+- **直し方は、宛先の URL を `location` の示す最終オリジン（`https://`）へ書き換える**こと。`bin/shrieker source validate` は `http://` の宛先を WARN する
+- 監視は効く: `attempted > 0 / delivered = 0` の error になるので、`errored` と `undelivered` で `/healthz/source/:id` が 503 になる
+- ⚠ フィードの取得（FeedSource / IcalendarSource など）は従来どおりリダイレクトを追う
+
 ### CLI で横断して問い合わせる (#1561)
 
 `/status.json` を全部舐めなくても、本番で次のように引ける（⚠ 本番では `sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && bin/shrieker ..."`）。HTTP を経由せずプロセス内で DB を読むので、**daemon が止まっていても答えられる**。

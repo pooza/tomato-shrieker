@@ -32,7 +32,7 @@ sources:
 | YouTubeChannelSource | `/source/youtube_channel/channel_id` | `/source/youtube_channel/keyword` |
 | GitHubRepositorySource | `/source/github/repository` | `/source/github/timeline`（releases 等） |
 
-🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ 8 文字未満の値は伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。
+🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ 8 文字未満の値は伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。⚠⚠ **伏せるのは「書いたとおりの形」（とシェルエスケープした形）だけ。**コマンドが加工して書き出した形（URL のパスだけ・クエリを落とした URL・JSON や HTML のエスケープ・URL エンコード・Base64・途中で折り返された値）は伏せられない。
 
 ### キーワードフィルタ（FeedSource 系共通）
 
@@ -53,8 +53,12 @@ sources:
 | MisskeyShrieker | `/dest/misskey/url`, `/dest/misskey/token` | 権限: `write:notes`（画像は `write:drive`） |
 | WebhookShrieker | `/dest/hooks` | Slack Incoming Webhooks 互換の宛先の配列（Discord は末尾に `/slack`）。URL 文字列のほかオブジェクト形式も可 → [Webhook 宛先の指定形式](#webhook-宛先の指定形式) |
 | LineShrieker | `/dest/line/user_id`, `/dest/line/token` | チャンネルアクセストークン（長期） |
-| PieFedShrieker | `/dest/piefed/url`, `/dest/piefed/access_token`, `/dest/piefed/community_name` | `/dest/piefed/api_version`（デフォルト alpha） |
+| PieFedShrieker | `/dest/piefed/host`, `/dest/piefed/user_id`, `/dest/piefed/password`, `/dest/piefed/community_id` | `host` はホスト名だけ（接続先は常に `https://<host>`）。`/dest/piefed/template`。API の版は `config/local.yaml` の `/piefed/api/version`（デフォルト alpha） |
 | NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/nostr/relays`（application.yaml） |
+
+🔴 **宛先はリダイレクトを追わない（4.14.0・ginseng-core 2.0.0）。宛先の URL は `https://` の最終オリジンで書く。**宛先が 3xx を返すと、その配信は `Ginseng::GatewayError: Bad response 301`（など）で失敗する。これまでは 301 / 302 を追って GET に化け、本文が落ちたまま「成功」と数えていた。⚠ `bin/shrieker source validate` は `/dest/hooks`・`/dest/mastodon/url`・`/dest/misskey/url` が `http://` のとき WARN を出す（`disable: true` の定義には出さない）。読み方は [monitoring.md](monitoring.md#bad-response-3xx-の読み方)。
+
+⚠ **PieFed 宛は、本文にだけタグ（`/dest/tags`）を付け、タイトルには付けない（4.14.0・#1484）。**4.13.0 までは同じソースの他の宛先しだいだった（単独ならタグなし・Mastodon / Misskey と併用なら本文とタイトルの両方・LINE と併用ならタグなし）。
 
 #### Webhook 宛先の指定形式
 

@@ -423,6 +423,7 @@ module TomatoShrieker
       assert_empty(SourceValidator.warnings(once.merge('disable' => true)))
     end
 
+    # 🔴 Codex P1 (#1558): しきい値に到達するのに retention_days より長くかかる
     # 組み合わせを弾く。⚠ **どれだけ連続で失敗しても 503 にならない**設定になる。
     def test_warnings_unreachable_error_streak_threshold
       retention = Config.instance['/monitor/retention_days']

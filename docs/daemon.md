@@ -26,7 +26,7 @@ systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake
 
 ### pid の再利用と `process_pattern` (#1654)
 
-pid ファイルは正常停止でも残る（systemd の TERM 直送など）。**残った番号を別のプロセスが引くと、`start` は「already running」で上がらず、`stop` と `source reload` は無関係なプロセスへシグナルを送る。**`SchedulerDaemon#process_pattern` が「うちの常駐」のコマンド行を宣言しており、`Ginseng::Daemon` は生きている番号の `ps -ww -o command= -p <pid>` と突き合わせ、一致しなければ「居ない」と答える（warn `process identity mismatch` を 1 行残す）。
+pid ファイルは異常終了（KILL・OOM・ホスト落ち）で残る。⚠ 正常停止（TERM）では消える — `SchedulerDaemon` は `exec` しないので TERM の trap が生きている（実測。残るのは `SchedulerDaemon.pid.lock` だけ）。**残った番号を別のプロセスが引くと、`start` は「already running」で上がらず、`stop` と `source reload` は無関係なプロセスへシグナルを送る。**`SchedulerDaemon#process_pattern` が「うちの常駐」のコマンド行を宣言しており、`Ginseng::Daemon` は生きている番号の `ps -ww -o command= -p <pid>` と突き合わせ、一致しなければ「居ない」と答える（warn `process identity mismatch` を 1 行残す）。
 
 - 実測した姿: `bundle exec` 経由は `bin/scheduler_daemon.rb start`（本番はこれ）、`ruby` 直は `ruby …/bin/scheduler_daemon.rb start`。どちらも `launcher_pattern('scheduler_daemon.rb')` に一致する
 - 🔴 **起動の仕方を変える・プロセス名を書き換えるコードを足すときは、宣言も変える。**挙げ漏らした姿は「他人」になり、**`start` が 2 本目を立て、`stop` は TERM を送らずに pid ファイルを消す**。先に `ps -ww -o command= -p $(cat tmp/pids/SchedulerDaemon.pid)` で姿を見る
