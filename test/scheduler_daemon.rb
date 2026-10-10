@@ -121,6 +121,52 @@ module TomatoShrieker
       assert_not_equal('DEFAULT', observed)
     end
 
+    # #1654: 実測した常駐の姿（本番の `bundle exec` 経由・`ruby` 直・restart）に一致し、
+    # 常駐でないもの（stop・CLI・エディタ）には一致しない。
+    def test_process_pattern
+      pattern = @daemon.process_pattern
+
+      assert_match(pattern, 'bin/scheduler_daemon.rb start')
+      assert_match(pattern, 'ruby /home/deploy/repos/tomato-shrieker/bin/scheduler_daemon.rb start')
+      assert_match(pattern, 'bin/scheduler_daemon.rb restart')
+      assert_no_match(pattern, 'bin/scheduler_daemon.rb stop')
+      assert_no_match(pattern, 'bin/scheduler_daemon.rb status')
+      assert_no_match(pattern, 'ruby bin/shrieker source reload')
+      assert_no_match(pattern, 'vim bin/scheduler_daemon.rb')
+    end
+
+    # 🔴 **pid ファイルの番号を別のプロセスが引いていたら「居ない」と答える (#1654)。**
+    # ここではテスト自身（`rake test` の姿）の番号を書く ＝ 生きているが常駐ではない。
+    # ⚠ 宣言が無ければ :alive になり、`start` は起動せず、`source reload` はそこへ HUP を送る。
+    def test_alive_state_rejects_reused_pid
+      use_test_pid_file
+      File.write(@pid_path, Process.pid.to_s)
+
+      assert_equal(:dead, @daemon.alive_state)
+    end
+
+    # ⚠ **本物の姿は「居る」と答える。**ここが落ちると、稼働中の常駐の上に 2 本目が立つ。
+    def test_alive_state_accepts_launcher
+      use_test_pid_file
+      Dir.mktmpdir do |dir|
+        script = File.join(dir, 'scheduler_daemon.rb')
+        File.write(script, "$stdout.puts('ready')\n$stdout.flush\nsleep\n")
+        IO.popen([RbConfig.ruby, script, 'start']) do |io|
+          io.gets
+          File.write(@pid_path, io.pid.to_s)
+
+          assert_equal(:alive, @daemon.alive_state)
+        ensure
+          Process.kill('KILL', io.pid)
+        end
+      end
+    end
+
+    def use_test_pid_file
+      path = @pid_path
+      @daemon.define_singleton_method(:pid_file) {path}
+    end
+
     # 起動完了の合図。SchedulerDaemon#start では monitor server を上げた直後に押す。
     def ready
       @daemon.instance_variable_get(:@reload_ready).push(true)

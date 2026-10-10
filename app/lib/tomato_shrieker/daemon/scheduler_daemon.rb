@@ -8,6 +8,21 @@ module TomatoShrieker
       return nil
     end
 
+    # pid ファイルの番号が「うちの常駐」かを、コマンド行で見分ける (#1654)。
+    # pid ファイルが残ったまま番号を別のプロセスが引くと、`start` は「already running」で
+    # 上がらず、`stop` と `source reload` は無関係なプロセスへシグナルを送る。
+    #
+    # ⚠ **`command` が nil で `exec` しないので、姿は起動スクリプトのまま**（実測:
+    # `bundle exec` 経由は `bin/scheduler_daemon.rb start`、`ruby` 直は
+    # `ruby …/bin/scheduler_daemon.rb start`。本番は前者）。プロセス名を書き換える
+    # コードは無い（監視は `Puma::Server` の埋め込みで、`Puma::Launcher` を通らない）。
+    #
+    # 🔴 **起動の仕方を変えたら、ここも変える。**挙げ漏らした姿は「他人」になり、
+    # `start` が 2 本目を立て、`stop` は TERM を送らずに pid ファイルを消す。
+    def process_pattern
+      return launcher_pattern('scheduler_daemon.rb')
+    end
+
     def motd
       return [
         "#{self.class} #{Package.version}",

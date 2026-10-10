@@ -24,6 +24,15 @@ systemd/rc.d → bin/scheduler_daemon.rb start
 
 systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake restart` は廃止済み（#1410）。
 
+### pid の再利用と `process_pattern` (#1654)
+
+pid ファイルは正常停止でも残る（systemd の TERM 直送など）。**残った番号を別のプロセスが引くと、`start` は「already running」で上がらず、`stop` と `source reload` は無関係なプロセスへシグナルを送る。**`SchedulerDaemon#process_pattern` が「うちの常駐」のコマンド行を宣言しており、`Ginseng::Daemon` は生きている番号の `ps -ww -o command= -p <pid>` と突き合わせ、一致しなければ「居ない」と答える（warn `process identity mismatch` を 1 行残す）。
+
+- 実測した姿: `bundle exec` 経由は `bin/scheduler_daemon.rb start`（本番はこれ）、`ruby` 直は `ruby …/bin/scheduler_daemon.rb start`。どちらも `launcher_pattern('scheduler_daemon.rb')` に一致する
+- 🔴 **起動の仕方を変える・プロセス名を書き換えるコードを足すときは、宣言も変える。**挙げ漏らした姿は「他人」になり、**`start` が 2 本目を立て、`stop` は TERM を送らずに pid ファイルを消す**。先に `ps -ww -o command= -p $(cat tmp/pids/SchedulerDaemon.pid)` で姿を見る
+- ⚠ 見抜けるのは同じユーザー（か root から見た）のプロセスだけ。`ps` が無い・コマンド行が取れないときは従来どおり「生きている」扱い
+- ⚠ FreeBSD の `ps` では実測していない
+
 ### 起動時マイグレーション
 
 **未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
