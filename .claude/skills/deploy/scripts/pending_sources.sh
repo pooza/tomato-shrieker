@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # 再起動の前に、稼働中のソースとディスク上の有効な定義を突き合わせる（読むだけ）。
 # 🔴 再起動は、ディスクに置かれたまま reload されていない定義を全部読み込む（#1649）。
-# あわせて、起動で倒れる定義が残っていないことを確かめる（残っていれば非 0 で終わる）。
 # diff の > は「再起動で増えるソース」、< は「再起動で消えるソース」。
 # 稼働中の ID は手元に控え、再起動後に verify.sh が増減を出す。
 #
@@ -21,14 +20,13 @@ if [ -z "$running" ] || [ -z "$disk" ]; then
   echo '一覧が空（取得に失敗している）＝突き合わせていない' >&2
   exit 1
 fi
-# 🔴 ID が一致していても、起動で倒れる定義が残っていれば再起動は失敗する（reload が拒否された
-# 後は、古いジョブが動き続けるので稼働中の一覧からは見えない）。reload と同じ検査を先に通す。
-if ! ssh oscura 'sudo -H -u deploy bash -lc "cd ~/repos/tomato-shrieker && bundle exec ruby -Iapp/lib -rtomato_shrieker -"' \
-  < "$(dirname "$0")/unstartable_sources.rb"; then
-  echo '🔴 起動で倒れる定義がある（または検査に失敗した）＝このまま再起動しない' >&2
-  exit 1
-fi
-echo '起動で倒れる定義は無い'
 printf '%s\n' "$running" >| "$before"
 echo "稼働中 $(wc -l < "$before") 件"
-diff "$before" <(printf '%s\n' "$disk") && echo '一致（再起動で増減するソースは無い）'
+# ⚠ 差分があっても 0 で終わる（増減は運用者が確かめるもので、失敗ではない）。diff 自体の失敗（2 以上）だけ伝える
+rc=0
+diff "$before" <(printf '%s\n' "$disk") || rc=$?
+case $rc in
+  0) echo '一致（再起動で増減するソースは無い）' ;;
+  1) echo '⚠ 再起動でソースが増減する。意図したものかを確かめる' ;;
+  *) exit "$rc" ;;
+esac

@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: 本番（oscura）へのデプロイ。再起動で増減するソースの確認、本体とサテライト 3 本の pull と bundle install、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
+description: 本番（oscura）へのデプロイ。再起動で増減するソースの確認、本体とサテライト 3 本の pull と bundle install、起動で倒れる定義の検査、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
 disable-model-invocation: true
 ---
 
@@ -23,10 +23,9 @@ disable-model-invocation: true
 
 🔴 **再起動は、ディスクに置かれたまま reload されていないソース定義を全部読み込む。**4.13.0 のデプロイでは保留中の定義 3 件が有効になり、56 → 59 ソースになった（発火前に無効化したので投稿は出ていない）。
 
-- 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**起動で倒れる定義が残っている（`source reload` の拒否と同じ検査・`scripts/unstartable_sources.rb`）。reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる。直すか `disable` してからやり直す
 - `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
 - `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
-- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
+- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。5. の `verify.sh` がこれと比べて増減を出す
 
 ## 2. pull と bundle install
 
@@ -36,13 +35,25 @@ disable-model-invocation: true
 
 本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
 
-## 3. 再起動
+## 3. 起動で倒れる定義の検査
+
+```sh
+.claude/skills/deploy/scripts/unstartable_sources.sh
+```
+
+読むだけ。`source reload` の拒否と同じ検査（`SourceValidator.startup_errors`）を、**pull した後のコードで**通す。DB には触らない。
+
+- 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**直すか `bin/shrieker source disable <id>` してからやり直す
+- ⚠ **1. の突き合わせでは見えない。**reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる
+- ⚠ **pull の前にやっても足りない。**再起動で走るのは新しいコードなので、古いコードの検査を通った定義が新しい版で倒れうる
+
+## 4. 再起動
 
 ```sh
 ssh oscura 'sudo systemctl restart tomato-shrieker'
 ```
 
-## 4. 確認
+## 5. 確認
 
 ```sh
 .claude/skills/deploy/scripts/verify.sh
@@ -73,4 +84,4 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 
 ⚠ `rake migrate` は不要（起動時に自動適用される。[daemon.md の「起動時マイグレーション」](../../../docs/daemon.md#起動時マイグレーション) 参照）。
 
-⚠ **順序は「pull → 再起動 → CLI」で固定する。**マイグレーションを走らせるのは `SchedulerDaemon#start` だけで、`bin/shrieker` は `Sequel.connect` しかしない。再起動前に新テーブルを触るサブコマンド（`source ack` → `silence_ack`）を叩くと、Thor のエラーではなく生の `Sequel::DatabaseError: no such table` で落ちる。
+⚠ **DB を読む CLI の順序は「pull → 再起動 → CLI」で固定する。**マイグレーションを走らせるのは `SchedulerDaemon#start` だけで、`bin/shrieker` は `Sequel.connect` しかしない。再起動前に新テーブルを触るサブコマンド（`source ack` → `silence_ack`）を叩くと、Thor のエラーではなく生の `Sequel::DatabaseError: no such table` で落ちる。
