@@ -1,5 +1,7 @@
 module TomatoShrieker
   class PiefedShrieker < Ginseng::Piefed::Service
+    include Package
+
     def initialize(params = {})
       params = params.deep_symbolize_keys
       params[:url] = "https://#{params[:host]}" if params[:host] && !params[:url]
