@@ -29,10 +29,14 @@ module TomatoShrieker
       rows = status_sources(id).map {|source| SourceStatusTable.row(source)}
       rows.select! {|v| v[:problems].any?} if options[:problems]
       rows = SourceStatusTable.sort(rows, options[:sort]) if options[:sort]
-      return puts(JSON.pretty_generate(rows.map {|v| v[:status]})) if options[:json]
-      print_table(SourceStatusTable.lines(rows))
-      # ⚠ 理由は stderr へ（表を機械で読む側を汚さない。`--json` は `error` キーに載る）
-      SourceStatusTable.failures(rows).each {|v| say_error(v)}
+      print_status(rows)
+      # 🔴 **`--problems` は、該当があれば非 0 で終わる (#1648)。**問題の有無を確かめる
+      # 問い合わせなので、`source validate` と同じく終了コードで答える（cron や `&&` で使える）。
+      # ⚠ `--problems` を付けない一覧は、赤いソースがあっても 0（一覧を出しただけ）。
+      # ⚠ **`exit` を直に呼ばない。**test-unit は at_exit の中でスイートを回すので、テストから
+      # ここを通ると残りのテストが走らないまま「100% passed」で終わる（実際に 410 → 137 本に
+      # なった）。`Thor::Error` なら CLI では stderr に 1 行出て終了コード 1、テストでは例外になる。
+      raise Thor::Error, "#{rows.size} source(s) have problems." if options[:problems] && rows.any?
     end
 
     desc 'collisions', '同じ秒に発火したソースの群を run_log の実績から表示'
@@ -228,6 +232,13 @@ module TomatoShrieker
       return [find_source!(id)] if id
       return Source.all if options[:all]
       return Source.all.reject(&:disable?)
+    end
+
+    def print_status(rows)
+      return puts(JSON.pretty_generate(rows.map {|v| v[:status]})) if options[:json]
+      print_table(SourceStatusTable.lines(rows))
+      # ⚠ 理由は stderr へ（表を機械で読む側を汚さない。`--json` は `error` キーに載る）
+      SourceStatusTable.failures(rows).each {|v| say_error(v)}
     end
 
     def nothing_to_ack_message(id)
