@@ -71,5 +71,33 @@ module TomatoShrieker
 
       assert_requested(@stub, times: 1)
     end
+
+    # #1631: `include Package` が無いと `http_class` が gem 既定の `Ginseng::HTTP` に
+    # 倒れ、tomato の `/http/retry/limit`・User-Agent・マスクが PieFed 宛にだけ効かない。
+    def test_uses_package_http
+      http = PiefedShrieker.new(PARAMS).http
+
+      assert_instance_of(HTTP, http)
+      assert_equal(config['/http/retry/limit'], http.retry_limit)
+    end
+
+    # #1620: 資格情報（JWT）を運ぶ要求がリダイレクト先へ持ち越されないこと。
+    def test_does_not_follow_redirect
+      stub_request(:post, %r{/api/[^/]+/post}).to_return(
+        status: 307,
+        headers: {'Location' => 'https://evil.example.com/post'},
+      )
+      evil = stub_request(:post, 'https://evil.example.com/post')
+      shrieker = PiefedShrieker.new(PARAMS)
+      shrieker.login
+
+      assert_raise(Ginseng::GatewayError) do
+        shrieker.http.post("/api/#{shrieker.api_version}/post", {
+          body: {title: 'x'},
+          headers: {'Authorization' => 'Bearer dummy'},
+        })
+      end
+      assert_not_requested(evil)
+    end
   end
 end

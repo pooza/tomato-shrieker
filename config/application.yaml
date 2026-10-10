@@ -62,6 +62,12 @@ nostr:
     - wss://nos.lol
     - wss://relay.nostr.band
 piefed:
+  api:
+    version: alpha
+  community:
+    types:
+      - Subscribed
+      - Moderating
   subject:
     max_length: 50
   verify_peer: true
