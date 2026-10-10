@@ -9,7 +9,7 @@ ssh oscura 'curl -s -o /dev/null -w "healthz %{http_code}\n" http://127.0.0.1:45
 before="${TMPDIR:-/tmp}/tomato-shrieker-sources-before.txt"
 status=$(ssh oscura 'curl -s http://127.0.0.1:4567/status.json')
 if [ -e "$before" ]; then
-  diff "$before" <(jq -r '.sources[].id' <<< "$status" | sort) && echo 'ソースの増減なし（再起動の前と同じ）' || true
+  diff "$before" <(jq -r '.sources[].id' <<< "$status" | sort -u) && echo 'ソースの増減なし（再起動の前と同じ）' || true
 else
   echo '⚠ 再起動の前の控えが無い（pending_sources.sh を先に実行していない）＝増減は比べられない'
 fi

@@ -14,10 +14,10 @@
 # 失敗しても末尾の sort が 0 を返し、空どうしを比べて「一致」と答える。
 set -euo pipefail
 before="${TMPDIR:-/tmp}/tomato-shrieker-sources-before.txt"
-running=$(ssh oscura 'curl -sf http://127.0.0.1:4567/status.json' | jq -er '.sources[].id' | sort)
+running=$(ssh oscura 'curl -sf http://127.0.0.1:4567/status.json' | jq -er '.sources[].id' | sort -u)
 out=$(ssh oscura 'sudo -H -u deploy bash -lc "cd ~/repos/tomato-shrieker && bundle exec ruby -Iapp/lib -rtomato_shrieker -"' \
   < "$(dirname "$0")/enabled_sources.rb")
-disk=$(awk -F'\t' '$1=="ID"{print $2}' <<< "$out" | sort)
+disk=$(awk -F'\t' '$1=="ID"{print $2}' <<< "$out" | sort -u)
 if [ -z "$running" ] || [ -z "$disk" ]; then
   echo '一覧が空（取得に失敗している）＝突き合わせていない' >&2
   exit 1
