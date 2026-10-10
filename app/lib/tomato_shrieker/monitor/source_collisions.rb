@@ -4,7 +4,7 @@ module TomatoShrieker
   # ⚠ **定義ではなく実績から見る。**`every` の位相は起動時刻で決まるので、
   # 定義を突き合わせても同時発火は分からない。`executed_at` は run の開始時刻＝発火時刻。
   # 📌 同じ顔ぶれは 1 行にまとめ、何回重なったかを `count` に数える。
-  class SourceCollisions
+  module SourceCollisions
     def self.find(hours: 24)
       since = Time.now - (hours * 3600)
       rows = SourceRunLog.where(Sequel.lit('executed_at >= ?', since))

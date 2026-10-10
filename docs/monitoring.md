@@ -345,4 +345,4 @@ HTTP(s) Monitor:
 | **同一ホストに Kuma 同居** | ネットワーク経路ゼロ、127.0.0.1 で完結 | Kuma の UI を見る側で別途 SSH ポートフォワード等が必要 |
 | **Firewall + IP 制限** | VPN 不要 | 監視ホストの固定 IP が前提。bind を 0.0.0.0 にする必要あり |
 
-本番の seas (FreeBSD) では Tailscale を併用する想定。Tailscale が動かない場合でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。
+⚠ この表は本番が seas (FreeBSD) だった頃の検討。**いまの本番は oscura（Ubuntu / systemd）で、`local.yaml` で `bind: 0.0.0.0` にして LAN / VPN 内の Kuma から叩いている**（アクセス制限が無い点は #1531）。Tailscale が動かない OS でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。

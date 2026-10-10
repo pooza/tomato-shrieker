@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: 本番（oscura）へのデプロイ。本体とサテライト 3 本の pull と bundle install、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
+description: 本番（oscura）へのデプロイ。本体とサテライト 3 本の pull と bundle install、再起動で増減するソースの確認、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
 disable-model-invocation: true
 ---
 
@@ -17,21 +17,35 @@ disable-model-invocation: true
 .claude/skills/deploy/scripts/pull.sh
 ```
 
-本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` する。⚠ 再起動はしない。
+本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
 
-## 2. 再起動
+## 2. 再起動で増減するソースの確認
+
+```sh
+.claude/skills/deploy/scripts/pending_sources.sh
+```
+
+読むだけ。稼働中のソース（`/status.json`）と、ディスク上の有効な定義（`bin/shrieker source status --json`）を突き合わせる。
+
+🔴 **再起動は、ディスクに置かれたまま reload されていないソース定義を全部読み込む。**4.13.0 のデプロイでは保留中の定義 3 件が有効になり、56 → 59 ソースになった（発火前に無効化したので投稿は出ていない）。
+
+- `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
+- `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
+- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
+
+## 3. 再起動
 
 ```sh
 ssh oscura 'sudo systemctl restart tomato-shrieker'
 ```
 
-## 3. 確認
+## 4. 確認
 
 ```sh
 .claude/skills/deploy/scripts/verify.sh
 ```
 
-読むだけ。先頭コミットと版・`ActiveState` / `NRestarts`・`/healthz`・ソースの内訳（success 以外と silent / undelivered の一覧）を出す。
+読むだけ。先頭コミットと版・`ActiveState` / `NRestarts`・`/healthz`・再起動の前からのソースの増減・ソースの内訳（success 以外と silent / undelivered の一覧）を出す。
 
 - 版が上げたものになっていること、`ActiveEnterTimestamp` がいまの再起動であること、`NRestarts` が増えていないこと
 - ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む
@@ -49,6 +63,8 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 ⚠ `git pull` を引数なしで打つと `There is no tracking information for the current branch.` で止まる。itamae の `git` リソースが upstream 追跡を持たないローカルブランチ `deploy` に着地させるため。本体は必ず **`git pull origin main`** と書く（ブランチ名が実行ユーザー名と同じなのは偶然）。
 
 ⚠ `shooby-do-bop` の既定ブランチは `master`（他は `main`）。
+
+⚠ **`sudo -iu deploy bash -lc "…"` は改行を潰す。**複数行のコマンドが 1 行に連結されて構文エラーになる。複数行で書くときは `pull.sh` と同じ `sudo -H -u deploy bash -lc "…"` にする（1 行なら `-iu` でも通る）。
 
 ⚠ `config/local.yaml` と `config/sources/` は gitignore 配下＝git では上がってこない。ソース定義の正本は本番の実体で、手元の `config/sources` は dev 用。
 
