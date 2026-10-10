@@ -32,8 +32,13 @@ for v in sources:
 # いまの常駐（MainPID）が出したログから、この種の失敗を数える（どれも 0 が正常）。
 # ⚠ リダイレクトの拒否は、そのソースが次に配信を試みたときに初めて出る。再起動の直後は 0 でも、
 # 配信の少ないソースが一巡するまでもう一度見る。
+# ⚠ `not started` だけは MainPID で絞らない（#1669 の Codex P2）。起動に失敗したプロセスは
+# もう居らず、`Restart=always` で上がり直した常駐は別の番号なので、絞ると必ず 0 になる。
+# 今日のログ全体から数える（ログは日次で回る）ので、再起動より前の分が混ざりうる。
 ssh oscura '
+  log=/var/log/tomato-shrieker.log
   pid=$(systemctl show tomato-shrieker -p MainPID --value)
-  for word in "redirect refused" "process identity" "not started" "event dropped"; do
-    printf "%s: %s\n" "$word" "$(grep -F "tomato-shrieker[$pid]:" /var/log/tomato-shrieker.log | grep -cF "$word")"
-  done'
+  for word in "redirect refused" "process identity" "event dropped"; do
+    printf "%s: %s\n" "$word" "$(grep -F "tomato-shrieker[$pid]:" "$log" | grep -cF "$word")"
+  done
+  printf "not started（今日のログ全体）: %s\n" "$(grep -cF "not started" "$log")"'
