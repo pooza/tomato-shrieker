@@ -37,7 +37,16 @@ module TomatoShrieker
 
     private
 
+    # ⚠ **タグは付けない。明示する (#1484)。**以前は立てずに描画していたので、同じソースに
+    # 他の宛先があると、その並び順でタグが付いたり落ちたりしていた（単独なら付かない）。
+    # ⚠ 描画結果は `title` にも使う（空白を潰した 1 行）ので、付けるとタイトルにタグが並ぶ。
     def create_piefed_template(original)
+      template = piefed_template(original)
+      template[:tag] = false
+      return template
+    end
+
+    def piefed_template(original)
       source = original.source
       piefed_template_name = source['/dest/piefed/template']
       return original unless piefed_template_name
