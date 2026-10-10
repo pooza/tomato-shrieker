@@ -4,6 +4,8 @@ require 'json'
 require 'shellwords'
 
 module TomatoShrieker
+  # ⚠ ClassLength は外せていない（#1648 で `status_row` を `SourceStatusTable` へ寄せても 227 行）。
+  # Thor のサブコマンドを 1 クラスに並べる形なので、分けるならサブコマンド単位になる。
   class SourceCommand < Thor # rubocop:disable Metrics/ClassLength
     include Package
 
@@ -24,11 +26,13 @@ module TomatoShrieker
     method_option :json, type: :boolean, default: false, desc: '/status.json の sources[] と同じキーで出す'
     method_option :all, type: :boolean, default: false, desc: '無効ソースも出す'
     def status(id = nil)
-      rows = status_sources(id).map {|source| status_row(source)}
+      rows = status_sources(id).map {|source| SourceStatusTable.row(source)}
       rows.select! {|v| v[:problems].any?} if options[:problems]
       rows = SourceStatusTable.sort(rows, options[:sort]) if options[:sort]
       return puts(JSON.pretty_generate(rows.map {|v| v[:status]})) if options[:json]
       print_table(SourceStatusTable.lines(rows))
+      # ⚠ 理由は stderr へ（表を機械で読む側を汚さない。`--json` は `error` キーに載る）
+      SourceStatusTable.failures(rows).each {|v| say_error(v)}
     end
 
     desc 'collisions', '同じ秒に発火したソースの群を run_log の実績から表示'
@@ -37,6 +41,7 @@ module TomatoShrieker
     method_option :hours, type: :numeric, default: 24, desc: '遡る時間'
     def collisions
       hours = options[:hours]
+      raise Thor::Error, '--hours は正の数を指定してください。' unless hours.positive?
       rows = SourceCollisions.find(hours:)
       return say("直近 #{hours} 時間に同じ秒の発火はありません。") if rows.empty?
       print_table([['COUNT', 'LAST', 'SOURCES']] + rows.map do |v|
@@ -223,23 +228,6 @@ module TomatoShrieker
       return [find_source!(id)] if id
       return Source.all if options[:all]
       return Source.all.reject(&:disable?)
-    end
-
-    # 1 ソースの失敗で全体を落とさない。壊れた側は `build_failed` として見せる
-    # （`MonitorApp#source_status` と同じ形の行を返す）。
-    def status_row(source)
-      status = SourceStatus.build(source)
-      # ⚠ **`disabled` は表示用の目印で、`problems` に混ぜない（#1638 の Codex P2）。**
-      # 無効ソースの healthz は 200 なので、混ぜると `--problems --all` が 200 のものを出す。
-      return {status:, problems: SourceStatus.problems(source), disabled: source.disable?}
-    rescue => e
-      return {
-        status: {id: source.id, class: source.class.to_s, error: Package.error_message(e)},
-        # ⚠ **無効・監視対象外は例外の経路でも免除する（#1638 の Codex P2）。**healthz は
-        # 組み立てる前にこれらを 200 で返すので、ここで問題にすると食い違う。
-        problems: source.disable? || !source.monitored? ? [] : [:build_failed],
-        disabled: source.disable?,
-      }
     end
 
     def nothing_to_ack_message(id)
