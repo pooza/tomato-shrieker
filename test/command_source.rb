@@ -89,6 +89,26 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **同じ定義から何度作っても `secrets` が変わらない（4.14.0 リリース前レビュー）。**
+    # ⚠ `/source/env` の Hash をそのまま `CommandLine` に渡すと、`BUNDLE_GEMFILE` / `RACK_ENV` が
+    # 定義の側へ書き戻り、2 個目から Gemfile のパスや `production` まで伏せていた。
+    def test_command_does_not_mutate_source_env
+      params = secret_params
+      first = CommandSource.new(params).command.secrets
+      second = CommandSource.new(params).command.secrets
+
+      assert_equal(first, second)
+      assert_equal(['DEBUG', 'PUSH_URL'], params.dig('source', 'env').keys.sort)
+    end
+
+    # ⚠ stderr が空（nil ではない）でも、stdout に書かれた理由を例外メッセージに載せる。
+    def test_exec_reports_stdout_when_stderr_is_empty
+      source = build_secret_source('echo "only on stdout"; exit 2')
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_include(error.message, 'only on stdout')
+    end
+
     # ⚠ 短い値まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる。
     def test_command_secrets_skips_short_values
       assert_not_include(build_secret_source.command.secrets, '1')
@@ -108,8 +128,12 @@ module TomatoShrieker
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
 
     def build_secret_source(script = nil)
+      return CommandSource.new(secret_params(script))
+    end
+
+    def secret_params(script = nil)
       script ||= "notify #{SECRET_HOOK} #{SECRET_TOKEN} #{SECRET_ENV}"
-      return CommandSource.new(
+      return {
         'id' => '__test_command_secrets__',
         'source' => {'command' => script, 'env' => {'PUSH_URL' => SECRET_ENV, 'DEBUG' => '1'}},
         'schedule' => {'every' => '1d'},
@@ -117,7 +141,7 @@ module TomatoShrieker
           'hooks' => [{'url' => SECRET_HOOK}],
           'mastodon' => {'url' => 'https://mastodon.example.test', 'token' => SECRET_TOKEN},
         },
-      )
+      }
     end
 
     def build_source

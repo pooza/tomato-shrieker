@@ -49,10 +49,10 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 .claude/skills/deploy/scripts/verify.sh
 ```
 
-読むだけ。先頭コミットと版・`ActiveState` / `NRestarts`・`/healthz`・再起動の前からのソースの増減・ソースの内訳（success 以外と silent / undelivered の一覧）を出す。
+読むだけ。先頭コミットと版・`ActiveState` / `NRestarts`・`/healthz`・再起動の前からのソースの増減（控えの時刻つき）・ソースの内訳（success 以外と silent / undelivered の一覧）・いまの常駐が出したログのうち `redirect refused` / `process identity` / `not started` / `event dropped` の件数（どれも 0 が正常）を出す。
 
 - 版が上げたものになっていること、`ActiveEnterTimestamp` がいまの再起動であること、`NRestarts` が増えていないこと
-- ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む
+- ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む。⚠ **宛先のリダイレクト拒否（`redirect refused`）は、そのソースが次に配信したときに初めて出る**＝配信の少ないソース（本番 59 件のうち 26 件は直近 8 日に配信が無い・2026-10-11 実測）は、日を置いてもう一度見る
 - ログは `/var/log/tomato-shrieker.log`
 
 ## 注意

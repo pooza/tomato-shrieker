@@ -4,7 +4,7 @@ require 'json'
 require 'shellwords'
 
 module TomatoShrieker
-  # ⚠ ClassLength は外せていない（#1648 で `status_row` を `SourceStatusTable` へ寄せても 227 行）。
+  # ⚠ ClassLength は外せていない（#1648 で `status_row` を `SourceStatusTable` へ寄せても 200 行を超える）。
   # Thor のサブコマンドを 1 クラスに並べる形なので、分けるならサブコマンド単位になる。
   class SourceCommand < Thor # rubocop:disable Metrics/ClassLength
     include Package

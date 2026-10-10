@@ -9,6 +9,8 @@ ssh oscura 'curl -s -o /dev/null -w "healthz %{http_code}\n" http://127.0.0.1:45
 before="${TMPDIR:-/tmp}/tomato-shrieker-sources-before.txt"
 status=$(ssh oscura 'curl -s http://127.0.0.1:4567/status.json')
 if [ -e "$before" ]; then
+  # ⚠ 控えは前回のデプロイのものが残りうる。時刻を出して、今回のものかを目で確かめられるようにする
+  echo "控え: $(date -r "$before" '+%Y-%m-%d %H:%M:%S')"
   diff "$before" <(jq -r '.sources[].id' <<< "$status" | sort -u) && echo 'ソースの増減なし（再起動の前と同じ）' || true
 else
   echo '⚠ 再起動の前の控えが無い（pending_sources.sh を先に実行していない）＝増減は比べられない'
@@ -27,3 +29,11 @@ for v in sources:
             "silent", v["silent"], "undelivered", v["undelivered"],
         )
 ' <<< "$status"
+# いまの常駐（MainPID）が出したログから、この種の失敗を数える（どれも 0 が正常）。
+# ⚠ リダイレクトの拒否は、そのソースが次に配信を試みたときに初めて出る。再起動の直後は 0 でも、
+# 配信の少ないソースが一巡するまでもう一度見る。
+ssh oscura '
+  pid=$(systemctl show tomato-shrieker -p MainPID --value)
+  for word in "redirect refused" "process identity" "not started" "event dropped"; do
+    printf "%s: %s\n" "$word" "$(grep -F "tomato-shrieker[$pid]:" /var/log/tomato-shrieker.log | grep -cF "$word")"
+  done'
