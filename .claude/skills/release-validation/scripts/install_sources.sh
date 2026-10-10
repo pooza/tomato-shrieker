@@ -9,6 +9,8 @@ for f in "$src"/test-*.yaml; do
     echo "skip   $dest"
   else
     cp "$f" "$dest"
+    # ⚠ test-google-news-piefed.yaml には後で平文のパスワードを書き込む
+    chmod 600 "$dest"
     echo "create $dest"
   fi
 done

@@ -15,7 +15,7 @@ disable-model-invocation: true
 | --- | --- |
 | セキュリティ | `/security-review` スキル。Webhook URL/トークン取り扱い・暗号化・Sentry/ログのシークレット scrub・フィード入力（RSS/nokogiri パース）の検証 |
 | 設定・宛先契約 | ソース定義 YAML スキーマ整合（`config/schema/source.yaml`・`base.yaml`）・各 Shrieker の dest 解釈・ginseng-fediverse/piefed/youtube interface・本家 API（Mastodon/Misskey/Nostr/LINE/Matrix/PieFed）呼び出しの正確性・ソース定義リファレンスや `/healthz` 仕様との齟齬 |
-| スケジューラ・ライフサイクル | rufus-scheduler の cron 駆動・`scheduler_daemon`・`source_run_log`・FeedItem 重複判定/entry 管理・Sequel 接続・CommandSource 子プロセス実行・seas(FreeBSD) daemon 駆動 |
+| スケジューラ・ライフサイクル | rufus-scheduler の cron 駆動・`scheduler_daemon`・`source_run_log`・Entry の重複判定と管理・Sequel 接続・CommandSource 子プロセス実行・oscura（Ubuntu / systemd）の daemon 駆動 |
 | エラー処理・観測性 | Sentry 計装（source/shrieker タグ）・`Ginseng::GatewayError` の scrub・`/healthz` の error_streak / WARN/NG 判定・ログの本文/個人情報漏洩チェック |
 | コーディングスタイル・規約整合性 | rubocop（+rubocop-sequel）・`rake config:lint`・設定のスラッシュ記法・2 スペースインデント・廃止語（lemmy 等） |
 

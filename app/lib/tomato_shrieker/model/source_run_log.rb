@@ -13,7 +13,7 @@ module TomatoShrieker
 
     dataset_module do
       def latest_for(source_id)
-        return where(source_id:).order(Sequel.desc(:executed_at)).first
+        return where(source_id:).order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
       end
 
       def recent_for(source_id, limit)

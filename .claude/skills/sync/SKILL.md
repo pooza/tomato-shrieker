@@ -13,7 +13,7 @@ description: セッション開始時の進捗同期。「進捗を同期して�
 ## 1. プロジェクトガイドの読み込み
 
 - `docs/CLAUDE.md` を読む（プロジェクトのルール・構造・履歴の正本）
-- 🔴 **`docs/` は 1 本ではない。**触る領域に応じて [monitoring.md](../../../docs/monitoring.md) / [sources.md](../../../docs/sources.md) / [daemon.md](../../../docs/daemon.md) も開く。⚠⚠ **自動ロードされるのは `CLAUDE.md` と `MEMORY.md` だけ**なので、**「書いていない」と判断する前に `grep -rn <語> docs/` でまとめて引く**
+- 🔴 **`docs/` は 1 本ではない。**触る領域に応じて [monitoring.md](../../../docs/monitoring.md) / [sources.md](../../../docs/sources.md) / [daemon.md](../../../docs/daemon.md) も開く。⚠⚠ **自動ロードされるのは `CLAUDE.md` と `MEMORY.md` だけ**なので、**「書いていない」と判断する前に `grep -rn <語> docs/ .claude/skills/` でまとめて引く**
 - `MEMORY.md` は自動ロードされるので、両者の整合性を意識する
 
 ## 2. リモートとの同期・状態確認
