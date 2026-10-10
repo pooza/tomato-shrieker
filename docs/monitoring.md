@@ -199,6 +199,14 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 `PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印で、**`--problems` には出ない**（無効ソースの healthz は 200）。
 
+⚠ **CLI だけが出す値が 1 つある: `build_failed`**（そのソースの状態を組み立てる途中で例外が出た）。理由は表の後に `<id>: <例外>` の形で **stderr** へ出す（`--json` では行の `error` キー）。⚠ 空の DB や migration 前の DB に向けると全行がこれになる（`no such table: source_run_log`）。⚠⚠ **healthz と食い違いうる。**`/healthz/source/:id` は判定材料しか読まないので、表示用の集計（`error_rate` など）だけが落ちる場合は healthz が 200 のまま、CLI は `build_failed` を出す＝ **`--problems` は「healthz が 503 のもの」＋「CLI が状態を組み立てられなかったもの」**。
+
+⚠ **CLI はディスク上の定義で答える。**daemon は読み込み済みの定義で走っているので、`source edit` / `disable` / `enable` の後・`source reload` の前に打つと、`/healthz/source/:id` と食い違う。
+
+⚠ **終了コードは、該当があっても 0。**`--problems` に何件出ても 0 で返す（`source validate` は NG で非 0 を返すが、こちらは問い合わせで検査ではない）。スクリプトで判定するなら `--problems --json | jq length` で数える。⚠ `--sort` に知らないキー・`collisions --hours` に 0 以下を渡したときは非 0。
+
+⚠ **`--json` は `problems` / `disabled` を持たない**（`/status.json` の `sources[]` と同じキーという約束どおり）。`--all --json` は無効ソースを印なしで混ぜるので、無効かどうかは表（`PROBLEMS` 列の `disabled`）で見る。
+
 ⚠ `collisions` は**定義ではなく run_log の実績**から見る。`every` の位相は起動時刻で決まるので、定義を突き合わせても同時発火は分からない。
 
 ### 設定

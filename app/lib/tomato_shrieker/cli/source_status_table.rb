@@ -18,9 +18,38 @@ module TomatoShrieker
 
     HEADER = ['ID', 'CLASS', 'SCHEDULE', 'LAST', 'STREAK', 'ERR24H', 'DELIVERED', 'PROBLEMS'].freeze
 
+    # ⚠ **`--sort` を値なしで渡すと Thor の enum 検査をすり抜ける (#1648)。**
+    # 知らないキーは `Thor::Error` にする（nil を `call` して NoMethodError で落ちていた）。
     def self.sort(rows, name)
-      key = SORTS[name]
+      key = SORTS.fetch(name) do
+        raise Thor::Error, "--sort は #{SORTS.keys.join(' / ')} のいずれかを指定してください。"
+      end
       return rows.sort_by {|v| [key.call(v[:status]), v[:status][:id]]}
+    end
+
+    # 1 ソースの失敗で全体を落とさない。壊れた側は `build_failed` として見せる
+    # （`MonitorApp#source_status` と同じ形の行を返す）。
+    def self.row(source)
+      status = SourceStatus.build(source)
+      # ⚠ **`disabled` は表示用の目印で、`problems` に混ぜない（#1638 の Codex P2）。**
+      # 無効ソースの healthz は 200 なので、混ぜると `--problems --all` が 200 のものを出す。
+      return {status:, problems: SourceStatus.problems(source), disabled: source.disable?}
+    rescue => e
+      return {
+        status: {id: source.id, class: source.class.to_s, error: Package.error_message(e)},
+        # ⚠ **無効・監視対象外は例外の経路でも免除する（#1638 の Codex P2）。**healthz は
+        # 組み立てる前にこれらを 200 で返すので、ここで問題にすると食い違う。
+        problems: source.disable? || !source.monitored? ? [] : [:build_failed],
+        disabled: source.disable?,
+      }
+    end
+
+    # 組み立てに失敗した行の理由 (#1648)。⚠ 表には `build_failed` としか出ないので、
+    # 理由（空の DB に向けたときの `no such table` など）は別に出す。
+    def self.failures(rows)
+      return rows.filter_map do |v|
+        "#{v[:status][:id]}: #{v[:status][:error]}" if v[:status][:error]
+      end
     end
 
     def self.lines(rows)
