@@ -38,10 +38,13 @@ module TomatoShrieker
       title = template.to_s.gsub(/[\r\n[:blank:]]+/, ' ')
       title.ellipsize!(TomatoShrieker::Config.instance['/piefed/subject/max_length'])
       template[:tag] = true
-      community_id = template.source['/dest/piefed/community_id']
-      data = {title:, body: template.to_s, community_id:}
-      Ginseng::URI.scan(data[:body]).each {|uri| data[:body].gsub!(uri.to_s, '')}
-      uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
+      # ⚠ **本文の描画は 1 回だけ（#1664 の Codex P2）。**タグ付きの描画は `create_tags` を通り、
+      # リモートタグ付けが有効ならモロヘイヤへ問い合わせる。URL は消す前に控えておく。
+      body = template.to_s
+      uris = Ginseng::URI.scan(body).to_a
+      uris.each {|uri| body.gsub!(uri.to_s, '')}
+      data = {title:, body:, community_id: template.source['/dest/piefed/community_id']}
+      uri = (template.entry || template.source).uri rescue uris.first
       data[:url] = uri.to_s if uri
       return data
     end
