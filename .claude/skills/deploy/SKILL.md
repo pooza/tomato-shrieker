@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: 本番（oscura）へのデプロイ。再起動で増減するソースの確認、本体とサテライト 3 本の pull と bundle install、起動で倒れる定義の検査、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
+description: 本番（oscura）へのデプロイ。本体とサテライト 3 本の pull と bundle install、再起動で増減するソースと起動で倒れる定義の確認、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
 disable-model-invocation: true
 ---
 
@@ -11,23 +11,7 @@ disable-model-invocation: true
 
 本番は oscura（Ubuntu / systemd）、実行ユーザー `deploy`、チェックアウトは `/home/deploy/repos/tomato-shrieker`。デプロイ対象は **`main` ブランチ**（develop は本番へデプロイしない）。🔴 **本番に出す＝リリースする。**タグを打っていない版を出さない（[release スキル](../release/SKILL.md) の 5. の後に行う）。
 
-## 1. 再起動で増減するソースの確認
-
-```sh
-.claude/skills/deploy/scripts/pending_sources.sh
-```
-
-読むだけ。稼働中のソース（`/status.json`）と、ディスク上の有効な定義（`bin/shrieker source status --json`）を突き合わせる。
-
-🔴 **pull より前に実行する。**`source status` は DB を読むので、pull した後（新しいコード・古いスキーマ）に叩くと、マイグレーションが要る版では落ちる（下の「順序は pull → 再起動 → CLI」と同じ理由）。ソース定義は git 管理外なので、pull の前後で答えは変わらない。
-
-🔴 **再起動は、ディスクに置かれたまま reload されていないソース定義を全部読み込む。**4.13.0 のデプロイでは保留中の定義 3 件が有効になり、56 → 59 ソースになった（発火前に無効化したので投稿は出ていない）。
-
-- `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
-- `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
-- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。5. の `verify.sh` がこれと比べて増減を出す
-
-## 2. pull と bundle install
+## 1. pull と bundle install
 
 ```sh
 .claude/skills/deploy/scripts/pull.sh
@@ -35,25 +19,31 @@ disable-model-invocation: true
 
 本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
 
-## 3. 起動で倒れる定義の検査
+## 2. 再起動で増減するソースと、起動で倒れる定義の確認
 
 ```sh
-.claude/skills/deploy/scripts/unstartable_sources.sh
+.claude/skills/deploy/scripts/pending_sources.sh
 ```
 
-読むだけ。`source reload` の拒否と同じ検査（`SourceValidator.startup_errors`）を、**pull した後のコードで**通す。DB には触らない。
+読むだけ。稼働中のソース（`/status.json`）と、ディスク上の有効な定義（生の `/sources`）を突き合わせ、あわせて `source reload` の拒否と同じ検査（`SourceValidator.startup_errors`）を通す。
 
-- 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**直すか `bin/shrieker source disable <id>` してからやり直す
-- ⚠ **1. の突き合わせでは見えない。**reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる
-- ⚠ **pull の前にやっても足りない。**再起動で走るのは新しいコードなので、古いコードの検査を通った定義が新しい版で倒れうる
+🔴 **再起動は、ディスクに置かれたまま reload されていないソース定義を全部読み込む。**4.13.0 のデプロイでは保留中の定義 3 件が有効になり、56 → 59 ソースになった（発火前に無効化したので投稿は出ていない）。
 
-## 4. 再起動
+- `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
+- `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
+- 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**起動で倒れる定義が残っている。reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる。直すか `disable` してからやり直す
+- ⚠ 増減があるだけなら 0 で終わる（失敗ではなく、確かめる対象）
+- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
+
+🔴 **pull の後・再起動の前に実行する。**再起動で走るのは pull した後のコードなので、定義も同じコードで読む（新しい版で増えたソース種別の定義や、新しい版の検査で倒れる定義は、古いコードからは見えない）。⚠ **DB を読む CLI（`source status` など）は使っていない** — この時点のスキーマは古く、マイグレーションが要る版では落ちる（下の「順序は pull → 再起動 → CLI」）。
+
+## 3. 再起動
 
 ```sh
 ssh oscura 'sudo systemctl restart tomato-shrieker'
 ```
 
-## 5. 確認
+## 4. 確認
 
 ```sh
 .claude/skills/deploy/scripts/verify.sh
