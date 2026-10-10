@@ -76,6 +76,19 @@ module TomatoShrieker
       assert_not_include(command.send(:masked_env).values.join, SECRET_ENV)
     end
 
+    # ⚠ **`CommandLine#to_s` は引数を shellescape して出す**（`?` → `\?`）。上流の `masked` は
+    # 生の形と shellescape した形の両方を当てるので、メタ文字入りの URL も伏せられる
+    # （#1662 の Codex P1 への回答。`SECRET_ENV` に `?` `=` `&` を入れてある）。
+    def test_command_masks_shell_escaped_secrets
+      [build_secret_source, build_secret_source(['notify', "--url=#{SECRET_ENV}"])].each do |source|
+        line = source.command.to_s
+
+        assert_include(line, '\\?status\\=up\\&msg\\=OK', 'shellescape された形でログに出る前提が崩れている')
+        assert_not_include(source.command.masked(line), 'AbCdEf123456')
+        assert_not_include(source.command.masked(line), 'status')
+      end
+    end
+
     # ⚠ 短い値まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる。
     def test_command_secrets_skips_short_values
       assert_not_include(build_secret_source.command.secrets, '1')
@@ -90,7 +103,7 @@ module TomatoShrieker
       assert_not_include(error.message, SECRET_ENV)
     end
 
-    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456'.freeze
+    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
 
