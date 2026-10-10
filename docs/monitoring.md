@@ -189,7 +189,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 ```sh
 bin/shrieker source status                    # 1 ソース 1 行（無効ソースは --all で出る）
-bin/shrieker source status --problems         # /healthz/source/:id が 503 になるものだけ
+bin/shrieker source status --problems         # /healthz/source/:id が 503 になるものだけ（あれば終了コード 1）
 bin/shrieker source status --sort=error_rate  # error_rate / last_delivered / streak
 bin/shrieker source status --json             # /status.json の sources[] と同じキー
 bin/shrieker source collisions --hours=24     # 同じ秒に発火したソースの群
@@ -203,7 +203,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 ⚠ **CLI はディスク上の定義で答える。**daemon は読み込み済みの定義で走っているので、`source edit` / `disable` / `enable` の後・`source reload` の前に打つと、`/healthz/source/:id` と食い違う。
 
-⚠ **終了コードは、該当があっても 0。**`--problems` に何件出ても 0 で返す（`source validate` は NG で非 0 を返すが、こちらは問い合わせで検査ではない）。スクリプトで判定するなら `--problems --json | jq length` で数える。⚠ `--sort` に知らないキー・`collisions --hours` に 0 以下を渡したときは非 0。
+🔴 **`--problems` は、該当が 1 件でもあれば終了コード 1 で終わる**（`--json` を付けても同じ。`source validate` が NG で非 0 を返すのと揃えた。stderr に `N source(s) have problems.` を 1 行出す）。該当が無ければ 0＝ `bin/shrieker source status --problems || 通知` の形で使える。⚠ **`--problems` を付けない一覧は、赤いソースがあっても 0**（一覧を出しただけ）。⚠ `--sort` に知らないキー・`collisions --hours` に 0 以下を渡したときも非 0。
 
 ⚠ **`--json` は `problems` / `disabled` を持たない**（`/status.json` の `sources[]` と同じキーという約束どおり）。`--all --json` は無効ソースを印なしで混ぜるので、無効かどうかは表（`PROBLEMS` 列の `disabled`）で見る。
 
