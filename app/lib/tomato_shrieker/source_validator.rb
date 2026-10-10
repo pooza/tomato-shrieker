@@ -97,8 +97,8 @@ module TomatoShrieker
       def warnings(params)
         params = params.deep_stringify_keys
         return [] if params['disable'] == true
-        return [] if params.dig('schedule', 'at')
-        messages = []
+        messages = insecure_dest_warnings(params)
+        return messages if params.dig('schedule', 'at')
         unless params.dig('monitor', 'silence_tolerance')
           messages.push('/monitor/silence_tolerance が未設定です。無配信が続いても検知されません')
         end
@@ -106,6 +106,32 @@ module TomatoShrieker
       end
 
       private
+
+      # 🔴 **投稿はリダイレクトを追わない（ginseng-core 2.0.0 / ginseng-fediverse 3.0.0）。**
+      # `http://` で書いた宛先が 307 / 308 で https へ飛ばす構成だと、3xx がそのまま
+      # `GatewayError` になり、投稿が全部 error になる (#1625)。
+      #
+      # ⚠ **NG ではなく WARN にする。**スキーマ上は妥当で、リダイレクトを返さない
+      # `http://` の宛先（LAN 内の中継など）はそのまま動く。
+      # ⚠ **メッセージにはホストまでしか出さない。**webhook の URL はパスに digest を持つ。
+      def insecure_dest_warnings(params)
+        dest = params['dest']
+        return [] unless dest.is_a?(Hash)
+        urls = {}
+        Array(dest['hooks']).each_with_index do |hook, i|
+          next urls["/dest/hooks/#{i}"] = hook unless hook.is_a?(Hash)
+          urls["/dest/hooks/#{i}/url"] = hook['url']
+        end
+        ['mastodon', 'misskey'].each do |key|
+          urls["/dest/#{key}/url"] = dest.dig(key, 'url') if dest[key].is_a?(Hash)
+        end
+        return urls.filter_map do |key, url|
+          next unless url.to_s.match?(%r{\Ahttp://}i)
+          host = Ginseng::URI.parse(url.to_s).host rescue nil
+          "#{key} が http:// です（#{host}）。投稿はリダイレクトを追わないので、" \
+            'https へ転送される宛先では投稿がすべて error になります。https:// で書いてください'
+        end
+      end
 
       # ⚠⚠ **`Source#register` の優先順（`at` > `cron` > `every`）に合わせて、
       # 実際に使われる 1 本だけを見る（#1570 の Codex P2）。**スキーマは複数キーを
