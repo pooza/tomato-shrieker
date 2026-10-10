@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: 本番（oscura）へのデプロイ。本体とサテライト 3 本の pull と bundle install、再起動で増減するソースの確認、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
+description: 本番（oscura）へのデプロイ。再起動で増減するソースの確認、本体とサテライト 3 本の pull と bundle install、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
 disable-model-invocation: true
 ---
 
@@ -11,15 +11,7 @@ disable-model-invocation: true
 
 本番は oscura（Ubuntu / systemd）、実行ユーザー `deploy`、チェックアウトは `/home/deploy/repos/tomato-shrieker`。デプロイ対象は **`main` ブランチ**（develop は本番へデプロイしない）。🔴 **本番に出す＝リリースする。**タグを打っていない版を出さない（[release スキル](../release/SKILL.md) の 5. の後に行う）。
 
-## 1. pull と bundle install
-
-```sh
-.claude/skills/deploy/scripts/pull.sh
-```
-
-本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
-
-## 2. 再起動で増減するソースの確認
+## 1. 再起動で増減するソースの確認
 
 ```sh
 .claude/skills/deploy/scripts/pending_sources.sh
@@ -27,11 +19,21 @@ disable-model-invocation: true
 
 読むだけ。稼働中のソース（`/status.json`）と、ディスク上の有効な定義（`bin/shrieker source status --json`）を突き合わせる。
 
+🔴 **pull より前に実行する。**`source status` は DB を読むので、pull した後（新しいコード・古いスキーマ）に叩くと、マイグレーションが要る版では落ちる（下の「順序は pull → 再起動 → CLI」と同じ理由）。ソース定義は git 管理外なので、pull の前後で答えは変わらない。
+
 🔴 **再起動は、ディスクに置かれたまま reload されていないソース定義を全部読み込む。**4.13.0 のデプロイでは保留中の定義 3 件が有効になり、56 → 59 ソースになった（発火前に無効化したので投稿は出ていない）。
 
 - `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
 - `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
 - ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
+
+## 2. pull と bundle install
+
+```sh
+.claude/skills/deploy/scripts/pull.sh
+```
+
+本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
 
 ## 3. 再起動
 
