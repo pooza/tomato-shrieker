@@ -19,16 +19,7 @@ module TomatoShrieker
       # 投稿しないケース（設定の読み込み・`source list`・テストの初期化）でも
       # PieFed の認証 API を叩き、レートリミット (429) を踏みやすくなる。
       login
-      template = create_piefed_template(body[:template])
-      data = {
-        title: template.to_s.gsub(/[\r\n[:blank:]]+/, ' '),
-        body: template.to_s,
-        community_id: template.source['/dest/piefed/community_id'],
-      }
-      Ginseng::URI.scan(data[:body]).each {|uri| data[:body].gsub!(uri.to_s, '')}
-      data[:title].ellipsize!(TomatoShrieker::Config.instance['/piefed/subject/max_length'])
-      uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
-      data[:url] = uri.to_s if uri
+      data = post_data(create_piefed_template(body[:template]))
       return http.post("/api/#{api_version}/post", {
         body: data,
         headers: {'Authorization' => "Bearer #{@jwt}"},
@@ -37,16 +28,25 @@ module TomatoShrieker
 
     private
 
-    # ⚠ **タグは付けない。明示する (#1484)。**以前は立てずに描画していたので、同じソースに
-    # 他の宛先があると、その並び順でタグが付いたり落ちたりしていた（単独なら付かない）。
-    # ⚠ 描画結果は `title` にも使う（空白を潰した 1 行）ので、付けるとタイトルにタグが並ぶ。
-    def create_piefed_template(original)
-      template = piefed_template(original)
+    # 🔴 **タグは本文にだけ付け、タイトルには付けない。どちらも明示する (#1484)。**
+    #
+    # 以前は `[:tag]` を立てずに描画していたので、同じソースに他の宛先があると、その並び順で
+    # タグが付いたり落ちたりしていた（単独なら付かない・Mastodon / Misskey と併用なら付く）。
+    # ⚠ タイトルは描画結果の空白を潰した 1 行なので、同じ描画を使うとタイトルにタグが並ぶ。
+    def post_data(template)
       template[:tag] = false
-      return template
+      title = template.to_s.gsub(/[\r\n[:blank:]]+/, ' ')
+      title.ellipsize!(TomatoShrieker::Config.instance['/piefed/subject/max_length'])
+      template[:tag] = true
+      community_id = template.source['/dest/piefed/community_id']
+      data = {title:, body: template.to_s, community_id:}
+      Ginseng::URI.scan(data[:body]).each {|uri| data[:body].gsub!(uri.to_s, '')}
+      uri = (template.entry || template.source).uri rescue Ginseng::URI.scan(template.to_s).first
+      data[:url] = uri.to_s if uri
+      return data
     end
 
-    def piefed_template(original)
+    def create_piefed_template(original)
       source = original.source
       piefed_template_name = source['/dest/piefed/template']
       return original unless piefed_template_name

@@ -99,5 +99,30 @@ module TomatoShrieker
       end
       assert_not_requested(evil)
     end
+
+    # 🔴 **#1484: タグは本文にだけ付き、タイトルには付かない。他の宛先に左右されない。**
+    # ⚠ 以前は `[:tag]` を立てずに描画していたので、単独なら付かず、Mastodon / Misskey と
+    # 併用なら付き、Line と併用なら落ちていた。
+    def test_post_data_tags_body_only
+      [nil, true, false].each do |leaked|
+        template = tagged_source.create_template(:default, 'フィクスチャの本文')
+        template[:tag] = leaked
+        data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+        assert_include(data[:body], '#fixture_tag', "body（前の宛先のフラグ: #{leaked.inspect}）")
+        assert_not_include(data[:title], '#fixture_tag', "title（前の宛先のフラグ: #{leaked.inspect}）")
+        assert_include(data[:title], 'フィクスチャの本文')
+        assert_equal(1, data[:community_id])
+      end
+    end
+
+    def tagged_source
+      return TextSource.new(
+        'id' => '__test_piefed_tags__',
+        'source' => {'text' => 'フィクスチャの本文'},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'tags' => ['fixture_tag'], 'piefed' => PARAMS.transform_keys(&:to_s)},
+      )
+    end
   end
 end
