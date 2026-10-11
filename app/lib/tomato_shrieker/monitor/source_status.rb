@@ -54,7 +54,10 @@ module TomatoShrieker
         # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
         # ⚠ opt-in の silent? と違い、しきい値の設定なしに常時有効。
         # 判定は Source 側に寄せてある。
-        undelivered: (source.undelivered_log if source.undelivered?),
+        # ⚠ **真偽値で持つ (#1509)。**他の判定（stale / errored / silent）と形を揃える。
+        # 503 本文に出す根拠の行は別のキーで渡す。
+        undelivered: source.undelivered?,
+        undelivered_log: source.undelivered_log,
       }
     end
 
