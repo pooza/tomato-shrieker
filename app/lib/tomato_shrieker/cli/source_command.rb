@@ -26,7 +26,7 @@ module TomatoShrieker
     method_option :json, type: :boolean, default: false, desc: '/status.json の sources[] と同じキーで出す'
     method_option :all, type: :boolean, default: false, desc: '無効ソースも出す'
     def status(id = nil)
-      rows = status_sources(id).map {|source| SourceStatusTable.row(source)}
+      rows = status_rows(id)
       rows.select! {|v| v[:problems].any?} if options[:problems]
       rows = SourceStatusTable.sort(rows, options[:sort]) if options[:sort]
       print_status(rows)
@@ -231,6 +231,19 @@ module TomatoShrieker
 
     # ⚠ **無効ソースは既定で出さない**（`/status.json` と同じ扱い）。ID を指定したら
     # 無効でも出す（止めたことの確認に使う）。
+    # ⚠ **unmatched な定義も行として出す (#1605)。**`Source.all` には現れないので、
+    # 足さないと「読めない定義」が一覧から黙って消える（`/status.json` と同じ形にする）。
+    def status_rows(id)
+      unmatched = Source.unmatched_ids
+      # ⚠ 読めない定義を先に見る（healthz と同じ順。同じ id の読める定義があっても 503）。
+      return [SourceStatusTable.unmatched_row(id)] if id && unmatched.include?(id)
+      # ⚠ 1 つの id に行は 1 つ（`/status.json` と同じ。読めない定義が勝つ）。
+      rows = status_sources(id).reject {|source| unmatched.include?(source.id)}
+        .map {|source| SourceStatusTable.row(source)}
+      rows.concat(unmatched.uniq.map {|v| SourceStatusTable.unmatched_row(v)}) unless id
+      return rows
+    end
+
     def status_sources(id)
       return [find_source!(id)] if id
       return Source.all if options[:all]

@@ -27,6 +27,14 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
 
+##### 定義は在るが読めないソース (#1605)
+
+判別キー（`source/feed` など）を打ち間違えた定義（unmatched）は、どのソースクラスにも一致しないので `Source.all` に現れない。⚠ **それでも reload は古いジョブを残す（#1572）ので、古い定義のまま走り続けている。**
+
+- `/healthz/source/:id` は **503**（本文 `no source class matched (unmatched definition): <id>`）。⚠ 4.14.0 までは 404 `Unknown source` で、意図的な削除や URL の打ち間違いと区別が付かなかった。**404 は本当に定義が無いときだけ**
+- `/status.json` には `{id, class: null, error}` の行が残る（4.14.0 までは行ごと消えた）。`source status` の `PROBLEMS` 列は `unmatched`
+- ⚠ `disable: true` の定義は対象外（止めたのだから問題にしない＝ 404・行なし）
+
 ##### まだ走っていないソース (#1560)
 
 run が 1 行も無いソースは、**初回の実行期限**までは 200（本文は `OK (awaiting first run, due by <期限>)`）、期限を過ぎても走っていなければ 503（`No run recorded yet` と `first_run_deadline:`）。
@@ -220,7 +228,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
 
-`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` と `awaiting_first_run`（#1560）は問題ではなく目印で、**`--problems` には出ない**（どちらも healthz は 200）。
+`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run` / `unmatched`（判定材料を見るまでもなく 503。`unmatched` は #1605）。`disabled` と `awaiting_first_run`（#1560）は問題ではなく目印で、**`--problems` には出ない**（どちらも healthz は 200）。
 
 ⚠ **CLI だけが出す値が 1 つある: `build_failed`**（そのソースの状態を組み立てる途中で例外が出た）。理由は表の後に `<id>: <例外>` の形で **stderr** へ出す（`--json` では行の `error` キー）。⚠ 空の DB や migration 前の DB に向けると全行がこれになる（`no such table: source_run_log`）。⚠⚠ **healthz と食い違いうる。**`/healthz/source/:id` は判定材料しか読まないので、表示用の集計（`error_rate` など）だけが落ちる場合は healthz が 200 のまま、CLI は `build_failed` を出す＝ **`--problems` は「healthz が 503 のもの」＋「CLI が状態を組み立てられなかったもの」**。
 

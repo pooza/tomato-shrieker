@@ -580,9 +580,13 @@ module TomatoShrieker
       return @silence_baseline_entry
     end
 
-    def self.all
-      return enum_for(__method__) unless block_given?
-      config['/sources'].each do |entry|
+    # ⚠ **`entries` を渡すと、その一覧から作る (#1605)。**`all` と `unmatched_ids` を続けて
+    # 呼ぶ側は、同じ一覧を両方へ渡すこと。⚠ 別々に `config['/sources']` を読むと、間に
+    # reload が挟まったとき、読めるソースと読めない定義が**別の時点の設定**になる
+    # （`Config#load` は一覧を新しい配列で差し替えるので、控えた配列は変わらない）。
+    def self.all(entries = config['/sources'])
+      return enum_for(__method__, entries) unless block_given?
+      entries.each do |entry|
         source_entry = entry.key_flatten
         classes.each do |source_class|
           yield source_class[:class].new(entry) if source_entry[source_class[:config]]
@@ -605,8 +609,8 @@ module TomatoShrieker
     # 止めた定義は `desired_sources` が弾くので、判別キーが壊れていても起動は倒れない
     # はず。ここに含めると **reload は古いジョブを守り続け、起動は倒れる**＝
     # 「直せないなら disable」という逃げ道が unmatched にだけ効かない。
-    def self.unmatched_ids
-      return config['/sources'].filter_map do |entry|
+    def self.unmatched_ids(entries = config['/sources'])
+      return entries.filter_map do |entry|
         entry_id(entry) unless entry['disable'] == true || matched?(entry)
       end
     end
@@ -631,8 +635,8 @@ module TomatoShrieker
       end
     end
 
-    def self.create(id)
-      return all.find {|v| v.id == id}
+    def self.create(id, entries = config['/sources'])
+      return all(entries).find {|v| v.id == id}
     end
 
     def fedi_sanitize(message)

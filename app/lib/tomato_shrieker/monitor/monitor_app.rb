@@ -47,7 +47,12 @@ module TomatoShrieker
     end
 
     def build_healthz_source(source_id)
-      source = Source.create(source_id)
+      # 🔴 **読めない定義を先に見る（#1682 の Codex P1）。**⚠ 同じ id の定義が 2 つあって
+      # 片方だけ読めないと、`Source.create` は読める側を返す＝ 200 になってしまう。
+      # ⚠ 一覧は 1 回だけ控えて両方に使う（同 P2）。
+      entries = Source.config['/sources']
+      return unmatched_response(source_id) if Source.unmatched_ids(entries).include?(source_id)
+      source = Source.create(source_id, entries)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
       # 意図的に止めたソースを「壊れている」と混同しない (#1503)。
       return [200, HEADERS, ["OK (disabled)\n"]] if source.disable?
@@ -62,6 +67,13 @@ module TomatoShrieker
       checks = source_checks(source, latest)
       return [200, HEADERS, ["OK\n"]] unless unhealthy?(checks)
       return [503, HEADERS, [unhealthy_body(source, latest, checks)]]
+    end
+
+    # 🔴 **「定義が無い」と「定義は在るが読めない」を分ける (#1605)。**判別キーを打ち
+    # 間違えた定義（unmatched）は `Source.all` に現れないが、消したわけではない。
+    # ⚠ 503 にする＝ cron を壊した定義（`failed`）と同じ扱い。404 は本当に無いときだけ。
+    def unmatched_response(source_id)
+      return [503, HEADERS, ["#{SourceStatus::UNMATCHED_ERROR}: #{source_id}\n"]]
     end
 
     # 🔴 **「まだ走っていない」と「壊れている」を分ける (#1560)。**初回の実行期限までは
@@ -156,7 +168,17 @@ module TomatoShrieker
     end
 
     def status_json
-      sources = Source.all.reject(&:disable?).map {|s| source_status(s)}
+      # 🔴 **一覧は 1 回だけ控える（#1682 の Codex P2）。**約 900ms かかる (#1472) ので、
+      # 途中で reload が挟まりうる。別々に読むと、読めなくなった定義が「古い健全な行」と
+      # 「新しい error の行」の両方に出たり、直した定義がどちらにも出なかったりする。
+      entries = Source.config['/sources']
+      # ⚠ **1 つの id に行は 1 つ。読めない定義が勝つ（#1682 の Codex P2・2 巡目）。**同じ id の
+      # 読める定義の行も並べると、id で引く消費者が健全な行を先に拾う（healthz は 503 なのに）。
+      unmatched = Source.unmatched_ids(entries)
+      sources = Source.all(entries).reject {|s| s.disable? || unmatched.include?(s.id)}
+        .map {|s| source_status(s)}
+      # #1605: 読めない定義も行として残す（消えると、Kuma に無いソースでは誰も気づけない）。
+      sources.concat(unmatched.uniq.map {|id| SourceStatus.unmatched(id)})
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,

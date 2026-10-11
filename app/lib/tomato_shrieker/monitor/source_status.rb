@@ -77,6 +77,19 @@ module TomatoShrieker
       return problems_of(checks(source, latest))
     end
 
+    UNMATCHED_ERROR = 'no source class matched (unmatched definition)'.freeze
+
+    # 🔴 **判別キーがどのソースクラスにも一致しない定義（unmatched）の行 (#1605)。**
+    #
+    # `Source.all` に 1 件も現れないので、何もしないと `/status.json` から**行ごと消え**、
+    # `/healthz/source/:id` は **404**（意図的な削除や URL の打ち間違いと区別が付かない）。
+    # ⚠⚠ しかも reload は古いジョブを残す（#1572）ので、**古い定義のまま走り続けている**。
+    # ⚠ 形は組み立てに失敗した行（`{id, class, error}`）に揃える。class は決まらないので nil。
+    # ⚠ `disable: true` の定義は含めない（`Source.unmatched_ids` が外す）。
+    def self.unmatched(id)
+      return {id:, class: nil, error: UNMATCHED_ERROR}
+    end
+
     def initialize(source)
       @source = source
     end
