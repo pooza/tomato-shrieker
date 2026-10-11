@@ -80,7 +80,7 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 **沈黙を測る起点は「配信・確認・観測開始のうち最も新しいもの」(#1505)。**
 
 ```
-silent? = now > max(last_delivered_at, silence_acknowledged_at, observed_since) + silence_tolerance
+silent? = now > max(last_delivered_at, acknowledged_at, observed_since) + silence_tolerance
           ただし配信実績も確認記録も無く、まだ超えていなければ nil (= 判定不能・#1502)
 ```
 
@@ -92,7 +92,7 @@ bin/shrieker source ack ID
 
 🔴 **確認は「今回は問題なかった」の記録であって「今後も問題ない」の保証ではない。**起点が前に進むだけなので、**そこからさらに `silence_tolerance` が経過すれば再び赤になる**（「また 1 か月経ったけど、やっぱりおかしくない?」という念押し）。配信が再開すれば `last_delivered_at` が確認を追い越すので、確認記録は自然に無効化される。
 
-🔴 **`ack` は未達 (`undelivered`) にも効く (#1506)。**⚠ **消えるのは「確認したその試行」だけ**で、確認より後の試行で再び届かなければまた赤くなる（サイレント不発と同じ規則）。
+🔴 **`ack` は未達 (`undelivered`) にも効く (#1506)。**⚠ **消えるのは「確認したその試行」だけ**で、確認より後の試行で再び届かなければまた赤くなる（サイレント不発と同じ規則）。⚠⚠ **`silence_tolerance` が未設定のソースを確認すると、次に配信を試みるまで再警告されない**（宛先が死んだままでも、新着が来るまでは緑）。`ack` の出力がそう言う (#1567)。
 
 ⚠⚠ **「確定的な信号を運用者が消してよいのか」は判断した上でこうしている。**取りこぼしたエントリは**再送されないので、赤を放置しても失われたものは戻らない**。一方 **2026-09-05 の実測では 57 ソースのうち 17 件が 12 日間に配信試行ゼロ**で、逃げ道が無いと疎なソースは数週間 503 に貼り付く。**「いつも赤いモニター」は監視ごと信用されなくなる**ほうが害が大きい。
 
@@ -100,7 +100,7 @@ bin/shrieker source ack ID
 
 📌 **この仕組みがあるので `silence_tolerance` を保守的に丸める必要は無い。**偽陽性のコストが「設定を直す」から「1 回確認する」に下がる。
 
-⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `silence_acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。
+⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。⚠ **4.14.0 までのキー名は `silence_acknowledged_at`（#1567 で改名）。**確認は未達（`undelivered`）にも効くので、`undelivered: false` の理由もこのキーで読む。503 本文の行も同じ名前。内部の名前（`SilenceAck` クラス・`silence_ack` テーブル）は据え置いている。
 
 ソースの状況ごとの使い分け:
 
@@ -163,7 +163,7 @@ bin/shrieker source ack ID
       "silent": false,
       "silence_baseline": "2026-04-14T14:00:01+09:00",
       "silence_baseline_origin": "delivery",
-      "silence_acknowledged_at": null,
+      "acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"MastodonShrieker": 1}

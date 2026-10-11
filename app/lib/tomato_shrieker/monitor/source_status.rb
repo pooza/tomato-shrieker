@@ -119,7 +119,7 @@ module TomatoShrieker
         dest_count: @source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
-        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは silence_acknowledged_at で読む
+        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは acknowledged_at で読む
         undelivered: @source.undelivered?,
         # 🔴 **`attempted` から出す（4.8.0 リリース前レビュー）。**`latest` は
         # **直近の run** なので、no-op を挟むと **`last_attempted_at` は前の試行を
@@ -141,7 +141,10 @@ module TomatoShrieker
         silence_baseline_origin: @source.silence_baseline_origin,
         # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
         # false だが、それは健全だからではなく運用者が確認したから
-        silence_acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
+        # ⚠ **キーは `acknowledged_at` (#1567)。**確認はサイレント不発にも未達にも効く (#1506)
+        # ので、`silence_` を付けると「未達がなぜ緑なのか」を探す人が行き当たらない。
+        # ⚠ 内部の名前（`SilenceAck` / `silence_ack` テーブル）は据え置き。
+        acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(@source.id),
         **threshold_status(logs),
       )
