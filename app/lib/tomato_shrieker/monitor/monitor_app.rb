@@ -58,10 +58,23 @@ module TomatoShrieker
       # 「無効なら監視しない」で一括して片付く。
       return [503, HEADERS, ["No destination configured\n"]] unless source.dest?
       latest = SourceRunLog.latest_for(source_id)
-      return [503, HEADERS, ["No run recorded yet\n"]] unless latest
+      return no_run_response(source) unless latest
       checks = source_checks(source, latest)
       return [200, HEADERS, ["OK\n"]] unless unhealthy?(checks)
       return [503, HEADERS, [unhealthy_body(source, latest, checks)]]
+    end
+
+    # 🔴 **「まだ走っていない」と「壊れている」を分ける (#1560)。**初回の実行期限までは
+    # 200、過ぎても走っていなければ 503。⚠ 期限は本文に出す（なぜ緑／赤なのかを読める
+    # ようにする）。判定は `SourceStatus.problems` と同じ述語（`awaiting_first_run?`）。
+    def no_run_response(source)
+      deadline = source.first_run_deadline
+      if source.awaiting_first_run?
+        return [200, HEADERS, ["OK (awaiting first run, due by #{deadline.iso8601})\n"]]
+      end
+      body = +"No run recorded yet\n"
+      body << "first_run_deadline: #{deadline.iso8601}\n" if deadline
+      return [503, HEADERS, [body]]
     end
 
     def source_checks(source, latest)

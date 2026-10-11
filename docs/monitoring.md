@@ -21,10 +21,22 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 該当ソースが以下をすべて満たせば 200:
 
 - 配信先が 1 つ以上ある (`dest_count > 0`)
+- 1 度は走っている。**ただし足したばかりのソースは、初回の実行期限までは 200**（下の「まだ走っていないソース」）
 - 最終実行から `grace_seconds` 以内に走っている (stale でない)
 - 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
+
+##### まだ走っていないソース (#1560)
+
+run が 1 行も無いソースは、**初回の実行期限**までは 200（本文は `OK (awaiting first run, due by <期限>)`）、期限を過ぎても走っていなければ 503（`No run recorded yet` と `first_run_deadline:`）。
+
+- **期限 ＝ 定義ファイルの更新時刻から見た初回の発火予定 ＋ `grace_seconds`。**`every: 30m` なら更新時刻の 30 分後、`cron` なら更新時刻の次に来る発火時刻（日次なら最大 1 日）
+- 🔴 **期限なしで緑にはしない。**登録しただけで一度も走っていないソースが緑のまま残ると、#1504 で塞いだ「壊れているのに緑」へ戻る
+- ⚠ **起点は「scheduler が登録した時刻」ではない。**定義を置いてから `source reload` までに間が空くと、そのぶん早く期限が来る（＝この仕組みが入る前と同じ 503 になるだけで、緑に化ける方向には外れない）。⚠ 定義を書き換えると起点も動く
+- ⚠ daemon は最後に読み込んだとき（起動・`source reload`）の更新時刻で、CLI はいまのディスクの更新時刻で答える
+- `/status.json` の `first_run_deadline` で期限が読める（1 度でも走ったら `null`）。CLI の `PROBLEMS` 列には目印 `awaiting_first_run` が出る（問題ではないので `--problems` には出ない）
+- ⚠ `every` のソースは daemon の再起動で位相が変わる（初回は再起動の 1 周期後）。足した直後に再起動を挟むと、期限のほうが先に来ることがある
 
 **宛先の一部にだけ配信できていない状態を検知する (#1504)。**直近の「配信を試みた run」(`attempted_count > 0`) で `delivered_count < attempted_count` なら 503。
 
@@ -131,6 +143,7 @@ bin/shrieker source ack ID
       "schedule": {"type": "every", "value": "5m"},
       "grace_seconds": 600,
       "last_run_at": "2026-04-14T14:00:00+09:00",
+      "first_run_deadline": null,
       "next_run_at": "2026-04-14T14:05:00+09:00",
       "last_status": "success",
       "last_error": null,
@@ -207,7 +220,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
 
-`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印で、**`--problems` には出ない**（無効ソースの healthz は 200）。
+`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` と `awaiting_first_run`（#1560）は問題ではなく目印で、**`--problems` には出ない**（どちらも healthz は 200）。
 
 ⚠ **CLI だけが出す値が 1 つある: `build_failed`**（そのソースの状態を組み立てる途中で例外が出た）。理由は表の後に `<id>: <例外>` の形で **stderr** へ出す（`--json` では行の `error` キー）。⚠ 空の DB や migration 前の DB に向けると全行がこれになる（`no such table: source_run_log`）。⚠⚠ **healthz と食い違いうる。**`/healthz/source/:id` は判定材料しか読まないので、表示用の集計（`error_rate` など）だけが落ちる場合は healthz が 200 のまま、CLI は `build_failed` を出す＝ **`--problems` は「healthz が 503 のもの」＋「CLI が状態を組み立てられなかったもの」**。
 

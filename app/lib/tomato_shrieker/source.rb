@@ -403,6 +403,30 @@ module TomatoShrieker
       return after + Rufus::Scheduler.parse(period)
     end
 
+    # 🔴 **一度も走っていないソースの「初回の実行期限」(#1560)。**
+    #
+    # 足したばかりのソースは、初回の実行が来るまで run_log が 1 行も無い。それを
+    # 「壊れている」と同じ 503 にすると、**ソースを足すたびに最大 1 周期ぶん赤くなる**
+    # （30 分間隔のソースを 17 本足して 16 本が一斉に鳴った）。
+    #
+    # ⚠ **起点は定義ファイルの更新時刻。**そこから見た初回の発火予定＋猶予までは待つ。
+    # ⚠⚠ **期限を過ぎても走っていなければ、従来どおり 503。**期限なしで緑に倒すと、
+    # 登録しただけで一度も走っていないソースが緑のまま残る（#1504 で塞いだ形へ戻る）。
+    # ⚠ 定義を置いてから reload までに間が空くと、そのぶん早く期限が来る＝従来と同じ
+    # 503 になるだけで、緑に化ける方向には外れない。
+    # ⚠ ファイルから読んでいないソース（`Source.new` で直に作ったもの）と `post_at` は nil。
+    def first_run_deadline
+      return nil unless (defined_at = Config.instance.source_defined_at(id))
+      return nil unless (due = next_run_at(defined_at))
+      return due + monitor_grace_seconds
+    end
+
+    # run_log が無く、まだ初回の実行期限の内にいるか。⚠ run_log の有無は呼び出し側が見る。
+    def awaiting_first_run?
+      return false unless (deadline = first_run_deadline)
+      return Time.now <= deadline
+    end
+
     def monitor_grace_seconds
       return nil if post_at
       override = self['/monitor/tolerance']

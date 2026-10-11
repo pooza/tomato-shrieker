@@ -27,7 +27,7 @@ module TomatoShrieker
     # `update` を横流しして完成品を組み立て、**1 回の `replace`** で公開する
     # （MRI の `Hash#replace` は C で完結するので中間状態が見えない）。
     def load
-      entries = source_entries
+      entries, defined_at = scan_sources
       @staging = {}
       begin
         super
@@ -37,6 +37,15 @@ module TomatoShrieker
         @staging = nil
       end
       replace(staged)
+      @source_defined_at = defined_at
+    end
+
+    # そのソースの定義ファイルの更新時刻。ファイルから読んだソースでなければ nil (#1560)。
+    #
+    # ⚠ **読み込んだ時点の値。**daemon は最後の load（起動・`source reload`）のとき、
+    # CLI はいまのディスクを見る（`docs/monitoring.md`「CLI はディスク上の定義で答える」と同じ）。
+    def source_defined_at(id)
+      return (@source_defined_at || {})[id.to_s]
     end
 
     # ⚠ `load` の最中だけ横流しする。ここを素通しにすると `super` が self を
@@ -48,15 +57,23 @@ module TomatoShrieker
 
     # ソース定義を読んで配列にする。⚠ self には触らない。
     def source_entries
-      return source_dirs.flat_map do |dir|
+      return scan_sources.first
+    end
+
+    # ソース定義と、その更新時刻（id => Time）を 1 回の走査で読む。⚠ self には触らない。
+    def scan_sources
+      defined_at = {}
+      entries = source_dirs.flat_map do |dir|
         suffixes.flat_map do |suffix|
           Dir.glob(File.join(dir, "*#{suffix}")).map do |f|
             values = YAML.load_file(f)
             values['id'] ||= File.basename(f, suffix)
+            defined_at[values['id'].to_s] = File.mtime(f)
             values
           end
         end
       end
+      return [entries, defined_at]
     end
 
     # 🔴 **テスト時だけ `test/sources/` も読む (#1593)。**
