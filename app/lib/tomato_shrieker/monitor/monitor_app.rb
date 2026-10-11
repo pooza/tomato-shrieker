@@ -111,6 +111,7 @@ module TomatoShrieker
       body << "entry_stage: #{checks[:entry_stage]}\n"
       body << failure_body(latest)
       body << undelivered_body(checks[:undelivered_log], latest) if checks[:undelivered]
+      body << lost_entries_body(checks[:lost_entries_log], latest) if checks[:lost_entries]
       body << silent_body(source) if checks[:silent]
       return body
     end
@@ -164,6 +165,18 @@ module TomatoShrieker
       return body if log.id == latest.id
       body << "last_attempted_status: #{log.status}\n"
       body << failure_body(log, 'last_attempted_')
+      return body
+    end
+
+    # #1574: 「いつ・何件のエントリを失ったか」を見せる。⚠ 宛先の障害ではない
+    # （宛先に触れる前に落ちている）ので、`undelivered` とは別の見出しで出す。
+    def lost_entries_body(log, latest)
+      body = +"lost_entries: true\n"
+      body << "lost_at: #{log.executed_at.iso8601}\n"
+      body << "lost_count: #{log.lost_entry_count}\n"
+      return body if log.id == latest.id
+      body << "lost_status: #{log.status}\n"
+      body << failure_body(log, 'lost_')
       return body
     end
 

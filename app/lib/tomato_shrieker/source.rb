@@ -388,6 +388,24 @@ module TomatoShrieker
       return @undelivered_log
     end
 
+    # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
+    #
+    # 未達（`undelivered?`）と同じ重さ・同じ消し方にする: 失われたものは戻らないので、
+    # 次にエントリを処理した run が何も失わないか、運用者が確認（`source ack`）するまで赤。
+    # ⚠ 確認が消すのは「確認したその run」だけ（終了時刻で比べる。`undelivered?` と同じ規則）。
+    def lost_entries?
+      return false unless log = lost_entries_log
+      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return log.finished_at > acknowledged_at
+    end
+
+    # 取りこぼしの根拠になっている run。確認済みかどうかは見ない。
+    def lost_entries_log
+      @lost_entries_log ||= SourceRunLog.last_entry_stage(id)
+      return nil unless @lost_entries_log&.lost_entries?
+      return @lost_entries_log
+    end
+
     # 監視の対象か (#1503)。
     # ⚠ 無効ソースは scheduler が register しないので executed_at が前に進まず、
     # 一度稼働してから無効化すると stale 判定が恒久的に成立して赤が貼り付く。

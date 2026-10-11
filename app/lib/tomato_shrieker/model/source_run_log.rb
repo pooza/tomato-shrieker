@@ -2,6 +2,7 @@ require 'sequel/model'
 
 module TomatoShrieker
   class SourceRunLog < Sequel::Model(:source_run_log)
+    include SourceRunLogLoss
     include Package
 
     STATUS_SUCCESS = 'success'.freeze

@@ -58,12 +58,15 @@ module TomatoShrieker
         # 503 本文に出す根拠の行は別のキーで渡す。
         undelivered: source.undelivered?,
         undelivered_log: source.undelivered_log,
+        # #1574: 宛先に触れる前にエントリを失った run が未解決のまま残っている。
+        lost_entries: source.lost_entries?,
+        lost_entries_log: source.lost_entries_log,
       }
     end
 
     # `checks` のうち立っているものの名前。空なら健全。
     def self.problems_of(checks)
-      return [:stale, :errored, :silent, :undelivered].select {|key| checks[key]}
+      return [:stale, :errored, :silent, :undelivered, :lost_entries].select {|key| checks[key]}
     end
 
     # 1 ソースの「緑でない理由」。空なら `/healthz/source/:id` は 200 を返す。
@@ -135,8 +138,7 @@ module TomatoShrieker
         dest_count: @source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
-        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは acknowledged_at で読む
-        undelivered: @source.undelivered?,
+        **loss_status,
         # 🔴 **`attempted` から出す（4.8.0 リリース前レビュー）。**`latest` は
         # **直近の run** なので、no-op を挟むと **`last_attempted_at` は前の試行を
         # 指しているのに件数だけ 0** という自己矛盾になる。⚠ 本番で再現した:
@@ -164,6 +166,15 @@ module TomatoShrieker
         error_rate_24h: SourceRunLog.error_rate(@source.id),
         **threshold_status(logs),
       )
+    end
+
+    def loss_status
+      return {
+        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは acknowledged_at で読む
+        undelivered: @source.undelivered?,
+        # #1574: 配信へ進む前に失ったエントリが未解決。⚠ 確認済みなら false（`acknowledged_at`）
+        lost_entries: @source.lost_entries?,
+      }
     end
 
     # ⚠ `logs` は `delivery_status` が取った窓をそのまま受ける＝ 503 本文と同じ値・追加クエリなし。
