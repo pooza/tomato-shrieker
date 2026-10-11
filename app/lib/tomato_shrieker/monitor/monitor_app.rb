@@ -134,7 +134,7 @@ module TomatoShrieker
       # #1505: 静かなだけと分かっているなら `bin/shrieker source ack ID` で緑に戻せる
       body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
       body << "silence_baseline_origin: #{source.silence_baseline_origin}\n"
-      body << "silence_acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
+      body << "acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
       return body
     end
 

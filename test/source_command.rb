@@ -51,12 +51,20 @@ module TomatoShrieker
     def test_ack_does_not_mention_silence_without_tolerance
       said = ack_with(stub_source(nil, undelivered: true))
 
-      assert_not_include(said, 'silence_tolerance')
+      assert_not_include(said, '再び警告します')
     ensure
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
     # 確認するものが無ければ記録しない
+    # #1567: しきい値の無いソースでは、再警告の予定が無いことを言う。
+    def test_ack_warns_when_no_tolerance
+      assert_include(ack_with(stub_source(nil, undelivered: true)), '再警告はありません')
+      assert_not_include(ack_with(stub_source(86_400, undelivered: true)), '再警告はありません')
+    ensure
+      SilenceAck.where(source_id: ACK_ID).delete
+    end
+
     def test_ack_refuses_when_nothing_to_acknowledge
       said = ack_with(stub_source(nil, undelivered: false))
 

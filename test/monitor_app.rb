@@ -508,7 +508,7 @@ module TomatoShrieker
 
       assert_equal(503, status)
       assert_include(body.first, 'silent: true')
-      assert_include(body.first, 'silence_acknowledged_at: ')
+      assert_match(/^acknowledged_at: /, body.first)
     end
 
     # 配信が再開したら確認記録は自然に無効化される（起点が追い越される）
@@ -520,17 +520,18 @@ module TomatoShrieker
       assert_equal(200, status)
     end
 
-    def test_status_json_reports_silence_acknowledged_at
+    def test_status_json_reports_acknowledged_at
       record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
 
       assert_true(source_status(SILENT_ID)['silent'])
-      assert_nil(source_status(SILENT_ID)['silence_acknowledged_at'])
+      assert_nil(source_status(SILENT_ID)['acknowledged_at'])
+      assert_false(source_status(SILENT_ID).key?('silence_acknowledged_at'), '旧いキーが残っている (#1567)')
 
       SilenceAck.acknowledge(SILENT_ID)
 
       assert_false(source_status(SILENT_ID)['silent'])
       # 「なぜ緑なのか」を答えられること
-      assert_not_nil(source_status(SILENT_ID)['silence_acknowledged_at'])
+      assert_not_nil(source_status(SILENT_ID)['acknowledged_at'])
     end
 
     # しきい値未指定のソースは、同じ状態でも沈黙では倒さない (opt-in)
