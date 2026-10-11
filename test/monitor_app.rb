@@ -94,6 +94,52 @@ module TomatoShrieker
       FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
 
+    # 🔴 **#1682 の Codex P1: 同じ id の読める定義があっても、読めない定義があれば 503。**
+    # ⚠ `Source.create` は読める側を返すので、先に読めない定義を見ないと 200 になる。
+    def test_healthz_unmatched_source_wins_over_same_id
+      write_unmatched_fixture('id' => FIXTURE_ID)
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+
+      assert_not_nil(Source.create(FIXTURE_ID), '前提: 読める定義もある')
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # 🔴 **#1682 の Codex P2: 読めるソースと読めない定義を、同じ一覧から作れること。**
+    # ⚠ 別々に設定を読むと、間に reload が挟まったとき別の時点の一覧になる。
+    def test_sources_are_built_from_given_entries
+      entries = [
+        {'id' => 'snapshot-ok', 'source' => {'text' => 'x'}, 'schedule' => {'every' => '1d'}},
+        {'id' => 'snapshot-typo', 'source' => {'texxt' => 'x'}, 'schedule' => {'every' => '1d'}},
+      ]
+
+      assert_equal(['snapshot-ok'], Source.all(entries).map(&:id))
+      assert_equal(['snapshot-typo'], Source.unmatched_ids(entries))
+      assert_not_nil(Source.create('snapshot-ok', entries))
+      assert_nil(Source.create('snapshot-ok'), '設定の一覧には無い')
+    end
+
+    # 🔴 **`/status.json` は一覧を 1 回だけ読む（同 P2）。**
+    def test_status_json_reads_sources_once
+      write_unmatched_fixture
+      reads = 0
+      original = config.method(:[])
+      config.define_singleton_method(:[]) do |key|
+        reads += 1 if key == '/sources'
+        original.call(key)
+      end
+      begin
+        call('/status.json')
+      ensure
+        config.singleton_class.remove_method(:[])
+      end
+
+      assert_equal(1, reads)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
     # 🔴 **#1605: `/status.json` と CLI から行ごと消えない。**
     def test_unmatched_source_stays_visible
       write_unmatched_fixture

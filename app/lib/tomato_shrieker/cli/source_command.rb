@@ -232,6 +232,7 @@ module TomatoShrieker
     # 足さないと「読めない定義」が一覧から黙って消える（`/status.json` と同じ形にする）。
     def status_rows(id)
       unmatched = Source.unmatched_ids
+      # ⚠ 読めない定義を先に見る（healthz と同じ順。同じ id の読める定義があっても 503）。
       return [SourceStatusTable.unmatched_row(id)] if id && unmatched.include?(id)
       rows = status_sources(id).map {|source| SourceStatusTable.row(source)}
       rows.concat(unmatched.map {|v| SourceStatusTable.unmatched_row(v)}) unless id
