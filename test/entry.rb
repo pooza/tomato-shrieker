@@ -138,6 +138,7 @@ module TomatoShrieker
           calls += 1
           raise error
         end
+
         with_deliverable_stub(busy) do
           assert_raise(error.class) {Entry.create(stage_values, stage_source(stats))}
         end
