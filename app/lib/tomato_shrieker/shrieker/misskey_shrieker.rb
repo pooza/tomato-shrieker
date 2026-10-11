@@ -1,15 +1,13 @@
 module TomatoShrieker
   class MisskeyShrieker < Ginseng::Fediverse::MisskeyService
     include Package
+    include RemoteAttachment
 
     def exec(body)
       body = body.clone
       body[:fileIds] ||= []
       if (attachments = body.delete(:attachments))
-        in_threads = Parallel.processor_count * 2
-        body[:fileIds] = Parallel.map(attachments, in_threads:) do |v|
-          upload_remote_resource(v[:image_url], {response: :id})
-        end
+        body[:fileIds] = upload_attachments(attachments, source: body[:template]&.source)
       end
       body[:template][:tag] = true
       body[:text] = body[:template].to_s.strip
