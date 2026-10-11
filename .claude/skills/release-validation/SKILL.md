@@ -117,6 +117,8 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 ⚠ **投稿先で実視認するなら FeedSource を使う。**`test-youtube-channel` の定義に PieFed の `dest` と `keyword` を足した一時ソースを作ると、ハッシュタグを含むエントリだけを 1 件投稿できる。⚠ **一時ソースには PieFed のパスワードが入るので、確認したら消すこと。**
 
+⚠ **PieFed のタグは投稿ページで見る (#1673)。**作成のあとに編集でタグを付けるので、投稿ページにタグのリンク（`/tag/<名前>`）が出ること、本文に `#tag` の文字が残っていないことを確かめる。`GET /api/alpha/post?id=<id>` の `post_view.post.tags` でも読める。⚠ ログに warn `tags not attached` が出ていたら付いていない。
+
 ### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
 ⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
