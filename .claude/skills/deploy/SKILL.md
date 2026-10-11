@@ -32,6 +32,7 @@ disable-model-invocation: true
 - `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
 - `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
 - 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**起動で倒れる定義が残っている。reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる。直すか `disable` してからやり直す
+- ⚠ **NG が 0 でも「起動できる」とは限らない。**見ているのはスケジュールと判別キーだけで、登録の途中で起きる失敗（`command:` のソースが `bundle …` で始まるときの `bundle install`・`/source/dir` の誤り）は見ていない（#1477）。そこは 1. の `bundle check` と、4. の `not started` の件数・`NRestarts` で受ける
 - ⚠ 増減があるだけなら 0 で終わる（失敗ではなく、確かめる対象）
 - ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
 
