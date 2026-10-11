@@ -139,6 +139,37 @@ module TomatoShrieker
         '報告が落ちると計上まで落ちている')
     end
 
+    # 🔴 **#1574 / #1685 の Codex P2: 保存の前に落ちたエントリと、後に落ちたエントリを分ける。**
+    #
+    # ⚠ 前（解析）は行が無いので次の run が拾い直す＝ `source#fetch`（取りこぼしに数えない）。
+    # ⚠⚠ 後は unique 制約で二度と取得されない＝ `source#entry`（取りこぼし）。
+    def test_fetch_failure_kind_tells_lost_from_retryable
+      {
+        '保存の前（印なし）' => [proc {|_entry| raise 'parse error'}, 'source#fetch'],
+        '保存の後（Entry.create の中）' => [
+          proc {|_entry| raise RuntimeError.new('after insert').extend(Entry::Inserted)}, 'source#entry'
+        ],
+      }.each do |label, (create_record, kind)|
+        stats = DeliveryStats.new
+        source = stub_entries(FeedSource.new(fixture_params), stats)
+        source.define_singleton_method(:create_record, &create_record)
+        source.fetch {|_record| nil}
+
+        assert_equal({kind => 1}, stats.shrieker_errors, label)
+      end
+    end
+
+    # ⚠ 保存は通り、その後（テンプレート・添付・配信の手前）で落ちた形も取りこぼし。
+    def test_fetch_failure_after_create_record_is_lost
+      stats = DeliveryStats.new
+      source = stub_entries(FeedSource.new(fixture_params), stats)
+      source.define_singleton_method(:create_record) {|_entry| :record}
+      source.fetch {|_record| raise 'template broken'}
+
+      assert_equal({'source#entry' => 1}, stats.shrieker_errors)
+      assert_true(stats.entry_stage?)
+    end
+
     # 🔴🔴 **#1622: 重複だけの run で段を立てない。**
     #
     # ⚠⚠ `targets` は `ignore_entry?` で絞っただけの**生のフィード項目**で、まだ重複判定を

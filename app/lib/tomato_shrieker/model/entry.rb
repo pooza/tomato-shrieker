@@ -2,6 +2,9 @@ require 'sequel/model'
 
 module TomatoShrieker
   class Entry < Sequel::Model(:entry)
+    # 保存（insert）が通った後に上がった例外の印 (#1574)。行は残っている＝再取得されない。
+    module Inserted; end
+
     include Package
 
     alias to_h values
@@ -118,6 +121,8 @@ module TomatoShrieker
         # **恒久的な取りこぼしが「取得段の失敗」＝緩和が効く側**に分類される。
         # ⚠ insert より前で落ちた場合（パース失敗）は立てない。**失うものが無い。**
         feed&.enter_entry_stage! if inserted
+        # ⚠ 呼び出し元（`FeedSource#fetch`）が「保存の後か」を見分けられるよう印を付ける (#1574)。
+        e.extend(Inserted) if inserted
         # ⚠ 握り潰して nil を返すと、呼び出し元の FeedSource#fetch が
         # `next unless record` で読み飛ばすため record_failure に到達しない。
         # 全エントリがパース失敗しても attempted=0 の no-op success になる (#1473)。

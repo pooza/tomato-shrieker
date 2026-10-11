@@ -115,9 +115,13 @@ module TomatoShrieker
       stats = DeliveryStats.new
       source = stage_source(stats)
 
+      error = nil
+
       with_deliverable_stub(-> {raise 'boom after insert'}) do
-        assert_raise(RuntimeError) {Entry.create(stage_values, source)}
+        error = assert_raise(RuntimeError) {Entry.create(stage_values, source)}
       end
+
+      assert_kind_of(Entry::Inserted, error, '保存の後に落ちた印が無い (#1574)')
 
       assert_true(stats.entry_stage?, '行は残るのに緩和が効く側に落ちている')
       assert_equal(FIXTURES.size + 1, Entry.where(feed: FEED_ID).count, '行が残っていない')
@@ -153,8 +157,10 @@ module TomatoShrieker
       stats = DeliveryStats.new
       source = stage_source(stats)
 
-      assert_raise(NoMethodError) {Entry.create(Object.new, source)}
+      error = assert_raise(NoMethodError) {Entry.create(Object.new, source)}
+
       assert_false(stats.entry_stage?, 'insert していない run で緩和を潰している')
+      assert_not_kind_of(Entry::Inserted, error, '保存していないのに印が付いている (#1574)')
     end
 
     # ⚠ 既知のエントリ（unique 制約）は insert が通っていないので立てない。

@@ -4,6 +4,9 @@ module TomatoShrieker
   class Source # rubocop:disable Metrics/ClassLength
     include Package
 
+    # run がエントリ処理の途中で落ちたことを `shrieker_errors` に残すときの種別 (#1574)。
+    EXEC_FAILURE_KIND = 'source#exec'.freeze
+
     # 沈黙の起点の根拠 (#1502)。
     BASELINE_DELIVERY = 'delivery'.freeze
     BASELINE_ACKNOWLEDGEMENT = 'acknowledgement'.freeze
@@ -388,6 +391,24 @@ module TomatoShrieker
       return @undelivered_log
     end
 
+    # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
+    #
+    # 未達（`undelivered?`）と同じ重さ・同じ消し方にする: 失われたものは戻らないので、
+    # 次にエントリを処理した run が何も失わないか、運用者が確認（`source ack`）するまで赤。
+    # ⚠ 確認が消すのは「確認したその run」だけ（終了時刻で比べる。`undelivered?` と同じ規則）。
+    def lost_entries?
+      return false unless log = lost_entries_log
+      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return log.finished_at > acknowledged_at
+    end
+
+    # 取りこぼしの根拠になっている run。確認済みかどうかは見ない。
+    def lost_entries_log
+      @lost_entries_log ||= SourceRunLog.last_entry_stage(id)
+      return nil unless @lost_entries_log&.lost_entries?
+      return @lost_entries_log
+    end
+
     # 監視の対象か (#1503)。
     # ⚠ 無効ソースは scheduler が register しないので executed_at が前に進まず、
     # 一度稼働してから無効化すると stale 判定が恒久的に成立して赤が貼り付く。
@@ -666,9 +687,22 @@ module TomatoShrieker
       finalize_run_log(started_at)
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
+      record_exec_abort(e)
       SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(source: id, error: e)
+    end
+
+    # 🔴 **エントリ処理の途中で run ごと落ちたら、それを取りこぼしとして数える (#1574)。**
+    #
+    # `CommandSource` / `IcalendarSource` は、エントリを読んだ後（`create_template` など）で
+    # 落ちるとここへ直に来る。⚠⚠ 何も数えないと、**その run が持つ内訳は「宛先で落ちた
+    # ぶん」だけ**になり、`SourceRunLog#lost_entry_count` が 0 を返す＝落ちたエントリが
+    # 未達の診断に埋もれる（#1685 の Codex P1・2 巡目）。⚠ 件数は分からないので 1 件と数える
+    # （「少なくとも 1 件」）。⚠ 段に入る前（取得の失敗）は数えない。失うものが無い。
+    def record_exec_abort(error)
+      return unless @delivery_stats&.entry_stage?
+      @delivery_stats.record_failure(EXEC_FAILURE_KIND, error)
     end
 
     # run を error に倒すのは 1 件も配信できなかったときだけ (#1482)。

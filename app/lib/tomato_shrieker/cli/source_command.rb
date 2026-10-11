@@ -132,12 +132,14 @@ module TomatoShrieker
     def ack(id)
       source = find_source!(id)
       undelivered = source.undelivered?
+      lost = source.lost_entries?
       tolerance = source.monitor_silence_tolerance_seconds
-      return say(nothing_to_ack_message(id)) unless undelivered || tolerance
+      return say(nothing_to_ack_message(id)) unless undelivered || lost || tolerance
       SilenceAck.acknowledge(id)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
       say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
+      say '  エントリの取りこぼし (lost_entries) を解除しました。失われたエントリは再送されません。' if lost
       say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
       # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
       # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。

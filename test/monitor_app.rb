@@ -1002,6 +1002,7 @@ module TomatoShrieker
             delivered_count: 1)
         end,
         stale: proc {record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 86_400)},
+        lost_entries: proc {record_lost_entries(at: Time.now - 60)},
       }.each do |label, scenario|
         SourceRunLog.where(source_id: FIXTURE_ID).delete
         scenario.call
@@ -1010,6 +1011,173 @@ module TomatoShrieker
 
         assert_equal(status == 200, problems.empty?, "#{label}: healthz=#{status} problems=#{problems}")
       end
+    end
+
+    # ⚠ 3 件が配信へ進む前に落ち、1 件は届いた run（`partial`・`attempted == delivered`）。
+    def record_lost_entries(at: Time.now - 600)
+      record(FIXTURE_ID, at:, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 1,
+        delivered_count: 1, entry_stage: true, error_message: 'RuntimeError: boom',
+        shrieker_errors: JSON.dump({'source#entry' => 3}))
+    end
+
+    # 🔴 **#1574: 配信へ進む前にエントリを失った run は、未達ではないが 503。**
+    # ⚠ 以前は healthz 200・`undelivered: false`・エラー率 0% で、失われたことがどこにも出なかった。
+    def test_healthz_source_lost_entries
+      record_lost_entries
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+      row = source_status(FIXTURE_ID)
+
+      assert_equal(503, status)
+      assert_include(body.first, "lost_entries: true\n")
+      assert_include(body.first, "lost_count: 3\n")
+      assert_not_include(body.first, 'undelivered: true', '宛先の障害ではない')
+      assert_true(row['lost_entries'])
+      assert_false(row['undelivered'])
+      assert_equal([:lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # 🔴 **新着の無い run を挟んでも消えない。**消えるのは、次にエントリを処理した run が
+    # 何も失わなかったとき。
+    def test_lost_entries_survive_noop_and_clear_on_clean_run
+      record_lost_entries
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'lost_status: partial')
+      assert_include(body.first, 'lost_shrieker_errors: ')
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, entry_stage: true)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      assert_false(source_status(FIXTURE_ID)['lost_entries'])
+    end
+
+    # 運用者が確認したら緑に戻す（未達と同じ規則。確認より後に失えばまた赤）。
+    def test_lost_entries_can_be_acknowledged
+      record_lost_entries
+      SilenceAck.acknowledge(FIXTURE_ID)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      assert_false(source_status(FIXTURE_ID)['lost_entries'])
+      record_lost_entries(at: Time.now + 60)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # ⚠ 取りこぼしと数えないもの: 段に入っていない run・旧行（NULL）・宛先で落ちただけの run。
+    def test_lost_entries_does_not_overcount
+      {
+        '段に入っていない' => {entry_stage: false, shrieker_errors: JSON.dump({'source#entry' => 1})},
+        '保存の前に落ちた' => {entry_stage: true, shrieker_errors: JSON.dump({'source#fetch' => 2})},
+        '旧行' => {entry_stage: nil, shrieker_errors: JSON.dump({'source#fetch' => 1})},
+        '宛先で落ちただけ' => {
+          entry_stage: true,
+          attempted_count: 3,
+          delivered_count: 1,
+          shrieker_errors: JSON.dump({'TomatoShrieker::WebhookShrieker' => 2}),
+        },
+      }.each do |label, values|
+        SourceRunLog.where(source_id: FIXTURE_ID).delete
+        log = record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 1,
+          delivered_count: 1, **values)
+
+        assert_false(log.lost_entries?, label)
+        assert_false(Source.create(FIXTURE_ID).lost_entries?, label)
+      end
+    end
+
+    # 🔴 **#1685 の Codex P1: 段に入った後、run ごと例外で落ちた形も取りこぼし。**
+    # ⚠ `CommandSource` / `IcalendarSource` の `create_template` の失敗がこの形（内訳が空）。
+    # ⚠⚠ 次の run（no-op）で連続エラーは切れるが、失ったことは消えない。
+    def test_lost_entries_when_run_aborts_in_entry_stage
+      record(FIXTURE_ID, at: Time.now - 600, status: SourceRunLog::STATUS_ERROR,
+        entry_stage: true, error_message: 'RuntimeError: template broken')
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, "lost_entries: true\n")
+      assert_include(body.first, 'lost_count: unknown')
+      assert_include(body.first, 'lost_error: RuntimeError: template broken')
+    end
+
+    # 🔴 **同 P1: 落ちた run が、前の取りこぼしの警告を消さないこと。**
+    def test_aborted_run_does_not_clear_earlier_loss
+      record_lost_entries(at: Time.now - 900)
+      record(FIXTURE_ID, at: Time.now - 600, status: SourceRunLog::STATUS_ERROR,
+        entry_stage: true, error_message: 'RuntimeError: template broken')
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+
+      assert_true(Source.create(FIXTURE_ID).lost_entries?)
+    end
+
+    # ⚠ `exec` を差し替えたソースを、実際の記録の経路（`exec_with_run_log`）で 1 回走らせる。
+    def run_with_exec(&)
+      source = Source.create(FIXTURE_ID)
+      source.define_singleton_method(:exec, &)
+      source.send(:exec_with_run_log, :every, '5m')
+      return SourceRunLog.latest_for(FIXTURE_ID)
+    end
+
+    # 🔴 **#1685 の Codex P1（2 巡目）: 宛先の失敗を記録した後に run ごと落ちた形。**
+    # ⚠⚠ 内訳は空ではない（宛先の失敗が載っている）ので、件数から引くだけだと 0 件になり、
+    # 落ちたエントリが未達の診断に埋もれる。落ちたこと自体を 1 件として数える。
+    def test_lost_entries_when_run_aborts_after_delivery_error
+      log = run_with_exec do
+        @delivery_stats.enter_entry_stage!
+        @delivery_stats.record_error(Object.new, RuntimeError.new('destination down'))
+        raise 'template broken'
+      end
+
+      assert_true(log.error?)
+      assert_equal({'Object' => 1, Source::EXEC_FAILURE_KIND => 1}, log.shrieker_error_counts)
+      assert_equal(1, log.lost_entry_count)
+      assert_false(log.aborted_in_entry_stage?, '内訳が空の旧い形ではない')
+      assert_equal([:errored, :undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # ⚠ 段に入る前（取得）で落ちた run は数えない。失うものが無い。
+    def test_fetch_stage_abort_records_no_loss
+      log = run_with_exec {raise 'Bad response 404'}
+
+      assert_true(log.error?)
+      assert_empty(log.shrieker_error_counts)
+      assert_false(log.lost_entries?)
+    end
+
+    # ⚠ 取得段で落ちた run（段に入っていない）は、内訳が空でも取りこぼしではない。
+    def test_fetch_stage_abort_is_not_a_loss
+      log = record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, entry_stage: false,
+        error_message: 'Bad response 404')
+
+      assert_false(log.lost_entries?)
+      assert_false(Source.create(FIXTURE_ID).lost_entries?)
+    end
+
+    # 🔴 **実際の集計（`DeliveryStats`）から書いた行で立つこと。**⚠ 上のテストは行を手で
+    # 書いているので、`record_failure` の数え方や保存の形が変わっても気づけない。
+    def test_lost_entries_from_delivery_stats
+      stats = DeliveryStats.new
+      stats.enter_entry_stage!
+      stats.record_success(Object.new)
+      3.times {stats.record_failure(FeedSource::ENTRY_FAILURE_KIND, RuntimeError.new('boom'))}
+      SourceRunLog.record_partial(FIXTURE_ID, started_at: Time.now, error: stats.first_error, stats:)
+      log = SourceRunLog.latest_for(FIXTURE_ID)
+
+      assert_true(log.partial?)
+      assert_false(log.undelivered?, '前提: 未達としては立たない')
+      assert_equal(3, log.lost_entry_count)
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # 宛先でも落ち、配信へ進む前にも落ちた run は、両方が立つ（件数は別々に数える）。
+    def test_lost_entries_and_undelivered_are_counted_separately
+      log = record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 3,
+        delivered_count: 1, entry_stage: true,
+        shrieker_errors: JSON.dump({'TomatoShrieker::WebhookShrieker' => 2, 'source#entry' => 4}))
+
+      assert_equal(4, log.lost_entry_count)
+      assert_equal([:undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
     end
 
     # #1509: 未達の判定は `Source#undelivered?` の 1 つ。判定材料では真偽値で持ち、

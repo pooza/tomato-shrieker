@@ -25,7 +25,20 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - 最終実行から `grace_seconds` 以内に走っている (stale でない)
 - 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
+- **配信へ進む前に失ったエントリが残っていない (lost_entries でない・#1574)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
+
+##### 配信へ進む前に失ったエントリ (#1574)
+
+`Entry.insert` は配信より先に走るので、その後（テンプレートの描画・添付の取り出しなど）で落ちたエントリは unique 制約で二度と取得されない。⚠⚠ **同じ run で他のエントリが 1 件でも届くと、run は `partial`・`attempted == delivered` になり、未達（`undelivered`）も連続エラー（`error_streak`）も立たない**＝ 4.14.0 までは、エントリを恒久的に失ったのに healthz 200・エラー率 0% だった。
+
+- **判定**: 直近の「エントリ処理段に入った run」（`entry_stage: true`）が、宛先に触れる前の失敗（`record_failure`）を 1 件でも持っているか、**内訳を残さずに run ごと落ちていれば** 503（後者は 4.14.0 までに書かれた行の形で、件数が分からないので `lost_count: unknown (run aborted)`）。⚠ **エントリ処理の途中で run ごと落ちたら、それ自体を 1 件と数える**（`shrieker_errors` に `source#exec`。`CommandSource` / `IcalendarSource` が `create_template` などで落ちた形で、宛先の失敗と混ざっても件数から消えない）。本文に `lost_entries: true` / `lost_at` / `lost_count` が出る。`/status.json` は `lost_entries`、`source status` の `PROBLEMS` 列は `lost_entries`
+- **未達と同じ重さ・同じ消し方。**失われたものは戻らないので、**次にエントリを処理した run が何も失わない**か、**`bin/shrieker source ack ID` で確認する**まで赤い。⚠ 新着の無い run（段に入らない）を挟んでも消えない。⚠ 確認が消すのはその run だけで、確認より後に失えばまた赤くなる
+- ⚠ **`undelivered` とは別の見出し。**宛先は健全でも起きるので、混ぜると運用者は存在しない宛先障害を探しに行く。同じ run で両方起きれば両方出る（件数は別々）
+- ⚠ 数えないもの: 段に入っていない run（エントリを 1 件も読めていない＝失うものが無い）・`entry_stage` が NULL の旧行（migration 013 より前）
+- ⚠ **保存の前（解析）で落ちたエントリは数えない。**行が無いので次の run が拾い直す。`shrieker_errors` の種別で分けている: `source#fetch`＝保存の前（数えない）・`source#entry`＝保存の後（数える）・`source#exec`＝エントリ処理の途中で run ごと落ちた（1 件と数える）
+- ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計。⚠ prune の保護行にもしていないので、確認しないまま保持期間を過ぎると行ごと消える
+- ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
 
 ##### 定義は在るが読めないソース (#1605)
 
@@ -163,6 +176,7 @@ bin/shrieker source ack ID
       "last_delivered_count": 2,
       "last_attempted_at": "2026-04-14T14:00:01+09:00",
       "undelivered": false,
+      "lost_entries": false,
       "last_delivered_at": "2026-04-14T14:00:01+09:00",
       "last_delivered_at_origin": "run_log",
       "error_streak": 0,
@@ -230,7 +244,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
 
-`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run` / `unmatched`（判定材料を見るまでもなく 503。`unmatched` は #1605）。`disabled` と `awaiting_first_run`（#1560）は問題ではなく目印で、**`--problems` には出ない**（どちらも healthz は 200）。
+`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered` / `lost_entries`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run` / `unmatched`（判定材料を見るまでもなく 503。`unmatched` は #1605）。`disabled` と `awaiting_first_run`（#1560）は問題ではなく目印で、**`--problems` には出ない**（どちらも healthz は 200）。
 
 ⚠ **CLI だけが出す値が 1 つある: `build_failed`**（そのソースの状態を組み立てる途中で例外が出た）。理由は表の後に `<id>: <例外>` の形で **stderr** へ出す（`--json` では行の `error` キー）。⚠ 空の DB や migration 前の DB に向けると全行がこれになる（`no such table: source_run_log`）。⚠⚠ **healthz と食い違いうる。**`/healthz/source/:id` は判定材料しか読まないので、表示用の集計（`error_rate` など）だけが落ちる場合は healthz が 200 のまま、CLI は `build_failed` を出す＝ **`--problems` は「healthz が 503 のもの」＋「CLI が状態を組み立てられなかったもの」**。
 
