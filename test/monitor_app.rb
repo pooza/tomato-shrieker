@@ -1085,6 +1085,40 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **#1685 の Codex P1: 段に入った後、run ごと例外で落ちた形も取りこぼし。**
+    # ⚠ `CommandSource` / `IcalendarSource` の `create_template` の失敗がこの形（内訳が空）。
+    # ⚠⚠ 次の run（no-op）で連続エラーは切れるが、失ったことは消えない。
+    def test_lost_entries_when_run_aborts_in_entry_stage
+      record(FIXTURE_ID, at: Time.now - 600, status: SourceRunLog::STATUS_ERROR,
+        entry_stage: true, error_message: 'RuntimeError: template broken')
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, "lost_entries: true\n")
+      assert_include(body.first, 'lost_count: unknown')
+      assert_include(body.first, 'lost_error: RuntimeError: template broken')
+    end
+
+    # 🔴 **同 P1: 落ちた run が、前の取りこぼしの警告を消さないこと。**
+    def test_aborted_run_does_not_clear_earlier_loss
+      record_lost_entries(at: Time.now - 900)
+      record(FIXTURE_ID, at: Time.now - 600, status: SourceRunLog::STATUS_ERROR,
+        entry_stage: true, error_message: 'RuntimeError: template broken')
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+
+      assert_true(Source.create(FIXTURE_ID).lost_entries?)
+    end
+
+    # ⚠ 取得段で落ちた run（段に入っていない）は、内訳が空でも取りこぼしではない。
+    def test_fetch_stage_abort_is_not_a_loss
+      log = record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, entry_stage: false,
+        error_message: 'Bad response 404')
+
+      assert_false(log.lost_entries?)
+      assert_false(Source.create(FIXTURE_ID).lost_entries?)
+    end
+
     # 🔴 **実際の集計（`DeliveryStats`）から書いた行で立つこと。**⚠ 上のテストは行を手で
     # 書いているので、`record_failure` の数え方や保存の形が変わっても気づけない。
     def test_lost_entries_from_delivery_stats

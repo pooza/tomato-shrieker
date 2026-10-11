@@ -32,7 +32,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 `Entry.insert` は配信より先に走るので、その後（テンプレートの描画・添付の取り出しなど）で落ちたエントリは unique 制約で二度と取得されない。⚠⚠ **同じ run で他のエントリが 1 件でも届くと、run は `partial`・`attempted == delivered` になり、未達（`undelivered`）も連続エラー（`error_streak`）も立たない**＝ 4.14.0 までは、エントリを恒久的に失ったのに healthz 200・エラー率 0% だった。
 
-- **判定**: 直近の「エントリ処理段に入った run」（`entry_stage: true`）が、宛先に触れる前の失敗（`record_failure`）を 1 件でも持っていれば 503。本文に `lost_entries: true` / `lost_at` / `lost_count` が出る。`/status.json` は `lost_entries`、`source status` の `PROBLEMS` 列は `lost_entries`
+- **判定**: 直近の「エントリ処理段に入った run」（`entry_stage: true`）が、宛先に触れる前の失敗（`record_failure`）を 1 件でも持っているか、**内訳を残さずに run ごと落ちていれば** 503（後者は `CommandSource` / `IcalendarSource` がエントリを読んだ後に `create_template` などで落ちた形。件数が分からないので `lost_count: unknown (run aborted)`）。本文に `lost_entries: true` / `lost_at` / `lost_count` が出る。`/status.json` は `lost_entries`、`source status` の `PROBLEMS` 列は `lost_entries`
 - **未達と同じ重さ・同じ消し方。**失われたものは戻らないので、**次にエントリを処理した run が何も失わない**か、**`bin/shrieker source ack ID` で確認する**まで赤い。⚠ 新着の無い run（段に入らない）を挟んでも消えない。⚠ 確認が消すのはその run だけで、確認より後に失えばまた赤くなる
 - ⚠ **`undelivered` とは別の見出し。**宛先は健全でも起きるので、混ぜると運用者は存在しない宛先障害を探しに行く。同じ run で両方起きれば両方出る（件数は別々）
 - ⚠ 数えないもの: 段に入っていない run（エントリを 1 件も読めていない＝失うものが無い）・`entry_stage` が NULL の旧行（migration 013 より前）

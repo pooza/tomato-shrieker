@@ -173,7 +173,9 @@ module TomatoShrieker
     def lost_entries_body(log, latest)
       body = +"lost_entries: true\n"
       body << "lost_at: #{log.executed_at.iso8601}\n"
-      body << "lost_count: #{log.lost_entry_count}\n"
+      # ⚠ run ごと落ちた形は件数が分からない（#1685 の Codex P1）。0 と出すと嘘になる。
+      count = log.aborted_in_entry_stage? ? 'unknown (run aborted)' : log.lost_entry_count
+      body << "lost_count: #{count}\n"
       return body if log.id == latest.id
       body << "lost_status: #{log.status}\n"
       body << failure_body(log, 'lost_')
