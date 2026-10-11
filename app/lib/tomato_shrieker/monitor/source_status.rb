@@ -140,9 +140,19 @@ module TomatoShrieker
         # false だが、それは健全だからではなく運用者が確認したから
         silence_acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(@source.id),
+        **threshold_status(logs),
+      )
+    end
+
+    # ⚠ `logs` は `delivery_status` が取った窓をそのまま受ける＝ 503 本文と同じ値・追加クエリなし。
+    def threshold_status(logs)
+      return {
         # #1558: 「なぜこのソースはまだ緑なのか」を外から説明できるようにする
         error_streak_threshold: self.class.effective_error_streak_threshold(@source, logs),
-      )
+        # #1624: しきい値が 1 に倒されている理由。⚠ 503 本文にしか無いと、503 になる前
+        # （`error_streak: 0`）には「28 と宣言したのに 1 と出ている」理由がどこからも読めない。
+        entry_stage: SourceRunLog.entry_level_error?(logs),
+      }
     end
   end
 end

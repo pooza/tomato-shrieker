@@ -144,6 +144,7 @@ bin/shrieker source ack ID
       "last_delivered_at_origin": "run_log",
       "error_streak": 0,
       "error_streak_threshold": 1,
+      "entry_stage": false,
       "noop_streak": 0,
       "silence_tolerance_seconds": null,
       "silent": false,
@@ -300,7 +301,7 @@ monitor:
 - ⚠⚠ **migration 013 より前の行は `entry_stage` が NULL。**NULL の行だけ従来の代理へ倒す。**「NULL ＝ エントリ処理段」にするとデプロイ直後に緩和を掛けているソースが一斉 503** になる（migration 010 の backfill と同じ型）
 - 📌 **503 本文に `entry_stage:` が出る。**しきい値を 28 に緩めていても `error_streak: 1 / 1` になる理由がそこで読める
 
-⚠ **`/status.json` の `error_streak_threshold` は実効値。**1 に倒されているときは `1` が出る（宣言値ではない）。
+⚠ **`/status.json` の `error_streak_threshold` は実効値。**1 に倒されているときは `1` が出る（宣言値ではない）。**倒された理由は同じ行の `entry_stage: true` で読める (#1624)。**⚠ 503 本文の `entry_stage:` と同じ値（同じ窓の run を見る）で、503 になる前（`error_streak: 0`）でも出る。
 
 ⚠ **opt-in なので「書き忘れ」と「意図的に検知しない」が設定上は区別できない。**`bin/shrieker source validate` は監視対象なのに `silence_tolerance` が無いソースを `WARN` として出す（スキーマ上は妥当なので `NG` にはせず、終了コードも倒さない）。年単位で静かなソースは意図的に未設定のままでよい。
 

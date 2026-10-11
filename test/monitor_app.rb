@@ -347,6 +347,18 @@ module TomatoShrieker
 
       assert_equal(1, status['error_streak_threshold'])
       assert_equal(1, status['error_streak'])
+      assert_true(status['entry_stage'], '1 に倒された理由が読めない (#1624)')
+    end
+
+    # #1624: 取得段の失敗では立たない（しきい値も宣言値のまま）。
+    def test_status_json_entry_stage_is_false_for_fetch_stage_failure
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404', entry_stage: false)
+      status = source_status(THRESHOLD_ID)
+
+      assert_false(status['entry_stage'])
+      assert_equal(3, status['error_streak_threshold'])
+      assert_false(source_status(FIXTURE_ID)['entry_stage'], '実行記録の無いソース')
     end
 
     def with_sample_size(size)
