@@ -48,7 +48,7 @@ module TomatoShrieker
 
     def build_healthz_source(source_id)
       source = Source.create(source_id)
-      return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
+      return unknown_source_response(source_id) unless source
       # 意図的に止めたソースを「壊れている」と混同しない (#1503)。
       return [200, HEADERS, ["OK (disabled)\n"]] if source.disable?
       return [200, HEADERS, ["OK (not monitored)\n"]] unless source.monitored?
@@ -62,6 +62,16 @@ module TomatoShrieker
       checks = source_checks(source, latest)
       return [200, HEADERS, ["OK\n"]] unless unhealthy?(checks)
       return [503, HEADERS, [unhealthy_body(source, latest, checks)]]
+    end
+
+    # 🔴 **「定義が無い」と「定義は在るが読めない」を分ける (#1605)。**判別キーを打ち
+    # 間違えた定義（unmatched）は `Source.all` に現れないが、消したわけではない。
+    # ⚠ 503 にする＝ cron を壊した定義（`failed`）と同じ扱い。404 は本当に無いときだけ。
+    def unknown_source_response(source_id)
+      if Source.unmatched_ids.include?(source_id)
+        return [503, HEADERS, ["#{SourceStatus::UNMATCHED_ERROR}: #{source_id}\n"]]
+      end
+      return [404, HEADERS, ["Unknown source: #{source_id}\n"]]
     end
 
     # 🔴 **「まだ走っていない」と「壊れている」を分ける (#1560)。**初回の実行期限までは
@@ -157,6 +167,8 @@ module TomatoShrieker
 
     def status_json
       sources = Source.all.reject(&:disable?).map {|s| source_status(s)}
+      # #1605: 読めない定義も行として残す（消えると、Kuma に無いソースでは誰も気づけない）。
+      sources.concat(Source.unmatched_ids.map {|id| SourceStatus.unmatched(id)})
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,

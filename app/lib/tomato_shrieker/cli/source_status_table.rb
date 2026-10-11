@@ -44,6 +44,11 @@ module TomatoShrieker
       }
     end
 
+    # 判別キーが一致しない定義の行 (#1605)。⚠ healthz は 503 なので、問題として数える。
+    def self.unmatched_row(id)
+      return {status: SourceStatus.unmatched(id), problems: [:unmatched], disabled: false}
+    end
+
     # 組み立てに失敗した行の理由 (#1648)。⚠ 表には `build_failed` としか出ないので、
     # 理由（空の DB に向けたときの `no such table` など）は別に出す。
     def self.failures(rows)
@@ -61,7 +66,7 @@ module TomatoShrieker
       schedule = status[:schedule]
       return [
         status[:id],
-        status[:class].split('::').last,
+        status[:class] ? status[:class].split('::').last : '-',
         schedule ? "#{schedule[:type]} #{schedule[:value]}" : '-',
         status[:last_status] || '-',
         status[:error_streak] ? "#{status[:error_streak]}/#{status[:error_streak_threshold]}" : '-',

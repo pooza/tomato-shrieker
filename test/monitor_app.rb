@@ -73,6 +73,51 @@ module TomatoShrieker
       assert_equal('text/plain; charset=utf-8', headers['content-type'])
     end
 
+    UNMATCHED_ID = '__test_monitor_app_unmatched__'.freeze
+
+    # ⚠ 判別キーの打ち間違い（`feed` → `feeed`）＝どのソースクラスにも一致しない定義。
+    def write_unmatched_fixture(extra = {})
+      write_fixture(UNMATCHED_ID, {'source' => {'feeed' => 'https://example.com/typo.rss'}}.merge(extra))
+      config.reload
+    end
+
+    # 🔴 **#1605: 読めない定義は 404（＝無い）ではなく 503（＝在るが壊れている）。**
+    def test_healthz_unmatched_source
+      write_unmatched_fixture
+      status, _headers, body = call("/healthz/source/#{UNMATCHED_ID}")
+
+      assert_nil(Source.create(UNMATCHED_ID), '前提: Source.all には現れない')
+      assert_equal(503, status)
+      assert_include(body.first, 'no source class matched')
+      assert_include(body.first, UNMATCHED_ID)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # 🔴 **#1605: `/status.json` と CLI から行ごと消えない。**
+    def test_unmatched_source_stays_visible
+      write_unmatched_fixture
+      row = source_status(UNMATCHED_ID)
+
+      assert_equal({'id' => UNMATCHED_ID, 'class' => nil, 'error' => SourceStatus::UNMATCHED_ERROR}, row)
+      assert_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, UNMATCHED_ID)
+      assert_include(JSON.parse(run_source_status(json: true, problems: true)).map {|v| v['id']}, UNMATCHED_ID)
+      assert_match(/#{UNMATCHED_ID}.*unmatched/o, run_source_status_table)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # ⚠ 止めた定義は逃げ道（`disable: true`）＝読めなくても問題にしない。
+    def test_disabled_unmatched_source_is_not_reported
+      write_unmatched_fixture('disable' => true)
+
+      assert_nil(source_status(UNMATCHED_ID))
+      assert_equal(404, call("/healthz/source/#{UNMATCHED_ID}").first)
+      assert_not_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, UNMATCHED_ID)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
     def test_healthz_unknown_source
       status, _headers, body = call('/healthz/source/__no_such_source__')
 
@@ -973,6 +1018,17 @@ module TomatoShrieker
       ids = JSON.parse(run_source_status(json: true, sort: 'streak')).map {|v| v['id']}
 
       assert_operator(ids.index(THRESHOLD_ID), :<, ids.index(FIXTURE_ID))
+    end
+
+    # 表の形（`--json` なし）。⚠ `print_table` は Thor の整形なので、行を文字列にして受ける。
+    def run_source_status_table
+      lines = []
+      command = SourceCommand.new
+      command.options = {}
+      command.define_singleton_method(:print_table) {|rows| lines.concat(rows.map {|v| v.join(' ')})}
+      command.define_singleton_method(:say_error) {|_message| nil}
+      command.status
+      return lines.join("\n")
     end
 
     def run_source_status(**options)
