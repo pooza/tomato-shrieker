@@ -10,6 +10,11 @@ module TomatoShrieker
     # 同じ Hash に足し込まれて `/status.json` が読めなくなっていた。
     # ⚠ ソース ID は run_log の行が持っているので、クラス名は冗長。
     FETCH_FAILURE_KIND = 'source#fetch'.freeze
+    # 🔴 **保存（`Entry.insert`）の後で落ちたエントリの種別 (#1574)。**⚠⚠ `source#fetch` と
+    # 分ける: 保存の前（解析）で落ちたエントリは行が無いので**次の run で拾い直せる**が、
+    # 保存の後で落ちたエントリは unique 制約で二度と取得されない＝**恒久的に失われる**。
+    # `SourceRunLog#lost_entry_count` が数えるのはこちらだけ（#1685 の Codex P2）。
+    ENTRY_FAILURE_KIND = 'source#entry'.freeze
 
     def initialize(params)
       super
@@ -132,25 +137,35 @@ module TomatoShrieker
         # ⚠ `yield` の手前なので `create_template` / `enclosures` 由来の失敗 (#1473) は
         # これまでどおり段の中側。⚠ `@mutex` 保護済みなので `Parallel.each` の
         # スレッドから呼んで安全。
+        inserted = false
         next unless record = create_record(entry)
+        inserted = true
         @delivery_stats&.enter_entry_stage!
         yield record
       rescue => e
-        # create_record / create_template / enclosures 由来の失敗は Entry#shriek に
-        # 到達しないので、ここで計上しないと run が no-op success になる (#1473)。
-        #
-        # ⚠⚠ **計上を先に打つ (#1485)。**この rescue で `/healthz` を赤にできるのは
-        # run_log への計上だけで、Sentry と logger は報告でしかない。報告を先に打つと、
-        # 壊れた例外メッセージ（#1469 の族）でそこが落ちたときに **失敗がまったく
-        # 計上されず run が no-op success に戻る**＝ #1473 が塞いだ穴が開き直す。
-        @delivery_stats&.record_failure(FETCH_FAILURE_KIND, e)
-        # 🔴 **`/healthz` を 503 にするのに Sentry へ出ないエラーを作らない (#1485)。**
-        # 既存の失敗チャンネル（`Source#shriek` の shrieker 失敗、run 全体の例外）は
-        # 送っているのに、4.5.0 で新設したこの経路だけ送っていなかった。
-        # ⚠ シークレットは `SentryScrubber` が落とす (#1467)。
-        Sentry.capture_exception(e, tags: {source: id, stage: 'fetch'}) if Sentry.initialized?
-        logger.error(source: id, error: e)
+        record_entry_failure(e, inserted)
       end
+    end
+
+    # エントリ 1 件ぶんの失敗を計上して報告する。⚠ ループは続ける（1 件の失敗でフィードを止めない）。
+    def record_entry_failure(error, inserted)
+      # create_record / create_template / enclosures 由来の失敗は Entry#shriek に
+      # 到達しないので、ここで計上しないと run が no-op success になる (#1473)。
+      #
+      # ⚠⚠ **計上を先に打つ (#1485)。**この rescue で `/healthz` を赤にできるのは
+      # run_log への計上だけで、Sentry と logger は報告でしかない。報告を先に打つと、
+      # 壊れた例外メッセージ（#1469 の族）でそこが落ちたときに **失敗がまったく
+      # 計上されず run が no-op success に戻る**＝ #1473 が塞いだ穴が開き直す。
+      # ⚠ 保存の後か前かで種別を分ける (#1574)。`Entry.create` の中で保存の後に落ちた
+      # ぶんは、例外に `Entry::Inserted` の印が付いて上がってくる。
+      lost = inserted || error.is_a?(Entry::Inserted)
+      @delivery_stats&.record_failure(lost ? ENTRY_FAILURE_KIND : FETCH_FAILURE_KIND, error)
+      # 🔴 **`/healthz` を 503 にするのに Sentry へ出ないエラーを作らない (#1485)。**
+      # 既存の失敗チャンネル（`Source#shriek` の shrieker 失敗、run 全体の例外）は
+      # 送っているのに、4.5.0 で新設したこの経路だけ送っていなかった。
+      # ⚠ シークレットは `SentryScrubber` が落とす (#1467)。
+      Sentry.capture_exception(error, tags: {source: id, stage: 'fetch'}) if Sentry.initialized?
+      logger.error(source: id, error:)
     end
 
     def ignore_entry?(entry)

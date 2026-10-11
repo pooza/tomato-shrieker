@@ -1,6 +1,8 @@
 module TomatoShrieker
   # 配信へ進む前に失ったエントリの判定 (#1574)。`SourceRunLog` に混ぜる。
   module SourceRunLogLoss
+    LOSS_KINDS = ['source#entry', 'source#exec'].freeze
+
     def self.included(base)
       base.extend(ClassMethods)
     end
@@ -35,11 +37,16 @@ module TomatoShrieker
       return entry_stage == true && error? && shrieker_error_counts.empty?
     end
 
-    # 宛先に触れる前に落ちた件数。⚠ 専用の列は無いので、失敗の総数から「試みて届かなかった
-    # ぶん」を引いて出す（`shrieker_errors` は両方を数え、`attempted - delivered` は後者だけ）。
+    # 恒久的に失ったエントリの件数。⚠ **種別で数える（#1685 の Codex P2）。**
+    #
+    # - `source#entry`: 保存の後で落ちたエントリ（`FeedSource`）
+    # - `source#exec`: エントリ処理の途中で run ごと落ちた（件数は不明なので 1 と数える）
+    #
+    # ⚠ **`source#fetch` は数えない。**保存の前（解析）で落ちたエントリで、行が無いので次の
+    # run が拾い直す。数えると、直らない 1 件のせいで「失っていないのに赤」が続く。
+    # ⚠ 宛先の失敗（Shrieker のクラス名のキー）も数えない。あちらは `undelivered?`。
     def lost_entry_count
-      attempted_failures = attempted_count.to_i - delivered_count.to_i
-      return [shrieker_error_counts.values.sum(&:to_i) - attempted_failures, 0].max
+      return shrieker_error_counts.slice(*LOSS_KINDS).values.sum(&:to_i)
     end
 
     module ClassMethods

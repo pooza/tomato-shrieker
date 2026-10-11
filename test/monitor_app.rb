@@ -1017,7 +1017,7 @@ module TomatoShrieker
     def record_lost_entries(at: Time.now - 600)
       record(FIXTURE_ID, at:, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 1,
         delivered_count: 1, entry_stage: true, error_message: 'RuntimeError: boom',
-        shrieker_errors: JSON.dump({'source#fetch' => 3}))
+        shrieker_errors: JSON.dump({'source#entry' => 3}))
     end
 
     # 🔴 **#1574: 配信へ進む前にエントリを失った run は、未達ではないが 503。**
@@ -1067,7 +1067,8 @@ module TomatoShrieker
     # ⚠ 取りこぼしと数えないもの: 段に入っていない run・旧行（NULL）・宛先で落ちただけの run。
     def test_lost_entries_does_not_overcount
       {
-        '段に入っていない' => {entry_stage: false, shrieker_errors: JSON.dump({'source#fetch' => 1})},
+        '段に入っていない' => {entry_stage: false, shrieker_errors: JSON.dump({'source#entry' => 1})},
+        '保存の前に落ちた' => {entry_stage: true, shrieker_errors: JSON.dump({'source#fetch' => 2})},
         '旧行' => {entry_stage: nil, shrieker_errors: JSON.dump({'source#fetch' => 1})},
         '宛先で落ちただけ' => {
           entry_stage: true,
@@ -1159,7 +1160,7 @@ module TomatoShrieker
       stats = DeliveryStats.new
       stats.enter_entry_stage!
       stats.record_success(Object.new)
-      3.times {stats.record_failure(FeedSource::FETCH_FAILURE_KIND, RuntimeError.new('boom'))}
+      3.times {stats.record_failure(FeedSource::ENTRY_FAILURE_KIND, RuntimeError.new('boom'))}
       SourceRunLog.record_partial(FIXTURE_ID, started_at: Time.now, error: stats.first_error, stats:)
       log = SourceRunLog.latest_for(FIXTURE_ID)
 
@@ -1173,7 +1174,7 @@ module TomatoShrieker
     def test_lost_entries_and_undelivered_are_counted_separately
       log = record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 3,
         delivered_count: 1, entry_stage: true,
-        shrieker_errors: JSON.dump({'TomatoShrieker::WebhookShrieker' => 2, 'source#fetch' => 4}))
+        shrieker_errors: JSON.dump({'TomatoShrieker::WebhookShrieker' => 2, 'source#entry' => 4}))
 
       assert_equal(4, log.lost_entry_count)
       assert_equal([:undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
