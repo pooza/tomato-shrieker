@@ -1012,6 +1012,22 @@ module TomatoShrieker
       end
     end
 
+    # #1509: 未達の判定は `Source#undelivered?` の 1 つ。判定材料では真偽値で持ち、
+    # 503 本文に出す根拠の行は別のキーで渡す。⚠ 確認（ack）すると判定だけが消える。
+    def test_checks_carry_undelivered_as_boolean
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2, delivered_count: 1)
+      checks = SourceStatus.checks(Source.create(FIXTURE_ID), SourceRunLog.latest_for(FIXTURE_ID))
+
+      assert_true(checks[:undelivered])
+      assert_kind_of(SourceRunLog, checks[:undelivered_log])
+      SilenceAck.acknowledge(FIXTURE_ID, at: Time.now + 60)
+      checks = SourceStatus.checks(Source.create(FIXTURE_ID), SourceRunLog.latest_for(FIXTURE_ID))
+
+      assert_false(checks[:undelivered])
+      assert_kind_of(SourceRunLog, checks[:undelivered_log], '根拠の行は確認しても残る')
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
     # 無効ソースは「壊れている」と混同しない (#1503)。healthz は 200、problems は空。
     def test_problems_ignore_disabled_source
       write_fixture(DISABLED_ID, {'disable' => true, 'dest' => {}})

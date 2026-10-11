@@ -110,7 +110,7 @@ module TomatoShrieker
       # ⚠ **いま連続している失敗のどれかが該当すれば true**（#1615 の Codex P2）。
       body << "entry_stage: #{checks[:entry_stage]}\n"
       body << failure_body(latest)
-      body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
+      body << undelivered_body(checks[:undelivered_log], latest) if checks[:undelivered]
       body << silent_body(source) if checks[:silent]
       return body
     end
