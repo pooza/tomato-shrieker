@@ -234,8 +234,10 @@ module TomatoShrieker
       unmatched = Source.unmatched_ids
       # ⚠ 読めない定義を先に見る（healthz と同じ順。同じ id の読める定義があっても 503）。
       return [SourceStatusTable.unmatched_row(id)] if id && unmatched.include?(id)
-      rows = status_sources(id).map {|source| SourceStatusTable.row(source)}
-      rows.concat(unmatched.map {|v| SourceStatusTable.unmatched_row(v)}) unless id
+      # ⚠ 1 つの id に行は 1 つ（`/status.json` と同じ。読めない定義が勝つ）。
+      rows = status_sources(id).reject {|source| unmatched.include?(source.id)}
+        .map {|source| SourceStatusTable.row(source)}
+      rows.concat(unmatched.uniq.map {|v| SourceStatusTable.unmatched_row(v)}) unless id
       return rows
     end
 

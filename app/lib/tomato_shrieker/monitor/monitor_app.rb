@@ -172,9 +172,13 @@ module TomatoShrieker
       # 途中で reload が挟まりうる。別々に読むと、読めなくなった定義が「古い健全な行」と
       # 「新しい error の行」の両方に出たり、直した定義がどちらにも出なかったりする。
       entries = Source.config['/sources']
-      sources = Source.all(entries).reject(&:disable?).map {|s| source_status(s)}
+      # ⚠ **1 つの id に行は 1 つ。読めない定義が勝つ（#1682 の Codex P2・2 巡目）。**同じ id の
+      # 読める定義の行も並べると、id で引く消費者が健全な行を先に拾う（healthz は 503 なのに）。
+      unmatched = Source.unmatched_ids(entries)
+      sources = Source.all(entries).reject {|s| s.disable? || unmatched.include?(s.id)}
+        .map {|s| source_status(s)}
       # #1605: 読めない定義も行として残す（消えると、Kuma に無いソースでは誰も気づけない）。
-      sources.concat(Source.unmatched_ids(entries).map {|id| SourceStatus.unmatched(id)})
+      sources.concat(unmatched.uniq.map {|id| SourceStatus.unmatched(id)})
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,

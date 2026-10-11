@@ -102,6 +102,14 @@ module TomatoShrieker
 
       assert_not_nil(Source.create(FIXTURE_ID), '前提: 読める定義もある')
       assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+      # ⚠ 一覧でも 1 つの id に行は 1 つで、読めない定義が勝つ（同 P2・2 巡目）。
+      _status, _headers, body = call('/status.json')
+      rows = JSON.parse(body.first)['sources'].select {|v| v['id'] == FIXTURE_ID}
+
+      assert_equal([SourceStatus::UNMATCHED_ERROR], rows.map {|v| v['error']})
+      cli = JSON.parse(run_source_status(json: true)).select {|v| v['id'] == FIXTURE_ID}
+
+      assert_equal([SourceStatus::UNMATCHED_ERROR], cli.map {|v| v['error']})
     ensure
       FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
