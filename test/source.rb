@@ -316,6 +316,33 @@ module TomatoShrieker
       ENV['TEST'] = saved
     end
 
+    # 🔴 **#1484: Template は Shrieker ごとに複製して渡す。**
+    #
+    # ⚠ 各 Shrieker は描画の前に `[:tag]` を書き換える。同じ Template を渡すと、
+    # 前の Shrieker（Line は false を立てる）のフラグが、自分では立てない Shrieker に見える。
+    def test_shriek_isolates_template_per_shrieker
+      saved = ENV.fetch('TEST', nil)
+      ENV.delete('TEST')
+      config.reload
+      seen = []
+      writer = Object.new
+      writer.define_singleton_method(:exec) {|body| body[:template][:tag] = false}
+      reader = Object.new
+      reader.define_singleton_method(:exec) {|body| seen.push(body[:template][:tag])}
+      source = Source.new({'id' => 'test-template-isolation'})
+      source.define_singleton_method(:shriekers) do |&block|
+        next enum_for(:shriekers) unless block
+        [writer, reader].each {|v| block.call(v)}
+      end
+      template = Template.new('common')
+      source.shriek(template:, visibility: nil, stats: DeliveryStats.new)
+
+      assert_equal([nil], seen, '前の Shrieker が立てたフラグが見えている')
+      assert_nil(template[:tag], '呼び出し側の Template が書き換わっている')
+    ensure
+      ENV['TEST'] = saved
+    end
+
     # #1433: 成功した配信も計上される。
     def test_shriek_counts_deliveries
       saved = ENV.fetch('TEST', nil)

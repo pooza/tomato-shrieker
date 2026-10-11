@@ -6,7 +6,7 @@ set -eu
 r=repos/pooza/tomato-shrieker
 bot='select(.user.login=="chatgpt-codex-connector[bot]")'
 prs=("$@")
-[ ${#prs[@]} -eq 0 ] && mapfile -t prs < <(gh pr list --state merged --limit 5 --json number --jq '.[].number')
+[ "${#prs[@]}" -eq 0 ] && mapfile -t prs < <(gh pr list --state merged --limit 5 --json number --jq '.[].number')
 for n in "${prs[@]}"; do
   echo "=== #$n"
   gh api --paginate "$r/pulls/$n/reviews" --jq ".[]|$bot|\"review \(.submitted_at) \(.commit_id[0:7])\""

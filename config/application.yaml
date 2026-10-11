@@ -55,13 +55,19 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.13.0
+  version: 4.14.0
 nostr:
   relays:
     - wss://relay.damus.io
     - wss://nos.lol
     - wss://relay.nostr.band
 piefed:
+  api:
+    version: alpha
+  community:
+    types:
+      - Subscribed
+      - Moderating
   subject:
     max_length: 50
   verify_peer: true

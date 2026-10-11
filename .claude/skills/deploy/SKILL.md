@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: 本番（oscura）へのデプロイ。本体とサテライト 3 本の pull と bundle install、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
+description: 本番（oscura）へのデプロイ。本体とサテライト 3 本の pull と bundle install、再起動で増減するソースと起動で倒れる定義の確認、サービスの再起動、再起動後の確認。ユーザーが「デプロイしましょう」などと明示したときだけ使う。
 disable-model-invocation: true
 ---
 
@@ -17,24 +17,43 @@ disable-model-invocation: true
 .claude/skills/deploy/scripts/pull.sh
 ```
 
-本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` する。⚠ 再起動はしない。
+本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
 
-## 2. 再起動
+## 2. 再起動で増減するソースと、起動で倒れる定義の確認
+
+```sh
+.claude/skills/deploy/scripts/pending_sources.sh
+```
+
+読むだけ。稼働中のソース（`/status.json`）と、ディスク上の有効な定義（生の `/sources`）を突き合わせ、あわせて `source reload` の拒否と同じ検査（`SourceValidator.startup_errors`）を通す。
+
+🔴 **再起動は、ディスクに置かれたまま reload されていないソース定義を全部読み込む。**4.13.0 のデプロイでは保留中の定義 3 件が有効になり、56 → 59 ソースになった（発火前に無効化したので投稿は出ていない）。
+
+- `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
+- `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
+- 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**起動で倒れる定義が残っている。reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる。直すか `disable` してからやり直す
+- ⚠ **NG が 0 でも「起動できる」とは限らない。**見ているのはスケジュールと判別キーだけで、登録の途中で起きる失敗（`command:` のソースが `bundle …` で始まるときの `bundle install`・`/source/dir` の誤り）は見ていない（#1477）。そこは 1. の `bundle check` と、4. の `not started` の件数・`NRestarts` で受ける
+- ⚠ 増減があるだけなら 0 で終わる（失敗ではなく、確かめる対象）
+- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
+
+🔴 **pull の後・再起動の前に実行する。**再起動で走るのは pull した後のコードなので、定義も同じコードで読む（新しい版で増えたソース種別の定義や、新しい版の検査で倒れる定義は、古いコードからは見えない）。⚠ **DB を読む CLI（`source status` など）は使っていない** — この時点のスキーマは古く、マイグレーションが要る版では落ちる（下の「順序は pull → 再起動 → CLI」）。
+
+## 3. 再起動
 
 ```sh
 ssh oscura 'sudo systemctl restart tomato-shrieker'
 ```
 
-## 3. 確認
+## 4. 確認
 
 ```sh
 .claude/skills/deploy/scripts/verify.sh
 ```
 
-読むだけ。先頭コミットと版・`ActiveState` / `NRestarts`・`/healthz`・ソースの内訳（success 以外と silent / undelivered の一覧）を出す。
+読むだけ。先頭コミットと版・`ActiveState` / `NRestarts`・`/healthz`・再起動の前からのソースの増減（控えの時刻つき）・ソースの内訳（success 以外と silent / undelivered の一覧）・いまの常駐が出したログのうち `redirect refused` / `process identity` / `event dropped` の件数と、今日のログ全体の `not started`（起動に失敗したプロセスは別の番号なので絞らない）の件数を出す（どれも 0 が正常）。
 
 - 版が上げたものになっていること、`ActiveEnterTimestamp` がいまの再起動であること、`NRestarts` が増えていないこと
-- ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む
+- ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む。⚠ **宛先のリダイレクト拒否（`redirect refused`）は、そのソースが次に配信したときに初めて出る**＝配信の少ないソース（本番 59 件のうち 26 件は直近 8 日に配信が無い・2026-10-11 実測）は、日を置いてもう一度見る
 - ログは `/var/log/tomato-shrieker.log`
 
 ## 注意
@@ -50,8 +69,10 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 
 ⚠ `shooby-do-bop` の既定ブランチは `master`（他は `main`）。
 
+⚠ **`sudo -iu deploy bash -lc "…"` は改行を潰す。**複数行のコマンドが 1 行に連結されて構文エラーになる。複数行で書くときは `pull.sh` と同じ `sudo -H -u deploy bash -lc "…"` にする（1 行なら `-iu` でも通る）。
+
 ⚠ `config/local.yaml` と `config/sources/` は gitignore 配下＝git では上がってこない。ソース定義の正本は本番の実体で、手元の `config/sources` は dev 用。
 
 ⚠ `rake migrate` は不要（起動時に自動適用される。[daemon.md の「起動時マイグレーション」](../../../docs/daemon.md#起動時マイグレーション) 参照）。
 
-⚠ **順序は「pull → 再起動 → CLI」で固定する。**マイグレーションを走らせるのは `SchedulerDaemon#start` だけで、`bin/shrieker` は `Sequel.connect` しかしない。再起動前に新テーブルを触るサブコマンド（`source ack` → `silence_ack`）を叩くと、Thor のエラーではなく生の `Sequel::DatabaseError: no such table` で落ちる。
+⚠ **DB を読む CLI の順序は「pull → 再起動 → CLI」で固定する。**マイグレーションを走らせるのは `SchedulerDaemon#start` だけで、`bin/shrieker` は `Sequel.connect` しかしない。再起動前に新テーブルを触るサブコマンド（`source ack` → `silence_ack`）を叩くと、Thor のエラーではなく生の `Sequel::DatabaseError: no such table` で落ちる。

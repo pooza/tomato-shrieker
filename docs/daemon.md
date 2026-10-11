@@ -24,6 +24,15 @@ systemd/rc.d → bin/scheduler_daemon.rb start
 
 systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake restart` は廃止済み（#1410）。
 
+### pid の再利用と `process_pattern` (#1654)
+
+pid ファイルは異常終了（KILL・OOM・ホスト落ち）で残る。⚠ 正常停止（TERM）では消える — `SchedulerDaemon` は `exec` しないので TERM の trap が生きている（実測。残るのは `SchedulerDaemon.pid.lock` だけ）。**残った番号を別のプロセスが引くと、`start` は「already running」で上がらず、`stop` と `source reload` は無関係なプロセスへシグナルを送る。**`SchedulerDaemon#process_pattern` が「うちの常駐」のコマンド行を宣言しており、`Ginseng::Daemon` は生きている番号の `ps -ww -o command= -p <pid>` と突き合わせ、一致しなければ「居ない」と答える（warn `process identity mismatch` を 1 行残す）。
+
+- 実測した姿: `bundle exec` 経由は `bin/scheduler_daemon.rb start`（本番はこれ）、`ruby` 直は `ruby …/bin/scheduler_daemon.rb start`。どちらも `launcher_pattern('scheduler_daemon.rb')` に一致する
+- 🔴 **起動の仕方を変える・プロセス名を書き換えるコードを足すときは、宣言も変える。**挙げ漏らした姿は「他人」になり、**`start` が 2 本目を立て、`stop` は TERM を送らずに pid ファイルを消す**。先に `ps -ww -o command= -p $(cat tmp/pids/SchedulerDaemon.pid)` で姿を見る
+- ⚠ 見抜けるのは同じユーザー（か root から見た）のプロセスだけ。`ps` が無い・コマンド行が取れないときは従来どおり「生きている」扱い
+- ⚠ FreeBSD の `ps` では実測していない
+
 ### 起動時マイグレーション
 
 **未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
@@ -78,7 +87,7 @@ bin/shrieker source reload
 
 ### 本番操作の注意
 
-- ⚠ **本番のチェックアウトを `git` で覗くときは必ず `deploy` ユーザーで。**`ssh oscura 'git -C ~deploy/repos/tomato-shrieker log'` は `detected dubious ownership` で落ちる。`sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && git log"` と書く（`sudo -u deploy` では rbenv が効かず system ruby になるので `-i` が要る）
+- ⚠ **本番のチェックアウトを `git` で覗くときは必ず `deploy` ユーザーで。**`ssh oscura 'git -C ~deploy/repos/tomato-shrieker log'` は `detected dubious ownership` で落ちる。`sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && git log"` と書く（`sudo -u deploy` では rbenv が効かず system ruby になるので `-i` が要る）。⚠ **`-iu` は改行を潰す**ので、複数行のコマンドは `sudo -H -u deploy bash -lc "…"` で書く
 - 本番デーモンは必ず OS のサービス管理経由 (`systemctl restart tomato-shrieker` / `service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
 - Monit を停止/再開する際は事前にユーザーに確認する
 

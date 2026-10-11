@@ -183,13 +183,22 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 **腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
+### `Bad response 3xx` の読み方
+
+4.14.0 から、宛先（Webhook / LINE / PieFed / Mastodon / Misskey）はリダイレクトを追わない。宛先が 3xx を返すと、run_log・`/healthz/source/:id`・`/status.json`・Sentry には **`Ginseng::GatewayError: Bad response 301`**（302 / 307 / 308 も同じ形）としか出ない。再送はしない。
+
+- **転送先はログにだけ出る。**同じ時刻の `{"error":"redirect refused",…,"location":"…"}` の行を見る。⚠ この行に `source:` は無いので、直後の `{"source":…,"shrieker":…,"error":…}` の行と時刻で結ぶ
+- **直し方は、宛先の URL を `location` の示す最終オリジン（`https://`）へ書き換える**こと。`bin/shrieker source validate` は `http://` の宛先を WARN する
+- 監視は効く: `attempted > 0 / delivered = 0` の error になるので、`errored` と `undelivered` で `/healthz/source/:id` が 503 になる
+- ⚠ フィードの取得（FeedSource / IcalendarSource など）は従来どおりリダイレクトを追う
+
 ### CLI で横断して問い合わせる (#1561)
 
 `/status.json` を全部舐めなくても、本番で次のように引ける（⚠ 本番では `sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && bin/shrieker ..."`）。HTTP を経由せずプロセス内で DB を読むので、**daemon が止まっていても答えられる**。
 
 ```sh
 bin/shrieker source status                    # 1 ソース 1 行（無効ソースは --all で出る）
-bin/shrieker source status --problems         # /healthz/source/:id が 503 になるものだけ
+bin/shrieker source status --problems         # /healthz/source/:id が 503 になるものだけ（あれば終了コード 1）
 bin/shrieker source status --sort=error_rate  # error_rate / last_delivered / streak
 bin/shrieker source status --json             # /status.json の sources[] と同じキー
 bin/shrieker source collisions --hours=24     # 同じ秒に発火したソースの群
@@ -198,6 +207,14 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
 
 `PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印で、**`--problems` には出ない**（無効ソースの healthz は 200）。
+
+⚠ **CLI だけが出す値が 1 つある: `build_failed`**（そのソースの状態を組み立てる途中で例外が出た）。理由は表の後に `<id>: <例外>` の形で **stderr** へ出す（`--json` では行の `error` キー）。⚠ 空の DB や migration 前の DB に向けると全行がこれになる（`no such table: source_run_log`）。⚠⚠ **healthz と食い違いうる。**`/healthz/source/:id` は判定材料しか読まないので、表示用の集計（`error_rate` など）だけが落ちる場合は healthz が 200 のまま、CLI は `build_failed` を出す＝ **`--problems` は「healthz が 503 のもの」＋「CLI が状態を組み立てられなかったもの」**。
+
+⚠ **CLI はディスク上の定義で答える。**daemon は読み込み済みの定義で走っているので、`source edit` / `disable` / `enable` の後・`source reload` の前に打つと、`/healthz/source/:id` と食い違う。
+
+🔴 **`--problems` は、該当が 1 件でもあれば終了コード 1 で終わる**（`--json` を付けても同じ。`source validate` が NG で非 0 を返すのと揃えた。stderr に `N source(s) have problems.` を 1 行出す）。該当が無ければ 0＝ `bin/shrieker source status --problems || 通知` の形で使える。⚠ **`--problems` を付けない一覧は、赤いソースがあっても 0**（一覧を出しただけ）。⚠ `--sort` に知らないキー・`collisions --hours` に 0 以下を渡したときも非 0。
+
+⚠ **`--json` は `problems` / `disabled` を持たない**（`/status.json` の `sources[]` と同じキーという約束どおり）。`--all --json` は無効ソースを印なしで混ぜるので、無効かどうかは表（`PROBLEMS` 列の `disabled`）で見る。
 
 ⚠ `collisions` は**定義ではなく run_log の実績**から見る。`every` の位相は起動時刻で決まるので、定義を突き合わせても同時発火は分からない。
 
@@ -345,4 +362,4 @@ HTTP(s) Monitor:
 | **同一ホストに Kuma 同居** | ネットワーク経路ゼロ、127.0.0.1 で完結 | Kuma の UI を見る側で別途 SSH ポートフォワード等が必要 |
 | **Firewall + IP 制限** | VPN 不要 | 監視ホストの固定 IP が前提。bind を 0.0.0.0 にする必要あり |
 
-本番の seas (FreeBSD) では Tailscale を併用する想定。Tailscale が動かない場合でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。
+⚠ この表は本番が seas (FreeBSD) だった頃の検討。**いまの本番は oscura（Ubuntu / systemd）で、`local.yaml` で `bind: 0.0.0.0` にして LAN / VPN 内の Kuma から叩いている**（アクセス制限が無い点は #1531）。Tailscale が動かない OS でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。

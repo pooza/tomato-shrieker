@@ -906,7 +906,13 @@ module TomatoShrieker
       command = SourceCommand.new
       command.options = options
       command.define_singleton_method(:puts) {|v| out.push(v)}
-      command.status
+      # ⚠ `--problems` は該当があると `Thor::Error`（CLI では終了コード 1・#1648）。
+      # ここで見たいのは出力なので、出し終えた後の例外は受け流す。
+      begin
+        command.status
+      rescue Thor::Error
+        nil
+      end
       return out.join("\n")
     end
 

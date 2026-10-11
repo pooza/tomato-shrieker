@@ -179,7 +179,7 @@ ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (applica
 GitHub Actions (`.github/workflows/test.yml`):
 
 - Ruby 4.0 / Ubuntu
-- `bundle exec rake migration:run` → `bundle exec rubocop` → `bundle exec rake test`
+- `bundle exec rake migration:run` → `bundle exec rubocop` → `bundle exec rake config:lint` → `bundle exec rake test`
 
 ## ディレクトリ構成（主要）
 
@@ -191,11 +191,13 @@ app/lib/tomato_shrieker/
   model/          # Entry (Sequel::Model)
   service/        # SlackService, MulukhiyaService
   cli/            # CLI コマンド (Thor)
+  monitor/        # 監視用 HTTP (MonitorApp / MonitorServer)・SourceStatus・SourceCollisions
 app/task/
   migration.rb    # DB マイグレーション
   bundle.rb, config.rb, test.rb  # ビルド系 rake タスク
 bin/
-  shrieker             # CLI エントリポイント (source list/fetch/shriek/touch/clear)
+  shrieker             # CLI エントリポイント (`bin/shrieker help source` で一覧。source list/status/collisions/
+                       # add/edit/delete/enable/disable/validate/reload/ack/fetch/shriek/touch/clear)
   scheduler_daemon.rb  # デーモンエントリポイント
 config/
   application.yaml     # メイン設定
@@ -282,7 +284,7 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 - **プロジェクト共有すべき知見** → `docs/` 配下の git 管理下のファイルに記載する。⚠ **メモリにだけ置かない**
 - 🔴 **書く先を間違えない。**`CLAUDE.md` は**毎回読む必要があるもの**だけに絞る（自動ロードされる唯一のファイルなので、太らせると毎回のコストになる）。領域ごとの詳細は [monitoring.md](monitoring.md) / [sources.md](sources.md) / [daemon.md](daemon.md) / [sync スキル](../.claude/skills/sync/SKILL.md) へ。⚠ **どちらか迷うなら「この話を知らずに作業を始めると事故るか」で決める**
-- **進捗の同期** → `MEMORY.md` だけでなく `docs/` 側も更新すること。特にリリース済みバージョンの反映（「開発中」→「リリース済み」への変更）を忘れないこと
+- **進捗の同期** → `MEMORY.md` だけでなく `docs/` 側も更新すること
 
 ## 関連リポジトリ
 
@@ -290,5 +292,5 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 - [ginseng-fediverse](https://github.com/pooza/ginseng-fediverse) — Fediverse 対応
 - [ginseng-youtube](https://github.com/pooza/ginseng-youtube) — YouTube 対応
 - [mulukhiya-toot-proxy](https://github.com/pooza/mulukhiya-toot-proxy) — 姉妹プロジェクト（構成が類似）
-- [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) — Google News redirect URL 解決ツール（kues 上で systemd 稼働、Node.js + Playwright）。tomato-shrieker の管理対象に含む
+- [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) — Google News redirect URL 解決ツール（scylla 上で systemd 稼働、Node.js + Playwright）。tomato-shrieker の管理対象に含む
 - [chubo2](https://github.com/pooza/chubo2) — itamae ベースの構成管理。インフラ課題の issue 管理先

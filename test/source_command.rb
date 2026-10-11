@@ -163,7 +163,65 @@ module TomatoShrieker
       assert_equal(['zero-every'], unstartable_with(broken).map(&:first))
     end
 
+    # #1648: `--sort` を値なしで渡すと Thor の enum 検査をすり抜け、nil を `call` して落ちていた。
+    def test_status_sort_rejects_unknown_key
+      error = assert_raise(Thor::Error) {SourceStatusTable.sort([], 'sort')}
+
+      assert_include(error.message, 'error_rate')
+    end
+
+    # #1648: 組み立てに失敗した行の理由を、表の外（stderr）で言えること。
+    # ⚠ 表には `build_failed` としか出ないので、空の DB に向けると原因が読めなかった。
+    def test_status_row_reports_build_failure
+      row = SourceStatusTable.row(broken_status_source)
+
+      assert_equal([:build_failed], row[:problems])
+      assert_equal(1, SourceStatusTable.failures([row]).size)
+      assert_match(/\A__broken__: .+/, SourceStatusTable.failures([row]).first)
+    end
+
+    def test_status_failures_is_empty_for_healthy_rows
+      assert_empty(SourceStatusTable.failures([{status: {id: 'ok'}, problems: [], disabled: false}]))
+    end
+
+    # 🔴 **#1648: `--problems` は、該当があれば終了コード 1・無ければ 0。**
+    # ⚠ `--problems` を付けない一覧は、赤いソースがあっても 0（一覧を出しただけ）。
+    def test_status_problems_exit_code
+      assert_equal(1, status_exit_code([broken_status_source], problems: true))
+      assert_equal(1, status_exit_code([broken_status_source], problems: true, json: true))
+      assert_equal(0, status_exit_code([], problems: true))
+      assert_equal(0, status_exit_code([broken_status_source], problems: false))
+    end
+
+    # #1648: 0 と負数を黙って受けて「発火はありません」と答えていた。
+    def test_collisions_rejects_non_positive_hours
+      [0, -5].each do |hours|
+        assert_raise(Thor::Error) {SourceCommand.new([], {hours:}).collisions}
+      end
+    end
+
     private
+
+    # `source status` を回し、終了コードを返す。出力は捨てる。
+    # ⚠ CLI では `Thor::Error` が終了コード 1 になる（`MainCommand.exit_on_failure?`）。
+    def status_exit_code(sources, **options)
+      command = SourceCommand.new([], options)
+      command.define_singleton_method(:status_sources) {|_id| sources}
+      [:puts, :print_table, :say_error].each {|name| command.define_singleton_method(name) {|*| nil}}
+      command.status
+      return 0
+    rescue Thor::Error
+      return 1
+    end
+
+    # `SourceStatus.build` が落ちるソース（必要なメソッドを持たない）。
+    def broken_status_source
+      source = Object.new
+      source.define_singleton_method(:id) {'__broken__'}
+      source.define_singleton_method(:disable?) {false}
+      source.define_singleton_method(:monitored?) {true}
+      return source
+    end
 
     def source_path(id, suffix)
       return File.join(Environment.dir, 'config/sources', "#{id}.#{suffix}")

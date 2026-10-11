@@ -378,6 +378,51 @@ module TomatoShrieker
       assert_false(SourceValidator.valid?(base.merge('monitor' => {'error_streak_threshold' => '4'})))
     end
 
+    # #1625: 投稿はリダイレクトを追わない。`http://` の宛先が https へ転送する構成だと
+    # 投稿が全部 error になるので、スキーマは通したまま WARN で知らせる。
+    def test_warnings_insecure_dest
+      digest = 'fa9c541e163ff35ac49e12dd5ad71dc4e27876a3a5514f46d074e9b6f190652d'
+      base = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'monitor' => {'silence_tolerance' => '7d'},
+      }
+      secure = base.merge('dest' => {
+        'hooks' => ['https://example.com/x', {'url' => 'https://example.com/y'}],
+        'mastodon' => {'url' => 'https://mastodon.example', 'token' => 't'},
+      })
+
+      assert_empty(SourceValidator.warnings(secure))
+
+      insecure = base.merge('dest' => {
+        'hooks' => ["http://hook.example/mulukhiya/webhook/#{digest}", {'url' => 'http://room.example/webhook'}],
+        'mastodon' => {'url' => 'http://mastodon.example', 'token' => 't'},
+        'misskey' => {'url' => 'HTTP://misskey.example', 'token' => 't'},
+      })
+
+      assert_true(SourceValidator.valid?(insecure), 'スキーマ上は妥当なので NG にはしない')
+      warnings = SourceValidator.warnings(insecure)
+
+      assert_equal(4, warnings.size)
+      assert_match(%r{\A/dest/hooks/0 .*hook\.example}, warnings[0])
+      assert_match(%r{\A/dest/hooks/1/url .*room\.example}, warnings[1])
+      assert_match(%r{\A/dest/mastodon/url .*mastodon\.example}, warnings[2])
+      assert_match(%r{\A/dest/misskey/url .*misskey\.example}, warnings[3])
+      assert_not_include(warnings.join, digest, 'webhook の digest を出さない')
+    end
+
+    # ⚠ `schedule.at`（1 回きり）のソースは silence_tolerance の指摘を出さないが、
+    # 宛先の指摘は間隔に関係なく出す。無効なソースには何も出さない。
+    def test_warnings_insecure_dest_regardless_of_schedule
+      once = {
+        'source' => {'text' => 'x'},
+        'schedule' => {'at' => '2030-01-01 00:00'},
+        'dest' => {'hooks' => ['http://hook.example/x']},
+      }
+
+      assert_equal(1, SourceValidator.warnings(once).size)
+      assert_empty(SourceValidator.warnings(once.merge('disable' => true)))
+    end
+
     # 🔴 Codex P1 (#1558): しきい値に到達するのに retention_days より長くかかる
     # 組み合わせを弾く。⚠ **どれだけ連続で失敗しても 503 にならない**設定になる。
     def test_warnings_unreachable_error_streak_threshold

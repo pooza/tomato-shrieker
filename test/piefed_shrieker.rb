@@ -71,5 +71,74 @@ module TomatoShrieker
 
       assert_requested(@stub, times: 1)
     end
+
+    # #1631: `include Package` が無いと `http_class` が gem 既定の `Ginseng::HTTP` に
+    # 倒れ、tomato の `/http/retry/limit`・User-Agent・マスクが PieFed 宛にだけ効かない。
+    def test_uses_package_http
+      http = PiefedShrieker.new(PARAMS).http
+
+      assert_instance_of(HTTP, http)
+      assert_equal(config['/http/retry/limit'], http.retry_limit)
+    end
+
+    # #1620: 資格情報（JWT）を運ぶ要求がリダイレクト先へ持ち越されないこと。
+    def test_does_not_follow_redirect
+      stub_request(:post, %r{/api/[^/]+/post}).to_return(
+        status: 307,
+        headers: {'Location' => 'https://evil.example.com/post'},
+      )
+      evil = stub_request(:post, 'https://evil.example.com/post')
+      shrieker = PiefedShrieker.new(PARAMS)
+      shrieker.login
+
+      assert_raise(Ginseng::GatewayError) do
+        shrieker.http.post("/api/#{shrieker.api_version}/post", {
+          body: {title: 'x'},
+          headers: {'Authorization' => 'Bearer dummy'},
+        })
+      end
+      assert_not_requested(evil)
+    end
+
+    # 🔴 **#1484: タグは本文にだけ付き、タイトルには付かない。他の宛先に左右されない。**
+    # ⚠ 以前は `[:tag]` を立てずに描画していたので、単独なら付かず、Mastodon / Misskey と
+    # 併用なら付き、Line と併用なら落ちていた。
+    def test_post_data_tags_body_only
+      [nil, true, false].each do |leaked|
+        template = tagged_source.create_template(:default, 'フィクスチャの本文')
+        template[:tag] = leaked
+        data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+        assert_include(data[:body], '#fixture_tag', "body（前の宛先のフラグ: #{leaked.inspect}）")
+        assert_not_include(data[:title], '#fixture_tag', "title（前の宛先のフラグ: #{leaked.inspect}）")
+        assert_include(data[:title], 'フィクスチャの本文')
+        assert_equal(1, data[:community_id])
+      end
+    end
+
+    # ⚠ タグ付きの描画は 1 回だけ（#1664 の Codex P2）。URL の控えも同じ描画から取る。
+    def test_post_data_renders_tagged_body_once
+      template = tagged_source.create_template(:default, '本文 https://example.com/a')
+      tagged = 0
+      original = template.method(:to_s)
+      template.define_singleton_method(:to_s) do
+        tagged += 1 if self[:tag]
+        original.call
+      end
+      data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+      assert_equal(1, tagged)
+      assert_equal('https://example.com/a', data[:url])
+      assert_not_include(data[:body], 'https://example.com/a')
+    end
+
+    def tagged_source
+      return TextSource.new(
+        'id' => '__test_piefed_tags__',
+        'source' => {'text' => 'フィクスチャの本文'},
+        'schedule' => {'every' => '1d'},
+        'dest' => {'tags' => ['fixture_tag'], 'piefed' => PARAMS.transform_keys(&:to_s)},
+      )
+    end
   end
 end

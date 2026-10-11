@@ -155,7 +155,7 @@ journalctl -t tomato-shrieker --since -1min --no-pager | grep '"scheduler":"relo
 curl -s http://127.0.0.1:4567/status.json | jq -r '.sources[].id' | grep test-reload-probe
 
 # 5. 消して reload し、消えること
-bin/shrieker source delete test-reload-probe && bin/shrieker source reload
+bin/shrieker source delete test-reload-probe && bin/shrieker source reload   # ⚠ delete は確認の入力を待つ。非対話で流すなら rm config/sources/test-reload-probe.yaml
 ```
 
 ⚠⚠ **「reload requested」は成功の証拠ではない。**必ず 3 と 4 で結果を確かめること。
@@ -168,6 +168,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] **壊れた定義を置いたまま HUP を直接送っても、他のソースが止まらない**（daemon 側の fail safe）。⚠⚠ **`source reload` は上のとおり拒否するので、ここは `kill -HUP "$(cat tmp/pids/SchedulerDaemon.pid)"` で送る。**ログの `failed`（cron）/ `unmatched`（判別キー）に ID が出て、古いジョブが残ること
   - ⚠ **先に妥当な定義へ戻して `source reload` し、ジョブを立て直してから壊す。**直前の `disable: true` の reload でジョブは消えているので、そのまま HUP を送っても「残るべき古いジョブ」が無く、fail safe を確かめたことにならない
 - [ ] ⚠ **その壊れた定義を残したまま daemon を再起動すると、起動が倒れる**（fail closed）。⚠ **4.11.0（ginseng-core 1.24.0）から、倒れた後に pid ファイルは残らない。**代わりに **理由が syslog に 1 行出る**（`{"daemon":"SchedulerDaemon","message":"not started","reason":"start failed","error":"Ginseng::ConfigError","detail":"failed to register: <id>"}`）。⚠ **4.10.0 までは pid が残り、理由はどこにも出なかった**（`bin/scheduler_daemon.rb` が stderr を `/dev/null` へ付け替えているため）。直して `start` すれば通るのは従来どおり。⚠ **確かめたら必ず直してから再起動すること**（`Restart=always` なので直すまで再起動ループが続く。**2026-09-05 に本番で実際に起きた**: cron の `*` がシェルの glob で展開されて 338 文字になり、7 回の再起動・約 50 秒すべてのソースが停止した）
+  - ⚠ **ここまで（fail closed の再起動 → 定義を直す）を済ませてから次へ進む。**壊れた定義を置いたままだと、以後の `source reload` は仕様どおり全部拒否される＝別の reload を先に挟むと、反映されないまま待ち続ける
 - [ ] `source reload` の後に **HUP をもう一度送っても効く**（ワーカースレッドが生きている）
 
 ## チェックリスト
@@ -179,6 +180,8 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
 - [ ] ⚠ **`ginseng-fediverse` のタグ判定が動いたリリースでは、配信済みエントリの新旧差分を取る**（上記 5）。差分が出たら**全角 ＃ 系（`precure-petitcure`）と `#NNN` 系（GitHub releases）の投稿本文**を投稿先で実視認する
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
+  - 🔴 **一時ソースの ID を使い回すなら、発火の前に `bin/shrieker source clear <id>` する。**⚠⚠ **Entry が残ったまま走らせると「新着を全部投稿」になる**（最新 1 件だけなのは初回だけ）
+  - ⚠ **`source clear` が消すのは Entry だけで、run_log は残る。**`/status.json` の `last_run_at` が前回の値で返るので「もう走った」と読み違える＝**発火の前に `last_run_at` を控え、それより新しくなったことで走ったと判断する**（または ID を新しくする）
 
 ## 後始末
 

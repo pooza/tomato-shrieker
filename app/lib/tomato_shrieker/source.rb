@@ -55,10 +55,23 @@ module TomatoShrieker
       available = 0
       shriekers do |shrieker|
         available += 1
-        delivered += 1 if deliver(shrieker, params, stats)
+        delivered += 1 if deliver(shrieker, params_for_shrieker(params), stats)
       end
       record_unavailable_dests(available, stats)
       return delivered
+    end
+
+    # 🔴 **Template は Shrieker ごとに複製して渡す (#1484)。**
+    #
+    # 各 Shrieker は描画の前に `body[:template][:tag]` を書き換える（Line は false、
+    # Mastodon / Misskey / Nostr / Webhook は true）。`body.clone` は浅いコピーなので、
+    # 同じ Template を渡すと**前の Shrieker が立てたフラグが次の Shrieker に見える**。
+    # ⚠ #1484 の当時は、自分では立てない Shrieker（Piefed）の出力が、同じソースの他の宛先と
+    # その並び順で変わっていた（#1474 のスレッド間の共有と同じ族）。いまは全 Shrieker が
+    # 自分で立てるが、立て忘れた Shrieker が黙って他の宛先に左右されないよう、複製は残す。
+    def params_for_shrieker(params)
+      return params unless params[:template]
+      return params.merge(template: params[:template].dup)
     end
 
     # 1 宛先ぶんの配信。配信できたら true。

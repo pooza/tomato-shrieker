@@ -6,8 +6,9 @@ kuma() {
   ssh mucor "sudo docker exec uptime-kuma sqlite3 -readonly /app/data/kuma.db \"$1\""
 }
 echo '=== diff（本番 / Kuma）'
-diff <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
-     <(kuma "select name from monitor where name like 'tomato-shrieker %';" | sed 's/^tomato-shrieker //' | sort) &&
+diff \
+  <(ssh oscura 'curl -s http://127.0.0.1:4567/status.json' | jq -r '.sources[].id' | sort) \
+  <(kuma "select name from monitor where name like 'tomato-shrieker %';" | sed 's/^tomato-shrieker //' | sort) &&
   echo '一致'
 echo '=== active|件数'
 kuma "select active, count(*) from monitor where name like 'tomato-shrieker %' group by active;"
