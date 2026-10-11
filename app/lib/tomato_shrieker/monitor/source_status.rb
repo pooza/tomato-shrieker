@@ -72,7 +72,8 @@ module TomatoShrieker
       return [] if source.disable? || !source.monitored?
       return [:no_dest] unless source.dest?
       latest = SourceRunLog.latest_for(source.id)
-      return [:no_run] unless latest
+      # ⚠ 初回の実行期限の内なら問題にしない (#1560)。healthz も同じ述語で 200 を返す。
+      return source.awaiting_first_run? ? [] : [:no_run] unless latest
       return problems_of(checks(source, latest))
     end
 
@@ -89,6 +90,8 @@ module TomatoShrieker
         schedule: @source.schedule_spec,
         grace_seconds: @source.monitor_grace_seconds,
         last_run_at: latest&.executed_at&.iso8601,
+        # #1560: 一度も走っていないソースが、いつまで緑でいられるか。走ったら null。
+        first_run_deadline: (@source.first_run_deadline&.iso8601 if @source.monitored? && !latest),
         next_run_at: next_run&.iso8601,
         last_status: latest&.status,
         last_error: latest&.error_message,

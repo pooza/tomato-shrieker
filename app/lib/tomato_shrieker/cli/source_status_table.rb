@@ -72,8 +72,11 @@ module TomatoShrieker
     end
 
     # 問題に加えて無効の目印も出す。⚠ 目印は `problems` には入れない（`--problems` の判定を汚す）
+    # ⚠ `awaiting_first_run` も目印 (#1560)。まだ一度も走っていないが、初回の実行期限の内
+    # （healthz は 200）。期限を過ぎると `no_run` という問題になる。
     def self.marks(row)
       marks = row[:problems] + (row[:disabled] ? [:disabled] : [])
+      marks.push(:awaiting_first_run) if marks.empty? && row[:status][:first_run_deadline]
       return marks.any? ? marks.join(',') : '-'
     end
 

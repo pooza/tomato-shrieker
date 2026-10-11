@@ -58,6 +58,33 @@ module TomatoShrieker
       assert_equal(expected, config['/sources'].size)
     end
 
+    # 🔴 #1560 / #1678 の Codex P2: 定義の更新時刻は、一覧と同時かそれより先に見えること。
+    # ⚠ 後から書くと、公開の瞬間に来た要求は足したばかりのソースの期限を引けず 503 を返す。
+    # ⚠ 消える定義の側も、公開の前に表から消えてはいけない（古い一覧にはまだ居る）。
+    def test_load_publishes_definition_times_before_sources
+      write_sources(1)
+      config.reload
+      removed = "#{PREFIX}0"
+      added = "#{PREFIX}1"
+      File.delete(source_path(0))
+      File.write(source_path(1), {'source' => {'text' => 'new'}, 'schedule' => {'cron' => '0 0 * * *'}}.to_yaml)
+      seen = nil
+      config.define_singleton_method(:replace) do |hash|
+        seen = [source_defined_at(added), source_defined_at(removed)]
+        super(hash)
+      end
+      begin
+        config.reload
+      ensure
+        config.singleton_class.remove_method(:replace)
+      end
+
+      assert_kind_of(Time, seen.first, '公開の時点で、足したソースの更新時刻が引けない')
+      assert_kind_of(Time, seen.last, '公開の前に、消える定義の更新時刻が消えている')
+      assert_kind_of(Time, config.source_defined_at(added))
+      assert_nil(config.source_defined_at(removed), '公開の後も、消えた定義が残っている')
+    end
+
     # 🔴 #1530: 壊れた YAML があっても、それまでの内容を壊さないこと。
     #
     # 以前は 3 件目で raise すると 2 件目まで積まれた状態で残った。⚠ ソース定義を

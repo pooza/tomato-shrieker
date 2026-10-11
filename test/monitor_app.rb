@@ -80,12 +80,73 @@ module TomatoShrieker
       assert_include(body.first, '__no_such_source__')
     end
 
-    # run が無いソースは 503 (No run recorded yet)
+    # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
+    def backdate_fixture(id, seconds)
+      at = Time.now - seconds
+      File.utime(at, at, fixture_path(id))
+      config.reload
+    end
+
+    # run が無いまま初回の実行期限を過ぎたソースは 503 (No run recorded yet)
     def test_healthz_source_without_run
+      backdate_fixture(FIXTURE_ID, 86_400)
       status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(503, status)
       assert_include(body.first, 'No run recorded yet')
+      assert_include(body.first, 'first_run_deadline: ')
+      assert_equal([:no_run], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # 🔴 **#1560: 足したばかりのソースは、初回の実行期限までは赤くしない。**
+    def test_healthz_source_awaiting_first_run
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+      source = Source.create(FIXTURE_ID)
+
+      assert_equal(200, status)
+      assert_include(body.first, 'awaiting first run')
+      assert_empty(SourceStatus.problems(source))
+      # 5 分間隔なので、期限は「定義の更新時刻 + 5 分 + 猶予」
+      expected = File.mtime(fixture_path(FIXTURE_ID)) + 300 + source.monitor_grace_seconds
+
+      assert_in_delta(expected.to_f, source.first_run_deadline.to_f, 1)
+      assert_equal(source.first_run_deadline.iso8601, source_status(FIXTURE_ID)['first_run_deadline'])
+    end
+
+    # ⚠ 期限ちょうどの境目。5 分間隔＋猶予なので、その少し手前は緑・少し過ぎは赤。
+    def test_first_run_deadline_boundary
+      window = 300 + Source.create(FIXTURE_ID).monitor_grace_seconds
+      backdate_fixture(FIXTURE_ID, window - 30)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      backdate_fixture(FIXTURE_ID, window + 30)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # ⚠ cron は「定義の更新時刻から見た次の発火」まで待つ（日次なら最大 1 日）。
+    def test_first_run_deadline_follows_cron
+      write_fixture(FIXTURE_ID, {'schedule' => {'cron' => '0 0 * * *'}})
+      backdate_fixture(FIXTURE_ID, 3600)
+      source = Source.create(FIXTURE_ID)
+      due = Rufus::Scheduler.parse('0 0 * * *').next_time(File.mtime(fixture_path(FIXTURE_ID))).to_t
+
+      assert_in_delta((due + source.monitor_grace_seconds).to_f, source.first_run_deadline.to_f, 1)
+    end
+
+    # 1 度でも走ったら、期限は出さない（以後は stale / errored などの通常の判定）。
+    def test_first_run_deadline_is_null_after_first_run
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+
+      assert_nil(source_status(FIXTURE_ID)['first_run_deadline'])
+    end
+
+    # ⚠ ファイルから読んでいないソースは起点が無い＝期限なし＝従来どおり `no_run`。
+    def test_first_run_deadline_requires_definition_file
+      source = Source.new({'id' => '__not_from_file__', 'schedule' => {'every' => '5m'}})
+
+      assert_nil(source.first_run_deadline)
+      assert_false(source.awaiting_first_run?)
     end
 
     def test_healthz_source_healthy
@@ -832,7 +893,8 @@ module TomatoShrieker
     # 判定は `SourceStatus` に 1 つだけ置いたので、それを両方が通っていることを状態ごとに見る。
     def test_problems_agree_with_healthz_source
       {
-        no_run: proc {},
+        awaiting_first_run: proc {},
+        no_run: proc {backdate_fixture(FIXTURE_ID, 86_400)},
         healthy: proc {record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)},
         errored: proc {record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)},
         undelivered: proc do
@@ -871,11 +933,11 @@ module TomatoShrieker
     def test_source_status_problems_and_all
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
       write_fixture(DISABLED_ID, {'disable' => true})
-      config.reload
+      backdate_fixture(SILENT_ID, 86_400)
       problems = JSON.parse(run_source_status(json: true, problems: true)).map {|v| v['id']}
 
       assert_not_include(problems, FIXTURE_ID)
-      assert_include(problems, SILENT_ID) # run が 1 本も無い
+      assert_include(problems, SILENT_ID) # run が 1 本も無く、初回の実行期限も過ぎた (#1560)
       assert_not_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, DISABLED_ID)
       assert_include(JSON.parse(run_source_status(json: true, all: true)).map {|v| v['id']}, DISABLED_ID)
     end
