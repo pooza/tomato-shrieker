@@ -36,6 +36,11 @@ module TomatoShrieker
       ensure
         @staging = nil
       end
+      # 🔴 **更新時刻の表は、一覧より先に見えるようにする（#1678 の Codex P2）。**⚠ 後から
+      # 書くと、`replace` との間に来た要求は「新しい一覧・古い表」を見て、足したばかりの
+      # ソースに期限が無い＝ 503 を返す。⚠ 先に差し替えるだけだと、今度は消える定義が
+      # 「古い一覧・新しい表」で同じ目に遭うので、**公開の前は新旧を重ねた表**にしておく。
+      @source_defined_at = (@source_defined_at || {}).merge(defined_at)
       replace(staged)
       @source_defined_at = defined_at
     end
