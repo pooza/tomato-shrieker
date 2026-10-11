@@ -1,15 +1,13 @@
 module TomatoShrieker
   class MastodonShrieker < Ginseng::Fediverse::MastodonService
     include Package
+    include RemoteAttachment
 
     def exec(body)
       body = body.clone
       body[:media_ids] ||= []
       if (attachments = body.delete(:attachments))
-        in_threads = Parallel.processor_count * 2
-        body[:media_ids] = Parallel.map(attachments, in_threads:) do |v|
-          upload_remote_resource(v[:image_url], {response: :id})
-        end
+        body[:media_ids] = upload_attachments(attachments, source: body[:template]&.source)
       end
       body[:template][:tag] = true
       body[:status] = body[:template].to_s.strip

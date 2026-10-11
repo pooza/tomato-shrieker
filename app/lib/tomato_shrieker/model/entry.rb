@@ -51,8 +51,11 @@ module TomatoShrieker
       return @uri
     end
 
+    # 🔴 **取りにいく先のホストを検証する (#1666)。**エントリの URL はフィードの書き手
+    # （第三者）が決めるので、内部ホストやそこへのリダイレクトを踏ませられる。
+    # ⚠ 拒否は `GatewayError` で、`tags` が握ってソースのタグだけに倒す。
     def nokogiri
-      @nokogiri ||= HTTP.new.get(uri).body.nokogiri
+      @nokogiri ||= HTTP.new.get(uri, {host_validator: Ginseng::PublicHost.validator}).body.nokogiri
       return @nokogiri
     end
 

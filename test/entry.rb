@@ -73,6 +73,22 @@ module TomatoShrieker
       end
     end
 
+    # #1666: エントリの URL は第三者が決める。内部ホストへは要求を出さない。
+    def test_nokogiri_rejects_internal_host
+      entry = Entry[Entry.insert(
+        feed: FEED_ID,
+        title: 'フィクスチャ（内部ホスト）',
+        url: 'http://127.0.0.1/secret',
+        enclosure_url: [].to_json,
+        extra_tags: [].to_json,
+        published: Time.now,
+      )]
+
+      error = assert_raise(Ginseng::GatewayError) {entry.nokogiri}
+      assert_match(/Rejected host/, error.message)
+      assert_not_requested(:any, /127\.0\.0\.1/)
+    end
+
     def test_create_template
       @entries.each do |entry|
         assert_kind_of(Template, entry.create_template)

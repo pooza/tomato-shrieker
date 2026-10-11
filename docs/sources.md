@@ -97,6 +97,21 @@ dest:
 
 ⚠ **クラス名が `Matrix～` でないのは意図的。**喋る相手は Matrix の Client-Server API ではなく `tsunagal/matrix-webhook` という HTTP webhook なので、`MatrixShrieker` は将来 C-S API を実装するときのために空けてある。
 
+### 第三者が書ける URL を取りにいく経路 (#1666)
+
+フィードの書き手（第三者）が決める URL を、tomato 自身が GET する経路は 2 つある。どちらも**取りにいく先のホストを検証する**（`Ginseng::PublicHost.validator`。初段もリダイレクトの各ホップも）。
+
+| 経路 | 何を取りにいくか | 効くソース |
+| --- | --- | --- |
+| 添付（`RemoteAttachment`） | フィードの enclosure（先頭 4 件）を取り、投稿先へ上げる | `/dest/mastodon` / `/dest/misskey` の**直接経路**だけ。⚠ Webhook は `image_url` を渡すだけで、取りにいくのはモロヘイヤ側 |
+| リモートのタグ付け（`Entry#nokogiri`） | エントリの URL のページ（h1〜h3 / title / meta のテキスト） | `/dest/mulukhiya/tagging/enable: true` のソース |
+
+落ちるのは、IP アドレスのリテラル・ドットを含まない名前（`localhost`）・内部や予約アドレスに解決される名前・解決できない名前・それらへのリダイレクト。要求は 1 本も出ない。⚠ **`/etc/hosts` は見ない**（DNS だけ）。⚠ **名前解決の一時的な失敗も同じ扱いで、再送しない。**🔴 **プロキシ環境（`http_proxy` / `https_proxy`）では添付が全部落ちる**（検証したアドレスへ接続を固定できないため）。
+
+- 🔴 **取れなかった添付は落とし、本文は投稿する。**ログに warn `attachment dropped`（`source` / `shrieker` / `host` / `error`）が残る。⚠ 添付の失敗で投稿ごと落とすと、**enclosure に 1 本おかしな URL が混ざっただけでそのエントリが宛先に届かなくなる**（Entry は作成済みなので次の run でも拾われない）
+- リモートのタグ付けが拒否されたら、ソースのタグだけで投稿する（ログに error）
+- ⚠ **添付の検証は gem（ginseng-fediverse 6.0.0 以降）の既定。**tomato 側に自前の検証は置いていない＝版を戻すと守りも消える（`RemoteAttachmentTest` が赤くなる）
+
 ### モロヘイヤ連携
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（デフォルト true）
