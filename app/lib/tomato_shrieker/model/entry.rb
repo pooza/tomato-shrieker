@@ -88,8 +88,17 @@ module TomatoShrieker
       return entry
     end
 
+    # 🔴 **DB が混んでいても、ここでは再試行しない (#1630)。**
+    #
+    # 以前は `rescue SQLite3::BusyException` で 5 回まで `retry` する形だったが、**一度も
+    # 到達しない死んだコードだった**。Sequel は SQLite の例外を包み直すので、BUSY は素の
+    # `Sequel::DatabaseError`（`wrapped_exception` が `SQLite3::BusyException`）で上がり、
+    # 下の `rescue => e` に落ちる。ロック待ちは接続の側（Sequel 既定の 5000ms）が持つ。
+    # ⚠⚠ **`retry` を「効くように」直してはいけない。**`begin` の先頭へ戻ると insert を
+    # もう一度打つので、insert の後（`Entry[id]`）で混んだ run は**自分が入れた行に当たって
+    # `UniqueConstraintViolation` → `nil`**＝行は残るのに失敗がどこにも計上されない。
+    # 再試行を入れるなら、insert と読み出しで単位を分けること。
     def self.create(entry, feed = nil)
-      retry_count = 0
       inserted = false
       begin
         parser = EntryParser.new(entry)
@@ -97,11 +106,6 @@ module TomatoShrieker
         id = Entry.insert(parser.parse)
         inserted = true
         return deliverable(Entry[id], feed)
-      rescue SQLite3::BusyException
-        retry_count += 1
-        raise if retry_count >= 5
-        sleep(rand(0.5..2.0))
-        retry
       rescue Sequel::UniqueConstraintViolation
         # 既知のエントリ＝異常ではないので nil を返して読み飛ばす
         return nil

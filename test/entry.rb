@@ -123,6 +123,29 @@ module TomatoShrieker
       assert_equal(FIXTURES.size + 1, Entry.where(feed: FEED_ID).count, '行が残っていない')
     end
 
+    # 🔴 **#1630: insert の後で DB が混んでも、再試行しない（失敗として上げる）。**
+    #
+    # ⚠⚠ `begin` の先頭へ戻る再試行は insert をもう一度打つので、**自分が入れた行に
+    # 当たって `UniqueConstraintViolation` → `nil`**＝行は残るのに失敗がどこにも残らない。
+    # ⚠ 素の `SQLite3::BusyException` と、Sequel が包み直した形の両方で見る。
+    def test_create_does_not_retry_when_busy_after_insert
+      wrapped = Sequel::DatabaseError.new('SQLite3::BusyException: database is locked')
+      [SQLite3::BusyException.new('database is locked'), wrapped].each do |error|
+        Entry.where(feed: FEED_ID, url: stage_values[:url]).delete
+        stats = DeliveryStats.new
+        calls = 0
+        with_deliverable_stub(lambda {
+          calls += 1
+          raise error
+        }) do
+          assert_raise(error.class) {Entry.create(stage_values, stage_source(stats))}
+        end
+
+        assert_equal(1, calls, "#{error.class}: 再試行している")
+        assert_true(stats.entry_stage?, "#{error.class}: 行は残るのに段が立っていない")
+      end
+    end
+
     # ⚠ insert より手前（パース失敗）で落ちたら立てない。**失うものが無い。**
     def test_create_does_not_mark_entry_stage_when_it_fails_before_insert
       stats = DeliveryStats.new
