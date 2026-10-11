@@ -185,6 +185,26 @@ module TomatoShrieker
       assert_requested(edit, times: 1)
     end
 
+    # 🔴 **#1679 の Codex P2: 投稿を作った後は、例外の種類を選ばずに握る。**
+    # ⚠ 応答が JSON でない（`parsed_response` が文字列）と `dig` が `NoMethodError` を上げる。
+    def test_exec_succeeds_when_response_is_not_json
+      stub_request(:post, %r{/api/[^/]+/post\z}).to_return(status: 200, body: 'OK')
+      edit = stub_edit
+
+      assert_nothing_raised {exec_with(tagged_source)}
+      assert_not_requested(edit)
+    end
+
+    # 🔴 **タグを求めるところで落ちるなら、投稿を作る前に落とす**（再実行で二重にならない）。
+    def test_exec_resolves_tags_before_creating_the_post
+      create = stub_create
+      source = tagged_source
+      source.define_singleton_method(:create_tags) {|_status| raise 'tagging failed'}
+
+      assert_raise(RuntimeError) {exec_with(source)}
+      assert_not_requested(create)
+    end
+
     # ⚠ 応答から投稿の id が読めないときも同じ（編集は出さない）。
     def test_exec_succeeds_when_post_id_is_missing
       stub_create({})

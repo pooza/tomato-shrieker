@@ -20,11 +20,14 @@ module TomatoShrieker
       # PieFed の認証 API を叩き、レートリミット (429) を踏みやすくなる。
       login
       template = create_piefed_template(body[:template])
+      # ⚠ **タグは投稿の前に求める（#1679 の Codex P2）。**モロヘイヤへの問い合わせなどで
+      # 落ちるなら、投稿を作る前に落とす＝再実行しても二重にならない。
+      tags = tags_of(template)
       response = http.post("/api/#{api_version}/post", {
         body: post_data(template),
         headers: auth_headers,
       })
-      attach_tags(response, template)
+      attach_tags(response, tags, template.source)
       return response
     end
 
@@ -44,22 +47,23 @@ module TomatoShrieker
     # 🔴 **タグが付かなくても、投稿は成功として返す。**⚠⚠ ここで例外を上げると
     # `Source#deliver` が「配信に失敗した」と数えるが、**投稿はもう出ている**。
     # 再実行すれば同じ投稿が二重に出る。失敗は warn `tags not attached` で残す。
-    def attach_tags(response, template)
-      tags = tags_of(template)
+    # ⚠⚠ **投稿を作った後なので、例外の種類を選ばずに握る（#1679 の Codex P2）。**
+    # `GatewayError` だけだと、応答の形が違うときの `NoMethodError` などがすり抜ける。
+    def attach_tags(response, tags, source)
       return if tags.empty?
-      id = response.parsed_response.dig('post_view', 'post', 'id') rescue nil
+      id = response.parsed_response.dig('post_view', 'post', 'id')
       raise Ginseng::GatewayError, 'post id not found in response' unless id
       http.put("/api/#{api_version}/post", {
         body: {post_id: id, tags: tags.join(',')},
         headers: auth_headers,
       })
-    rescue Ginseng::GatewayError => e
+    rescue => e
       logger.warn(
-        source: template.source&.id,
+        source: source&.id,
         shrieker: self.class.to_s,
         message: 'tags not attached',
         post_id: id,
-        error: e.message,
+        error: Package.error_message(e),
       )
     end
 
