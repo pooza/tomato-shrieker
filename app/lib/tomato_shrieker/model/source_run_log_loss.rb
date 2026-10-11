@@ -29,6 +29,8 @@ module TomatoShrieker
     end
 
     # 段に入った後、内訳を 1 件も残さずに落ちた run。⚠ 失った件数は分からない。
+    # ⚠ **この形になるのは 4.14.0 までに書かれた行だけ。**4.15.0 からは `Source#record_exec_abort`
+    # が `source#exec` を 1 件数えるので、`lost_entry_count` の側で立つ（宛先の失敗と混ざっても）。
     def aborted_in_entry_stage?
       return entry_stage == true && error? && shrieker_error_counts.empty?
     end

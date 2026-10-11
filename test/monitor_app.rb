@@ -1110,6 +1110,40 @@ module TomatoShrieker
       assert_true(Source.create(FIXTURE_ID).lost_entries?)
     end
 
+    # ⚠ `exec` を差し替えたソースを、実際の記録の経路（`exec_with_run_log`）で 1 回走らせる。
+    def run_with_exec(&)
+      source = Source.create(FIXTURE_ID)
+      source.define_singleton_method(:exec, &)
+      source.send(:exec_with_run_log, :every, '5m')
+      return SourceRunLog.latest_for(FIXTURE_ID)
+    end
+
+    # 🔴 **#1685 の Codex P1（2 巡目）: 宛先の失敗を記録した後に run ごと落ちた形。**
+    # ⚠⚠ 内訳は空ではない（宛先の失敗が載っている）ので、件数から引くだけだと 0 件になり、
+    # 落ちたエントリが未達の診断に埋もれる。落ちたこと自体を 1 件として数える。
+    def test_lost_entries_when_run_aborts_after_delivery_error
+      log = run_with_exec do
+        @delivery_stats.enter_entry_stage!
+        @delivery_stats.record_error(Object.new, RuntimeError.new('destination down'))
+        raise 'template broken'
+      end
+
+      assert_true(log.error?)
+      assert_equal({'Object' => 1, Source::EXEC_FAILURE_KIND => 1}, log.shrieker_error_counts)
+      assert_equal(1, log.lost_entry_count)
+      assert_false(log.aborted_in_entry_stage?, '内訳が空の旧い形ではない')
+      assert_equal([:errored, :undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # ⚠ 段に入る前（取得）で落ちた run は数えない。失うものが無い。
+    def test_fetch_stage_abort_records_no_loss
+      log = run_with_exec {raise 'Bad response 404'}
+
+      assert_true(log.error?)
+      assert_empty(log.shrieker_error_counts)
+      assert_false(log.lost_entries?)
+    end
+
     # ⚠ 取得段で落ちた run（段に入っていない）は、内訳が空でも取りこぼしではない。
     def test_fetch_stage_abort_is_not_a_loss
       log = record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, entry_stage: false,
