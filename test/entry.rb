@@ -134,11 +134,11 @@ module TomatoShrieker
         Entry.where(feed: FEED_ID, url: stage_values[:url]).delete
         stats = DeliveryStats.new
         calls = 0
-
-        with_deliverable_stub(lambda {
-                                calls += 1
-                                                raise error
-        }) do
+        busy = lambda do
+          calls += 1
+          raise error
+        end
+        with_deliverable_stub(busy) do
           assert_raise(error.class) {Entry.create(stage_values, stage_source(stats))}
         end
 
