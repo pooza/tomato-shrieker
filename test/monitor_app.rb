@@ -1180,6 +1180,34 @@ module TomatoShrieker
       assert_equal([:undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
     end
 
+    # 🔴 **4.15.0 リリース前レビュー: サブクラス経由の `create` が動くこと。**
+    # ⚠ `Source.create` に一覧の引数を足したとき、サブクラスの `all`（引数なし）へ渡して
+    # `ArgumentError` になっていた（アプリからの呼び出しは無いが、公開の口）。
+    def test_create_via_subclass
+      assert_kind_of(FeedSource, FeedSource.create(FIXTURE_ID))
+      assert_nil(TextSource.create(FIXTURE_ID), '別の種別からは引けない')
+    end
+
+    # ⚠ 段に入った run が無いソースでも、根拠の行を引くのは 1 回だけ（nil もメモする）。
+    def test_lost_entries_log_is_looked_up_once
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, entry_stage: false)
+      source = Source.create(FIXTURE_ID)
+      calls = 0
+      original = SourceRunLog.method(:last_entry_stage)
+      SourceRunLog.define_singleton_method(:last_entry_stage) do |id|
+        calls += 1
+        original.call(id)
+      end
+      begin
+        3.times {source.lost_entries?}
+        source.lost_entries_log
+      ensure
+        SourceRunLog.define_singleton_method(:last_entry_stage, original)
+      end
+
+      assert_equal(1, calls)
+    end
+
     # #1509: 未達の判定は `Source#undelivered?` の 1 つ。判定材料では真偽値で持ち、
     # 503 本文に出す根拠の行は別のキーで渡す。⚠ 確認（ack）すると判定だけが消える。
     def test_checks_carry_undelivered_as_boolean
@@ -1293,7 +1321,7 @@ module TomatoShrieker
     end
 
     def record(source_id, at: Time.now, **values)
-      SourceRunLog.create({
+      return SourceRunLog.create({
         source_id:,
         executed_at: at,
         status: SourceRunLog::STATUS_SUCCESS,

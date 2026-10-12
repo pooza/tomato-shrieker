@@ -403,8 +403,9 @@ module TomatoShrieker
     end
 
     # 取りこぼしの根拠になっている run。確認済みかどうかは見ない。
+    # ⚠ **nil もメモする**（`||=` だと、段に入った run が無いソースで毎回引き直す）。
     def lost_entries_log
-      @lost_entries_log ||= SourceRunLog.last_entry_stage(id)
+      @lost_entries_log = SourceRunLog.last_entry_stage(id) unless defined?(@lost_entries_log)
       return nil unless @lost_entries_log&.lost_entries?
       return @lost_entries_log
     end
@@ -656,8 +657,10 @@ module TomatoShrieker
       end
     end
 
+    # ⚠ **`Source.all` を直に呼ぶ（4.15.0 リリース前レビュー）。**サブクラスの `all` は引数を
+    # 取らないので、`all(entries)` だと `FeedSource.create(id)` が `ArgumentError` になる。
     def self.create(id, entries = config['/sources'])
-      return all(entries).find {|v| v.id == id}
+      return Source.all(entries).grep(self).find {|v| v.id == id}
     end
 
     def fedi_sanitize(message)

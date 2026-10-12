@@ -14,7 +14,7 @@ module TomatoShrieker
     #    この窓に重なると**ソースが欠けて見える**。`/healthz/source/:id` は
     #    `Source.create(id)` が見つからず **404** を返す。Kuma に偽の 404 / 503 が出る
     #
-    # ⚠ **`source_entries` を `super` より先に呼ぶこと。** ファイル I/O を先に
+    # ⚠ **`scan_sources` を `super` より先に呼ぶこと。** ファイル I/O を先に
     # 済ませておけば、`super` の `update` と下の代入の間に I/O が挟まらず、
     # 窓はマイクロ秒まで縮む。壊れた YAML があれば `self` を一切変更しないまま
     # raise するので、呼び出し側は前の内容のまま走り続ける。
@@ -58,11 +58,6 @@ module TomatoShrieker
     def update(other)
       return @staging.update(other) if @staging
       return super
-    end
-
-    # ソース定義を読んで配列にする。⚠ self には触らない。
-    def source_entries
-      return scan_sources.first
     end
 
     # ソース定義と、その更新時刻（id => Time）を 1 回の走査で読む。⚠ self には触らない。

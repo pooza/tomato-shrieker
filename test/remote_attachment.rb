@@ -57,6 +57,40 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **4.15.0 リリース前レビュー: 読めない `Location` の全文をログに出さない。**
+    # ⚠ `URI::InvalidURIError` のメッセージは URL 全体を含み、読めない URL はログのマスクが
+    # 素通しにする＝リダイレクト先の署名が残る。クラス名だけを出す。
+    def test_dropped_log_does_not_leak_unparsable_location
+      shriekers.each do |shrieker|
+        logged = []
+        fake = Object.new
+        fake.define_singleton_method(:warn) {|values| logged.push(values)}
+        shrieker.define_singleton_method(:logger) {fake}
+        shrieker.define_singleton_method(:upload_remote_resource) do |_url, _params = {}|
+          raise ::URI::InvalidURIError, 'bad URI (is not URI?): "http://exa mple.com/a b?token=SECRET"'
+        end
+
+        assert_empty(shrieker.upload_attachments([{image_url: 'https://cdn.example.com/a.png?sig=QUERY'}]))
+        assert_equal(1, logged.size)
+        assert_equal('URI::InvalidURIError', logged.first[:error])
+        assert_equal('cdn.example.com', logged.first[:host])
+        assert_not_include(logged.first.to_s, 'SECRET')
+        assert_not_include(logged.first.to_s, 'QUERY')
+      end
+    end
+
+    # ⚠ ほかの失敗は `Package.error_message` を通す（クラス名つき）。
+    def test_dropped_log_carries_error_class
+      shrieker = shriekers.first
+      logged = []
+      fake = Object.new
+      fake.define_singleton_method(:warn) {|values| logged.push(values)}
+      shrieker.define_singleton_method(:logger) {fake}
+      shrieker.upload_attachments([{image_url: 'http://127.0.0.1/a.png'}])
+
+      assert_match(/\AGinseng::GatewayError: Rejected host/, logged.first[:error])
+    end
+
     # ⚠ 握るのは「取れない・上げられない」だけ。実装の誤りまで握らない。
     def test_does_not_swallow_unexpected_errors
       shriekers.each do |shrieker|

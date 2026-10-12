@@ -214,6 +214,33 @@ module TomatoShrieker
       assert_not_requested(edit)
     end
 
+    # 🔴 **4.15.0 リリース前レビュー: 本文（`status`）が無いテンプレートで `create_tags` を呼ばない。**
+    # ⚠ 予定（`IcalendarSource`）のテンプレートは本文を持たない。リモートのタグ付けが有効だと
+    # モロヘイヤへ nil を渡して `NoMethodError` になり、予定 1 件ごとに PieFed 宛が失敗していた。
+    # ⚠ `calendar.erb` が並べるのは `source.tags` なので、そちらに合わせる。
+    def test_tags_of_uses_source_tags_without_status
+      source = tagged_source(['fixture_tag', 'second'])
+      source.define_singleton_method(:create_tags) {|_status| raise 'create_tags は呼ばない'}
+      template = source.create_template(:default, nil)
+      template[:entry] = {title: '予定'}
+      template[:status] = nil
+
+      assert_equal(['fixture_tag', 'second'], PiefedShrieker.new(PARAMS).send(:tags_of, template))
+    end
+
+    # ⚠ 本文があれば `create_tags`（リモートのタグ付けを含む）、エントリがタグを持てばそちら。
+    def test_tags_of_follows_template_kind
+      source = tagged_source
+      source.define_singleton_method(:create_tags) {|_status| ['#from_create_tags']}
+      shrieker = PiefedShrieker.new(PARAMS)
+
+      assert_equal(['from_create_tags'], shrieker.send(:tags_of, source.create_template(:default, '本文')))
+      template = source.create_template(:default, '本文')
+      template[:entry] = Struct.new(:tags).new(['#from_entry', '#from_entry'])
+
+      assert_equal(['from_entry'], shrieker.send(:tags_of, template))
+    end
+
     def tagged_source(tags = ['fixture_tag'])
       return TextSource.new(
         'id' => '__test_piefed_tags__',
