@@ -73,6 +73,105 @@ module TomatoShrieker
       assert_equal('text/plain; charset=utf-8', headers['content-type'])
     end
 
+    UNMATCHED_ID = '__test_monitor_app_unmatched__'.freeze
+
+    # ⚠ 判別キーの打ち間違い（`feed` → `feeed`）＝どのソースクラスにも一致しない定義。
+    def write_unmatched_fixture(extra = {})
+      write_fixture(UNMATCHED_ID, {'source' => {'feeed' => 'https://example.com/typo.rss'}}.merge(extra))
+      config.reload
+    end
+
+    # 🔴 **#1605: 読めない定義は 404（＝無い）ではなく 503（＝在るが壊れている）。**
+    def test_healthz_unmatched_source
+      write_unmatched_fixture
+      status, _headers, body = call("/healthz/source/#{UNMATCHED_ID}")
+
+      assert_nil(Source.create(UNMATCHED_ID), '前提: Source.all には現れない')
+      assert_equal(503, status)
+      assert_include(body.first, 'no source class matched')
+      assert_include(body.first, UNMATCHED_ID)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # 🔴 **#1682 の Codex P1: 同じ id の読める定義があっても、読めない定義があれば 503。**
+    # ⚠ `Source.create` は読める側を返すので、先に読めない定義を見ないと 200 になる。
+    def test_healthz_unmatched_source_wins_over_same_id
+      write_unmatched_fixture('id' => FIXTURE_ID)
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+
+      assert_not_nil(Source.create(FIXTURE_ID), '前提: 読める定義もある')
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+      # ⚠ 一覧でも 1 つの id に行は 1 つで、読めない定義が勝つ（同 P2・2 巡目）。
+      _status, _headers, body = call('/status.json')
+      rows = JSON.parse(body.first)['sources'].select {|v| v['id'] == FIXTURE_ID}
+
+      assert_equal([SourceStatus::UNMATCHED_ERROR], rows.map {|v| v['error']})
+      cli = JSON.parse(run_source_status(json: true)).select {|v| v['id'] == FIXTURE_ID}
+
+      assert_equal([SourceStatus::UNMATCHED_ERROR], cli.map {|v| v['error']})
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # 🔴 **#1682 の Codex P2: 読めるソースと読めない定義を、同じ一覧から作れること。**
+    # ⚠ 別々に設定を読むと、間に reload が挟まったとき別の時点の一覧になる。
+    def test_sources_are_built_from_given_entries
+      entries = [
+        {'id' => 'snapshot-ok', 'source' => {'text' => 'x'}, 'schedule' => {'every' => '1d'}},
+        {'id' => 'snapshot-typo', 'source' => {'texxt' => 'x'}, 'schedule' => {'every' => '1d'}},
+      ]
+
+      assert_equal(['snapshot-ok'], Source.all(entries).map(&:id))
+      assert_equal(['snapshot-typo'], Source.unmatched_ids(entries))
+      assert_not_nil(Source.create('snapshot-ok', entries))
+      assert_nil(Source.create('snapshot-ok'), '設定の一覧には無い')
+    end
+
+    # 🔴 **`/status.json` は一覧を 1 回だけ読む（同 P2）。**
+    def test_status_json_reads_sources_once
+      write_unmatched_fixture
+      reads = 0
+      original = config.method(:[])
+      config.define_singleton_method(:[]) do |key|
+        reads += 1 if key == '/sources'
+        original.call(key)
+      end
+      begin
+        call('/status.json')
+      ensure
+        config.singleton_class.remove_method(:[])
+      end
+
+      assert_equal(1, reads)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # 🔴 **#1605: `/status.json` と CLI から行ごと消えない。**
+    def test_unmatched_source_stays_visible
+      write_unmatched_fixture
+      row = source_status(UNMATCHED_ID)
+
+      assert_equal({'id' => UNMATCHED_ID, 'class' => nil, 'error' => SourceStatus::UNMATCHED_ERROR}, row)
+      assert_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, UNMATCHED_ID)
+      assert_include(JSON.parse(run_source_status(json: true, problems: true)).map {|v| v['id']}, UNMATCHED_ID)
+      assert_match(/#{UNMATCHED_ID}.*unmatched/o, run_source_status_table)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
+    # ⚠ 止めた定義は逃げ道（`disable: true`）＝読めなくても問題にしない。
+    def test_disabled_unmatched_source_is_not_reported
+      write_unmatched_fixture('disable' => true)
+
+      assert_nil(source_status(UNMATCHED_ID))
+      assert_equal(404, call("/healthz/source/#{UNMATCHED_ID}").first)
+      assert_not_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, UNMATCHED_ID)
+    ensure
+      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
+    end
+
     def test_healthz_unknown_source
       status, _headers, body = call('/healthz/source/__no_such_source__')
 
@@ -80,12 +179,73 @@ module TomatoShrieker
       assert_include(body.first, '__no_such_source__')
     end
 
-    # run が無いソースは 503 (No run recorded yet)
+    # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
+    def backdate_fixture(id, seconds)
+      at = Time.now - seconds
+      File.utime(at, at, fixture_path(id))
+      config.reload
+    end
+
+    # run が無いまま初回の実行期限を過ぎたソースは 503 (No run recorded yet)
     def test_healthz_source_without_run
+      backdate_fixture(FIXTURE_ID, 86_400)
       status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(503, status)
       assert_include(body.first, 'No run recorded yet')
+      assert_include(body.first, 'first_run_deadline: ')
+      assert_equal([:no_run], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # 🔴 **#1560: 足したばかりのソースは、初回の実行期限までは赤くしない。**
+    def test_healthz_source_awaiting_first_run
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+      source = Source.create(FIXTURE_ID)
+
+      assert_equal(200, status)
+      assert_include(body.first, 'awaiting first run')
+      assert_empty(SourceStatus.problems(source))
+      # 5 分間隔なので、期限は「定義の更新時刻 + 5 分 + 猶予」
+      expected = File.mtime(fixture_path(FIXTURE_ID)) + 300 + source.monitor_grace_seconds
+
+      assert_in_delta(expected.to_f, source.first_run_deadline.to_f, 1)
+      assert_equal(source.first_run_deadline.iso8601, source_status(FIXTURE_ID)['first_run_deadline'])
+    end
+
+    # ⚠ 期限ちょうどの境目。5 分間隔＋猶予なので、その少し手前は緑・少し過ぎは赤。
+    def test_first_run_deadline_boundary
+      window = 300 + Source.create(FIXTURE_ID).monitor_grace_seconds
+      backdate_fixture(FIXTURE_ID, window - 30)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      backdate_fixture(FIXTURE_ID, window + 30)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # ⚠ cron は「定義の更新時刻から見た次の発火」まで待つ（日次なら最大 1 日）。
+    def test_first_run_deadline_follows_cron
+      write_fixture(FIXTURE_ID, {'schedule' => {'cron' => '0 0 * * *'}})
+      backdate_fixture(FIXTURE_ID, 3600)
+      source = Source.create(FIXTURE_ID)
+      due = Rufus::Scheduler.parse('0 0 * * *').next_time(File.mtime(fixture_path(FIXTURE_ID))).to_t
+
+      assert_in_delta((due + source.monitor_grace_seconds).to_f, source.first_run_deadline.to_f, 1)
+    end
+
+    # 1 度でも走ったら、期限は出さない（以後は stale / errored などの通常の判定）。
+    def test_first_run_deadline_is_null_after_first_run
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
+
+      assert_nil(source_status(FIXTURE_ID)['first_run_deadline'])
+    end
+
+    # ⚠ ファイルから読んでいないソースは起点が無い＝期限なし＝従来どおり `no_run`。
+    def test_first_run_deadline_requires_definition_file
+      source = Source.new({'id' => '__not_from_file__', 'schedule' => {'every' => '5m'}})
+
+      assert_nil(source.first_run_deadline)
+      assert_false(source.awaiting_first_run?)
     end
 
     def test_healthz_source_healthy
@@ -347,6 +507,18 @@ module TomatoShrieker
 
       assert_equal(1, status['error_streak_threshold'])
       assert_equal(1, status['error_streak'])
+      assert_true(status['entry_stage'], '1 に倒された理由が読めない (#1624)')
+    end
+
+    # #1624: 取得段の失敗では立たない（しきい値も宣言値のまま）。
+    def test_status_json_entry_stage_is_false_for_fetch_stage_failure
+      record(THRESHOLD_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 0,
+        error_message: 'Bad response 404', entry_stage: false)
+      status = source_status(THRESHOLD_ID)
+
+      assert_false(status['entry_stage'])
+      assert_equal(3, status['error_streak_threshold'])
+      assert_false(source_status(FIXTURE_ID)['entry_stage'], '実行記録の無いソース')
     end
 
     def with_sample_size(size)
@@ -435,7 +607,7 @@ module TomatoShrieker
 
       assert_equal(503, status)
       assert_include(body.first, 'silent: true')
-      assert_include(body.first, 'silence_acknowledged_at: ')
+      assert_match(/^acknowledged_at: /, body.first)
     end
 
     # 配信が再開したら確認記録は自然に無効化される（起点が追い越される）
@@ -447,17 +619,18 @@ module TomatoShrieker
       assert_equal(200, status)
     end
 
-    def test_status_json_reports_silence_acknowledged_at
+    def test_status_json_reports_acknowledged_at
       record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
 
       assert_true(source_status(SILENT_ID)['silent'])
-      assert_nil(source_status(SILENT_ID)['silence_acknowledged_at'])
+      assert_nil(source_status(SILENT_ID)['acknowledged_at'])
+      assert_false(source_status(SILENT_ID).key?('silence_acknowledged_at'), '旧いキーが残っている (#1567)')
 
       SilenceAck.acknowledge(SILENT_ID)
 
       assert_false(source_status(SILENT_ID)['silent'])
       # 「なぜ緑なのか」を答えられること
-      assert_not_nil(source_status(SILENT_ID)['silence_acknowledged_at'])
+      assert_not_nil(source_status(SILENT_ID)['acknowledged_at'])
     end
 
     # しきい値未指定のソースは、同じ状態でも沈黙では倒さない (opt-in)
@@ -820,7 +993,8 @@ module TomatoShrieker
     # 判定は `SourceStatus` に 1 つだけ置いたので、それを両方が通っていることを状態ごとに見る。
     def test_problems_agree_with_healthz_source
       {
-        no_run: proc {},
+        awaiting_first_run: proc {},
+        no_run: proc {backdate_fixture(FIXTURE_ID, 86_400)},
         healthy: proc {record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)},
         errored: proc {record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)},
         undelivered: proc do
@@ -828,6 +1002,7 @@ module TomatoShrieker
             delivered_count: 1)
         end,
         stale: proc {record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 86_400)},
+        lost_entries: proc {record_lost_entries(at: Time.now - 60)},
       }.each do |label, scenario|
         SourceRunLog.where(source_id: FIXTURE_ID).delete
         scenario.call
@@ -836,6 +1011,217 @@ module TomatoShrieker
 
         assert_equal(status == 200, problems.empty?, "#{label}: healthz=#{status} problems=#{problems}")
       end
+    end
+
+    # ⚠ 3 件が配信へ進む前に落ち、1 件は届いた run（`partial`・`attempted == delivered`）。
+    def record_lost_entries(at: Time.now - 600)
+      record(FIXTURE_ID, at:, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 1,
+        delivered_count: 1, entry_stage: true, error_message: 'RuntimeError: boom',
+        shrieker_errors: JSON.dump({'source#entry' => 3}))
+    end
+
+    # 🔴 **#1574: 配信へ進む前にエントリを失った run は、未達ではないが 503。**
+    # ⚠ 以前は healthz 200・`undelivered: false`・エラー率 0% で、失われたことがどこにも出なかった。
+    def test_healthz_source_lost_entries
+      record_lost_entries
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+      row = source_status(FIXTURE_ID)
+
+      assert_equal(503, status)
+      assert_include(body.first, "lost_entries: true\n")
+      assert_include(body.first, "lost_count: 3\n")
+      assert_not_include(body.first, 'undelivered: true', '宛先の障害ではない')
+      assert_true(row['lost_entries'])
+      assert_false(row['undelivered'])
+      assert_equal([:lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # 🔴 **新着の無い run を挟んでも消えない。**消えるのは、次にエントリを処理した run が
+    # 何も失わなかったとき。
+    def test_lost_entries_survive_noop_and_clear_on_clean_run
+      record_lost_entries
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, 'lost_status: partial')
+      assert_include(body.first, 'lost_shrieker_errors: ')
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, entry_stage: true)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      assert_false(source_status(FIXTURE_ID)['lost_entries'])
+    end
+
+    # 運用者が確認したら緑に戻す（未達と同じ規則。確認より後に失えばまた赤）。
+    def test_lost_entries_can_be_acknowledged
+      record_lost_entries
+      SilenceAck.acknowledge(FIXTURE_ID)
+
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      assert_false(source_status(FIXTURE_ID)['lost_entries'])
+      record_lost_entries(at: Time.now + 60)
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # ⚠ 取りこぼしと数えないもの: 段に入っていない run・旧行（NULL）・宛先で落ちただけの run。
+    def test_lost_entries_does_not_overcount
+      {
+        '段に入っていない' => {entry_stage: false, shrieker_errors: JSON.dump({'source#entry' => 1})},
+        '保存の前に落ちた' => {entry_stage: true, shrieker_errors: JSON.dump({'source#fetch' => 2})},
+        '旧行' => {entry_stage: nil, shrieker_errors: JSON.dump({'source#fetch' => 1})},
+        '宛先で落ちただけ' => {
+          entry_stage: true,
+          attempted_count: 3,
+          delivered_count: 1,
+          shrieker_errors: JSON.dump({'TomatoShrieker::WebhookShrieker' => 2}),
+        },
+      }.each do |label, values|
+        SourceRunLog.where(source_id: FIXTURE_ID).delete
+        log = record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 1,
+          delivered_count: 1, **values)
+
+        assert_false(log.lost_entries?, label)
+        assert_false(Source.create(FIXTURE_ID).lost_entries?, label)
+      end
+    end
+
+    # 🔴 **#1685 の Codex P1: 段に入った後、run ごと例外で落ちた形も取りこぼし。**
+    # ⚠ `CommandSource` / `IcalendarSource` の `create_template` の失敗がこの形（内訳が空）。
+    # ⚠⚠ 次の run（no-op）で連続エラーは切れるが、失ったことは消えない。
+    def test_lost_entries_when_run_aborts_in_entry_stage
+      record(FIXTURE_ID, at: Time.now - 600, status: SourceRunLog::STATUS_ERROR,
+        entry_stage: true, error_message: 'RuntimeError: template broken')
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_include(body.first, "lost_entries: true\n")
+      assert_include(body.first, 'lost_count: unknown')
+      assert_include(body.first, 'lost_error: RuntimeError: template broken')
+    end
+
+    # 🔴 **同 P1: 落ちた run が、前の取りこぼしの警告を消さないこと。**
+    def test_aborted_run_does_not_clear_earlier_loss
+      record_lost_entries(at: Time.now - 900)
+      record(FIXTURE_ID, at: Time.now - 600, status: SourceRunLog::STATUS_ERROR,
+        entry_stage: true, error_message: 'RuntimeError: template broken')
+      record(FIXTURE_ID, at: Time.now - 300, entry_stage: false)
+
+      assert_true(Source.create(FIXTURE_ID).lost_entries?)
+    end
+
+    # ⚠ `exec` を差し替えたソースを、実際の記録の経路（`exec_with_run_log`）で 1 回走らせる。
+    def run_with_exec(&)
+      source = Source.create(FIXTURE_ID)
+      source.define_singleton_method(:exec, &)
+      source.send(:exec_with_run_log, :every, '5m')
+      return SourceRunLog.latest_for(FIXTURE_ID)
+    end
+
+    # 🔴 **#1685 の Codex P1（2 巡目）: 宛先の失敗を記録した後に run ごと落ちた形。**
+    # ⚠⚠ 内訳は空ではない（宛先の失敗が載っている）ので、件数から引くだけだと 0 件になり、
+    # 落ちたエントリが未達の診断に埋もれる。落ちたこと自体を 1 件として数える。
+    def test_lost_entries_when_run_aborts_after_delivery_error
+      log = run_with_exec do
+        @delivery_stats.enter_entry_stage!
+        @delivery_stats.record_error(Object.new, RuntimeError.new('destination down'))
+        raise 'template broken'
+      end
+
+      assert_true(log.error?)
+      assert_equal({'Object' => 1, Source::EXEC_FAILURE_KIND => 1}, log.shrieker_error_counts)
+      assert_equal(1, log.lost_entry_count)
+      assert_false(log.aborted_in_entry_stage?, '内訳が空の旧い形ではない')
+      assert_equal([:errored, :undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # ⚠ 段に入る前（取得）で落ちた run は数えない。失うものが無い。
+    def test_fetch_stage_abort_records_no_loss
+      log = run_with_exec {raise 'Bad response 404'}
+
+      assert_true(log.error?)
+      assert_empty(log.shrieker_error_counts)
+      assert_false(log.lost_entries?)
+    end
+
+    # ⚠ 取得段で落ちた run（段に入っていない）は、内訳が空でも取りこぼしではない。
+    def test_fetch_stage_abort_is_not_a_loss
+      log = record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, entry_stage: false,
+        error_message: 'Bad response 404')
+
+      assert_false(log.lost_entries?)
+      assert_false(Source.create(FIXTURE_ID).lost_entries?)
+    end
+
+    # 🔴 **実際の集計（`DeliveryStats`）から書いた行で立つこと。**⚠ 上のテストは行を手で
+    # 書いているので、`record_failure` の数え方や保存の形が変わっても気づけない。
+    def test_lost_entries_from_delivery_stats
+      stats = DeliveryStats.new
+      stats.enter_entry_stage!
+      stats.record_success(Object.new)
+      3.times {stats.record_failure(FeedSource::ENTRY_FAILURE_KIND, RuntimeError.new('boom'))}
+      SourceRunLog.record_partial(FIXTURE_ID, started_at: Time.now, error: stats.first_error, stats:)
+      log = SourceRunLog.latest_for(FIXTURE_ID)
+
+      assert_true(log.partial?)
+      assert_false(log.undelivered?, '前提: 未達としては立たない')
+      assert_equal(3, log.lost_entry_count)
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first)
+    end
+
+    # 宛先でも落ち、配信へ進む前にも落ちた run は、両方が立つ（件数は別々に数える）。
+    def test_lost_entries_and_undelivered_are_counted_separately
+      log = record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 3,
+        delivered_count: 1, entry_stage: true,
+        shrieker_errors: JSON.dump({'TomatoShrieker::WebhookShrieker' => 2, 'source#entry' => 4}))
+
+      assert_equal(4, log.lost_entry_count)
+      assert_equal([:undelivered, :lost_entries], SourceStatus.problems(Source.create(FIXTURE_ID)))
+    end
+
+    # 🔴 **4.15.0 リリース前レビュー: サブクラス経由の `create` が動くこと。**
+    # ⚠ `Source.create` に一覧の引数を足したとき、サブクラスの `all`（引数なし）へ渡して
+    # `ArgumentError` になっていた（アプリからの呼び出しは無いが、公開の口）。
+    def test_create_via_subclass
+      assert_kind_of(FeedSource, FeedSource.create(FIXTURE_ID))
+      assert_nil(TextSource.create(FIXTURE_ID), '別の種別からは引けない')
+    end
+
+    # ⚠ 段に入った run が無いソースでも、根拠の行を引くのは 1 回だけ（nil もメモする）。
+    def test_lost_entries_log_is_looked_up_once
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, entry_stage: false)
+      source = Source.create(FIXTURE_ID)
+      calls = 0
+      original = SourceRunLog.method(:last_entry_stage)
+      SourceRunLog.define_singleton_method(:last_entry_stage) do |id|
+        calls += 1
+        original.call(id)
+      end
+      begin
+        3.times {source.lost_entries?}
+        source.lost_entries_log
+      ensure
+        SourceRunLog.define_singleton_method(:last_entry_stage, original)
+      end
+
+      assert_equal(1, calls)
+    end
+
+    # #1509: 未達の判定は `Source#undelivered?` の 1 つ。判定材料では真偽値で持ち、
+    # 503 本文に出す根拠の行は別のキーで渡す。⚠ 確認（ack）すると判定だけが消える。
+    def test_checks_carry_undelivered_as_boolean
+      record(FIXTURE_ID, status: SourceRunLog::STATUS_PARTIAL, attempted_count: 2, delivered_count: 1)
+      checks = SourceStatus.checks(Source.create(FIXTURE_ID), SourceRunLog.latest_for(FIXTURE_ID))
+
+      assert_true(checks[:undelivered])
+      assert_kind_of(SourceRunLog, checks[:undelivered_log])
+      SilenceAck.acknowledge(FIXTURE_ID, at: Time.now + 60)
+      checks = SourceStatus.checks(Source.create(FIXTURE_ID), SourceRunLog.latest_for(FIXTURE_ID))
+
+      assert_false(checks[:undelivered])
+      assert_kind_of(SourceRunLog, checks[:undelivered_log], '根拠の行は確認しても残る')
+      assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
     end
 
     # 無効ソースは「壊れている」と混同しない (#1503)。healthz は 200、problems は空。
@@ -859,11 +1245,11 @@ module TomatoShrieker
     def test_source_status_problems_and_all
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
       write_fixture(DISABLED_ID, {'disable' => true})
-      config.reload
+      backdate_fixture(SILENT_ID, 86_400)
       problems = JSON.parse(run_source_status(json: true, problems: true)).map {|v| v['id']}
 
       assert_not_include(problems, FIXTURE_ID)
-      assert_include(problems, SILENT_ID) # run が 1 本も無い
+      assert_include(problems, SILENT_ID) # run が 1 本も無く、初回の実行期限も過ぎた (#1560)
       assert_not_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, DISABLED_ID)
       assert_include(JSON.parse(run_source_status(json: true, all: true)).map {|v| v['id']}, DISABLED_ID)
     end
@@ -901,6 +1287,17 @@ module TomatoShrieker
       assert_operator(ids.index(THRESHOLD_ID), :<, ids.index(FIXTURE_ID))
     end
 
+    # 表の形（`--json` なし）。⚠ `print_table` は Thor の整形なので、行を文字列にして受ける。
+    def run_source_status_table
+      lines = []
+      command = SourceCommand.new
+      command.options = {}
+      command.define_singleton_method(:print_table) {|rows| lines.concat(rows.map {|v| v.join(' ')})}
+      command.define_singleton_method(:say_error) {|_message| nil}
+      command.status
+      return lines.join("\n")
+    end
+
     def run_source_status(**options)
       out = []
       command = SourceCommand.new
@@ -924,7 +1321,7 @@ module TomatoShrieker
     end
 
     def record(source_id, at: Time.now, **values)
-      SourceRunLog.create({
+      return SourceRunLog.create({
         source_id:,
         executed_at: at,
         status: SourceRunLog::STATUS_SUCCESS,

@@ -31,6 +31,12 @@ module TomatoShrieker
       end
     end
 
+    # ⚠ 「直近の配信試行の行が未達か」。ソースとしての判定（確認も見る）は
+    # `Source#undelivered?` で、そちらは MonitorAppTest が見ている (#1509)。
+    def last_attempt_undelivered?
+      return SourceRunLog.last_attempted(SOURCE_ID)&.undelivered? || false
+    end
+
     def test_noop?
       create_logs(
         {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 0},
@@ -324,7 +330,7 @@ module TomatoShrieker
 
       assert_equal(1, remain.size, '保護行そのものは残る')
       assert_nil(remain.first.error_message)
-      assert_true(SourceRunLog.undelivered?(SOURCE_ID), '取りこぼしの判定は生きている')
+      assert_true(last_attempt_undelivered?, '取りこぼしの判定は生きている')
     end
 
     # ⚠ 期限内の行の error_message は消さないこと。消すと直近の失敗理由が
@@ -363,7 +369,7 @@ module TomatoShrieker
       end
       SourceRunLog.prune(14)
 
-      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_true(last_attempt_undelivered?)
     end
 
     def test_undelivered?
@@ -373,25 +379,25 @@ module TomatoShrieker
       )
 
       # no-op は判定を持ち越す
-      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_true(last_attempt_undelivered?)
 
       create_logs({attempted_count: 2, delivered_count: 2})
 
-      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_false(last_attempt_undelivered?)
     end
 
     # 全滅も同じ式で拾う（error_streak と二重管理にしない）
     def test_undelivered_covers_total_failure
       create_logs({attempted_count: 2, delivered_count: 0, status: SourceRunLog::STATUS_ERROR})
 
-      assert_true(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_true(last_attempt_undelivered?)
     end
 
     # 一度も配信を試みていなければ未達ではない
     def test_undelivered_ignores_noop_only
       create_logs({attempted_count: 0}, {attempted_count: 0})
 
-      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_false(last_attempt_undelivered?)
       assert_nil(SourceRunLog.last_attempted(SOURCE_ID))
     end
 
@@ -406,7 +412,7 @@ module TomatoShrieker
         status: SourceRunLog::STATUS_ERROR, error: stats.first_error, stats:
       )
 
-      assert_false(SourceRunLog.undelivered?(SOURCE_ID))
+      assert_false(last_attempt_undelivered?)
       assert_true(SourceRunLog.latest_for(SOURCE_ID).error?)
     end
 

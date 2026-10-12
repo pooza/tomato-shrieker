@@ -4,6 +4,9 @@ module TomatoShrieker
   class Source # rubocop:disable Metrics/ClassLength
     include Package
 
+    # run がエントリ処理の途中で落ちたことを `shrieker_errors` に残すときの種別 (#1574)。
+    EXEC_FAILURE_KIND = 'source#exec'.freeze
+
     # 沈黙の起点の根拠 (#1502)。
     BASELINE_DELIVERY = 'delivery'.freeze
     BASELINE_ACKNOWLEDGEMENT = 'acknowledgement'.freeze
@@ -388,6 +391,25 @@ module TomatoShrieker
       return @undelivered_log
     end
 
+    # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
+    #
+    # 未達（`undelivered?`）と同じ重さ・同じ消し方にする: 失われたものは戻らないので、
+    # 次にエントリを処理した run が何も失わないか、運用者が確認（`source ack`）するまで赤。
+    # ⚠ 確認が消すのは「確認したその run」だけ（終了時刻で比べる。`undelivered?` と同じ規則）。
+    def lost_entries?
+      return false unless log = lost_entries_log
+      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return log.finished_at > acknowledged_at
+    end
+
+    # 取りこぼしの根拠になっている run。確認済みかどうかは見ない。
+    # ⚠ **nil もメモする**（`||=` だと、段に入った run が無いソースで毎回引き直す）。
+    def lost_entries_log
+      @lost_entries_log = SourceRunLog.last_entry_stage(id) unless defined?(@lost_entries_log)
+      return nil unless @lost_entries_log&.lost_entries?
+      return @lost_entries_log
+    end
+
     # 監視の対象か (#1503)。
     # ⚠ 無効ソースは scheduler が register しないので executed_at が前に進まず、
     # 一度稼働してから無効化すると stale 判定が恒久的に成立して赤が貼り付く。
@@ -401,6 +423,30 @@ module TomatoShrieker
       return nil if post_at
       return Rufus::Scheduler.parse(cron).next_time(after).to_t if cron
       return after + Rufus::Scheduler.parse(period)
+    end
+
+    # 🔴 **一度も走っていないソースの「初回の実行期限」(#1560)。**
+    #
+    # 足したばかりのソースは、初回の実行が来るまで run_log が 1 行も無い。それを
+    # 「壊れている」と同じ 503 にすると、**ソースを足すたびに最大 1 周期ぶん赤くなる**
+    # （30 分間隔のソースを 17 本足して 16 本が一斉に鳴った）。
+    #
+    # ⚠ **起点は定義ファイルの更新時刻。**そこから見た初回の発火予定＋猶予までは待つ。
+    # ⚠⚠ **期限を過ぎても走っていなければ、従来どおり 503。**期限なしで緑に倒すと、
+    # 登録しただけで一度も走っていないソースが緑のまま残る（#1504 で塞いだ形へ戻る）。
+    # ⚠ 定義を置いてから reload までに間が空くと、そのぶん早く期限が来る＝従来と同じ
+    # 503 になるだけで、緑に化ける方向には外れない。
+    # ⚠ ファイルから読んでいないソース（`Source.new` で直に作ったもの）と `post_at` は nil。
+    def first_run_deadline
+      return nil unless (defined_at = Config.instance.source_defined_at(id))
+      return nil unless (due = next_run_at(defined_at))
+      return due + monitor_grace_seconds
+    end
+
+    # run_log が無く、まだ初回の実行期限の内にいるか。⚠ run_log の有無は呼び出し側が見る。
+    def awaiting_first_run?
+      return false unless (deadline = first_run_deadline)
+      return Time.now <= deadline
     end
 
     def monitor_grace_seconds
@@ -556,9 +602,13 @@ module TomatoShrieker
       return @silence_baseline_entry
     end
 
-    def self.all
-      return enum_for(__method__) unless block_given?
-      config['/sources'].each do |entry|
+    # ⚠ **`entries` を渡すと、その一覧から作る (#1605)。**`all` と `unmatched_ids` を続けて
+    # 呼ぶ側は、同じ一覧を両方へ渡すこと。⚠ 別々に `config['/sources']` を読むと、間に
+    # reload が挟まったとき、読めるソースと読めない定義が**別の時点の設定**になる
+    # （`Config#load` は一覧を新しい配列で差し替えるので、控えた配列は変わらない）。
+    def self.all(entries = config['/sources'])
+      return enum_for(__method__, entries) unless block_given?
+      entries.each do |entry|
         source_entry = entry.key_flatten
         classes.each do |source_class|
           yield source_class[:class].new(entry) if source_entry[source_class[:config]]
@@ -581,8 +631,8 @@ module TomatoShrieker
     # 止めた定義は `desired_sources` が弾くので、判別キーが壊れていても起動は倒れない
     # はず。ここに含めると **reload は古いジョブを守り続け、起動は倒れる**＝
     # 「直せないなら disable」という逃げ道が unmatched にだけ効かない。
-    def self.unmatched_ids
-      return config['/sources'].filter_map do |entry|
+    def self.unmatched_ids(entries = config['/sources'])
+      return entries.filter_map do |entry|
         entry_id(entry) unless entry['disable'] == true || matched?(entry)
       end
     end
@@ -607,8 +657,10 @@ module TomatoShrieker
       end
     end
 
-    def self.create(id)
-      return all.find {|v| v.id == id}
+    # ⚠ **`Source.all` を直に呼ぶ（4.15.0 リリース前レビュー）。**サブクラスの `all` は引数を
+    # 取らないので、`all(entries)` だと `FeedSource.create(id)` が `ArgumentError` になる。
+    def self.create(id, entries = config['/sources'])
+      return Source.all(entries).grep(self).find {|v| v.id == id}
     end
 
     def fedi_sanitize(message)
@@ -638,9 +690,22 @@ module TomatoShrieker
       finalize_run_log(started_at)
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
+      record_exec_abort(e)
       SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(source: id, error: e)
+    end
+
+    # 🔴 **エントリ処理の途中で run ごと落ちたら、それを取りこぼしとして数える (#1574)。**
+    #
+    # `CommandSource` / `IcalendarSource` は、エントリを読んだ後（`create_template` など）で
+    # 落ちるとここへ直に来る。⚠⚠ 何も数えないと、**その run が持つ内訳は「宛先で落ちた
+    # ぶん」だけ**になり、`SourceRunLog#lost_entry_count` が 0 を返す＝落ちたエントリが
+    # 未達の診断に埋もれる（#1685 の Codex P1・2 巡目）。⚠ 件数は分からないので 1 件と数える
+    # （「少なくとも 1 件」）。⚠ 段に入る前（取得の失敗）は数えない。失うものが無い。
+    def record_exec_abort(error)
+      return unless @delivery_stats&.entry_stage?
+      @delivery_stats.record_failure(EXEC_FAILURE_KIND, error)
     end
 
     # run を error に倒すのは 1 件も配信できなかったときだけ (#1482)。

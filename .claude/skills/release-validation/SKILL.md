@@ -117,6 +117,8 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 
 ⚠ **投稿先で実視認するなら FeedSource を使う。**`test-youtube-channel` の定義に PieFed の `dest` と `keyword` を足した一時ソースを作ると、ハッシュタグを含むエントリだけを 1 件投稿できる。⚠ **一時ソースには PieFed のパスワードが入るので、確認したら消すこと。**
 
+⚠ **PieFed のタグは投稿ページで見る (#1673)。**作成のあとに編集でタグを付けるので、投稿ページにタグのリンク（`/tag/<名前>`）が出ること、本文に `#tag` の文字が残っていないことを確かめる。`GET /api/alpha/post?id=<id>` の `post_view.post.tags` でも読める。⚠ ログに warn `tags not attached` が出ていたら付いていない。
+
 ### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 
 ⚠ **`curl` や Python の urllib で `/api/alpha/user/login` を直接叩いて確かめようとしないこと。**Cloudflare が弾いて **HTTP 403 (error code 1010)** を返し、認証失敗と見分けが付かない。必ず下記のようにアプリの HTTP クライアント経由で確認する（2026-08-03 に踏んだ）。なお `/api/alpha/post/list` のような GET は `curl` でも通る。
@@ -178,6 +180,9 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload   # �
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
+- [ ] ⚠ **PieFed の実投稿は、タグ以外も見る (#1673)。**投稿ページにタグのリンクが出る／本文に `#tag` の文字が残っていない／タイトル・本文・URL・サムネイルが作成時のまま／「編集済み」と出る（仕様）／ログに `tags not attached` が無い
+- [ ] ⚠ **監視の新しい判定を 1 回ずつ通す（4.15.0）。**reload の節の `test-reload-probe` を足した直後に `curl -s http://127.0.0.1:4567/healthz/source/test-reload-probe` が 200 `OK (awaiting first run, due by …)`（#1560）／定義の判別キーを打ち間違えて（`feed` → `feeed`）HUP を直接送ると 503 `no source class matched`・`/status.json` に `class: null` の行（#1605。⚠ `source reload` は拒否するので `kill -HUP` で）／`/status.json` の行に `acknowledged_at`・`lost_entries`・`entry_stage`・`first_run_deadline` があり、`silence_acknowledged_at` が無い（#1567）
+- [ ] ⚠ **`/status.json` の所要時間を測る（4.15.0）。**1 ソースあたりクエリが 1 本増えた（`last_entry_stage`。`entry_stage` は索引に無い）。本番 4.14.0 は 0.78〜0.86 秒で、予算は 900ms（#1472）。`curl -s -o /dev/null -w '%{time_total}\n' http://127.0.0.1:4567/status.json` を 3 回
 - [ ] ⚠ **`ginseng-fediverse` のタグ判定が動いたリリースでは、配信済みエントリの新旧差分を取る**（上記 5）。差分が出たら**全角 ＃ 系（`precure-petitcure`）と `#NNN` 系（GitHub releases）の投稿本文**を投稿先で実視認する
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
   - 🔴 **一時ソースの ID を使い回すなら、発火の前に `bin/shrieker source clear <id>` する。**⚠⚠ **Entry が残ったまま走らせると「新着を全部投稿」になる**（最新 1 件だけなのは初回だけ）

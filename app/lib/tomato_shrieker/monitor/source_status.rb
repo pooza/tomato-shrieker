@@ -54,13 +54,19 @@ module TomatoShrieker
         # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
         # ⚠ opt-in の silent? と違い、しきい値の設定なしに常時有効。
         # 判定は Source 側に寄せてある。
-        undelivered: (source.undelivered_log if source.undelivered?),
+        # ⚠ **真偽値で持つ (#1509)。**他の判定（stale / errored / silent）と形を揃える。
+        # 503 本文に出す根拠の行は別のキーで渡す。
+        undelivered: source.undelivered?,
+        undelivered_log: source.undelivered_log,
+        # #1574: 宛先に触れる前にエントリを失った run が未解決のまま残っている。
+        lost_entries: source.lost_entries?,
+        lost_entries_log: source.lost_entries_log,
       }
     end
 
     # `checks` のうち立っているものの名前。空なら健全。
     def self.problems_of(checks)
-      return [:stale, :errored, :silent, :undelivered].select {|key| checks[key]}
+      return [:stale, :errored, :silent, :undelivered, :lost_entries].select {|key| checks[key]}
     end
 
     # 1 ソースの「緑でない理由」。空なら `/healthz/source/:id` は 200 を返す。
@@ -72,8 +78,22 @@ module TomatoShrieker
       return [] if source.disable? || !source.monitored?
       return [:no_dest] unless source.dest?
       latest = SourceRunLog.latest_for(source.id)
-      return [:no_run] unless latest
+      # ⚠ 初回の実行期限の内なら問題にしない (#1560)。healthz も同じ述語で 200 を返す。
+      return source.awaiting_first_run? ? [] : [:no_run] unless latest
       return problems_of(checks(source, latest))
+    end
+
+    UNMATCHED_ERROR = 'no source class matched (unmatched definition)'.freeze
+
+    # 🔴 **判別キーがどのソースクラスにも一致しない定義（unmatched）の行 (#1605)。**
+    #
+    # `Source.all` に 1 件も現れないので、何もしないと `/status.json` から**行ごと消え**、
+    # `/healthz/source/:id` は **404**（意図的な削除や URL の打ち間違いと区別が付かない）。
+    # ⚠⚠ しかも reload は古いジョブを残す（#1572）ので、**古い定義のまま走り続けている**。
+    # ⚠ 形は組み立てに失敗した行（`{id, class, error}`）に揃える。class は決まらないので nil。
+    # ⚠ `disable: true` の定義は含めない（`Source.unmatched_ids` が外す）。
+    def self.unmatched(id)
+      return {id:, class: nil, error: UNMATCHED_ERROR}
     end
 
     def initialize(source)
@@ -89,6 +109,8 @@ module TomatoShrieker
         schedule: @source.schedule_spec,
         grace_seconds: @source.monitor_grace_seconds,
         last_run_at: latest&.executed_at&.iso8601,
+        # #1560: 一度も走っていないソースが、いつまで緑でいられるか。走ったら null。
+        first_run_deadline: (@source.first_run_deadline&.iso8601 if @source.monitored? && !latest),
         next_run_at: next_run&.iso8601,
         last_status: latest&.status,
         last_error: latest&.error_message,
@@ -116,8 +138,7 @@ module TomatoShrieker
         dest_count: @source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
-        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは silence_acknowledged_at で読む
-        undelivered: @source.undelivered?,
+        **loss_status,
         # 🔴 **`attempted` から出す（4.8.0 リリース前レビュー）。**`latest` は
         # **直近の run** なので、no-op を挟むと **`last_attempted_at` は前の試行を
         # 指しているのに件数だけ 0** という自己矛盾になる。⚠ 本番で再現した:
@@ -138,11 +159,33 @@ module TomatoShrieker
         silence_baseline_origin: @source.silence_baseline_origin,
         # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
         # false だが、それは健全だからではなく運用者が確認したから
-        silence_acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
+        # ⚠ **キーは `acknowledged_at` (#1567)。**確認はサイレント不発にも未達にも効く (#1506)
+        # ので、`silence_` を付けると「未達がなぜ緑なのか」を探す人が行き当たらない。
+        # ⚠ 内部の名前（`SilenceAck` / `silence_ack` テーブル）は据え置き。
+        acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(@source.id),
+        **threshold_status(logs),
+      )
+    end
+
+    def loss_status
+      return {
+        # ⚠ 確認済みなら false になる (#1506)。なぜ緑なのかは acknowledged_at で読む
+        undelivered: @source.undelivered?,
+        # #1574: 配信へ進む前に失ったエントリが未解決。⚠ 確認済みなら false（`acknowledged_at`）
+        lost_entries: @source.lost_entries?,
+      }
+    end
+
+    # ⚠ `logs` は `delivery_status` が取った窓をそのまま受ける＝ 503 本文と同じ値・追加クエリなし。
+    def threshold_status(logs)
+      return {
         # #1558: 「なぜこのソースはまだ緑なのか」を外から説明できるようにする
         error_streak_threshold: self.class.effective_error_streak_threshold(@source, logs),
-      )
+        # #1624: しきい値が 1 に倒されている理由。⚠ 503 本文にしか無いと、503 になる前
+        # （`error_streak: 0`）には「28 と宣言したのに 1 と出ている」理由がどこからも読めない。
+        entry_stage: SourceRunLog.entry_level_error?(logs),
+      }
     end
   end
 end

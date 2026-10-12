@@ -51,12 +51,31 @@ module TomatoShrieker
     def test_ack_does_not_mention_silence_without_tolerance
       said = ack_with(stub_source(nil, undelivered: true))
 
-      assert_not_include(said, 'silence_tolerance')
+      assert_not_include(said, '再び警告します')
     ensure
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
     # 確認するものが無ければ記録しない
+    # #1574: エントリの取りこぼしも `ack` で確認でき、どちらに効いたかを言う。
+    def test_ack_reports_lost_entries
+      said = ack_with(stub_source(nil, lost: true))
+
+      assert_include(said, 'lost_entries')
+      assert_not_include(said, 'undelivered')
+      assert_not_nil(SilenceAck.acknowledged_at(ACK_ID), '確認が記録されていない')
+    ensure
+      SilenceAck.where(source_id: ACK_ID).delete
+    end
+
+    # #1567: しきい値の無いソースでは、再警告の予定が無いことを言う。
+    def test_ack_warns_when_no_tolerance
+      assert_include(ack_with(stub_source(nil, undelivered: true)), '再警告はありません')
+      assert_not_include(ack_with(stub_source(86_400, undelivered: true)), '再警告はありません')
+    ensure
+      SilenceAck.where(source_id: ACK_ID).delete
+    end
+
     def test_ack_refuses_when_nothing_to_acknowledge
       said = ack_with(stub_source(nil, undelivered: false))
 
@@ -258,10 +277,11 @@ module TomatoShrieker
       return said.join("\n")
     end
 
-    def stub_source(seconds, undelivered: false)
+    def stub_source(seconds, undelivered: false, lost: false)
       source = Object.new
       source.define_singleton_method(:monitor_silence_tolerance_seconds) {seconds}
       source.define_singleton_method(:undelivered?) {undelivered}
+      source.define_singleton_method(:lost_entries?) {lost}
       return source
     end
   end

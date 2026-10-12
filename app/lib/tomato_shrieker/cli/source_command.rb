@@ -26,7 +26,7 @@ module TomatoShrieker
     method_option :json, type: :boolean, default: false, desc: '/status.json の sources[] と同じキーで出す'
     method_option :all, type: :boolean, default: false, desc: '無効ソースも出す'
     def status(id = nil)
-      rows = status_sources(id).map {|source| SourceStatusTable.row(source)}
+      rows = status_rows(id)
       rows.select! {|v| v[:problems].any?} if options[:problems]
       rows = SourceStatusTable.sort(rows, options[:sort]) if options[:sort]
       print_status(rows)
@@ -132,13 +132,18 @@ module TomatoShrieker
     def ack(id)
       source = find_source!(id)
       undelivered = source.undelivered?
+      lost = source.lost_entries?
       tolerance = source.monitor_silence_tolerance_seconds
-      return say(nothing_to_ack_message(id)) unless undelivered || tolerance
+      return say(nothing_to_ack_message(id)) unless undelivered || lost || tolerance
       SilenceAck.acknowledge(id)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
       say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
+      say '  エントリの取りこぼし (lost_entries) を解除しました。失われたエントリは再送されません。' if lost
       say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
+      # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
+      # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
+      say '  ⚠ silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
@@ -228,6 +233,19 @@ module TomatoShrieker
 
     # ⚠ **無効ソースは既定で出さない**（`/status.json` と同じ扱い）。ID を指定したら
     # 無効でも出す（止めたことの確認に使う）。
+    # ⚠ **unmatched な定義も行として出す (#1605)。**`Source.all` には現れないので、
+    # 足さないと「読めない定義」が一覧から黙って消える（`/status.json` と同じ形にする）。
+    def status_rows(id)
+      unmatched = Source.unmatched_ids
+      # ⚠ 読めない定義を先に見る（healthz と同じ順。同じ id の読める定義があっても 503）。
+      return [SourceStatusTable.unmatched_row(id)] if id && unmatched.include?(id)
+      # ⚠ 1 つの id に行は 1 つ（`/status.json` と同じ。読めない定義が勝つ）。
+      rows = status_sources(id).reject {|source| unmatched.include?(source.id)}
+        .map {|source| SourceStatusTable.row(source)}
+      rows.concat(unmatched.uniq.map {|v| SourceStatusTable.unmatched_row(v)}) unless id
+      return rows
+    end
+
     def status_sources(id)
       return [find_source!(id)] if id
       return Source.all if options[:all]
@@ -242,7 +260,7 @@ module TomatoShrieker
     end
 
     def nothing_to_ack_message(id)
-      return "#{id} は silence_tolerance が未設定で、未達の警告も出ていません。確認するものがありません。"
+      return "#{id} は silence_tolerance が未設定で、未達・取りこぼしの警告も出ていません。確認するものがありません。"
     end
 
     # silence_tolerance を人が読める長さで返す (#1513)。

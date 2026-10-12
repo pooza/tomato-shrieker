@@ -47,7 +47,12 @@ module TomatoShrieker
     end
 
     def build_healthz_source(source_id)
-      source = Source.create(source_id)
+      # 🔴 **読めない定義を先に見る（#1682 の Codex P1）。**⚠ 同じ id の定義が 2 つあって
+      # 片方だけ読めないと、`Source.create` は読める側を返す＝ 200 になってしまう。
+      # ⚠ 一覧は 1 回だけ控えて両方に使う（同 P2）。
+      entries = Source.config['/sources']
+      return unmatched_response(source_id) if Source.unmatched_ids(entries).include?(source_id)
+      source = Source.create(source_id, entries)
       return [404, HEADERS, ["Unknown source: #{source_id}\n"]] unless source
       # 意図的に止めたソースを「壊れている」と混同しない (#1503)。
       return [200, HEADERS, ["OK (disabled)\n"]] if source.disable?
@@ -58,10 +63,30 @@ module TomatoShrieker
       # 「無効なら監視しない」で一括して片付く。
       return [503, HEADERS, ["No destination configured\n"]] unless source.dest?
       latest = SourceRunLog.latest_for(source_id)
-      return [503, HEADERS, ["No run recorded yet\n"]] unless latest
+      return no_run_response(source) unless latest
       checks = source_checks(source, latest)
       return [200, HEADERS, ["OK\n"]] unless unhealthy?(checks)
       return [503, HEADERS, [unhealthy_body(source, latest, checks)]]
+    end
+
+    # 🔴 **「定義が無い」と「定義は在るが読めない」を分ける (#1605)。**判別キーを打ち
+    # 間違えた定義（unmatched）は `Source.all` に現れないが、消したわけではない。
+    # ⚠ 503 にする＝ cron を壊した定義（`failed`）と同じ扱い。404 は本当に無いときだけ。
+    def unmatched_response(source_id)
+      return [503, HEADERS, ["#{SourceStatus::UNMATCHED_ERROR}: #{source_id}\n"]]
+    end
+
+    # 🔴 **「まだ走っていない」と「壊れている」を分ける (#1560)。**初回の実行期限までは
+    # 200、過ぎても走っていなければ 503。⚠ 期限は本文に出す（なぜ緑／赤なのかを読める
+    # ようにする）。判定は `SourceStatus.problems` と同じ述語（`awaiting_first_run?`）。
+    def no_run_response(source)
+      deadline = source.first_run_deadline
+      if source.awaiting_first_run?
+        return [200, HEADERS, ["OK (awaiting first run, due by #{deadline.iso8601})\n"]]
+      end
+      body = +"No run recorded yet\n"
+      body << "first_run_deadline: #{deadline.iso8601}\n" if deadline
+      return [503, HEADERS, [body]]
     end
 
     def source_checks(source, latest)
@@ -85,7 +110,8 @@ module TomatoShrieker
       # ⚠ **いま連続している失敗のどれかが該当すれば true**（#1615 の Codex P2）。
       body << "entry_stage: #{checks[:entry_stage]}\n"
       body << failure_body(latest)
-      body << undelivered_body(checks[:undelivered], latest) if checks[:undelivered]
+      body << undelivered_body(checks[:undelivered_log], latest) if checks[:undelivered]
+      body << lost_entries_body(checks[:lost_entries_log], latest) if checks[:lost_entries]
       body << silent_body(source) if checks[:silent]
       return body
     end
@@ -121,7 +147,7 @@ module TomatoShrieker
       # #1505: 静かなだけと分かっているなら `bin/shrieker source ack ID` で緑に戻せる
       body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
       body << "silence_baseline_origin: #{source.silence_baseline_origin}\n"
-      body << "silence_acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
+      body << "acknowledged_at: #{SilenceAck.acknowledged_at(source.id)&.iso8601}\n"
       return body
     end
 
@@ -142,8 +168,32 @@ module TomatoShrieker
       return body
     end
 
+    # #1574: 「いつ・何件のエントリを失ったか」を見せる。⚠ 宛先の障害ではない
+    # （宛先に触れる前に落ちている）ので、`undelivered` とは別の見出しで出す。
+    def lost_entries_body(log, latest)
+      body = +"lost_entries: true\n"
+      body << "lost_at: #{log.executed_at.iso8601}\n"
+      # ⚠ run ごと落ちた形は件数が分からない（#1685 の Codex P1）。0 と出すと嘘になる。
+      count = log.aborted_in_entry_stage? ? 'unknown (run aborted)' : log.lost_entry_count
+      body << "lost_count: #{count}\n"
+      return body if log.id == latest.id
+      body << "lost_status: #{log.status}\n"
+      body << failure_body(log, 'lost_')
+      return body
+    end
+
     def status_json
-      sources = Source.all.reject(&:disable?).map {|s| source_status(s)}
+      # 🔴 **一覧は 1 回だけ控える（#1682 の Codex P2）。**約 900ms かかる (#1472) ので、
+      # 途中で reload が挟まりうる。別々に読むと、読めなくなった定義が「古い健全な行」と
+      # 「新しい error の行」の両方に出たり、直した定義がどちらにも出なかったりする。
+      entries = Source.config['/sources']
+      # ⚠ **1 つの id に行は 1 つ。読めない定義が勝つ（#1682 の Codex P2・2 巡目）。**同じ id の
+      # 読める定義の行も並べると、id で引く消費者が健全な行を先に拾う（healthz は 503 なのに）。
+      unmatched = Source.unmatched_ids(entries)
+      sources = Source.all(entries).reject {|s| s.disable? || unmatched.include?(s.id)}
+        .map {|s| source_status(s)}
+      # #1605: 読めない定義も行として残す（消えると、Kuma に無いソースでは誰も気づけない）。
+      sources.concat(unmatched.uniq.map {|id| SourceStatus.unmatched(id)})
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,

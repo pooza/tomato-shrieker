@@ -21,10 +21,49 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 該当ソースが以下をすべて満たせば 200:
 
 - 配信先が 1 つ以上ある (`dest_count > 0`)
+- 1 度は走っている。**ただし足したばかりのソースは、初回の実行期限までは 200**（下の「まだ走っていないソース」）
 - 最終実行から `grace_seconds` 以内に走っている (stale でない)
 - 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
+- **配信へ進む前に失ったエントリが残っていない (lost_entries でない・#1574)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
+
+##### 配信へ進む前に失ったエントリ (#1574)
+
+`Entry.insert` は配信より先に走るので、その後（テンプレートの描画・添付の取り出しなど）で落ちたエントリは unique 制約で二度と取得されない。⚠⚠ **同じ run で他のエントリが 1 件でも届くと、run は `partial`・`attempted == delivered` になり、未達（`undelivered`）も連続エラー（`error_streak`）も立たない**＝ 4.14.0 までは、エントリを恒久的に失ったのに healthz 200・エラー率 0% だった。
+
+- **判定**: 直近の「エントリ処理段に入った run」（run_log の `entry_stage` が true の行）が、**保存の後で落ちたエントリ（`shrieker_errors` の `source#entry`）**か、**エントリ処理の途中で run ごと落ちた記録（`source#exec`）**を 1 件でも持っていれば 503。⚠ 4.14.0 までに書かれた行は、段に入った error 行で内訳が空のものも数える（件数が分からないので `lost_count: unknown (run aborted)`）。本文に `lost_entries: true` / `lost_at` / `lost_count` が出る。`/status.json` は `lost_entries`、`source status` の `PROBLEMS` 列は `lost_entries`
+- ⚠ **`/status.json` と 503 本文の `entry_stage` は別の問い。**あちらは「いま連続している失敗のどれかが段に入っていたか」（しきい値を 1 に倒す理由）で、ここで言う「直近の段に入った run」とは見ている行が違う。`entry_stage: false` と `lost_entries: true` は同時に出うる
+- **未達と同じ重さ・同じ消し方。**失われたものは戻らないので、**次にエントリを処理した run が何も失わない**か、**`bin/shrieker source ack ID` で確認する**まで赤い。⚠ 新着の無い run（段に入らない）を挟んでも消えない。⚠ 確認が消すのはその run だけで、確認より後に失えばまた赤くなる
+- ⚠ **`undelivered` とは別の見出し。**宛先は健全でも起きるので、混ぜると運用者は存在しない宛先障害を探しに行く。同じ run で両方起きれば両方出る（件数は別々）
+- ⚠ 数えないもの: 段に入っていない run（エントリを 1 件も読めていない＝失うものが無い）・`entry_stage` が NULL の旧行（migration 013 より前）
+- ⚠ **保存の前（解析）で落ちたエントリは数えない。**行が無いので次の run が拾い直す。`shrieker_errors` の種別で分けている: `source#fetch`＝保存の前（数えない）・`source#entry`＝保存の後（数える）・`source#exec`＝エントリ処理の途中で run ごと落ちた（1 件と数える）
+- ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計
+- ⚠ **prune の保護行にしていない。**確認しないまま保持期間（`/monitor/retention_days`）を過ぎると、行ごと消えて緑に戻る。⚠⚠ **残るかどうかは `attempted_count` で決まる**: 他のエントリが届いた run（`partial`）は未達の保護行（`last_attempted_ids`）として残るが、**新着 1 件だけが落ちた run（配信の試行が 0）は消える側**
+- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` だけ（Sentry にも出ない）
+- ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
+
+##### 定義は在るが読めないソース (#1605)
+
+判別キー（`source/feed` など）を打ち間違えた定義（unmatched）は、どのソースクラスにも一致しないので `Source.all` に現れない。⚠ **それでも reload は古いジョブを残す（#1572）ので、古い定義のまま走り続けている。**
+
+- `/healthz/source/:id` は **503**（本文 `no source class matched (unmatched definition): <id>`）。⚠ 4.14.0 までは 404 `Unknown source` で、意図的な削除や URL の打ち間違いと区別が付かなかった。**404 は本当に定義が無いときだけ**
+- `/status.json` には `{id, class: null, error}` の行が残る（4.14.0 までは行ごと消えた）。`source status` の `PROBLEMS` 列は `unmatched`
+- ⚠ `disable: true` の定義は対象外（止めたのだから問題にしない＝ 404・行なし）
+
+##### まだ走っていないソース (#1560)
+
+run が 1 行も無いソースは、**初回の実行期限**までは 200（本文は `OK (awaiting first run, due by <期限>)`）、期限を過ぎても走っていなければ 503（`No run recorded yet` と `first_run_deadline:`）。
+
+- **期限 ＝ 定義ファイルの更新時刻から見た初回の発火予定 ＋ `grace_seconds`。**`every: 30m` なら更新時刻の 30 分後、`cron` なら更新時刻の次に来る発火時刻（日次なら最大 1 日）
+- 🔴 **期限なしで緑にはしない。**登録しただけで一度も走っていないソースが緑のまま残ると、#1504 で塞いだ「壊れているのに緑」へ戻る
+- 🔴 **scheduler にジョブが登録されているかは見ない。**reload で登録に失敗した新しいソース（`CommandSource` の `bundle install` 失敗など）は、ジョブが無いのに期限まで 200 のまま（日次 cron なら最長で約 26 時間。4.14.0 までは即 503 だった）。失敗そのものは reload のログと Sentry に `failed` として出るので、**ソースを足したら reload の結果行を必ず見る**
+- ⚠ **起点は「scheduler が登録した時刻」ではない。**定義を置いてから `source reload` までに間が空くと、そのぶん早く期限が来る（＝この仕組みが入る前と同じ 503 になるだけで、緑に化ける方向には外れない）。⚠ 定義を書き換えると起点も動く
+- ⚠ daemon は最後に読み込んだとき（起動・`source reload`）の更新時刻で、CLI はいまのディスクの更新時刻で答える
+- `/status.json` の `first_run_deadline` で期限が読める（1 度でも走ったら `null`）。CLI の `PROBLEMS` 列には目印 `awaiting_first_run` が出る（問題ではないので `--problems` には出ない）
+- ⚠ `every` のソースは daemon の再起動で位相が変わる（初回は再起動の 1 周期後）。足した直後に再起動を挟むと、期限のほうが先に来ることがある
+
+##### 宛先の一部にだけ届かない (undelivered・#1504)
 
 **宛先の一部にだけ配信できていない状態を検知する (#1504)。**直近の「配信を試みた run」(`attempted_count > 0`) で `delivered_count < attempted_count` なら 503。
 
@@ -35,7 +74,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 🔴 **だからこそ `attempted_count` に載せてよいのは「宛先に触れた試行」だけ。**解除条件が「次に配信できるまで」である以上、過検知の代償は「翌日まで赤」ではなく**「次に新着が出るまで赤」**になる。本番の実測では 12 日間に 1 度も配信を試みていないソースが 40 件中 13 件あり、疎なソースなら数週間に及ぶ。
 
 - **宛先を組み立てられなかった**（アクセサが例外を握って nil を返した）→ `DeliveryStats#record_unavailable` で **attempted に載せる**。届いていないのは事実なので未達で正しい
-- **配信より手前で落ちた**（`Entry.create` の `SQLite3::BusyException`、`create_template` の失敗等）→ `DeliveryStats#record_failure` で **attempted には載せない**。宛先は全部健全なのに「宛先に届いていない」と表示すると、運用者は存在しない宛先障害を探しに行く。`@errors` には積むので status は `error` / `partial` に倒れ、`error_streak` では捕まる
+- **配信より手前で落ちた**（DB が混んだときの `Sequel::DatabaseError`、`create_template` の失敗等）→ `DeliveryStats#record_failure` で **attempted には載せない**。宛先は全部健全なのに「宛先に届いていない」と表示すると、運用者は存在しない宛先障害を探しに行く。`@errors` には積むので status は `error` / `partial` に倒れ、`error_streak` では捕まる。⚠ **保存の後で落ちたぶんは `lost_entries` が拾う（4.15.0・#1574）。**同じ run で他のエントリが届くと status は `partial` になり、`error_streak` では捕まらないため
 
 ⚠ **宛先ごとの識別子は持たない。**Kuma のモニターがソース単位なのでアラートの粒度は元からソース単位であり、1 ソースに宛先を詰め込んで粒度が落ちるのは運用側の判断とする。また hook の URL にはトークンが入っており、宛先を記録すると run_log と `/status.json` にシークレットが載る。**503 の本文には `attempted_count` / `delivered_count` だけを出し、どの宛先かは設定を見て切り分ける。**
 
@@ -68,7 +107,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 **沈黙を測る起点は「配信・確認・観測開始のうち最も新しいもの」(#1505)。**
 
 ```
-silent? = now > max(last_delivered_at, silence_acknowledged_at, observed_since) + silence_tolerance
+silent? = now > max(last_delivered_at, acknowledged_at, observed_since) + silence_tolerance
           ただし配信実績も確認記録も無く、まだ超えていなければ nil (= 判定不能・#1502)
 ```
 
@@ -80,7 +119,9 @@ bin/shrieker source ack ID
 
 🔴 **確認は「今回は問題なかった」の記録であって「今後も問題ない」の保証ではない。**起点が前に進むだけなので、**そこからさらに `silence_tolerance` が経過すれば再び赤になる**（「また 1 か月経ったけど、やっぱりおかしくない?」という念押し）。配信が再開すれば `last_delivered_at` が確認を追い越すので、確認記録は自然に無効化される。
 
-🔴 **`ack` は未達 (`undelivered`) にも効く (#1506)。**⚠ **消えるのは「確認したその試行」だけ**で、確認より後の試行で再び届かなければまた赤くなる（サイレント不発と同じ規則）。
+📌 **未達の判定の入口は `Source#undelivered?` の 1 つ (#1509)。**`/healthz/source/:id`・`/status.json`・`source status`・`source ack` のどれもこれを通る（直近の配信試行の行を選び、確認も見る）。`SourceRunLog#undelivered?` は「その行が未達か」だけを答える。
+
+🔴 **`ack` は未達 (`undelivered`) にも効く (#1506)。**⚠ **消えるのは「確認したその試行」だけ**で、確認より後の試行で再び届かなければまた赤くなる（サイレント不発と同じ規則）。⚠⚠ **`silence_tolerance` が未設定のソースを確認すると、次に配信を試みるまで再警告されない**（宛先が死んだままでも、新着が来るまでは緑）。`ack` の出力がそう言う (#1567)。
 
 ⚠⚠ **「確定的な信号を運用者が消してよいのか」は判断した上でこうしている。**取りこぼしたエントリは**再送されないので、赤を放置しても失われたものは戻らない**。一方 **2026-09-05 の実測では 57 ソースのうち 17 件が 12 日間に配信試行ゼロ**で、逃げ道が無いと疎なソースは数週間 503 に貼り付く。**「いつも赤いモニター」は監視ごと信用されなくなる**ほうが害が大きい。
 
@@ -88,7 +129,7 @@ bin/shrieker source ack ID
 
 📌 **この仕組みがあるので `silence_tolerance` を保守的に丸める必要は無い。**偽陽性のコストが「設定を直す」から「1 回確認する」に下がる。
 
-⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `silence_acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。
+⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。⚠ **4.14.0 までのキー名は `silence_acknowledged_at`（#1567 で改名）。**確認は未達（`undelivered`）にも効くので、`undelivered: false` の理由もこのキーで読む。503 本文の行も同じ名前。内部の名前（`SilenceAck` クラス・`silence_ack` テーブル）は据え置いている。
 
 ソースの状況ごとの使い分け:
 
@@ -131,6 +172,7 @@ bin/shrieker source ack ID
       "schedule": {"type": "every", "value": "5m"},
       "grace_seconds": 600,
       "last_run_at": "2026-04-14T14:00:00+09:00",
+      "first_run_deadline": null,
       "next_run_at": "2026-04-14T14:05:00+09:00",
       "last_status": "success",
       "last_error": null,
@@ -140,16 +182,18 @@ bin/shrieker source ack ID
       "last_delivered_count": 2,
       "last_attempted_at": "2026-04-14T14:00:01+09:00",
       "undelivered": false,
+      "lost_entries": false,
       "last_delivered_at": "2026-04-14T14:00:01+09:00",
       "last_delivered_at_origin": "run_log",
       "error_streak": 0,
       "error_streak_threshold": 1,
+      "entry_stage": false,
       "noop_streak": 0,
       "silence_tolerance_seconds": null,
       "silent": false,
       "silence_baseline": "2026-04-14T14:00:01+09:00",
       "silence_baseline_origin": "delivery",
-      "silence_acknowledged_at": null,
+      "acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"MastodonShrieker": 1}
@@ -206,7 +250,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 🔴 **組み立ても判定も Web と同じもの（`SourceStatus`）を通す。**`--json` の行は `/status.json` と、`--problems` の判定は `/healthz/source/:id` と一致する（テストで突き合わせている）。⚠ CLI 用に計算を書き直さない — 2 つの出口が同名フィールドで違う数字を出す不具合は `last_attempted_count`（4.8.0）としきい値の実効値（#1558）で 2 回直している。
 
-`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run`（判定材料を見るまでもなく 503）。`disabled` は問題ではなく目印で、**`--problems` には出ない**（無効ソースの healthz は 200）。
+`PROBLEMS` 列の値は `stale` / `errored` / `silent` / `undelivered` / `lost_entries`（`/healthz/source/:id` の判定材料）と、`no_dest` / `no_run` / `unmatched`（判定材料を見るまでもなく 503。`unmatched` は #1605）。`disabled` と `awaiting_first_run`（#1560）は問題ではなく目印で、**`--problems` には出ない**（どちらも healthz は 200）。
 
 ⚠ **CLI だけが出す値が 1 つある: `build_failed`**（そのソースの状態を組み立てる途中で例外が出た）。理由は表の後に `<id>: <例外>` の形で **stderr** へ出す（`--json` では行の `error` キー）。⚠ 空の DB や migration 前の DB に向けると全行がこれになる（`no such table: source_run_log`）。⚠⚠ **healthz と食い違いうる。**`/healthz/source/:id` は判定材料しか読まないので、表示用の集計（`error_rate` など）だけが落ちる場合は healthz が 200 のまま、CLI は `build_failed` を出す＝ **`--problems` は「healthz が 503 のもの」＋「CLI が状態を組み立てられなかったもの」**。
 
@@ -300,7 +344,7 @@ monitor:
 - ⚠⚠ **migration 013 より前の行は `entry_stage` が NULL。**NULL の行だけ従来の代理へ倒す。**「NULL ＝ エントリ処理段」にするとデプロイ直後に緩和を掛けているソースが一斉 503** になる（migration 010 の backfill と同じ型）
 - 📌 **503 本文に `entry_stage:` が出る。**しきい値を 28 に緩めていても `error_streak: 1 / 1` になる理由がそこで読める
 
-⚠ **`/status.json` の `error_streak_threshold` は実効値。**1 に倒されているときは `1` が出る（宣言値ではない）。
+⚠ **`/status.json` の `error_streak_threshold` は実効値。**1 に倒されているときは `1` が出る（宣言値ではない）。**倒された理由は同じ行の `entry_stage: true` で読める (#1624)。**⚠ 503 本文の `entry_stage:` と同じ値（同じ窓の run を見る）で、503 になる前（`error_streak: 0`）でも出る。
 
 ⚠ **opt-in なので「書き忘れ」と「意図的に検知しない」が設定上は区別できない。**`bin/shrieker source validate` は監視対象なのに `silence_tolerance` が無いソースを `WARN` として出す（スキーマ上は妥当なので `NG` にはせず、終了コードも倒さない）。年単位で静かなソースは意図的に未設定のままでよい。
 
@@ -314,6 +358,7 @@ monitor:
   - ⚠ **4.12.0 で FeedSource の意味が狭まった (#1622)。**「**配信対象の**新しいエントリの行を作った run（insert 後の失敗を含む）」だけが true。⚠ insert はしたが意図して流さない行（まだ touch していない／`feed.time` より古い／`keep_years` の外）は `create_record` が nil を返すので立たない＝失うものが無い。⚠⚠ **4.11.0 で書かれた行は既知エントリしか無い run でも true**（本番 14 日で約 3 万行）なので、**デプロイ前後で集計が不連続**になる
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
   - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
+  - 🔴 **4.15.0 で種別が 3 つになった (#1574)。**`source#fetch`＝保存の**前**（解析）で落ちたエントリ（次の run が拾い直す）／`source#entry`＝保存の**後**で落ちたエントリ（二度と取得されない）／`source#exec`＝エントリ処理の途中で run ごと落ちた（件数は不明なので 1）。⚠⚠ **4.14.0 までの `source#fetch` は保存の前後を区別していない。**run ごと落ちた error 行は、4.14.0 までは内訳が空（`NULL`）だった
   - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
   - ⚠ 保護行（上の「prune はソースごとに 4 行を守る」）は残るが、**retention を過ぎると `error_message` は消える (#1511)**。⚠ そのため**実行間隔が retention より長いソースが error のまま 503 を立て続けると、15 日目以降の 503 本文には `error:` 行が出ない (#1621)**。原文は Sentry かログに残る。⚠⚠ **ただし宛先を組み立てられなかった失敗（`UnavailableDest`）は Sentry へ送らず `logger.error` だけ**で、ログは 7 世代でローテーションされる＝**retention を過ぎると原文はどこにも残らない**

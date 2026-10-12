@@ -2,6 +2,7 @@ require 'sequel/model'
 
 module TomatoShrieker
   class SourceRunLog < Sequel::Model(:source_run_log)
+    include SourceRunLogLoss
     include Package
 
     STATUS_SUCCESS = 'success'.freeze
@@ -76,6 +77,16 @@ module TomatoShrieker
 
     # 試みたのに届かなかった宛先がある run (#1504)。
     # 宛先ごとの識別子を持たなくても、試行数と成功数の差で「取りこぼし」は判る。
+    #
+    # 🔴 2026-06 の Matrix 配信停止 (#1455) がこの形だった。hooks が 2 つあり
+    # matrix-webhook だけ毎回失敗、モロヘイヤは成功。`delivered_count > 0` なので
+    # status は `partial`、`last_delivered_at` も前進し続け、error_streak も silent も
+    # 立たず、監視は最後まで緑だった。
+    #
+    # ⚠ **これは「この行が未達か」だけ。ソースが未達かは `Source#undelivered?` に聞く
+    # (#1509)。**そちらが「直近の配信試行の行」を選び、運用者の確認（ack）も見る。
+    # ⚠ 以前は `SourceRunLog.undelivered?(source_id)` というクラスメソッドもあったが、
+    # **確認を見ない**ので `Source#undelivered?` と答えが食い違った。入口は 1 つにする。
     def undelivered?
       return false unless attempted?
       return delivered_count.to_i < attempted_count.to_i
@@ -213,16 +224,6 @@ module TomatoShrieker
     def self.last_attempted(source_id)
       return where(source_id:).where(Sequel.lit('attempted_count > 0'))
           .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
-    end
-
-    # 試みたのに届かなかった配信が未解決のまま残っているか (#1504)。
-    #
-    # 🔴 2026-06 の Matrix 配信停止 (#1455) がこの形だった。hooks が 2 つあり
-    # matrix-webhook だけ毎回失敗、モロヘイヤは成功。`delivered_count > 0` なので
-    # status は `partial`、`last_delivered_at` も前進し続け、error_streak も silent も
-    # 立たず、監視は最後まで緑だった。
-    def self.undelivered?(source_id)
-      return last_attempted(source_id)&.undelivered? || false
     end
 
     # このソースの run を観測し始めた時刻 (#1483)。

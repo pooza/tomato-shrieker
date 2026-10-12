@@ -73,6 +73,22 @@ module TomatoShrieker
       end
     end
 
+    # #1666: エントリの URL は第三者が決める。内部ホストへは要求を出さない。
+    def test_nokogiri_rejects_internal_host
+      entry = Entry[Entry.insert(
+        feed: FEED_ID,
+        title: 'フィクスチャ（内部ホスト）',
+        url: 'http://127.0.0.1/secret',
+        enclosure_url: [].to_json,
+        extra_tags: [].to_json,
+        published: Time.now,
+      )]
+
+      error = assert_raise(Ginseng::GatewayError) {entry.nokogiri}
+      assert_match(/Rejected host/, error.message)
+      assert_not_requested(:any, /127\.0\.0\.1/)
+    end
+
     def test_create_template
       @entries.each do |entry|
         assert_kind_of(Template, entry.create_template)
@@ -99,12 +115,41 @@ module TomatoShrieker
       stats = DeliveryStats.new
       source = stage_source(stats)
 
+      error = nil
+
       with_deliverable_stub(-> {raise 'boom after insert'}) do
-        assert_raise(RuntimeError) {Entry.create(stage_values, source)}
+        error = assert_raise(RuntimeError) {Entry.create(stage_values, source)}
       end
+
+      assert_kind_of(Entry::Inserted, error, '保存の後に落ちた印が無い (#1574)')
 
       assert_true(stats.entry_stage?, '行は残るのに緩和が効く側に落ちている')
       assert_equal(FIXTURES.size + 1, Entry.where(feed: FEED_ID).count, '行が残っていない')
+    end
+
+    # 🔴 **#1630: insert の後で DB が混んでも、再試行しない（失敗として上げる）。**
+    #
+    # ⚠⚠ `begin` の先頭へ戻る再試行は insert をもう一度打つので、**自分が入れた行に
+    # 当たって `UniqueConstraintViolation` → `nil`**＝行は残るのに失敗がどこにも残らない。
+    # ⚠ 素の `SQLite3::BusyException` と、Sequel が包み直した形の両方で見る。
+    def test_create_does_not_retry_when_busy_after_insert
+      wrapped = Sequel::DatabaseError.new('SQLite3::BusyException: database is locked')
+      [SQLite3::BusyException.new('database is locked'), wrapped].each do |error|
+        Entry.where(feed: FEED_ID, url: stage_values[:url]).delete
+        stats = DeliveryStats.new
+        calls = 0
+        busy = lambda do
+          calls += 1
+          raise error
+        end
+
+        with_deliverable_stub(busy) do
+          assert_raise(error.class) {Entry.create(stage_values, stage_source(stats))}
+        end
+
+        assert_equal(1, calls, "#{error.class}: 再試行している")
+        assert_true(stats.entry_stage?, "#{error.class}: 行は残るのに段が立っていない")
+      end
     end
 
     # ⚠ insert より手前（パース失敗）で落ちたら立てない。**失うものが無い。**
@@ -112,8 +157,10 @@ module TomatoShrieker
       stats = DeliveryStats.new
       source = stage_source(stats)
 
-      assert_raise(NoMethodError) {Entry.create(Object.new, source)}
+      error = assert_raise(NoMethodError) {Entry.create(Object.new, source)}
+
       assert_false(stats.entry_stage?, 'insert していない run で緩和を潰している')
+      assert_not_kind_of(Entry::Inserted, error, '保存していないのに印が付いている (#1574)')
     end
 
     # ⚠ 既知のエントリ（unique 制約）は insert が通っていないので立てない。

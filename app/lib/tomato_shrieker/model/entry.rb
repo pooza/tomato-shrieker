@@ -2,6 +2,9 @@ require 'sequel/model'
 
 module TomatoShrieker
   class Entry < Sequel::Model(:entry)
+    # 保存（insert）が通った後に上がった例外の印 (#1574)。行は残っている＝再取得されない。
+    module Inserted; end
+
     include Package
 
     alias to_h values
@@ -51,8 +54,11 @@ module TomatoShrieker
       return @uri
     end
 
+    # 🔴 **取りにいく先のホストを検証する (#1666)。**エントリの URL はフィードの書き手
+    # （第三者）が決めるので、内部ホストやそこへのリダイレクトを踏ませられる。
+    # ⚠ 拒否は `GatewayError` で、`tags` が握ってソースのタグだけに倒す。
     def nokogiri
-      @nokogiri ||= HTTP.new.get(uri).body.nokogiri
+      @nokogiri ||= HTTP.new.get(uri, {host_validator: Ginseng::PublicHost.validator}).body.nokogiri
       return @nokogiri
     end
 
@@ -85,8 +91,17 @@ module TomatoShrieker
       return entry
     end
 
+    # 🔴 **DB が混んでいても、ここでは再試行しない (#1630)。**
+    #
+    # 以前は `rescue SQLite3::BusyException` で 5 回まで `retry` する形だったが、**一度も
+    # 到達しない死んだコードだった**。Sequel は SQLite の例外を包み直すので、BUSY は素の
+    # `Sequel::DatabaseError`（`wrapped_exception` が `SQLite3::BusyException`）で上がり、
+    # 下の `rescue => e` に落ちる。ロック待ちは接続の側（Sequel 既定の 5000ms）が持つ。
+    # ⚠⚠ **`retry` を「効くように」直してはいけない。**`begin` の先頭へ戻ると insert を
+    # もう一度打つので、insert の後（`Entry[id]`）で混んだ run は**自分が入れた行に当たって
+    # `UniqueConstraintViolation` → `nil`**＝行は残るのに失敗がどこにも計上されない。
+    # 再試行を入れるなら、insert と読み出しで単位を分けること。
     def self.create(entry, feed = nil)
-      retry_count = 0
       inserted = false
       begin
         parser = EntryParser.new(entry)
@@ -94,11 +109,6 @@ module TomatoShrieker
         id = Entry.insert(parser.parse)
         inserted = true
         return deliverable(Entry[id], feed)
-      rescue SQLite3::BusyException
-        retry_count += 1
-        raise if retry_count >= 5
-        sleep(rand(0.5..2.0))
-        retry
       rescue Sequel::UniqueConstraintViolation
         # 既知のエントリ＝異常ではないので nil を返して読み飛ばす
         return nil
@@ -111,6 +121,8 @@ module TomatoShrieker
         # **恒久的な取りこぼしが「取得段の失敗」＝緩和が効く側**に分類される。
         # ⚠ insert より前で落ちた場合（パース失敗）は立てない。**失うものが無い。**
         feed&.enter_entry_stage! if inserted
+        # ⚠ 呼び出し元（`FeedSource#fetch`）が「保存の後か」を見分けられるよう印を付ける (#1574)。
+        e.extend(Inserted) if inserted
         # ⚠ 握り潰して nil を返すと、呼び出し元の FeedSource#fetch が
         # `next unless record` で読み飛ばすため record_failure に到達しない。
         # 全エントリがパース失敗しても attempted=0 の no-op success になる (#1473)。
