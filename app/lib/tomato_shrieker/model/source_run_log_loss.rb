@@ -1,7 +1,8 @@
 module TomatoShrieker
   # 配信へ進む前に失ったエントリの判定 (#1574)。`SourceRunLog` に混ぜる。
   module SourceRunLogLoss
-    LOSS_KINDS = ['source#entry', 'source#exec'].freeze
+    # ⚠ 種別の正本は書く側の定数（`FeedSource` / `Source`）。
+    LOSS_KINDS = [FeedSource::ENTRY_FAILURE_KIND, Source::EXEC_FAILURE_KIND].freeze
 
     def self.included(base)
       base.extend(ClassMethods)
@@ -21,10 +22,12 @@ module TomatoShrieker
     #
     # 🔴 **run ごと例外で抜けた形も数える（#1685 の Codex P1）。**`CommandSource` /
     # `IcalendarSource` は、エントリを読んだ後（`create_template` など）で落ちると
-    # `record_failure` を通らずに `exec_with_run_log` の rescue へ入るので、**段は立って
-    # いるのに `shrieker_errors` が空の error 行**になる。⚠⚠ 件数だけで判定すると 0 件＝
-    # 「失っていない」と読み、**次の run で連続エラーが切れた時点で緑に戻る**うえ、
-    # その行が「直近の段に入った run」になって**前の取りこぼしの警告まで消す**。
+    # `record_failure` を通らずに `exec_with_run_log` の rescue へ入る。⚠ **4.14.0 までは、
+    # それが「段は立っているのに `shrieker_errors` が空の error 行」になった**（下の
+    # `aborted_in_entry_stage?`）。4.15.0 からは rescue が `source#exec` を 1 件数えるので、
+    # `lost_entry_count` の側で立つ。⚠⚠ どちらの形も数えないと、**次の run で連続エラーが
+    # 切れた時点で緑に戻る**うえ、その行が「直近の段に入った run」になって**前の取りこぼしの
+    # 警告まで消す**。
     def lost_entries?
       return false unless entry_stage == true
       return lost_entry_count.positive? || aborted_in_entry_stage?
@@ -54,8 +57,8 @@ module TomatoShrieker
       # 取りこぼしは次に新着を処理する run が来るまで（または運用者が確認するまで）残る。
       # ⚠ **prune の保護行にはしていない。**確認しないまま保持期間を過ぎると行ごと消える。
       def last_entry_stage(source_id)
-        return where(source_id:, entry_stage: true)
-            .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+        logs = where(source_id:, entry_stage: true)
+        return logs.order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
       end
     end
   end

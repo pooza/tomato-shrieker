@@ -32,12 +32,15 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 
 `Entry.insert` は配信より先に走るので、その後（テンプレートの描画・添付の取り出しなど）で落ちたエントリは unique 制約で二度と取得されない。⚠⚠ **同じ run で他のエントリが 1 件でも届くと、run は `partial`・`attempted == delivered` になり、未達（`undelivered`）も連続エラー（`error_streak`）も立たない**＝ 4.14.0 までは、エントリを恒久的に失ったのに healthz 200・エラー率 0% だった。
 
-- **判定**: 直近の「エントリ処理段に入った run」（`entry_stage: true`）が、宛先に触れる前の失敗（`record_failure`）を 1 件でも持っているか、**内訳を残さずに run ごと落ちていれば** 503（後者は 4.14.0 までに書かれた行の形で、件数が分からないので `lost_count: unknown (run aborted)`）。⚠ **エントリ処理の途中で run ごと落ちたら、それ自体を 1 件と数える**（`shrieker_errors` に `source#exec`。`CommandSource` / `IcalendarSource` が `create_template` などで落ちた形で、宛先の失敗と混ざっても件数から消えない）。本文に `lost_entries: true` / `lost_at` / `lost_count` が出る。`/status.json` は `lost_entries`、`source status` の `PROBLEMS` 列は `lost_entries`
+- **判定**: 直近の「エントリ処理段に入った run」（run_log の `entry_stage` が true の行）が、**保存の後で落ちたエントリ（`shrieker_errors` の `source#entry`）**か、**エントリ処理の途中で run ごと落ちた記録（`source#exec`）**を 1 件でも持っていれば 503。⚠ 4.14.0 までに書かれた行は、段に入った error 行で内訳が空のものも数える（件数が分からないので `lost_count: unknown (run aborted)`）。本文に `lost_entries: true` / `lost_at` / `lost_count` が出る。`/status.json` は `lost_entries`、`source status` の `PROBLEMS` 列は `lost_entries`
+- ⚠ **`/status.json` と 503 本文の `entry_stage` は別の問い。**あちらは「いま連続している失敗のどれかが段に入っていたか」（しきい値を 1 に倒す理由）で、ここで言う「直近の段に入った run」とは見ている行が違う。`entry_stage: false` と `lost_entries: true` は同時に出うる
 - **未達と同じ重さ・同じ消し方。**失われたものは戻らないので、**次にエントリを処理した run が何も失わない**か、**`bin/shrieker source ack ID` で確認する**まで赤い。⚠ 新着の無い run（段に入らない）を挟んでも消えない。⚠ 確認が消すのはその run だけで、確認より後に失えばまた赤くなる
 - ⚠ **`undelivered` とは別の見出し。**宛先は健全でも起きるので、混ぜると運用者は存在しない宛先障害を探しに行く。同じ run で両方起きれば両方出る（件数は別々）
 - ⚠ 数えないもの: 段に入っていない run（エントリを 1 件も読めていない＝失うものが無い）・`entry_stage` が NULL の旧行（migration 013 より前）
 - ⚠ **保存の前（解析）で落ちたエントリは数えない。**行が無いので次の run が拾い直す。`shrieker_errors` の種別で分けている: `source#fetch`＝保存の前（数えない）・`source#entry`＝保存の後（数える）・`source#exec`＝エントリ処理の途中で run ごと落ちた（1 件と数える）
-- ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計。⚠ prune の保護行にもしていないので、確認しないまま保持期間を過ぎると行ごと消える
+- ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計
+- ⚠ **prune の保護行にしていない。**確認しないまま保持期間（`/monitor/retention_days`）を過ぎると、行ごと消えて緑に戻る。⚠⚠ **残るかどうかは `attempted_count` で決まる**: 他のエントリが届いた run（`partial`）は未達の保護行（`last_attempted_ids`）として残るが、**新着 1 件だけが落ちた run（配信の試行が 0）は消える側**
+- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` だけ（Sentry にも出ない）
 - ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
 
 ##### 定義は在るが読めないソース (#1605)
@@ -54,10 +57,13 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 
 - **期限 ＝ 定義ファイルの更新時刻から見た初回の発火予定 ＋ `grace_seconds`。**`every: 30m` なら更新時刻の 30 分後、`cron` なら更新時刻の次に来る発火時刻（日次なら最大 1 日）
 - 🔴 **期限なしで緑にはしない。**登録しただけで一度も走っていないソースが緑のまま残ると、#1504 で塞いだ「壊れているのに緑」へ戻る
+- 🔴 **scheduler にジョブが登録されているかは見ない。**reload で登録に失敗した新しいソース（`CommandSource` の `bundle install` 失敗など）は、ジョブが無いのに期限まで 200 のまま（日次 cron なら最長で約 26 時間。4.14.0 までは即 503 だった）。失敗そのものは reload のログと Sentry に `failed` として出るので、**ソースを足したら reload の結果行を必ず見る**
 - ⚠ **起点は「scheduler が登録した時刻」ではない。**定義を置いてから `source reload` までに間が空くと、そのぶん早く期限が来る（＝この仕組みが入る前と同じ 503 になるだけで、緑に化ける方向には外れない）。⚠ 定義を書き換えると起点も動く
 - ⚠ daemon は最後に読み込んだとき（起動・`source reload`）の更新時刻で、CLI はいまのディスクの更新時刻で答える
 - `/status.json` の `first_run_deadline` で期限が読める（1 度でも走ったら `null`）。CLI の `PROBLEMS` 列には目印 `awaiting_first_run` が出る（問題ではないので `--problems` には出ない）
 - ⚠ `every` のソースは daemon の再起動で位相が変わる（初回は再起動の 1 周期後）。足した直後に再起動を挟むと、期限のほうが先に来ることがある
+
+##### 宛先の一部にだけ届かない (undelivered・#1504)
 
 **宛先の一部にだけ配信できていない状態を検知する (#1504)。**直近の「配信を試みた run」(`attempted_count > 0`) で `delivered_count < attempted_count` なら 503。
 
@@ -68,7 +74,7 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 🔴 **だからこそ `attempted_count` に載せてよいのは「宛先に触れた試行」だけ。**解除条件が「次に配信できるまで」である以上、過検知の代償は「翌日まで赤」ではなく**「次に新着が出るまで赤」**になる。本番の実測では 12 日間に 1 度も配信を試みていないソースが 40 件中 13 件あり、疎なソースなら数週間に及ぶ。
 
 - **宛先を組み立てられなかった**（アクセサが例外を握って nil を返した）→ `DeliveryStats#record_unavailable` で **attempted に載せる**。届いていないのは事実なので未達で正しい
-- **配信より手前で落ちた**（`Entry.create` の `SQLite3::BusyException`、`create_template` の失敗等）→ `DeliveryStats#record_failure` で **attempted には載せない**。宛先は全部健全なのに「宛先に届いていない」と表示すると、運用者は存在しない宛先障害を探しに行く。`@errors` には積むので status は `error` / `partial` に倒れ、`error_streak` では捕まる
+- **配信より手前で落ちた**（DB が混んだときの `Sequel::DatabaseError`、`create_template` の失敗等）→ `DeliveryStats#record_failure` で **attempted には載せない**。宛先は全部健全なのに「宛先に届いていない」と表示すると、運用者は存在しない宛先障害を探しに行く。`@errors` には積むので status は `error` / `partial` に倒れ、`error_streak` では捕まる。⚠ **保存の後で落ちたぶんは `lost_entries` が拾う（4.15.0・#1574）。**同じ run で他のエントリが届くと status は `partial` になり、`error_streak` では捕まらないため
 
 ⚠ **宛先ごとの識別子は持たない。**Kuma のモニターがソース単位なのでアラートの粒度は元からソース単位であり、1 ソースに宛先を詰め込んで粒度が落ちるのは運用側の判断とする。また hook の URL にはトークンが入っており、宛先を記録すると run_log と `/status.json` にシークレットが載る。**503 の本文には `attempted_count` / `delivered_count` だけを出し、どの宛先かは設定を見て切り分ける。**
 
@@ -352,6 +358,7 @@ monitor:
   - ⚠ **4.12.0 で FeedSource の意味が狭まった (#1622)。**「**配信対象の**新しいエントリの行を作った run（insert 後の失敗を含む）」だけが true。⚠ insert はしたが意図して流さない行（まだ touch していない／`feed.time` より古い／`keep_years` の外）は `create_record` が nil を返すので立たない＝失うものが無い。⚠⚠ **4.11.0 で書かれた行は既知エントリしか無い run でも true**（本番 14 日で約 3 万行）なので、**デプロイ前後で集計が不連続**になる
 - `shrieker_errors` — shrieker (投稿先) 別のエラー件数を JSON で保持（例: `{"MastodonShrieker":2}`）。エラーが無ければ `NULL`
   - ⚠ **shrieker クラス名以外の値も入る。**宛先に一度も触れていない失敗はここへ **`UnavailableDest`**（設定はあるが Shrieker を組み立てられなかった宛先・#1504）や **`source#fetch`**（配信手前でエントリが落ちた・#1473 / #1485）として積まれる。**「どの宛先が失敗したか」と「どの処理段階が失敗したか」が同じ Hash に混在する**ので、集計を読むときは区別すること
+  - 🔴 **4.15.0 で種別が 3 つになった (#1574)。**`source#fetch`＝保存の**前**（解析）で落ちたエントリ（次の run が拾い直す）／`source#entry`＝保存の**後**で落ちたエントリ（二度と取得されない）／`source#exec`＝エントリ処理の途中で run ごと落ちた（件数は不明なので 1）。⚠⚠ **4.14.0 までの `source#fetch` は保存の前後を区別していない。**run ごと落ちた error 行は、4.14.0 までは内訳が空（`NULL`）だった
   - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
   - ⚠ 保護行（上の「prune はソースごとに 4 行を守る」）は残るが、**retention を過ぎると `error_message` は消える (#1511)**。⚠ そのため**実行間隔が retention より長いソースが error のまま 503 を立て続けると、15 日目以降の 503 本文には `error:` 行が出ない (#1621)**。原文は Sentry かログに残る。⚠⚠ **ただし宛先を組み立てられなかった失敗（`UnavailableDest`）は Sentry へ送らず `logger.error` だけ**で、ログは 7 世代でローテーションされる＝**retention を過ぎると原文はどこにも残らない**

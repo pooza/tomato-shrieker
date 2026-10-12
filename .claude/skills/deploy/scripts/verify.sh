@@ -23,10 +23,14 @@ for v in sources:
     # ⚠ 組み立てに失敗したソースは {id, class, error} だけの行になる
     if "last_status" not in v:
         print(v["id"], "broken", v.get("error"))
-    elif v["last_status"] not in ("success", None) or v["silent"] or v["undelivered"]:
+    # ⚠ `lost_entries`（4.15.0・#1574）も見る。取りこぼしの後に新着なしの success が続くと、
+    # healthz は 503 なのに last_status は success のまま。⚠ 4.14.0 以前の版はこのキーを持たない
+    elif (v["last_status"] not in ("success", None) or v["silent"] or v["undelivered"]
+          or v.get("lost_entries")):
         print(
             v["id"], v["last_status"], "streak", v["error_streak"], "/", v["error_streak_threshold"],
             "silent", v["silent"], "undelivered", v["undelivered"],
+            "lost_entries", v.get("lost_entries"),
         )
 ' <<< "$status"
 # いまの常駐（MainPID）が出したログから、この種の失敗を数える（どれも 0 が正常）。
@@ -38,7 +42,9 @@ for v in sources:
 ssh oscura '
   log=/var/log/tomato-shrieker.log
   pid=$(systemctl show tomato-shrieker -p MainPID --value)
-  for word in "redirect refused" "process identity" "event dropped"; do
+  # ⚠ `attachment dropped` / `tags not attached`（4.15.0）は、投稿は成功として数えるので
+  # 監視のどこにも出ない。ここでしか気づけない（直接経路・PieFed 宛が無ければ 0 のはず）
+  for word in "redirect refused" "process identity" "event dropped" "attachment dropped" "tags not attached"; do
     printf "%s: %s\n" "$word" "$(grep -F "tomato-shrieker[$pid]:" "$log" | grep -cF "$word")"
   done
   printf "not started（今日のログ全体）: %s\n" "$(grep -cF "not started" "$log")"'

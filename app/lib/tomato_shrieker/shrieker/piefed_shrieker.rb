@@ -69,12 +69,19 @@ module TomatoShrieker
 
     # テンプレートが本文に並べるのと同じタグを、`#` なしで返す。
     #
+    # ⚠ **出どころはテンプレートに合わせて 3 通り。**フィードのエントリは自分のタグ
+    # （`Entry#tags`・`title.erb` / `summary.erb`）。本文（`status`）を持つものはソースの
+    # タグにリモートのタグ付けを足したもの（`create_tags`・`common.erb`）。予定は本文を
+    # 持たないので、ソースのタグだけ（`calendar.erb`）。
+    # 🔴 **本文が無いのに `create_tags` を呼ばない（4.15.0 リリース前レビュー）。**リモートの
+    # タグ付けが有効だとモロヘイヤへ nil を渡して `NoMethodError` になり、予定 1 件ごとに
+    # PieFed 宛が失敗する（4.14.0 では投稿できていた組み合わせ）。
     # ⚠ **`create_tags` を呼ぶのはここの 1 回だけ（#1664 の Codex P2 と同じ理由）。**
-    # リモートタグ付けが有効ならモロヘイヤへ問い合わせる。⚠ フィードのエントリは自分の
-    # タグ（`Entry#tags`）を持つ。それ以外（テキスト・コマンド・予定）はソースのタグ。
     def tags_of(template)
       entry = template.entry
-      tags = entry.respond_to?(:tags) ? entry.tags : template.source.create_tags(template[:status])
+      source = template.source
+      tags = entry.tags if entry.respond_to?(:tags)
+      tags ||= template[:status] ? source.create_tags(template[:status]) : source.tags
       return tags.map {|v| v.to_s.delete_prefix('#')}.reject(&:empty?).uniq
     end
 
