@@ -203,6 +203,34 @@ module TomatoShrieker
       return JSON::Validator.fully_validate(SourceValidator.schema, params)
     end
 
+    # 🔴 **#1462: PieFed の `host` はホスト名だけ。**
+    #
+    # ⚠ 接続先は常に `https://<host>`。`http://p.example.com:8080/x` と書くと `https://http` へ
+    # つなぎに行き、ポートを書いても 443 のまま。以前は `validate` を通り、WARN も出なかった。
+    def test_piefed_host_must_be_hostname
+      [
+        'http://p.example.com', 'https://p.example.com/', 'p.example.com:8080', 'p.example.com/x', '', ' ',
+        # #1699 の Codex P2: ラベルごとに見る（全体の先頭と末尾だけでは通ってしまう）。
+        'p.example..com', 'p.-example.com', 'p.example-.com', '.example.com', 'example.com.'
+      ].each do |host|
+        assert_not_empty(SourceValidator.validate(piefed_params('host' => host)), host.inspect)
+      end
+      ['p.example.com', 'pf.korako.me', 'localhost', 'xn--eckwd4c7c.example'].each do |host|
+        assert_empty(SourceValidator.validate(piefed_params('host' => host)), host)
+      end
+    end
+
+    # #1462: 実装（`PiefedShrieker#api_version`）が読む `api_version` を、スキーマが NG にしていた。
+    def test_piefed_api_version_is_allowed
+      assert_empty(SourceValidator.validate(piefed_params('api_version' => 'v3')))
+      assert_equal('v3', PiefedShrieker.new(piefed_params('api_version' => 'v3').dig('dest', 'piefed')).api_version)
+    end
+
+    def piefed_params(piefed = {})
+      base = {'host' => 'p.example.com', 'user_id' => 'u', 'password' => 'p', 'community_id' => 1}
+      return {'source' => {'feed' => 'https://example.com/f'}, 'dest' => {'piefed' => base.merge(piefed)}}
+    end
+
     def test_valid_hook_hash
       assert_true(SourceValidator.valid?(
         'source' => {'feed' => 'https://example.com/feed'},
