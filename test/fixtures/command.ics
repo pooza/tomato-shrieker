@@ -1,0 +1,18 @@
+BEGIN:VCALENDAR
+PRODID:-//tomato-shrieker//command fixture//EN
+VERSION:2.0
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+DTSTAMP:20260101T000000Z
+UID:command-fixture-today@tomato-shrieker.test
+DTSTART;VALUE=DATE:__TODAY__
+SUMMARY:コマンド由来の予定（今日）
+DESCRIPTION:#fixture #command
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20260101T000000Z
+UID:command-fixture-far@tomato-shrieker.test
+DTSTART;VALUE=DATE:20990927
+SUMMARY:コマンド由来の予定（遠い先）
+END:VEVENT
+END:VCALENDAR

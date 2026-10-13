@@ -22,6 +22,34 @@ module TomatoShrieker
       ))
     end
 
+    # #1691: `source.ical` は URL のほか、コマンド（標準出力を iCalendar として読む）も書ける。
+    def test_valid_ical_command
+      ical = {'command' => ['bin/anniv.rb', '--ics', 'character'], 'dir' => '/tmp', 'env' => {'A' => 'b'}}
+
+      assert_empty(SourceValidator.validate(
+        'source' => {'ical' => ical, 'days' => 3},
+        'dest' => {'hooks' => ['https://example.com/x'], 'sanitize' => 'html'},
+      ))
+      assert_empty(SourceValidator.validate(
+        'source' => {'ical' => {'command' => 'bin/anniv.rb --ics character'}},
+        'dest' => {'hooks' => ['https://example.com/x']},
+      ))
+    end
+
+    # ⚠ `command` の無い `ical:`（`dir` だけ・綴り違い）は、どのクラスにもマッチしない。
+    def test_invalid_ical_command
+      [
+        {'dir' => '/tmp'}, {'comand' => ['a']}, {'command' => ['a'], 'delimiter' => '='},
+        # #1692 の Codex P2: 空の command は判別キーにマッチするのに、走らせるものが無い。
+        {'command' => ''}, {'command' => '  '}, {'command' => []}
+      ].each do |ical|
+        assert_not_empty(SourceValidator.validate(
+          'source' => {'ical' => ical},
+          'dest' => {'hooks' => ['https://example.com/x']},
+        ), ical.to_json)
+      end
+    end
+
     def test_valid_hook_hash
       assert_true(SourceValidator.valid?(
         'source' => {'feed' => 'https://example.com/feed'},

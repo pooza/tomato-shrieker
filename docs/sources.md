@@ -28,11 +28,38 @@ sources:
 | CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`） |
 | FeedSource | `/source/feed`（`/source/url` でも可） | `/source/title/unique`（デフォルト true）、`/keep/years`、`/dest/prefix`、`/dest/account/bot` |
 | GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
-| IcalendarSource | `/source/icalendar/url` | iCalendar (.ics) URL。`/source/icalendar/keyword` |
+| IcalendarSource | `/source/ical`（`/source/calendar` でも可） | iCalendar (.ics) の URL、またはコマンド（`/source/ical/command`・下記）。`/source/days`（何日前から出すか・既定 3）、`/source/keyword` / `/source/negative_keyword`、`/source/google` |
 | YouTubeChannelSource | `/source/youtube_channel/channel_id` | `/source/youtube_channel/keyword` |
 | GitHubRepositorySource | `/source/github/repository` | `/source/github/timeline`（releases 等） |
 
 🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ 8 文字未満の値は伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。⚠⚠ **伏せるのは「書いたとおりの形」（とシェルエスケープした形）だけ。**コマンドが加工して書き出した形（URL のパスだけ・クエリを落とした URL・JSON や HTML のエスケープ・URL エンコード・Base64・途中で折り返された値）は伏せられない。
+
+### コマンドの出力を iCalendar として読む（IcalendarSource・#1691）
+
+`/source/ical` に URL ではなくコマンドを書くと、その標準出力を iCalendar として読む。事前告知（`/source/days` 日前から当日まで毎日）・テンプレート（`views/calendar.erb`）・リマインド・監視は URL のときと同じ。
+
+```yaml
+source:
+  ical:
+    command:            # 配列（argv）または文字列（sh -c）。CommandSource の /source/command と同じ
+      - bin/anniv.rb
+      - --ics
+      - numbering_title
+    dir: /home/deploy/repos/dqdai-anniv
+    # env:              # 資格情報はここへ（値はログと例外メッセージから伏せる）
+  days: 3
+dest:
+  sanitize: html        # ⚠ 既定（fedi）は本文の `#タグ` を `# タグ` に崩す
+  hooks:
+    - https://...
+```
+
+- 🔴 **`dir` / `env` は `/source/ical` の下に書く。**`/source/dir` / `/source/env` は CommandSource のもので、こちらでは読まない。⚠ `/source/command` を一緒に書くと CommandSource も立つ（1 つの定義から 2 つのソース）
+- コマンドの組み立て（bundler・`BUNDLE_GEMFILE`・伏せ字・`bundle …` で始まるときの `bundle install`）は CommandSource と共有している（`CommandRunner`）。上の資格情報の注意もそのまま当てはまる
+- **空の出力は「該当なし」で正常**（予定 0 件の `VCALENDAR` と同じ）。🔴 **空でないのに iCalendar として読めない出力は error**（取得段の失敗）。コマンドが非 0 で終わったときも同じ
+- ⚠ **本文のハッシュタグを生かすなら `dest.sanitize: html` を付ける。**既定の `fedi` は、投稿先に再解釈させないために `#` / `@` の後ろへ空白を入れる。本番の予定のソース（`delmulin-numbering-title` など）はどれも `html`
+- ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る
+- ⚠ 終日の予定に `DTEND` を書くなら注意。iCalendar の規格では終了日は「翌日」だが、1 日戻すのは Google カレンダーのとき（`/source/google`）だけ。書かなければ開始日と同じ日になる
 
 ### キーワードフィルタ（FeedSource 系共通）
 

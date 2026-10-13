@@ -116,8 +116,34 @@ properties:
         type: string
         format: uri
       ical:
-        type: string
-        format: uri
+        # URL、またはコマンド（標準出力を iCalendar として読む・#1691）。
+        # ⚠ コマンドの `dir` / `env` は `/source/dir` / `/source/env` ではなくここに書く
+        # （そちらは CommandSource のもの）。
+        oneOf:
+          - type: string
+            format: uri
+          - type: object
+            additionalProperties: false
+            required:
+              - command
+            properties:
+              command:
+                # 配列（argv）または文字列（sh -c で実行）。
+                # ⚠ 空（`''`・空白だけ・`[]`）は NG。判別キーにはマッチするのに、
+                # 走らせるものが無い（#1692 の Codex P2）。
+                type:
+                  - array
+                  - string
+                minItems: 1
+                pattern: \S
+                items:
+                  type: string
+              dir:
+                type: string
+              env:
+                type: object
+                additionalProperties:
+                  type: string
       google:
         type: boolean
       text:
