@@ -20,6 +20,19 @@ module TomatoShrieker
     # `source validate` が 1 秒ほどで返るように抑える。超えたら判定を諦めて警告しない。
     MAX_CRON_SAMPLES = 10_000
 
+    # 配信先が 1 つも無い定義への指摘 (#1488)。⚠ スキーマのトップレベル `anyOf`（有効なソースは
+    # 配信先必須・#1473）が落ちたときの 20 行を、これ 1 行に置き換える。
+    NO_DEST_MESSAGE = [
+      '配信先がありません: dest に hooks / mastodon / misskey / line / piefed / nostr の',
+      'いずれかが必要です（止めるなら disable: true）',
+    ].join.freeze
+
+    # トップレベルの `anyOf` が落ちたときの 1 行目。
+    NO_DEST_PATTERN = %r{\AThe property '#/' of type object did not match one or more of the}
+
+    # `anyOf` / `oneOf` の内訳の前置き。
+    BRANCH_HEADER = '. The schema specific errors were:'
+
     class << self
       def schema
         @schema ||= YAML.load_file(File.join(Environment.dir, SCHEMA_FILE))
@@ -29,9 +42,35 @@ module TomatoShrieker
       # json-schema が付与する末尾の「 in schema <uuid>」は可読性のため除去する。
       def validate(params)
         params = params.deep_stringify_keys
-        errors = JSON::Validator.fully_validate(schema, params)
-          .map {|message| message.sub(/ in schema [0-9a-f-]+\z/, '')}
+        errors = JSON::Validator.fully_validate(schema, params).map {|message| readable(message)}
         return errors.concat(startup_errors(params))
+      end
+
+      # 🔴 **`anyOf` / `oneOf` の指摘を 1 行に畳む (#1488)。**
+      #
+      # json-schema gem は、分岐のどれにも合わなかった理由を分岐ごとに字下げして 1 つの
+      # メッセージに詰める。配信先の無い定義 1 件で 20 行になり、しかも先頭が
+      # 「`disable` が必須です」という誤誘導だった。draft-06 はメッセージを差し替えられない
+      # ので、ここで読める形にする。
+      #
+      # - トップレベルの `anyOf`（配信先必須）は、意味が 1 つしか無いので定型文にする
+      # - それ以外（`/dest/hooks` の要素・`/source/ical`）は、1 行目に各分岐の理由を並べる
+      def readable(message)
+        message = message.gsub(/ in schema [0-9a-f-]+$/, '')
+        return NO_DEST_MESSAGE if message.match?(NO_DEST_PATTERN)
+        head, *rest = message.split("\n")
+        return message unless head.end_with?(BRANCH_HEADER)
+        reasons = rest.filter_map {|line| branch_reason(line)}
+        return "#{head.delete_suffix(BRANCH_HEADER)}: #{reasons.uniq.join(' / ')}"
+      end
+
+      # 分岐の内訳 1 行から理由だけを取り出す。⚠ 見出し（`- oneOf #0:`）と、入れ子の分岐の
+      # 前置きは理由ではない。
+      def branch_reason(line)
+        line = line.strip.delete_prefix('- ').strip
+        return nil if line.empty? || line.match?(/\A(anyOf|oneOf|allOf) #\d+:\z/)
+        return nil if line.end_with?(BRANCH_HEADER)
+        return line.sub(/\AThe property '[^']*' (of type \w+ )?/, '')
       end
 
       # 🔴 **起動なら倒れる定義の指摘を全部返す（4.10.0 リリース前レビュー）。**
