@@ -50,6 +50,80 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **#1488: 配信先の無い定義への指摘は 1 行。**
+    #
+    # ⚠ 以前は json-schema の `anyOf` の内訳がそのまま出て、1 件あたり 20 行、しかも先頭が
+    # 「`disable` が必須です」という誤誘導だった。
+    def test_no_dest_message_is_one_line
+      [{'tags' => ['a']}, {}].each do |dest|
+        errors = SourceValidator.validate('source' => {'feed' => 'https://example.com/f'}, 'dest' => dest)
+
+        assert_equal([SourceValidator::NO_DEST_MESSAGE], errors, dest.to_json)
+      end
+    end
+
+    # ⚠ 他の指摘と同時に出ても、それぞれ 1 行。
+    def test_no_dest_message_with_other_errors
+      errors = SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/f'}, 'dest' => {}, 'bogus' => 1,
+      )
+
+      assert_equal(2, errors.size)
+      assert_include(errors, SourceValidator::NO_DEST_MESSAGE)
+      assert_true(errors.any? {|v| v.include?('bogus')})
+      assert_true(errors.none? {|v| v.include?("\n")})
+    end
+
+    # ⚠ `disable: true` は配信先が無くてよい（死蔵定義）。定型文を出さない。
+    def test_no_dest_message_not_for_disabled
+      assert_empty(SourceValidator.validate(
+        'disable' => true, 'source' => {'feed' => 'https://example.com/f'}, 'dest' => {},
+      ))
+    end
+
+    # 🔴 **#1488: `oneOf` の指摘（`/dest/hooks` の要素・`/source/ical`）も 1 行。**
+    # ⚠ どのプロパティか・なぜ合わないかは残す。
+    def test_one_of_message_is_one_line
+      dest = {'hooks' => ['https://example.com/x']}
+      {
+        {'source' => {'feed' => 'https://example.com/f'}, 'dest' => {'hooks' => ['nope']}} => '#/dest/hooks/0',
+        {'source' => {'ical' => 'nope'}, 'dest' => dest} => '#/source/ical',
+      }.each do |params, property|
+        errors = SourceValidator.validate(params).reject {|v| v.start_with?('/source:')}
+
+        assert_equal(1, errors.size, params.to_json)
+        assert_not_include(errors.first, "\n")
+        assert_include(errors.first, property)
+        assert_include(errors.first, 'must be an absolute URI')
+        assert_not_include(errors.first, 'oneOf #')
+        assert_not_include(errors.first, 'schema specific errors')
+      end
+    end
+
+    # 🔴 **#1697 の Codex P2: 分岐の中で、下のプロパティが落ちたときはその名前を残す。**
+    # ⚠ 落とすと 1 行目の `#/source/ical` しか残らず、どこを直すかが分からない。2 か所あれば
+    # 2 つとも出る（同じ文面として 1 つに潰れない）。
+    def test_one_of_message_keeps_nested_property
+      ical = {'command' => ['a'], 'env' => {'A' => 1, 'B' => 2}}
+      errors = SourceValidator.validate(
+        'source' => {'ical' => ical}, 'dest' => {'hooks' => ['https://example.com/x']},
+      )
+
+      assert_equal(1, errors.size)
+      assert_not_include(errors.first, "\n")
+      assert_include(errors.first, "'#/source/ical/env/A'")
+      assert_include(errors.first, "'#/source/ical/env/B'")
+    end
+
+    # ⚠ 分岐を持たない指摘は、末尾の `in schema <uuid>` を落とすだけでそのまま。
+    def test_plain_message_is_kept
+      errors = SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/f'}, 'dest' => {'hooks' => []},
+      )
+
+      assert_equal(["The property '#/dest/hooks' did not contain a minimum number of items 1"], errors)
+    end
+
     # 🔴 **#1461: `format: uri` が URL でないものを弾くこと。**
     #
     # ⚠ json-schema gem の `uri` は相対参照を許すので、以前は `not a uri with spaces` も
