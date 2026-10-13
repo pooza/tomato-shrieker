@@ -61,6 +61,14 @@ dest:
 - ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る
 - ⚠ 終日の予定に `DTEND` を書くなら注意。iCalendar の規格では終了日は「翌日」だが、1 日戻すのは Google カレンダーのとき（`/source/google`）だけ。書かなければ開始日と同じ日になる
 
+### URL の検証（`source validate`・#1461）
+
+スキーマの `format: uri`（`/source/feed`・`/source/url`・`/source/calendar`・`/source/ical`・`/source/news/url`・`/dest/hooks` など）は、**絶対 URI（スキーム必須）**を要求する。`example.com/feed` や空文字は NG。
+
+- ⚠ **この判定は ginseng-core の側にある**（1.18.0）。こちらのスキーマに書いてあるのは `format: uri` だけなので、効いていることは `SourceValidatorTest#test_invalid_uri_is_ng` で受けている
+- ⚠ **`host:port/path`（スキームの書き忘れ）は通る。**`localhost:3000/clean` は規格上 `localhost` というスキームの絶対 URI として読める。スキームは絞っていない（`webcal:` などを弾くため）
+- `source.news` は `phrase`（空文字は NG）か `url` のどちらかが要る。どちらも無い定義は「どのクラスにもマッチしない」で NG になる
+
 ### キーワードフィルタ（FeedSource 系共通）
 
 - `/source/keyword` — 含むエントリのみ対象（正規表現可）
