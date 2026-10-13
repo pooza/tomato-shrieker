@@ -67,7 +67,7 @@ dest:
 
 - ⚠ **この判定は ginseng-core の側にある**（1.18.0）。こちらのスキーマに書いてあるのは `format: uri` だけなので、効いていることは `SourceValidatorTest#test_invalid_uri_is_ng` で受けている
 - ⚠ **`host:port/path`（スキームの書き忘れ）は通る。**`localhost:3000/clean` は規格上 `localhost` というスキームの絶対 URI として読める。スキームは絞っていない（`webcal:` などを弾くため）
-- `source.news` は `phrase`（空文字は NG）か `url` のどちらかが要る。どちらも無い定義は「どのクラスにもマッチしない」で NG になる
+- `source.news` は `phrase`（空文字・空白だけは NG）か `url` のどちらかが要る。どちらも無い定義は「どのクラスにもマッチしない」で NG になる
 
 ### キーワードフィルタ（FeedSource 系共通）
 

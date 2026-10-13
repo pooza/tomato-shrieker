@@ -189,10 +189,10 @@ properties:
             type: string
             format: uri
           phrase:
-            # ⚠ 空文字は NG。判別キー（/source/news/phrase）にはマッチするのに、
+            # ⚠ 空文字・空白だけは NG。判別キー（/source/news/phrase）にはマッチするのに、
             # 検索語の無い URL を読みに行く (#1461)。
             type: string
-            minLength: 1
+            pattern: '[^[:space:]]'
           dedupe:
             type: boolean
           cleaner:

@@ -103,7 +103,12 @@ module TomatoShrieker
     def test_blank_news_phrase_is_ng
       dest = {'hooks' => ['https://example.com/x']}
 
-      assert_not_empty(schema_errors('source' => {'news' => {'phrase' => ''}}, 'dest' => dest))
+      # ⚠ 空白だけも同じ（#1696 の Codex P2）。`minLength` では通る。
+      ['', '   ', "\t", '　'].each do |phrase|
+        errors = schema_errors('source' => {'news' => {'phrase' => phrase}}, 'dest' => dest)
+
+        assert_not_empty(errors, phrase.inspect)
+      end
       assert_empty(schema_errors('source' => {'news' => {'phrase' => 'プリキュア'}}, 'dest' => dest))
     end
 
