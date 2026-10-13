@@ -315,13 +315,20 @@ properties:
           - community_id
         properties:
           host:
+            # ⚠ ホスト名だけ。接続先は常に `https://<host>` で、`http://p.example.com:8080/x` と
+            # 書くと `https://http` へつなぎに行く（ポートを書いても 443 のまま）(#1462)。
             type: string
+            pattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
           user_id:
             type: string
           password:
             type: string
           community_id:
             type: integer
+          api_version:
+            # 宛先ごとの API の版。実装（PiefedShrieker#api_version）が読む (#1462)。
+            # ⚠ 全体の既定は `config/local.yaml` の `/piefed/api/version`。
+            type: string
           template:
             type: string
       nostr:
