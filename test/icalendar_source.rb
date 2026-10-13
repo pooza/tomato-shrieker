@@ -127,10 +127,173 @@ module TomatoShrieker
       assert_predicate(source, :present?)
     end
 
+    # ⚠ コマンド由来のソースは URL を持たない (#1691)。
     def test_uri
       IcalendarSource.all do |source|
-        assert_kind_of(Ginseng::URI, source.uri)
+        assert_kind_of(source.command? ? NilClass : Ginseng::URI, source.uri)
       end
+    end
+
+    # 🔴 **#1691: CI でも 1 本は回ること。**`test/sources/ical-command.yaml` が無いと
+    # 上のループは 1 度も回らない。⚠ 今日の日付の予定を 1 件出すので、いつ走らせても
+    # エントリが 1 件は出る。
+    def test_command_fixture
+      source = IcalendarSource.all.find {|v| v.id == 'ical-command'}
+
+      assert_predicate(source, :command?)
+      assert_false(source.google?)
+      assert_equal(2, source.ical.events.count)
+      entry = source.entries.first
+
+      assert_equal('コマンド由来の予定（今日）', entry[:title])
+      assert_true(entry[:is_today])
+      assert_equal('#fixture #command', entry[:body])
+      assert_true(entry[:all_day])
+    end
+
+    # #1691: コマンドの出力を、URL から取ったものと同じ規則で予定にする。
+    def test_command_entries
+      source = build_command_source
+      date = Date.today + 2
+      stub_output(source, command_ics(date))
+      entry = source.entries.to_a.first
+
+      assert_equal(1, source.entries.count)
+      assert_equal(date, entry[:start_date].to_date)
+      assert_equal(date, entry[:end_date].to_date, '終了日を書かない終日の予定は、開始日と同じ日')
+      assert_equal(2, entry[:countdown])
+      assert_false(entry[:is_today])
+      assert_true(entry[:all_day])
+      assert_equal('「ドラゴンクエストV 天空の花嫁」の発売日から34周年', entry[:title])
+    end
+
+    # ⚠ `days`（何日前から出すか）の外の予定は出さない。コマンドは今年と来年のぶんを全部返す。
+    def test_command_entries_outside_days
+      source = build_command_source
+      stub_output(source, command_ics(Date.today + 4))
+
+      assert_empty(source.entries.to_a)
+    end
+
+    # ⚠ **空の出力は「該当なし」で正常**（予定 0 件の VCALENDAR と同じ）。段も立てない。
+    def test_command_empty_output
+      ['', "\n", "BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n"].each do |output|
+        source = build_command_source
+        stub_output(source, output)
+        stats = attach_stats(source)
+        source.exec
+
+        assert_empty(source.entries.to_a)
+        assert_false(stats.entry_stage?)
+      end
+    end
+
+    # 🔴 **空でないのに iCalendar として読めない出力は、取得段の失敗にする。**⚠⚠ パーサは
+    # 入力によっては例外を出さず何も返さない（下の 2 つ目）ので、黙って通すと壊れたコマンドが
+    # 「予定なし」の success を積み続ける。
+    def test_command_invalid_output
+      ["今日は記念日ではありません\n", "garbage\nline\n"].each do |output|
+        source = build_command_source
+        stub_output(source, output)
+        stats = attach_stats(source)
+        error = assert_raise(RuntimeError) {source.exec}
+
+        assert_include(error.message, 'invalid iCalendar output')
+        assert_false(stats.entry_stage?)
+      end
+    end
+
+    # ⚠ コマンドが非 0 で終わった run も取得段。理由（stderr）を例外メッセージに載せる。
+    def test_command_failure
+      source = build_command_source('echo "calendar name required" >&2; exit 1')
+      stats = attach_stats(source)
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_include(error.message, 'calendar name required')
+      assert_false(stats.entry_stage?)
+    end
+
+    # ⚠ 読めない出力を例外メッセージへ載せるときも、資格情報は伏せる（run_log・Sentry へ流れる）。
+    def test_command_invalid_output_is_masked
+      source = build_command_source("echo error at #{SECRET_ENV}")
+      error = assert_raise(RuntimeError) {source.ical}
+
+      assert_include(error.message, 'invalid iCalendar output')
+      assert_not_include(error.message, SECRET_ENV)
+    end
+
+    # 🔴 **`dir` / `env` は `/source/ical` の下から読む。**⚠ `/source/dir` / `/source/env` は
+    # CommandSource のもの。
+    def test_command_is_built_from_ical
+      command = build_command_source.command
+
+      assert_equal(['cat', 'test/fixtures/command.ics'], command.args)
+      assert_equal(File.join(Environment.dir, 'test'), command.dir)
+      assert_equal(SECRET_ENV, command.env['PUSH_URL'])
+      assert_equal(File.join(Environment.dir, 'test/Gemfile'), command.env['BUNDLE_GEMFILE'])
+      assert_include(command.secrets, SECRET_ENV)
+      assert_include(command.secrets, 'https://hook.example.test/ical-command')
+    end
+
+    # 🔴 **1 つの定義から立つソースは 1 つ。**⚠ 判別キーを `/source/command` にすると、
+    # `CommandSource` も一緒に立つ。
+    def test_command_definition_matches_one_class
+      sources = Source.all([command_params]).to_a
+
+      assert_equal([IcalendarSource], sources.map(&:class))
+      assert_empty(Source.unmatched_ids([command_params]))
+    end
+
+    # ⚠ URL のソースは今までどおり（コマンドとして扱わない）。
+    def test_url_source_is_not_command
+      source = build_entry_stage_source
+
+      assert_false(source.command?)
+      assert_empty(source.command_params)
+      assert_kind_of(Ginseng::URI, source.uri)
+    end
+
+    def test_google_with_command
+      assert_false(build_command_source.google?)
+      params = command_params
+      params['source']['google'] = true
+
+      assert_true(IcalendarSource.new(params).google?)
+    end
+
+    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456'.freeze
+
+    def build_command_source(script = nil)
+      return IcalendarSource.new(command_params(script))
+    end
+
+    def command_params(script = nil)
+      return {
+        'id' => '__test_icalendar_command__',
+        'source' => {
+          'ical' => {
+            'command' => script || ['cat', 'test/fixtures/command.ics'],
+            'dir' => File.join(Environment.dir, 'test'),
+            'env' => {'PUSH_URL' => SECRET_ENV},
+          },
+        },
+        'dest' => {'hooks' => ['https://hook.example.test/ical-command'], 'sanitize' => 'html'},
+      }
+    end
+
+    def stub_output(source, output)
+      source.define_singleton_method(:run_command) {output}
+    end
+
+    def command_ics(date)
+      return [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//dqdai-anniv//numbering_title//JA',
+        'BEGIN:VEVENT', 'DTSTAMP:20260101T000000Z', 'UID:numbering_title-0@dqdai-anniv',
+        "DTSTART;VALUE=DATE:#{date.strftime('%Y%m%d')}",
+        'DESCRIPTION:#dq5',
+        'SUMMARY:「ドラゴンクエストV 天空の花嫁」の発売日から3', ' 4周年',
+        'END:VEVENT', 'END:VCALENDAR'
+      ].join("\n")
     end
 
     def test_prefix

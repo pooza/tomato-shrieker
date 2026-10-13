@@ -3,6 +3,8 @@ require 'icalendar-rrule'
 module TomatoShrieker
   class IcalendarSource < Source
     using Icalendar::Scannable
+    include CommandRunner
+    include GoogleCalendarFixable
 
     def initialize(params)
       super
@@ -17,8 +19,37 @@ module TomatoShrieker
       return nil
     end
 
+    # コマンドの `command` / `dir` / `env` は `/source/ical` の下に置く (#1691)。
+    # ⚠ `/source/command` は `CommandSource` の判別キーなので、同じ名前を使うと
+    # 1 つの定義から 2 つのソースが立つ。
+    def command_root
+      return '/source/ical'
+    end
+
     def ical
+      return command_ical if command?
       return Icalendar::Calendar.parse(@http.get(uri)).first
+    end
+
+    # コマンドの標準出力を iCalendar として読む (#1691)。
+    #
+    # ⚠ **空の出力は「該当なし」で正常。**予定 0 件の `VCALENDAR` と同じに扱う。
+    # 🔴 **空でないのに読めない出力は例外にする。**パーサは入力によっては例外を出さず
+    # 何も返さないだけなので、そのままだと壊れたコマンドが「予定なし」の success を
+    # 積み続ける。⚠ ここまでは取得段（`exec` が `entries.to_a` を先に評価している）。
+    # ⚠ **パーサの例外をそのまま上げない。**メッセージに出力の行がそのまま入るので、
+    # 資格情報を伏せられない（例外メッセージは run_log・`/status.json`・Sentry へ流れる）。
+    def command_ical
+      output = run_command
+      return Icalendar::Calendar.new if output.blank?
+      begin
+        ical = Icalendar::Calendar.parse(output).first
+      rescue Icalendar::Parser::ParseError
+        ical = nil
+      end
+      # ⚠ 伏せてから切り詰める。先に切ると、途中で切れた資格情報が伏せ字に一致しなくなる。
+      return ical if ical
+      raise "invalid iCalendar output: #{command.masked(output.strip).ellipsize(100)}"
     end
 
     def exec
@@ -75,11 +106,6 @@ module TomatoShrieker
       return self['/source/days'] || 3
     end
 
-    def google?
-      return uri.host.split('.').member?('google') if self['/source/google'].nil?
-      return self['/source/google']
-    end
-
     def entries(&block)
       return enum_for(__method__) unless block
       ical.events
@@ -132,21 +158,6 @@ module TomatoShrieker
       return data
     end
 
-    def fix_google_calendar_entry(data)
-      # Google Calendarで、終日予定の終了日が1日ずれる。
-      data[:end_date] -= 1.days if data[:all_day] && (data[:start_date] < data[:end_date])
-
-      # Google Meet
-      lines = data[:body].split(/\r?\n/)
-      lines.reject! {|line| line.match?(/^Google Meet に参加:/)}
-      lines.reject! {|line| line.match?(/^Meet の詳細:/)}
-      data[:body] = lines.join("\n").strip
-
-      # 場所
-      data[:location] = data[:location].split(',').first
-      return data
-    end
-
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'calendar'),
@@ -164,6 +175,7 @@ module TomatoShrieker
 
     def register
       return if disable?
+      install_command_bundle if command?
       schedule_remind if remind?
       return super
     end

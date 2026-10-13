@@ -1,0 +1,12 @@
+# コマンドの出力を読む IcalendarSource のテスト専用ソース (#1691)
+# ⚠ これが無いと、CI には IcalendarSource が 1 件も無く、`IcalendarSource.all` を回す
+# テストは何も確かめずに緑になる（#1593 の族）。
+# ⚠ `__TODAY__` を今日の日付に置き換えて出す。いつ走らせてもエントリが 1 件は出る。
+test: true
+source:
+  ical:
+    command: sed "s/__TODAY__/$(date +%Y%m%d)/" test/fixtures/command.ics
+dest:
+  sanitize: html
+  hooks:
+    - https://hook.example.test/ical-command
