@@ -7,13 +7,6 @@ module TomatoShrieker
     BROKEN_ID = '__test_scheduler_broken__'.freeze
     IDS = [FIXTURE_ID, OTHER_ID, ICAL_ID, BROKEN_ID].freeze
 
-    # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので取り残しは
-    # git status にも出ず、次のスケジューラ起動で偽ソースとして登録されてしまう。
-    at_exit do
-      Dir.glob(File.join(Environment.dir, 'config/sources', '__test_scheduler*.yaml'))
-        .each {|f| FileUtils.rm_f(f)}
-    end
-
     def setup
       @scheduler = Scheduler.instance
       IDS.each {|id| FileUtils.rm_f(fixture_path(id))}
@@ -30,7 +23,7 @@ module TomatoShrieker
     end
 
     def fixture_path(id)
-      return File.join(Environment.dir, 'config/sources', "#{id}.yaml")
+      return File.join(Config.scratch_sources_dir, "#{id}.yaml")
     end
 
     def write_fixture(id, extra)

@@ -1,7 +1,8 @@
 ---
 # 単一ソース定義（config/sources/<id>.yaml）用スキーマ。
 # 1 ファイル = 1 ソース。ファイル名が id になるため、ファイル内に id は持たない。
-# base.yaml はこの定義を $ref で参照する。
+# ⚠ base.yaml はこの定義を参照しない（json-schema gem が YAML ファイルへの $ref を解決できない）。
+# 見るのは SourceValidator（`shrieker source validate`）だけ。
 $schema: http://json-schema.org/draft-06/schema#
 title: Source definition
 type: object
@@ -116,8 +117,38 @@ properties:
         type: string
         format: uri
       ical:
-        type: string
-        format: uri
+        # URL、またはコマンド（標準出力を iCalendar として読む・#1691）。
+        # ⚠ コマンドの `dir` / `env` は `/source/dir` / `/source/env` ではなくここに書く
+        # （そちらは CommandSource のもの）。
+        oneOf:
+          - type: string
+            format: uri
+          - type: object
+            additionalProperties: false
+            required:
+              - command
+            properties:
+              command:
+                # 配列（argv）または文字列（sh -c で実行）。
+                # ⚠ 空（`''`・空白だけ・`[]`）は NG。判別キーにはマッチするのに、
+                # 走らせるものが無い（#1692 の Codex P2）。
+                type:
+                  - array
+                  - string
+                minItems: 1
+                pattern: \S
+                # ⚠ 配列は先頭（実行するもの）が空でないこと。`pattern` は文字列にしか効かない。
+                items:
+                  - type: string
+                    pattern: \S
+                additionalItems:
+                  type: string
+              dir:
+                type: string
+              env:
+                type: object
+                additionalProperties:
+                  type: string
       google:
         type: boolean
       text:
@@ -134,10 +165,17 @@ properties:
         type: string
       command:
         # 配列（argv）または文字列（CommandSource が sh -c で実行）
+        # ⚠ 空（`''`・空白だけ・`[]`）は NG。走らせるものが無い（`/source/ical/command` と同じ）。
         type:
           - array
           - string
+        minItems: 1
+        pattern: \S
+        # ⚠ 配列は先頭（実行するもの）が空でないこと。`pattern` は文字列にしか効かない。
         items:
+          - type: string
+            pattern: \S
+        additionalItems:
           type: string
       env:
         type: object
@@ -163,7 +201,10 @@ properties:
             type: string
             format: uri
           phrase:
+            # ⚠ 空文字・空白だけは NG。判別キー（/source/news/phrase）にはマッチするのに、
+            # 検索語の無い URL を読みに行く (#1461)。
             type: string
+            pattern: '[^[:space:]]'
           dedupe:
             type: boolean
           cleaner:
@@ -286,13 +327,24 @@ properties:
           - community_id
         properties:
           host:
+            # ⚠ ホスト名だけ。接続先は常に `https://<host>` で、`http://p.example.com:8080/x` と
+            # 書くと `https://http` へつなぎに行く（ポートを書いても 443 のまま）(#1462)。
             type: string
+            # ラベル（ドットで区切った各部）ごとに、英数字で始まり英数字で終わること。
+            # ⚠ `^` / `$` は行頭・行末なので使わない（改行を挟むと `evil\nok` が通る）。
+            pattern: '\A[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*\z'
           user_id:
             type: string
           password:
             type: string
           community_id:
             type: integer
+          api_version:
+            # 宛先ごとの API の版。実装（PiefedShrieker#api_version）が読む (#1462)。
+            # ⚠ 全体の既定は `config/local.yaml` の `/piefed/api/version`。
+            # ⚠ 空文字は既定へ倒れず（Ruby では真）、パスが `/api//post` になる。
+            type: string
+            pattern: '\A[A-Za-z0-9._-]+\z'
           template:
             type: string
       nostr:

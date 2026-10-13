@@ -55,7 +55,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.15.0
+  version: 4.16.0
 nostr:
   relays:
     - wss://relay.damus.io
@@ -99,6 +99,9 @@ source:
       config: /source/calendar
     - class: IcalendarSource
       config: /source/ical
+    # コマンドの出力を iCalendar として読む (#1691)
+    - class: IcalendarSource
+      config: /source/ical/command
     - class: YouTubeChannelSource
       config: /source/youtube/channel/id
     - class: YouTubeChannelSource

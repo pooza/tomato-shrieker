@@ -22,6 +22,246 @@ module TomatoShrieker
       ))
     end
 
+    # #1691: `source.ical` は URL のほか、コマンド（標準出力を iCalendar として読む）も書ける。
+    def test_valid_ical_command
+      ical = {'command' => ['bin/anniv.rb', '--ics', 'character'], 'dir' => '/tmp', 'env' => {'A' => 'b'}}
+
+      assert_empty(SourceValidator.validate(
+        'source' => {'ical' => ical, 'days' => 3},
+        'dest' => {'hooks' => ['https://example.com/x'], 'sanitize' => 'html'},
+      ))
+      assert_empty(SourceValidator.validate(
+        'source' => {'ical' => {'command' => 'bin/anniv.rb --ics character'}},
+        'dest' => {'hooks' => ['https://example.com/x']},
+      ))
+    end
+
+    # ⚠ `command` の無い `ical:`（`dir` だけ・綴り違い）は、どのクラスにもマッチしない。
+    def test_invalid_ical_command
+      [
+        {'dir' => '/tmp'}, {'comand' => ['a']}, {'command' => ['a'], 'delimiter' => '='},
+        # #1692 の Codex P2: 空の command は判別キーにマッチするのに、走らせるものが無い。
+        {'command' => ''}, {'command' => '  '}, {'command' => []}
+      ].each do |ical|
+        assert_not_empty(SourceValidator.validate(
+          'source' => {'ical' => ical},
+          'dest' => {'hooks' => ['https://example.com/x']},
+        ), ical.to_json)
+      end
+    end
+
+    # 🔴 **#1488: 配信先の無い定義への指摘は 1 行。**
+    #
+    # ⚠ 以前は json-schema の `anyOf` の内訳がそのまま出て、1 件あたり 20 行、しかも先頭が
+    # 「`disable` が必須です」という誤誘導だった。
+    def test_no_dest_message_is_one_line
+      [{'tags' => ['a']}, {}].each do |dest|
+        errors = SourceValidator.validate('source' => {'feed' => 'https://example.com/f'}, 'dest' => dest)
+
+        assert_equal([SourceValidator::NO_DEST_MESSAGE], errors, dest.to_json)
+      end
+    end
+
+    # ⚠ 他の指摘と同時に出ても、それぞれ 1 行。
+    def test_no_dest_message_with_other_errors
+      errors = SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/f'}, 'dest' => {}, 'bogus' => 1,
+      )
+
+      assert_equal(2, errors.size)
+      assert_include(errors, SourceValidator::NO_DEST_MESSAGE)
+      assert_true(errors.any? {|v| v.include?('bogus')})
+      assert_true(errors.none? {|v| v.include?("\n")})
+    end
+
+    # ⚠ `disable: true` は配信先が無くてよい（死蔵定義）。定型文を出さない。
+    def test_no_dest_message_not_for_disabled
+      assert_empty(SourceValidator.validate(
+        'disable' => true, 'source' => {'feed' => 'https://example.com/f'}, 'dest' => {},
+      ))
+    end
+
+    # 🔴 **#1488: `oneOf` の指摘（`/dest/hooks` の要素・`/source/ical`）も 1 行。**
+    # ⚠ どのプロパティか・なぜ合わないかは残す。
+    def test_one_of_message_is_one_line
+      dest = {'hooks' => ['https://example.com/x']}
+      {
+        {'source' => {'feed' => 'https://example.com/f'}, 'dest' => {'hooks' => ['nope']}} => '#/dest/hooks/0',
+        {'source' => {'ical' => 'nope'}, 'dest' => dest} => '#/source/ical',
+      }.each do |params, property|
+        errors = SourceValidator.validate(params).reject {|v| v.start_with?('/source:')}
+
+        assert_equal(1, errors.size, params.to_json)
+        assert_not_include(errors.first, "\n")
+        assert_include(errors.first, property)
+        assert_include(errors.first, 'must be an absolute URI')
+        assert_not_include(errors.first, 'oneOf #')
+        assert_not_include(errors.first, 'schema specific errors')
+      end
+    end
+
+    # 🔴 **#1697 の Codex P2: 分岐の中で、下のプロパティが落ちたときはその名前を残す。**
+    # ⚠ 落とすと 1 行目の `#/source/ical` しか残らず、どこを直すかが分からない。2 か所あれば
+    # 2 つとも出る（同じ文面として 1 つに潰れない）。
+    def test_one_of_message_keeps_nested_property
+      ical = {'command' => ['a'], 'env' => {'A' => 1, 'B' => 2}}
+      errors = SourceValidator.validate(
+        'source' => {'ical' => ical}, 'dest' => {'hooks' => ['https://example.com/x']},
+      )
+
+      assert_equal(1, errors.size)
+      assert_not_include(errors.first, "\n")
+      assert_include(errors.first, "'#/source/ical/env/A'")
+      assert_include(errors.first, "'#/source/ical/env/B'")
+    end
+
+    # ⚠ 分岐を持たない指摘は、末尾の `in schema <uuid>` を落とすだけでそのまま。
+    def test_plain_message_is_kept
+      errors = SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/f'}, 'dest' => {'hooks' => []},
+      )
+
+      assert_equal(["The property '#/dest/hooks' did not contain a minimum number of items 1"], errors)
+    end
+
+    # 🔴 **#1461: `format: uri` が URL でないものを弾くこと。**
+    #
+    # ⚠ json-schema gem の `uri` は相対参照を許すので、以前は `not a uri with spaces` も
+    # `example.com` も通っていた。絶対 URI（スキーム必須）を要求するのは ginseng-core
+    # （1.18.0・pooza/ginseng-core#516）の側。⚠⚠ **こちらのスキーマには何も書いていない**ので、
+    # 上流の読み込み方が変わると黙って素通しに戻る。CI は常に最新の ginseng で走るので、
+    # ここで受ける。
+    def test_invalid_uri_is_ng
+      dest = {'hooks' => ['https://example.com/x']}
+
+      [
+        {'feed' => 'not a uri with spaces'}, {'feed' => 'example.com'}, {'feed' => ''},
+        {'url' => '/feed.xml'}, {'calendar' => 'example.com/a.ics'}, {'ical' => 'example.com/a.ics'},
+        {'news' => {'url' => 'news.google.com/rss'}},
+        {'news' => {'phrase' => 'a', 'cleaner' => {'url' => 'cleaner.example.test/clean'}}}
+      ].each do |source|
+        assert_not_empty(schema_errors('source' => source, 'dest' => dest), source.to_json)
+      end
+      [['also not uri'], [{'url' => 'example.com/hook'}]].each do |hooks|
+        params = {'source' => {'feed' => 'https://example.com/feed'}, 'dest' => {'hooks' => hooks}}
+
+        assert_not_empty(schema_errors(params), hooks.to_json)
+      end
+    end
+
+    # ⚠ **`host:port/path`（スキームの書き忘れ）は通ってしまう。**`localhost:3000/clean` は
+    # 規格上 `localhost` というスキームの絶対 URI として読める。スキームを http / https に
+    # 絞ると `webcal:` などを弾くので、ここは絞っていない。
+    def test_host_with_port_passes_as_uri
+      source = {'news' => {'phrase' => 'a', 'cleaner' => {'url' => 'localhost:3000/clean'}}}
+
+      assert_empty(schema_errors('source' => source, 'dest' => {'hooks' => ['https://example.com/x']}))
+    end
+
+    # ⚠ 過剰に弾かないこと。本番にある形（ポートつき・`.local`・エンコード済みのクエリ・
+    # `webcal:`）は通す。
+    def test_valid_uri_is_ok
+      dest = {'hooks' => ['https://example.com/x']}
+
+      [
+        {'feed' => 'http://scylla.b-shock.local:3000/clean?q=%E3%83%97%E3%83%AA%E3%82%AD%E3%83%A5%E3%82%A2'},
+        {'feed' => 'https://example.com/feed.xml#fragment'},
+        {'ical' => 'webcal://example.com/a.ics'},
+        {'calendar' => 'https://calendar.google.com/calendar/ical/a%40group.calendar.google.com/public/basic.ics'},
+      ].each do |source|
+        assert_empty(schema_errors('source' => source, 'dest' => dest), source.to_json)
+      end
+    end
+
+    # #1461: 空の検索語は、判別キーにはマッチするのに検索語の無い URL を読みに行く。
+    def test_blank_news_phrase_is_ng
+      dest = {'hooks' => ['https://example.com/x']}
+
+      # ⚠ 空白だけも同じ（#1696 の Codex P2）。`minLength` では通る。
+      ['', '   ', "\t", '　'].each do |phrase|
+        errors = schema_errors('source' => {'news' => {'phrase' => phrase}}, 'dest' => dest)
+
+        assert_not_empty(errors, phrase.inspect)
+      end
+      assert_empty(schema_errors('source' => {'news' => {'phrase' => 'プリキュア'}}, 'dest' => dest))
+    end
+
+    # ⚠ `news: {}` や `news: {dedupe: true}` はスキーマを通るが、どのクラスにもマッチしないので
+    # `startup_errors` が拾う（#1572）。スキーマに `anyOf` を重ねない。
+    def test_news_without_phrase_or_url_is_unmatched
+      [{}, {'dedupe' => true}].each do |news|
+        errors = SourceValidator.validate(
+          'source' => {'news' => news}, 'dest' => {'hooks' => ['https://example.com/x']},
+        )
+
+        assert_equal(1, errors.count {|v| v.include?('no source class matched')}, news.to_json)
+      end
+    end
+
+    # スキーマだけの指摘（起動時の検査を除く）。
+    def schema_errors(params)
+      return JSON::Validator.fully_validate(SourceValidator.schema, params)
+    end
+
+    # 🔴 **#1462: PieFed の `host` はホスト名だけ。**
+    #
+    # ⚠ 接続先は常に `https://<host>`。`http://p.example.com:8080/x` と書くと `https://http` へ
+    # つなぎに行き、ポートを書いても 443 のまま。以前は `validate` を通り、WARN も出なかった。
+    def test_piefed_host_must_be_hostname
+      [
+        'http://p.example.com', 'https://p.example.com/', 'p.example.com:8080', 'p.example.com/x', '', ' ',
+        # #1699 の Codex P2: ラベルごとに見る（全体の先頭と末尾だけでは通ってしまう）。
+        'p.example..com', 'p.-example.com', 'p.example-.com', '.example.com', 'example.com.',
+        # 4.16.0 リリース前レビュー: `^` / `$` は行頭・行末。改行を挟んだ値を通さない。
+        "evil.example\np.example.com", "p.example.com\n", "\np.example.com"
+      ].each do |host|
+        assert_not_empty(SourceValidator.validate(piefed_params('host' => host)), host.inspect)
+      end
+      ['p.example.com', 'pf.korako.me', 'localhost', 'xn--eckwd4c7c.example'].each do |host|
+        assert_empty(SourceValidator.validate(piefed_params('host' => host)), host)
+      end
+    end
+
+    # #1462: 実装（`PiefedShrieker#api_version`）が読む `api_version` を、スキーマが NG にしていた。
+    def test_piefed_api_version_is_allowed
+      assert_empty(SourceValidator.validate(piefed_params('api_version' => 'v3')))
+      assert_equal('v3', PiefedShrieker.new(piefed_params('api_version' => 'v3').dig('dest', 'piefed')).api_version)
+    end
+
+    # ⚠ 空文字は既定へ倒れない（Ruby では真）。パスが `/api//post` になる。
+    def test_piefed_api_version_must_be_token
+      ['', ' ', '../x', "v3\n"].each do |version|
+        assert_not_empty(SourceValidator.validate(piefed_params('api_version' => version)), version.inspect)
+      end
+      assert_empty(SourceValidator.validate(piefed_params('api_version' => 'alpha')))
+    end
+
+    # 4.16.0 リリース前レビュー: 空の `/source/command` も、`/source/ical/command` と同じく NG。
+    # ⚠ 4.16.0 から、空のコマンドは実行時にも error になる（以前は `sh -c ''` で無出力の success）。
+    def test_blank_command_is_ng
+      dest = {'hooks' => ['https://example.com/x']}
+      # ⚠ 配列は先頭（実行するもの）を見る（#1702 の Codex P2）。`pattern` は文字列にしか効かない。
+      ['', '  ', [], [''], ['   '], ['', 'echo']].each do |command|
+        errors = schema_errors('source' => {'command' => command}, 'dest' => dest)
+
+        assert_not_empty(errors, command.inspect)
+        errors = schema_errors('source' => {'ical' => {'command' => command}}, 'dest' => dest)
+
+        assert_not_empty(errors, "ical: #{command.inspect}")
+      end
+      assert_empty(schema_errors('source' => {'command' => ['echo', '', ' ']}, 'dest' => dest))
+      assert_empty(schema_errors('source' => {'ical' => {'command' => ['cat', 'a.ics']}}, 'dest' => dest))
+      # ⚠ 文字列以外の要素は今までどおり NG。
+      assert_not_empty(schema_errors('source' => {'command' => ['echo', 1]}, 'dest' => dest))
+      assert_empty(schema_errors('source' => {'command' => ['echo', 'a']}, 'dest' => dest))
+      assert_empty(schema_errors('source' => {'command' => 'echo a | cat'}, 'dest' => dest))
+    end
+
+    def piefed_params(piefed = {})
+      base = {'host' => 'p.example.com', 'user_id' => 'u', 'password' => 'p', 'community_id' => 1}
+      return {'source' => {'feed' => 'https://example.com/f'}, 'dest' => {'piefed' => base.merge(piefed)}}
+    end
+
     def test_valid_hook_hash
       assert_true(SourceValidator.valid?(
         'source' => {'feed' => 'https://example.com/feed'},

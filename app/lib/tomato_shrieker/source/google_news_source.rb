@@ -42,13 +42,22 @@ module TomatoShrieker
     private
 
     def cleaner_uri
-      base = self['/source/news/cleaner/url'] || config['/google/news/cleaner/url']
+      base = self['/source/news/cleaner/url'] || default_cleaner_url
       return nil unless base
       phrase = self['/source/news/phrase']
       return nil unless phrase
       uri = Ginseng::URI.parse(base)
       uri.query_values = {'q' => phrase}
       return uri.normalize
+    end
+
+    # ⚠ **未設定なら nil。**`application.yaml` の既定は `null` で、`Config#[]` は値の無いキーを
+    # `ConfigError` にする。そのまま読むと、cleaner を立てていない環境では Google News の
+    # ソースを作った時点（`FeedSource#initialize` が `uri` を呼ぶ）で落ちる。
+    def default_cleaner_url
+      return config['/google/news/cleaner/url']
+    rescue Ginseng::ConfigError
+      return nil
     end
 
     def similar_entry?(entry)

@@ -101,6 +101,36 @@ module TomatoShrieker
       assert_equal(['DEBUG', 'PUSH_URL'], params.dig('source', 'env').keys.sort)
     end
 
+    # #1692 の Codex P2: 空の `command` は走らせずに落とす（`sh -c ''` は 0 で終わる）。
+    def test_exec_rejects_blank_command
+      source = build_secret_source('')
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_equal('/source/command is blank', error.message)
+    end
+
+    # 🔴 **4.16.0 リリース前レビュー: stderr に不正なバイト列があっても、その中身を理由に残す。**
+    #
+    # ⚠⚠ 以前は `stderr.presence` が `ArgumentError: invalid byte sequence in UTF-8` を上げ、
+    # **本来の失敗の理由がすり替わっていた**（stderr の中身は run_log にも Sentry にも残らない）。
+    def test_exec_reports_stderr_with_invalid_bytes
+      source = build_secret_source("printf '\\223\\372 failed' >&2; exit 1")
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_include(error.message, 'failed')
+      assert_predicate(error.message, :valid_encoding?)
+    end
+
+    # ⚠ 何も書かずに落ちるコマンドは、終わり方を理由にする（以前は空のメッセージだった）。
+    def test_exec_reports_exit_status_without_output
+      error = assert_raise(RuntimeError) {build_secret_source('exit 3').exec}
+
+      assert_equal('command exited with status 3', error.message)
+      # ⚠ wait status の下位 7 ビットはシグナル（`exit 2` は 512）。
+      assert_equal('command exited with status 2', build_source.exit_description(512))
+      assert_equal('command killed by signal 9', build_source.exit_description(9))
+    end
+
     # ⚠ stderr が空（nil ではない）でも、stdout に書かれた理由を例外メッセージに載せる。
     def test_exec_reports_stdout_when_stderr_is_empty
       source = build_secret_source('echo "only on stdout"; exit 2')
