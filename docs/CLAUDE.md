@@ -161,6 +161,11 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
   本番・開発の実行では読まれない（`rake config:lint` や `bin/shrieker` でも読まれない）
 - 🔴 **この仕掛けが外れても「落ちない」ので、保証そのものにテストがある**
   （`ConfigTest#test_test_sources_are_loaded` / `#test_test_sources_are_not_loaded_outside_test`）
+- 🔴 **テストの中でソース定義を書くときは `Config.scratch_sources_dir` へ (#1573)。**
+  プロセスごとの一時ディレクトリ（リポジトリの外）で、テスト時だけ読み、終了時に消える。
+  ⚠⚠ **実 `config/sources/` へ書かない。**途中で落ちると残り、次の起動か `source reload` で
+  本番のスケジューラに登録される。⚠ テストファイルの `at_exit` は掃除に使えない
+  （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）
 
 ### Schema 設計の指針 (required の意味論)
 
