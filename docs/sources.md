@@ -58,7 +58,11 @@ dest:
 ```
 
 - 🔴 **`dir` / `env` は `/source/ical` の下に書く。**`/source/dir` / `/source/env` は CommandSource のもので、こちらでは読まない。⚠ `/source/command` を一緒に書くと CommandSource も立つ（1 つの定義から 2 つのソース）
-- コマンドの組み立て（bundler・`BUNDLE_GEMFILE`・伏せ字・`bundle …` で始まるときの `bundle install`）は CommandSource と共有している（`CommandRunner`）。上の資格情報の注意もそのまま当てはまる
+- コマンドの組み立て（bundler・`BUNDLE_GEMFILE`・伏せ字・`bundle …` で始まるときの `bundle install`）は CommandSource と共有している（`CommandRunner`）。上の資格情報の注意もそのまま当てはまる。⚠ `bundle install` が走るのは `command` を**配列**で書いたときだけ（文字列は `sh -c` に包まれる。CommandSource も同じ）
+- 🔴 **空を正常として扱うので、「何も返さなくなった」コマンドは緑のまま。**取得先が空の一覧を返す・例外を握って 0 で終わる、といった壊れ方は error にならない。拾えるのは `/monitor/silence_tolerance`（無配信の許容期間）だけなので、**予定の間隔より少し長い値を必ず付ける**
+- ⚠ **`schedule.remind.enable: true` にすると、コマンドが `remind.minutes` 分ごとにも走る**（5 分なら 1 日 288 回）。`bin/shrieker source fetch` でも走る。副作用のあるコマンド・重いコマンドを書かない
+- ⚠ **実行する時刻は `schedule.cron` で書く。**IcalendarSource は既定の cron（`0 0 * * *`）を持ち、`schedule.every` より優先する（URL のときも同じ）
+- ⚠ コマンドに締切は無い。戻らないコマンドは、そのソースの以後の実行を塞ぐ（CommandSource も同じ）
 - **空の出力は「該当なし」で正常**（予定 0 件の `VCALENDAR` と同じ）。🔴 **空でないのに iCalendar として読めない出力は error**（取得段の失敗）。コマンドが非 0 で終わったときも同じ
 - ⚠ **本文のハッシュタグを生かすなら `dest.sanitize: html` を付ける。**既定の `fedi` は、投稿先に再解釈させないために `#` / `@` の後ろへ空白を入れる。本番の予定のソース（`delmulin-numbering-title` など）はどれも `html`
 - ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る

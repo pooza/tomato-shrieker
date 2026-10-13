@@ -211,7 +211,9 @@ module TomatoShrieker
       [
         'http://p.example.com', 'https://p.example.com/', 'p.example.com:8080', 'p.example.com/x', '', ' ',
         # #1699 の Codex P2: ラベルごとに見る（全体の先頭と末尾だけでは通ってしまう）。
-        'p.example..com', 'p.-example.com', 'p.example-.com', '.example.com', 'example.com.'
+        'p.example..com', 'p.-example.com', 'p.example-.com', '.example.com', 'example.com.',
+        # 4.16.0 リリース前レビュー: `^` / `$` は行頭・行末。改行を挟んだ値を通さない。
+        "evil.example\np.example.com", "p.example.com\n", "\np.example.com"
       ].each do |host|
         assert_not_empty(SourceValidator.validate(piefed_params('host' => host)), host.inspect)
       end
@@ -224,6 +226,27 @@ module TomatoShrieker
     def test_piefed_api_version_is_allowed
       assert_empty(SourceValidator.validate(piefed_params('api_version' => 'v3')))
       assert_equal('v3', PiefedShrieker.new(piefed_params('api_version' => 'v3').dig('dest', 'piefed')).api_version)
+    end
+
+    # ⚠ 空文字は既定へ倒れない（Ruby では真）。パスが `/api//post` になる。
+    def test_piefed_api_version_must_be_token
+      ['', ' ', '../x', "v3\n"].each do |version|
+        assert_not_empty(SourceValidator.validate(piefed_params('api_version' => version)), version.inspect)
+      end
+      assert_empty(SourceValidator.validate(piefed_params('api_version' => 'alpha')))
+    end
+
+    # 4.16.0 リリース前レビュー: 空の `/source/command` も、`/source/ical/command` と同じく NG。
+    # ⚠ 4.16.0 から、空のコマンドは実行時にも error になる（以前は `sh -c ''` で無出力の success）。
+    def test_blank_command_is_ng
+      dest = {'hooks' => ['https://example.com/x']}
+      ['', '  ', []].each do |command|
+        errors = schema_errors('source' => {'command' => command}, 'dest' => dest)
+
+        assert_not_empty(errors, command.inspect)
+      end
+      assert_empty(schema_errors('source' => {'command' => ['echo', 'a']}, 'dest' => dest))
+      assert_empty(schema_errors('source' => {'command' => 'echo a | cat'}, 'dest' => dest))
     end
 
     def piefed_params(piefed = {})

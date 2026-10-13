@@ -37,6 +37,7 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 | --- | --- | --- |
 | [test-ical-schedule.yaml](sources/test-ical-schedule.yaml) | IcalendarSource (cron + days) |  |
 | [test-ical-remind.yaml](sources/test-ical-remind.yaml) | IcalendarSource (remind) |  |
+| [test-ical-command.yaml](sources/test-ical-command.yaml) | IcalendarSource（コマンドの出力・#1691） | `test/fixtures/command.ics` を今日の日付で出す。`fetch` に「コマンド由来の予定（今日）」が 1 件出れば、コマンドの実行・パース・日付の判定が通っている |
 | [test-youtube-channel.yaml](sources/test-youtube-channel.yaml) | YouTubeChannelSource (URL 指定) |  |
 | [test-youtube-keyword.yaml](sources/test-youtube-keyword.yaml) | YouTubeChannelSource (ID + keyword フィルタ) |  |
 | [test-github.yaml](sources/test-github.yaml) | GitHubRepositorySource |  |

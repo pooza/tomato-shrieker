@@ -239,6 +239,59 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **4.16.0 リリース前レビュー: パーサが上げる例外は、型に関わらず伏せ字を通す。**
+    #
+    # ⚠⚠ 日付として読めない値は `Icalendar::Values::Date::FormatError`（`ArgumentError` の子）で
+    # 上がり、メッセージに値がそのまま入る（`Failed to parse "<値>"`）。`ParseError` だけを
+    # 受けていたときは、これが run_log・`/status.json`・Sentry へ素通しだった。
+    def test_command_parser_error_is_masked
+      lines = [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', 'DTSTART;VALUE=DATE:%s',
+        'SUMMARY:x', 'END:VEVENT', 'END:VCALENDAR', ''
+      ]
+      script = %(printf "#{lines.join('\n')}" "$PUSH_URL")
+      source = build_command_source(script)
+      stats = attach_stats(source)
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_include(error.message, 'invalid iCalendar output')
+      assert_not_include(error.message, 'AbCdEf123456')
+      assert_false(stats.entry_stage?)
+    end
+
+    # 🔴 **4.16.0 リリース前レビュー: 出力に不正なバイト列があっても、本来の理由で落ちる。**
+    # ⚠ 以前は `blank?` が `ArgumentError: invalid byte sequence in UTF-8` を上げていた。
+    def test_command_output_with_invalid_bytes
+      error = assert_raise(RuntimeError) {build_command_source("printf '\\377\\376 invalid'").ical}
+
+      assert_include(error.message, 'invalid iCalendar output')
+      assert_predicate(error.message, :valid_encoding?)
+    end
+
+    # 🔴 **4.16.0 リリース前レビュー: 日次の実行とリマインドは、同じコマンドを同時に走らせない。**
+    #
+    # ⚠⚠ 別々のジョブ（別スレッド）が同じ `Ginseng::CommandLine` を `exec` すると、片方が
+    # 結果を読む前にもう片方が `@stdout` / `@status` を nil に戻す。
+    def test_command_runs_one_at_a_time
+      source = build_command_source
+      running = 0
+      overlapped = false
+      command = Ginseng::CommandLine.new(['true'])
+      command.define_singleton_method(:exec) do |**|
+        running += 1
+        overlapped = true if running > 1
+        sleep(0.05)
+        running -= 1
+        @stdout = ''
+        @stderr = ''
+        @status = 0
+      end
+      source.define_singleton_method(:command) {command}
+      Array.new(4) {Thread.new {source.run_command}}.each(&:join)
+
+      assert_false(overlapped)
+    end
+
     # 🔴 **`dir` / `env` は `/source/ical` の下から読む。**⚠ `/source/dir` / `/source/env` は
     # CommandSource のもの。
     def test_command_is_built_from_ical
