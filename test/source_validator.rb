@@ -124,6 +124,85 @@ module TomatoShrieker
       assert_equal(["The property '#/dest/hooks' did not contain a minimum number of items 1"], errors)
     end
 
+    # 🔴 **#1461: `format: uri` が URL でないものを弾くこと。**
+    #
+    # ⚠ json-schema gem の `uri` は相対参照を許すので、以前は `not a uri with spaces` も
+    # `example.com` も通っていた。絶対 URI（スキーム必須）を要求するのは ginseng-core
+    # （1.18.0・pooza/ginseng-core#516）の側。⚠⚠ **こちらのスキーマには何も書いていない**ので、
+    # 上流の読み込み方が変わると黙って素通しに戻る。CI は常に最新の ginseng で走るので、
+    # ここで受ける。
+    def test_invalid_uri_is_ng
+      dest = {'hooks' => ['https://example.com/x']}
+
+      [
+        {'feed' => 'not a uri with spaces'}, {'feed' => 'example.com'}, {'feed' => ''},
+        {'url' => '/feed.xml'}, {'calendar' => 'example.com/a.ics'}, {'ical' => 'example.com/a.ics'},
+        {'news' => {'url' => 'news.google.com/rss'}},
+        {'news' => {'phrase' => 'a', 'cleaner' => {'url' => 'cleaner.example.test/clean'}}}
+      ].each do |source|
+        assert_not_empty(schema_errors('source' => source, 'dest' => dest), source.to_json)
+      end
+      [['also not uri'], [{'url' => 'example.com/hook'}]].each do |hooks|
+        params = {'source' => {'feed' => 'https://example.com/feed'}, 'dest' => {'hooks' => hooks}}
+
+        assert_not_empty(schema_errors(params), hooks.to_json)
+      end
+    end
+
+    # ⚠ **`host:port/path`（スキームの書き忘れ）は通ってしまう。**`localhost:3000/clean` は
+    # 規格上 `localhost` というスキームの絶対 URI として読める。スキームを http / https に
+    # 絞ると `webcal:` などを弾くので、ここは絞っていない。
+    def test_host_with_port_passes_as_uri
+      source = {'news' => {'phrase' => 'a', 'cleaner' => {'url' => 'localhost:3000/clean'}}}
+
+      assert_empty(schema_errors('source' => source, 'dest' => {'hooks' => ['https://example.com/x']}))
+    end
+
+    # ⚠ 過剰に弾かないこと。本番にある形（ポートつき・`.local`・エンコード済みのクエリ・
+    # `webcal:`）は通す。
+    def test_valid_uri_is_ok
+      dest = {'hooks' => ['https://example.com/x']}
+
+      [
+        {'feed' => 'http://scylla.b-shock.local:3000/clean?q=%E3%83%97%E3%83%AA%E3%82%AD%E3%83%A5%E3%82%A2'},
+        {'feed' => 'https://example.com/feed.xml#fragment'},
+        {'ical' => 'webcal://example.com/a.ics'},
+        {'calendar' => 'https://calendar.google.com/calendar/ical/a%40group.calendar.google.com/public/basic.ics'},
+      ].each do |source|
+        assert_empty(schema_errors('source' => source, 'dest' => dest), source.to_json)
+      end
+    end
+
+    # #1461: 空の検索語は、判別キーにはマッチするのに検索語の無い URL を読みに行く。
+    def test_blank_news_phrase_is_ng
+      dest = {'hooks' => ['https://example.com/x']}
+
+      # ⚠ 空白だけも同じ（#1696 の Codex P2）。`minLength` では通る。
+      ['', '   ', "\t", '　'].each do |phrase|
+        errors = schema_errors('source' => {'news' => {'phrase' => phrase}}, 'dest' => dest)
+
+        assert_not_empty(errors, phrase.inspect)
+      end
+      assert_empty(schema_errors('source' => {'news' => {'phrase' => 'プリキュア'}}, 'dest' => dest))
+    end
+
+    # ⚠ `news: {}` や `news: {dedupe: true}` はスキーマを通るが、どのクラスにもマッチしないので
+    # `startup_errors` が拾う（#1572）。スキーマに `anyOf` を重ねない。
+    def test_news_without_phrase_or_url_is_unmatched
+      [{}, {'dedupe' => true}].each do |news|
+        errors = SourceValidator.validate(
+          'source' => {'news' => news}, 'dest' => {'hooks' => ['https://example.com/x']},
+        )
+
+        assert_equal(1, errors.count {|v| v.include?('no source class matched')}, news.to_json)
+      end
+    end
+
+    # スキーマだけの指摘（起動時の検査を除く）。
+    def schema_errors(params)
+      return JSON::Validator.fully_validate(SourceValidator.schema, params)
+    end
+
     def test_valid_hook_hash
       assert_true(SourceValidator.valid?(
         'source' => {'feed' => 'https://example.com/feed'},
