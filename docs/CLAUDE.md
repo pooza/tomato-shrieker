@@ -97,7 +97,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | TextSource | Source | 静的テキスト |
 | GoogleNewsSource | FeedSource | Google News 検索 |
 | GitHubRepositorySource | FeedSource | GitHub リリース/コミット |
-| IcalendarSource | Source | カレンダーイベント (Google, iCloud等) |
+| IcalendarSource | Source | カレンダーイベント (Google, iCloud等)。URL のほか、コマンドの出力も読める |
 | YouTubeChannelSource | FeedSource | YouTube チャンネル動画 |
 
 ### Shrieker サブクラス
@@ -119,14 +119,16 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 
 ## 重要な設計判断
 
-### CommandSource の子プロセス実行
+### コマンドを走らせるソース（CommandRunner）の子プロセス実行
+
+📌 **コマンドの組み立てと実行は `CommandRunner`（`app/lib/tomato_shrieker/command_runner.rb`）にあり、`CommandSource`（出力をそのまま投稿）と `IcalendarSource`（`/source/ical/command`・出力を iCalendar として読む・#1691）が共有する。**下の注意は両方に当てはまる。違うのは設定の置き場所（`/source` と `/source/ical`）だけ。
 
 `Bundler.with_unbundled_env` で囲む（親の RUBYOPT, GEM_HOME 等の漏洩防止）。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（with_unbundled_env で一掃された後、子プロセスに正しい Gemfile 位置を教える役割）。
 
 ⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
 
-⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。
+⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**⚠ 真になるのは**配列で書いたとき**だけ（文字列は `sh -c …` に包まれるので偽）。`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。
 
 🔴 **動作確認のつもりで設定どおりのコマンドを手で叩いてはいけない。**サテライト側が「通知済み」状態を持っていることがあり、実行しただけで**次の定期実行ぶんを食い潰す**。実例: `loquat reserves` は `-n`（保存しない）を付けないと `tmp/cache/reserves-*.json` を更新するので、`precure-reserve`（`-n` なし）を手動実行すると未告知の予約が投稿されないまま消える（2026-08-04 に発生。キャッシュを消して再告知した）。⚠ **`dqdai-reserve` には `-n` が付いており、同じ `loquat reserves` でも挙動が違う。**復旧確認は各ソースの定義を読んでから、副作用のない形（`-n` 相当があるか / 冪等か）を確かめて行う。
 

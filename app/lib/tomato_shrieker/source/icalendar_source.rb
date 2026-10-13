@@ -37,14 +37,17 @@ module TomatoShrieker
     # 🔴 **空でないのに読めない出力は例外にする。**パーサは入力によっては例外を出さず
     # 何も返さないだけなので、そのままだと壊れたコマンドが「予定なし」の success を
     # 積み続ける。⚠ ここまでは取得段（`exec` が `entries.to_a` を先に評価している）。
-    # ⚠ **パーサの例外をそのまま上げない。**メッセージに出力の行がそのまま入るので、
+    # ⚠ **パーサの例外をそのまま上げない。**メッセージに出力の値がそのまま入るので、
     # 資格情報を伏せられない（例外メッセージは run_log・`/status.json`・Sentry へ流れる）。
+    # 🔴 **例外の型で絞らない（4.16.0 リリース前レビュー）。**`ParseError` が上がるのは strict
+    # モードだけで、実際に上がるのは `Icalendar::Values::Date::FormatError`（`ArgumentError`
+    # の子・`Failed to parse "<値>"`）など。`ParseError` だけ受けていたときは素通しだった。
     def command_ical
       output = run_command
       return Icalendar::Calendar.new if output.blank?
       begin
         ical = Icalendar::Calendar.parse(output).first
-      rescue Icalendar::Parser::ParseError
+      rescue StandardError
         ical = nil
       end
       # ⚠ 伏せてから切り詰める。先に切ると、途中で切れた資格情報が伏せ字に一致しなくなる。

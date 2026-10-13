@@ -1,0 +1,13 @@
+# コマンドの出力を iCalendar として読む IcalendarSource (#1691)
+# ⚠ `test/fixtures/command.ics` の `__TODAY__` を今日の日付に置き換えて出す。
+# いつ走らせても「❗️本日❗️」の予定が 1 件出る。
+source:
+  ical:
+    command: sed "s/__TODAY__/$(date +%Y%m%d)/" test/fixtures/command.ics
+  days: 3
+schedule:
+  cron: '6 0 * * *'
+dest:
+  sanitize: html
+  tags:
+    - test

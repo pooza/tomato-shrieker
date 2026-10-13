@@ -124,8 +124,6 @@ module TomatoShrieker
       end
     end
 
-    # ⚠ **本番・開発では読まない。**`test/sources/` は検証用の宛先を持つので、
-    # 運用の実行に混ざると**実在しないホストへ配信しようとする**。
     # 🔴 **#1573: テストがソース定義を書く先は、リポジトリの外。**
     #
     # ⚠⚠ 実 `config/sources/` へ書くと、途中で SIGKILL されたときに `at_exit` も走らず、
@@ -160,6 +158,8 @@ module TomatoShrieker
       FileUtils.rm_f(path)
     end
 
+    # ⚠ **本番・開発では読まない。**`test/sources/` は検証用の宛先を持つので、
+    # 運用の実行に混ざると**実在しないホストへ配信しようとする**。
     def test_test_sources_are_not_loaded_outside_test
       dirs = with_test_env(false) {Config.instance.send(:source_dirs)}
 

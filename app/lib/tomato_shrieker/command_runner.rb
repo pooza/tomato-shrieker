@@ -33,6 +33,15 @@ module TomatoShrieker
       return command_params.key?('command')
     end
 
+    # 🔴 **コマンドの実行は 1 本ずつ（4.16.0 リリース前レビュー）。**`command`（メモ化した
+    # `Ginseng::CommandLine`）は `exec` の冒頭で `@stdout` / `@status` を nil に戻す。
+    # `IcalendarSource` は日次の `exec` とリマインドが別々のジョブ（別スレッド）なので、
+    # 片方が結果を読む前にもう片方が走り出すと、nil や相手の結果を読む。
+    def initialize(params)
+      super
+      @command_mutex = Mutex.new
+    end
+
     # コマンドを走らせて標準出力を返す。非 0 で終わったら例外。
     #
     # 🔴 **空の `command` は例外にする（#1692 の Codex P2）。**`sh -c ''` は何も出さずに 0 で
@@ -40,13 +49,31 @@ module TomatoShrieker
     # ⚠ スキーマでも弾くが、`source reload` はスキーマを見ない。
     def run_command
       raise "#{command_root}/command is blank" if command_blank?
-      Bundler.with_unbundled_env {command.exec}
+      stdout, stderr, status = capture_command
+      return stdout if status.zero?
       # ⚠ 失敗したコマンドは、渡された資格情報を stderr に書き返すことがある（`curl` など）。
       # 例外メッセージは run_log・`/status.json`・Sentry へ流れるので、ここでも伏せる (#1623)。
       # ⚠ stderr は空でも String なので `||` では stdout へ倒れない（理由を stdout にだけ書いて
       # 非 0 で終わるコマンドの例外メッセージが空になっていた）。
-      raise command.masked(command.stderr.presence || command.stdout) unless command.status.zero?
-      return command.stdout
+      # ⚠ 何も書かずに落ちるコマンドもある。そのときは終わり方だけでも残す。
+      raise command.masked(stderr.presence || stdout.presence || exit_description(status))
+    end
+
+    # 🔴 **出力は受け取った直後に `scrub` する（4.16.0 リリース前レビュー）。**子プロセスの
+    # 出力はエンコーディングが不定で、不正なバイト列（Shift_JIS の stderr など）があると
+    # `presence` / `blank?` / `split` が `ArgumentError` を上げる。⚠⚠ そうなると**本来の失敗の
+    # 理由が `invalid byte sequence` にすり替わり**、stderr の中身はどこにも残らない。
+    def capture_command
+      return @command_mutex.synchronize do
+        Bundler.with_unbundled_env {command.exec}
+        [command.stdout.to_s.scrub, command.stderr.to_s.scrub, command.status]
+      end
+    end
+
+    # ⚠ `status` は wait status（`exit 2` が 512）。下位 7 ビットはシグナル。
+    def exit_description(status)
+      return "command exited with status #{status >> 8}" if status.nobits?(0x7f)
+      return "command killed by signal #{status & 0x7f}"
     end
 
     def command_blank?
