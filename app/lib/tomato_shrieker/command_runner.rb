@@ -27,12 +27,19 @@ module TomatoShrieker
       return params.is_a?(Hash) ? params : {}
     end
 
+    # ⚠ **キーの有無で見る（#1692 の Codex P2）。**`present?` で見ると、空の `command`
+    # （`''` / `[]`）を書いた定義が「コマンドではない」側へ流れる。
     def command?
-      return command_params['command'].present?
+      return command_params.key?('command')
     end
 
     # コマンドを走らせて標準出力を返す。非 0 で終わったら例外。
+    #
+    # 🔴 **空の `command` は例外にする（#1692 の Codex P2）。**`sh -c ''` は何も出さずに 0 で
+    # 終わるので、そのまま走らせると壊れた定義が「出力なし」の success を積み続ける。
+    # ⚠ スキーマでも弾くが、`source reload` はスキーマを見ない。
     def run_command
+      raise "#{command_root}/command is blank" if command_blank?
       Bundler.with_unbundled_env {command.exec}
       # ⚠ 失敗したコマンドは、渡された資格情報を stderr に書き返すことがある（`curl` など）。
       # 例外メッセージは run_log・`/status.json`・Sentry へ流れるので、ここでも伏せる (#1623)。
@@ -40,6 +47,12 @@ module TomatoShrieker
       # 非 0 で終わるコマンドの例外メッセージが空になっていた）。
       raise command.masked(command.stderr.presence || command.stdout) unless command.status.zero?
       return command.stdout
+    end
+
+    def command_blank?
+      value = command_params['command']
+      return value.all?(&:blank?) if value.is_a?(Array)
+      return value.blank?
     end
 
     def bundler?

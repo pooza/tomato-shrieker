@@ -38,7 +38,11 @@ module TomatoShrieker
 
     # ⚠ `command` の無い `ical:`（`dir` だけ・綴り違い）は、どのクラスにもマッチしない。
     def test_invalid_ical_command
-      [{'dir' => '/tmp'}, {'comand' => ['a']}, {'command' => ['a'], 'delimiter' => '='}].each do |ical|
+      [
+        {'dir' => '/tmp'}, {'comand' => ['a']}, {'command' => ['a'], 'delimiter' => '='},
+        # #1692 の Codex P2: 空の command は判別キーにマッチするのに、走らせるものが無い。
+        {'command' => ''}, {'command' => '  '}, {'command' => []}
+      ].each do |ical|
         assert_not_empty(SourceValidator.validate(
           'source' => {'ical' => ical},
           'dest' => {'hooks' => ['https://example.com/x']},

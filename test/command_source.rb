@@ -101,6 +101,14 @@ module TomatoShrieker
       assert_equal(['DEBUG', 'PUSH_URL'], params.dig('source', 'env').keys.sort)
     end
 
+    # #1692 の Codex P2: 空の `command` は走らせずに落とす（`sh -c ''` は 0 で終わる）。
+    def test_exec_rejects_blank_command
+      source = build_secret_source('')
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_equal('/source/command is blank', error.message)
+    end
+
     # ⚠ stderr が空（nil ではない）でも、stdout に書かれた理由を例外メッセージに載せる。
     def test_exec_reports_stdout_when_stderr_is_empty
       source = build_secret_source('echo "only on stdout"; exit 2')

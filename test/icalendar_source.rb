@@ -222,6 +222,23 @@ module TomatoShrieker
       assert_not_include(error.message, SECRET_ENV)
     end
 
+    # 🔴 **#1692 の Codex P2: 空の `command` は URL の側へ流さず、取得段の失敗にする。**
+    # ⚠ `present?` で見ていたときは `@http.get(nil)` へ進んでいた。`sh -c ''` を走らせると
+    # 「出力なし」の success になるので、走らせる前に落とす。
+    def test_command_blank
+      ['', '  ', [], ['']].each do |command|
+        params = command_params
+        params['source']['ical']['command'] = command
+        source = IcalendarSource.new(params)
+        stats = attach_stats(source)
+        error = assert_raise(RuntimeError) {source.exec}
+
+        assert_predicate(source, :command?)
+        assert_equal('/source/ical/command is blank', error.message)
+        assert_false(stats.entry_stage?)
+      end
+    end
+
     # 🔴 **`dir` / `env` は `/source/ical` の下から読む。**⚠ `/source/dir` / `/source/env` は
     # CommandSource のもの。
     def test_command_is_built_from_ical
