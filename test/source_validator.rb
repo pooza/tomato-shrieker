@@ -240,11 +240,19 @@ module TomatoShrieker
     # ⚠ 4.16.0 から、空のコマンドは実行時にも error になる（以前は `sh -c ''` で無出力の success）。
     def test_blank_command_is_ng
       dest = {'hooks' => ['https://example.com/x']}
-      ['', '  ', []].each do |command|
+      # ⚠ 配列は先頭（実行するもの）を見る（#1702 の Codex P2）。`pattern` は文字列にしか効かない。
+      ['', '  ', [], [''], ['   '], ['', 'echo']].each do |command|
         errors = schema_errors('source' => {'command' => command}, 'dest' => dest)
 
         assert_not_empty(errors, command.inspect)
+        errors = schema_errors('source' => {'ical' => {'command' => command}}, 'dest' => dest)
+
+        assert_not_empty(errors, "ical: #{command.inspect}")
       end
+      assert_empty(schema_errors('source' => {'command' => ['echo', '', ' ']}, 'dest' => dest))
+      assert_empty(schema_errors('source' => {'ical' => {'command' => ['cat', 'a.ics']}}, 'dest' => dest))
+      # ⚠ 文字列以外の要素は今までどおり NG。
+      assert_not_empty(schema_errors('source' => {'command' => ['echo', 1]}, 'dest' => dest))
       assert_empty(schema_errors('source' => {'command' => ['echo', 'a']}, 'dest' => dest))
       assert_empty(schema_errors('source' => {'command' => 'echo a | cat'}, 'dest' => dest))
     end

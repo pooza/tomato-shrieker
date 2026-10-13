@@ -137,7 +137,11 @@ properties:
                   - string
                 minItems: 1
                 pattern: \S
+                # ⚠ 配列は先頭（実行するもの）が空でないこと。`pattern` は文字列にしか効かない。
                 items:
+                  - type: string
+                    pattern: \S
+                additionalItems:
                   type: string
               dir:
                 type: string
@@ -167,7 +171,11 @@ properties:
           - string
         minItems: 1
         pattern: \S
+        # ⚠ 配列は先頭（実行するもの）が空でないこと。`pattern` は文字列にしか効かない。
         items:
+          - type: string
+            pattern: \S
+        additionalItems:
           type: string
       env:
         type: object
