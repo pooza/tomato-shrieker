@@ -60,17 +60,23 @@ module TomatoShrieker
         return NO_DEST_MESSAGE if message.match?(NO_DEST_PATTERN)
         head, *rest = message.split("\n")
         return message unless head.end_with?(BRANCH_HEADER)
-        reasons = rest.filter_map {|line| branch_reason(line)}
+        path = head[/\AThe property '([^']*)'/, 1]
+        reasons = rest.filter_map {|line| branch_reason(line, path)}
         return "#{head.delete_suffix(BRANCH_HEADER)}: #{reasons.uniq.join(' / ')}"
       end
 
       # 分岐の内訳 1 行から理由だけを取り出す。⚠ 見出し（`- oneOf #0:`）と、入れ子の分岐の
       # 前置きは理由ではない。
-      def branch_reason(line)
+      #
+      # 🔴 **プロパティの名前を落とすのは、1 行目と同じプロパティのときだけ（#1697 の Codex P2）。**
+      # 分岐の中で落ちたのがその下のプロパティ（`/source/ical/env/A` など）なら、名前が
+      # 「どこを直すか」の唯一の手がかりになる。
+      def branch_reason(line, path)
         line = line.strip.delete_prefix('- ').strip
         return nil if line.empty? || line.match?(/\A(anyOf|oneOf|allOf) #\d+:\z/)
         return nil if line.end_with?(BRANCH_HEADER)
-        return line.sub(/\AThe property '[^']*' (of type \w+ )?/, '')
+        line = line.sub(/\AThe property '#{Regexp.escape(path.to_s)}' (of type \w+ )?/, '')
+        return line.sub(/\AThe property ('[^']*')/, '\1')
       end
 
       # 🔴 **起動なら倒れる定義の指摘を全部返す（4.10.0 リリース前レビュー）。**

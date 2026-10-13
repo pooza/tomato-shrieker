@@ -100,6 +100,21 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **#1697 の Codex P2: 分岐の中で、下のプロパティが落ちたときはその名前を残す。**
+    # ⚠ 落とすと 1 行目の `#/source/ical` しか残らず、どこを直すかが分からない。2 か所あれば
+    # 2 つとも出る（同じ文面として 1 つに潰れない）。
+    def test_one_of_message_keeps_nested_property
+      ical = {'command' => ['a'], 'env' => {'A' => 1, 'B' => 2}}
+      errors = SourceValidator.validate(
+        'source' => {'ical' => ical}, 'dest' => {'hooks' => ['https://example.com/x']},
+      )
+
+      assert_equal(1, errors.size)
+      assert_not_include(errors.first, "\n")
+      assert_include(errors.first, "'#/source/ical/env/A'")
+      assert_include(errors.first, "'#/source/ical/env/B'")
+    end
+
     # ⚠ 分岐を持たない指摘は、末尾の `in schema <uuid>` を落とすだけでそのまま。
     def test_plain_message_is_kept
       errors = SourceValidator.validate(
