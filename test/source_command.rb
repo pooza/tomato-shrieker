@@ -3,15 +3,10 @@ module TomatoShrieker
     ACK_ID = '__test_source_command_ack__'.freeze
     ADD_ID = '__test_source_command_add__'.freeze
 
-    # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので
-    # 取り残しは git status にも出ず、次のスケジューラ起動で偽ソースとして登録される。
-    at_exit do
-      Dir.glob(File.join(Environment.dir, 'config/sources', '__test_source_command*'))
-        .each {|f| FileUtils.rm_f(f)}
-    end
-
+    # ⚠ **実 `config/sources/` には書かない (#1573)。**`add` などが見る先も差し替える。
     def setup
       @command = SourceCommand.new
+      @command.define_singleton_method(:sources_dir) {Config.scratch_sources_dir}
     end
 
     # #1513: silence_tolerance の表示が整数除算で「0日」にならないこと。
@@ -243,7 +238,7 @@ module TomatoShrieker
     end
 
     def source_path(id, suffix)
-      return File.join(Environment.dir, 'config/sources', "#{id}.#{suffix}")
+      return File.join(Config.scratch_sources_dir, "#{id}.#{suffix}")
     end
 
     # `SchedulerDaemon.new` に触れたら即失敗させる。⚠ 元の Method を保存して戻す。

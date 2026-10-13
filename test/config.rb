@@ -126,6 +126,40 @@ module TomatoShrieker
 
     # ⚠ **本番・開発では読まない。**`test/sources/` は検証用の宛先を持つので、
     # 運用の実行に混ざると**実在しないホストへ配信しようとする**。
+    # 🔴 **#1573: テストがソース定義を書く先は、リポジトリの外。**
+    #
+    # ⚠⚠ 実 `config/sources/` へ書くと、途中で SIGKILL されたときに `at_exit` も走らず、
+    # `.gitignore` が `*` なので `git status` にも出ない。次の起動か `source reload` で
+    # テスト用の定義が本番のスケジューラに登録される。
+    def test_scratch_sources_dir_is_outside_repository
+      dir = Config.scratch_sources_dir
+
+      assert_false(File.expand_path(dir).start_with?(File.expand_path(Environment.dir)), dir)
+      assert_true(File.directory?(dir))
+      assert_include(Config.instance.send(:source_dirs), dir)
+      assert_not_include(with_test_env(false) {Config.instance.send(:source_dirs)}, dir)
+    end
+
+    # 🔴 **#1573: テストの実行中に、実 `config/sources/` へ `__test_*` が置かれていないこと。**
+    # ⚠ 置き場所を移し忘れたテストがあれば、ここか次の実行で見つかる。
+    def test_no_test_definition_in_real_sources_dir
+      leaked = Dir.glob(File.join(Environment.dir, 'config/sources', '__test_*'))
+
+      assert_empty(leaked.map {|v| File.basename(v)})
+    end
+
+    # ⚠ 一時ディレクトリに置いた定義は、テスト時には読まれる。
+    def test_scratch_sources_are_loaded
+      path = File.join(Config.scratch_sources_dir, '__test_config_scratch__.yaml')
+      File.write(path, {'source' => {'text' => 'x'}, 'dest' => {'tags' => ['test']}}.to_yaml)
+      config.reload
+
+      assert_include(source_ids, '__test_config_scratch__')
+      assert_kind_of(Time, config.source_defined_at('__test_config_scratch__'))
+    ensure
+      FileUtils.rm_f(path)
+    end
+
     def test_test_sources_are_not_loaded_outside_test
       dirs = with_test_env(false) {Config.instance.send(:source_dirs)}
 
@@ -175,11 +209,11 @@ module TomatoShrieker
     end
 
     def source_path(key)
-      return File.join(Environment.dir, 'config/sources', "#{PREFIX}#{key}.yaml")
+      return File.join(Config.scratch_sources_dir, "#{PREFIX}#{key}.yaml")
     end
 
     def cleanup
-      Dir.glob(File.join(Environment.dir, 'config/sources', "#{PREFIX}*")).each do |f|
+      Dir.glob(File.join(Config.scratch_sources_dir, "#{PREFIX}*")).each do |f|
         File.delete(f)
       end
     end
