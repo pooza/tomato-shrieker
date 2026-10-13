@@ -208,7 +208,11 @@ module TomatoShrieker
     # ⚠ 接続先は常に `https://<host>`。`http://p.example.com:8080/x` と書くと `https://http` へ
     # つなぎに行き、ポートを書いても 443 のまま。以前は `validate` を通り、WARN も出なかった。
     def test_piefed_host_must_be_hostname
-      ['http://p.example.com', 'https://p.example.com/', 'p.example.com:8080', 'p.example.com/x', '', ' '].each do |host|
+      [
+        'http://p.example.com', 'https://p.example.com/', 'p.example.com:8080', 'p.example.com/x', '', ' ',
+        # #1699 の Codex P2: ラベルごとに見る（全体の先頭と末尾だけでは通ってしまう）。
+        'p.example..com', 'p.-example.com', 'p.example-.com', '.example.com', 'example.com.'
+      ].each do |host|
         assert_not_empty(SourceValidator.validate(piefed_params('host' => host)), host.inspect)
       end
       ['p.example.com', 'pf.korako.me', 'localhost', 'xn--eckwd4c7c.example'].each do |host|

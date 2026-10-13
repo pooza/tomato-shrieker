@@ -2,7 +2,7 @@
 
 ⚠ **`config/sources/*.yaml` の正本。**⚠⚠ **実体は gitignore されていて oscura にしか無い。**
 
-🔴 **キーの正本は [`config/schema/source.yaml`](../config/schema/source.yaml)。**このファイルは読み方の説明で、食い違ったらスキーマが正しい（`bin/shrieker source validate` が見るのもスキーマ）。⚠ `config/schema/base.yaml` はソース定義を複製せず、`$ref` で `source.yaml` を参照するだけ。ソースのキーを足すなら `source.yaml` へ。
+🔴 **キーの正本は [`config/schema/source.yaml`](../config/schema/source.yaml)。**このファイルは読み方の説明で、食い違ったらスキーマが正しい（`bin/shrieker source validate` が見るのもスキーマ）。⚠ `config/schema/base.yaml`（`rake config:lint` が見る）は**ソース定義を見ない**。`source.yaml` を参照も複製もしておらず、`sources` は「オブジェクトの配列」としか書いていない（json-schema gem が YAML ファイルへの `$ref` を解決できないため）。ソースのキーを足すなら `source.yaml` へ。⚠ ＝ `config/local.yaml` の `sources:` に書いた定義は、`rake config:lint` でも `source validate`（`config/sources/` のファイルだけを見る）でも検査されない。
 
 各ソースは `config/sources/<id>.yaml` に **1 ファイル 1 ソース**で定義する。**ファイル名が id になる**ので、ファイルの中に `id` は書かない。起動時と `source reload` のときにディレクトリ内の `*.yaml` / `*.yml` を読み込む。
 
