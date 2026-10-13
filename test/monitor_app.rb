@@ -8,13 +8,6 @@ module TomatoShrieker
     # #1558: しきい値をソース単位で上書きしたソース
     THRESHOLD_ID = '__test_monitor_app_threshold__'.freeze
 
-    # teardown は異常終了で走らない。config/sources/.gitignore が `*` なので取り残しは
-    # git status にも出ず、次のスケジューラ起動で偽ソースとして登録されてしまう。
-    at_exit do
-      Dir.glob(File.join(Environment.dir, 'config/sources', '__test_monitor_app*.yaml'))
-        .each {|f| FileUtils.rm_f(f)}
-    end
-
     def setup
       @app = MonitorApp.new
       SourceRunLog.where(source_id: [FIXTURE_ID, SILENT_ID, THRESHOLD_ID]).delete
@@ -34,7 +27,7 @@ module TomatoShrieker
     end
 
     def fixture_path(id)
-      return File.join(Environment.dir, 'config/sources', "#{id}.yaml")
+      return File.join(Config.scratch_sources_dir, "#{id}.yaml")
     end
 
     def write_fixture(id, extra)

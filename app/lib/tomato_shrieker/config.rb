@@ -1,3 +1,5 @@
+require 'tmpdir'
+
 module TomatoShrieker
   class Config < Ginseng::Config
     include Package
@@ -91,8 +93,36 @@ module TomatoShrieker
     # だけ。本番・開発の実行では読まれない。
     def source_dirs
       dirs = [File.join(Environment.dir, 'config/sources')]
-      dirs.push(File.join(Environment.dir, 'test/sources')) if Environment.test?
-      return dirs
+      return dirs unless Environment.test?
+      return dirs.push(File.join(Environment.dir, 'test/sources'), Config.scratch_sources_dir)
+    end
+
+    # 🔴 **テストがソース定義を書く先 (#1573)。**プロセスごとの一時ディレクトリで、
+    # テスト時だけ読む。終了時に丸ごと消す。
+    #
+    # ⚠⚠ 以前はテストが実 `config/sources/` へ `__test_*.yaml` を書いていた。途中で
+    # SIGKILL されると `at_exit` も走らず、`.gitignore` が `*` なので `git status` にも
+    # 出ない。**次の起動か `source reload` で、テスト用の定義が本番のスケジューラに
+    # 登録される**（#1459 で reload が入ってからは再起動を待たない）。
+    # ⚠ リポジトリの外に置く。残っても、どの実行も読まない。
+    # ⚠ プロセスごとに分けてあるので、並走する `rake test` が互いの定義を拾わない。
+    def self.scratch_sources_dir
+      unless @scratch_sources_dir
+        @scratch_sources_dir = Dir.mktmpdir("#{Package.name}-test-sources-")
+        dir = @scratch_sources_dir
+        owner = Process.pid
+        # ⚠ **作ったプロセスだけが消す。**fork した子も終了時の処理を引き継ぐ。
+        cleanup = proc {FileUtils.rm_rf(dir) if Process.pid == owner}
+        # 🔴 **test-unit の実行中は `Test::Unit.at_exit` に掛ける。**⚠⚠ `Kernel#at_exit` は
+        # 登録の逆順に走り、テストの実行そのものが test-unit の `at_exit` なので、後から
+        # 登録した掃除は**テストが走る前に**動く（置き場が消えた状態でテストが始まる）。
+        if defined?(Test::Unit) && Test::Unit.respond_to?(:at_exit)
+          Test::Unit.at_exit(&cleanup)
+        else
+          at_exit(&cleanup)
+        end
+      end
+      return @scratch_sources_dir
     end
 
     # Ginseng::Config の `alias reload load` は親の load を束縛するため、
