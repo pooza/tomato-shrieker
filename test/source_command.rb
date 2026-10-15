@@ -241,25 +241,51 @@ module TomatoShrieker
     end
 
     # #1529: 前進するまで読み直し、前進した回の結果を返す。締切を過ぎたら例外。
+    # 🔴 #1716 の Codex P1: 起動時の登録（`register`）の完了では返さない。HUP の回（`reload`）を待つ。
     def test_reload_waiter
       waiter = ReloadWaiter.new(timeout: 5)
-      states = [{'count' => 3}, {'count' => 3}, {'count' => 4, 'result' => {}}]
-      waiter.define_singleton_method(:state) {states.shift}
+      states = [
+        {'count' => 3, 'action' => 'reload'},
+        {'count' => 4, 'action' => 'register'},
+        {'count' => 5, 'action' => 'reload', 'result' => {}},
+      ]
+      waiter.define_singleton_method(:state) {|*| states.shift}
       waiter.define_singleton_method(:sleep) {|_| nil}
 
-      assert_equal(4, waiter.wait(3)['count'])
+      assert_equal(5, waiter.wait(3)['count'])
 
       stale = ReloadWaiter.new(timeout: 0)
-      stale.define_singleton_method(:state) {{'count' => 3}}
+      stale.define_singleton_method(:state) {|*| {'count' => 3, 'action' => 'reload'}}
       stale.define_singleton_method(:sleep) {|_| nil}
       assert_raise(Ginseng::GatewayError) {stale.wait(3)}
     end
 
-    # ⚠ 本番は `bind: 0.0.0.0`。つなぎ先はループバックにする。
+    # #1716 の Codex P2: 監視が接続を受けたまま応答しなくても、1 回の要求は締切で切れる
+    # （`Net::HTTP` の既定は 60 秒）。
+    # ⚠ 応答しない相手は実ソケットで作るので、この 1 本だけローカルへの接続を許す（後で戻す）。
+    def test_reload_waiter_request_is_bounded
+      WebMock.disable_net_connect!(allow_localhost: true)
+      server = TCPServer.new('127.0.0.1', 0)
+      config['/monitor/bind'] = '127.0.0.1'
+      config['/monitor/port'] = server.addr[1]
+      started = Time.now
+
+      assert_raise(Net::ReadTimeout) {ReloadWaiter.new(timeout: 1).state}
+      assert_operator(Time.now - started, :<, 10)
+    ensure
+      server&.close
+      WebMock.disable_net_connect!
+    end
+
+    # ⚠ 本番は `bind: 0.0.0.0`。つなぎ先はループバックにする。⚠ IPv6 は角括弧で包む
+    # （#1716 の Codex P2）。
     def test_reload_waiter_uri
       config['/monitor/bind'] = '0.0.0.0'
 
       assert_equal('127.0.0.1', ReloadWaiter.new(timeout: 1).uri.host)
+      config['/monitor/bind'] = '::1'
+
+      assert_equal("http://[::1]:#{config['/monitor/port']}/status.json", ReloadWaiter.new(timeout: 1).uri.to_s)
     end
 
     private

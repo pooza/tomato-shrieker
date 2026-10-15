@@ -644,7 +644,7 @@ module TomatoShrieker
       _status, _headers, body = call('/status.json')
       reload = JSON.parse(body.first)['reload']
 
-      assert_equal(['at', 'count', 'error', 'result'], reload.keys.sort)
+      assert_equal(['action', 'at', 'count', 'error', 'result'], reload.keys.sort)
       assert_kind_of(Integer, reload['count'])
     end
 

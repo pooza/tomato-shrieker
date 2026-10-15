@@ -328,6 +328,7 @@ module TomatoShrieker
       state = @scheduler.load_state
 
       assert_equal(before + 1, state[:count])
+      assert_equal('reload', state[:action])
       assert_include(state[:result][:added], OTHER_ID)
       assert_nil(state[:error])
     end
