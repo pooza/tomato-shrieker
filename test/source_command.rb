@@ -214,6 +214,54 @@ module TomatoShrieker
       end
     end
 
+    # #1529: 監視が無効なら、HUP を送る前に `--wait` を断る（送った後では成否が分からない）。
+    def test_reload_wait_requires_monitor
+      config['/monitor/enabled'] = false
+      @command.define_singleton_method(:refuse_unless_startable!) {nil}
+      @command.options = {wait: true, timeout: 1}
+      error = assert_raise(Thor::Error) {with_daemon_guard {@command.reload}}
+
+      assert_include(error.message, '/monitor/enabled')
+    end
+
+    # #1529: 反映できなかった定義・失敗した reload は非 0 で終わる。
+    def test_report_reload
+      said = []
+      @command.define_singleton_method(:say) {|message| said.push(message)}
+      @command.send(:report_reload, {'at' => 'T', 'result' => {'added' => ['a'], 'failed' => []}})
+
+      assert_include(said, '  added: a')
+      assert_include(said, 'reloaded at T')
+      assert_raise(Thor::Error) {@command.send(:report_reload, {'error' => 'Psych::SyntaxError'})}
+      error = assert_raise(Thor::Error) do
+        @command.send(:report_reload, {'result' => {'failed' => ['b'], 'unmatched' => ['c']}})
+      end
+
+      assert_include(error.message, 'b, c')
+    end
+
+    # #1529: 前進するまで読み直し、前進した回の結果を返す。締切を過ぎたら例外。
+    def test_reload_waiter
+      waiter = ReloadWaiter.new(timeout: 5)
+      states = [{'count' => 3}, {'count' => 3}, {'count' => 4, 'result' => {}}]
+      waiter.define_singleton_method(:state) {states.shift}
+      waiter.define_singleton_method(:sleep) {|_| nil}
+
+      assert_equal(4, waiter.wait(3)['count'])
+
+      stale = ReloadWaiter.new(timeout: 0)
+      stale.define_singleton_method(:state) {{'count' => 3}}
+      stale.define_singleton_method(:sleep) {|_| nil}
+      assert_raise(Ginseng::GatewayError) {stale.wait(3)}
+    end
+
+    # ⚠ 本番は `bind: 0.0.0.0`。つなぎ先はループバックにする。
+    def test_reload_waiter_uri
+      config['/monitor/bind'] = '0.0.0.0'
+
+      assert_equal('127.0.0.1', ReloadWaiter.new(timeout: 1).uri.host)
+    end
+
     private
 
     # `source status` を回し、終了コードを返す。出力は捨てる。

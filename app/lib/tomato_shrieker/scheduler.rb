@@ -47,8 +47,22 @@ module TomatoShrieker
         # 壊れた YAML があればここで raise する。#1530 以降 Config#load は読み切って
         # から 1 回で差し替えるので、**設定もジョブも何も変わらないまま**抜ける。
         Config.instance.reload
-        apply(desired_sources, action: 'reload')
+        record_load(apply(desired_sources, action: 'reload'))
+      rescue => e
+        record_load(nil, e)
+        raise
       end
+    end
+
+    # 🔴 **ソース定義を読んだ結果 (#1529)。**`/status.json` の `reload` に出し、
+    # `bin/shrieker source reload --wait` が `count` の前進を待って結果を読む。
+    #
+    # ⚠ `count` は起動時の登録を含めて読んだ回数で、**失敗しても進む**（進まないと、壊れた
+    # YAML の reload を CLI が締切まで待つことになる）。失敗なら `error` に例外のクラス名。
+    # ⚠ **メッセージは載せない。**`/status.json` は LAN から見える（#1531）ので、伏せるはずだった
+    # 値を出しうる（`SchedulerDaemon#report_reload_failure` と同じ判断）。
+    def load_state
+      return @load_state
     end
 
     private
@@ -58,6 +72,18 @@ module TomatoShrieker
       # id => 設定の digest。無変更のソースを見分けるためだけに持つ。
       @registry = {}
       @reload_mutex = Mutex.new
+      @load_state = {count: 0, at: nil, result: nil, error: nil}
+    end
+
+    # ⚠ Hash ごと差し替える（読む側のスレッドが書きかけを見ない）。`@reload_mutex` の中で呼ぶ。
+    def record_load(result, error = nil)
+      @load_state = {
+        count: @load_state[:count] + 1,
+        at: Time.now.iso8601,
+        result:,
+        error: error&.class&.to_s,
+      }.freeze
+      return result
     end
 
     # 🔴 **「ファイルを消した」と「ファイルは在るが壊れている」を混ぜない (#1572)。**
@@ -143,7 +169,7 @@ module TomatoShrieker
     # ⚠ **起動は fail closed、reload は fail safe** と覚える。稼働中の daemon を
     # 「誰かが YAML を打ち間違えた」で落とす理由は無い。
     def register_all
-      result = @reload_mutex.synchronize {apply(desired_sources, action: 'register')}
+      result = @reload_mutex.synchronize {record_load(apply(desired_sources, action: 'register'))}
       # ⚠ **理由が違うので混ぜずに名指しする (#1572)。**`failed` は register が例外を
       # 上げたもの、`unmatched` は判別キーが無く**そもそも 1 件も yield されなかった**もの。
       # 🔴 **後者も起動は倒す。**飛ばすと「定義は在るのに永久に走らない」まま

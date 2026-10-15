@@ -202,6 +202,8 @@ module TomatoShrieker
         database: database_alive?,
         # ⚠ 情報として出すだけで判定はしない (#1471)。詳細は Environment.ruby_health。
         ruby: Environment.ruby_health,
+        # #1529: `source reload --wait` が `count` の前進を待って結果を読む
+        reload: Scheduler.instance.load_state,
         sources:,
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]

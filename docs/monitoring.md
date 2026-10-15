@@ -165,6 +165,13 @@ bin/shrieker source ack ID
 {
   "scheduler": true,
   "database": true,
+  "ruby": {"version": "4.0.7", "yjit_available": true, "yjit_enabled": true},
+  "reload": {
+    "count": 3,
+    "at": "2026-10-16T08:00:00+09:00",
+    "result": {"added": [], "removed": [], "changed": ["matrix-news"], "failed": [], "unmatched": []},
+    "error": null
+  },
   "sources": [
     {
       "id": "matrix-news",
@@ -204,6 +211,8 @@ bin/shrieker source ack ID
 ```
 
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
+
+`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
 
 `last_delivered_at_origin` は配信時刻の出どころ:
 

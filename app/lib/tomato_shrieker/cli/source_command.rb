@@ -156,16 +156,22 @@ module TomatoShrieker
     #
     # ⚠ **逃げ道は `disable`。**直せないソースは止めれば検査対象から外れて reload は通る
     # （`SourceValidator.schedule_errors` のコメント参照）。
+    method_option :wait, type: :boolean, default: false,
+      desc: '反映を待って結果を出す（/status.json を読む・監視が有効なときだけ）'
+    method_option :timeout, type: :numeric, default: 30, desc: '--wait で待つ秒数'
     def reload
       refuse_unless_startable!
+      waiter = reload_waiter if options[:wait]
       daemon = SchedulerDaemon.new
       case daemon.alive_state
       when :alive
+        before = monitor_call {waiter&.count}
         pid = daemon.pid
         Process.kill('HUP', pid)
         say "reload requested (pid #{pid})"
-        # ⚠ シグナルは非同期なので、CLI は「要求した」までしか言えない (#1529)。
-        say '  結果はログの {"scheduler":"reload",...} 行で確認できます。'
+        return report_reload(monitor_call {waiter.wait(before)}) if waiter
+        # ⚠ シグナルは非同期なので、`--wait` なしでは「要求した」までしか言えない (#1529)。
+        say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
       when :unknown
         # ⚠ :unknown（EPERM）を :dead と混ぜない。プロセスは生きている可能性がある。
         raise Thor::Error, "PID #{daemon.pid} exists but is not ours. reload できません。"
@@ -206,6 +212,33 @@ module TomatoShrieker
     # **「起動はできるのに reload は拒否される」定義が生まれる**＝ 食い違いの向きが
     # 変わるだけで、この issue が直そうとしたものと同じ形になる。
     # **止めるのは、起動が実際に倒れるもの＝ schedule のパース失敗だけ。**
+    # ⚠ **HUP を送る前に断る。**監視が無効なら読む先が無く、送った後では「待てない」と
+    # 言うしかない（reload 自体は走るので、利用者には成否が分からないまま）。
+    def reload_waiter
+      raise Thor::Error, '--wait には監視（/monitor/enabled: true）が要ります。' unless ReloadWaiter.available?
+      return ReloadWaiter.new(timeout: options[:timeout])
+    end
+
+    # ⚠ 読めない・締切を過ぎたは Thor のエラーにする（終了コードで伝える・#1668）。
+    def monitor_call
+      return yield
+    rescue Ginseng::GatewayError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout => e
+      raise Thor::Error, "--wait: #{e.message}"
+    end
+
+    # `--wait` の結果。⚠ **失敗・登録できなかった・判別キーの合わない定義があれば非 0 で終わる。**
+    # 「reload requested」と同じ 0 で終わると、スクリプトから成否が分からない。
+    def report_reload(state)
+      raise Thor::Error, "reload failed: #{state['error']}（ログを確認してください）" if state['error']
+      result = state['result'] || {}
+      ['added', 'removed', 'changed', 'failed', 'unmatched'].each do |key|
+        say "  #{key}: #{Array(result[key]).join(', ')}" if Array(result[key]).any?
+      end
+      problems = Array(result['failed']) + Array(result['unmatched'])
+      raise Thor::Error, "反映できなかった定義があります: #{problems.join(', ')}" if problems.any?
+      say "reloaded at #{state['at']}"
+    end
+
     def refuse_unless_startable!
       unstartable = unstartable_sources
       return if unstartable.empty?

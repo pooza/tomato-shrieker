@@ -50,7 +50,14 @@ bin/shrieker source disable foo
 
 bin/shrieker source reload
 # reload requested (pid 1322485)
+
+bin/shrieker source reload --wait   # 反映を待つ（#1529）
+# reload requested (pid 1322485)
+#   changed: foo
+# reloaded at 2026-10-16T08:00:00+09:00
 ```
+
+⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `at` / `result` / `error`）を読み、HUP の前から `count` が進むまで待つ（既定 30 秒・`--timeout`）。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
 
 `source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
 

@@ -639,6 +639,15 @@ module TomatoShrieker
       assert_equal(200, status)
     end
 
+    # #1529: `source reload --wait` が読む `reload`（読んだ回数・時刻・結果・失敗のクラス名）。
+    def test_status_json_reports_reload
+      _status, _headers, body = call('/status.json')
+      reload = JSON.parse(body.first)['reload']
+
+      assert_equal(['at', 'count', 'error', 'result'], reload.keys.sort)
+      assert_kind_of(Integer, reload['count'])
+    end
+
     def test_status_json_reports_acknowledged_at
       record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
 

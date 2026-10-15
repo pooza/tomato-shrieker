@@ -320,6 +320,30 @@ module TomatoShrieker
     end
 
     # 🔴 壊れた定義を掴んだら、ジョブは 1 本も触らずに古い定義のまま走り続ける。
+    # 🔴 **#1529: 読んだ回数と結果を持つ。**`source reload --wait` が `count` の前進を待つ。
+    def test_load_state
+      before = @scheduler.load_state[:count]
+      write_fixture(OTHER_ID, {})
+      @scheduler.reload
+      state = @scheduler.load_state
+
+      assert_equal(before + 1, state[:count])
+      assert_include(state[:result][:added], OTHER_ID)
+      assert_nil(state[:error])
+    end
+
+    # ⚠ **失敗しても `count` は進む**（進まないと `--wait` が締切まで待つ）。メッセージは載せない。
+    def test_load_state_records_failure
+      before = @scheduler.load_state[:count]
+      File.write(fixture_path(BROKEN_ID), "source:\n  feed: \"unterminated\n")
+      assert_raise(Psych::SyntaxError) {@scheduler.reload}
+      state = @scheduler.load_state
+
+      assert_equal(before + 1, state[:count])
+      assert_equal('Psych::SyntaxError', state[:error])
+      assert_nil(state[:result])
+    end
+
     def test_reload_keeps_jobs_when_config_is_broken
       job = jobs(FIXTURE_ID).first
       File.write(fixture_path(BROKEN_ID), "source:\n  feed: \"unterminated\n")
