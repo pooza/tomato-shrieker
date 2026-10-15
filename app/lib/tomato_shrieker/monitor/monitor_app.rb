@@ -143,7 +143,10 @@ module TomatoShrieker
       body = +"silent: true\n"
       body << "last_delivered_at: #{source.last_delivered_at&.iso8601}\n"
       body << "silence_tolerance_seconds: #{source.monitor_silence_tolerance_seconds}\n"
-      body << "noop_streak: #{SourceRunLog.noop_streak(source.id)}\n"
+      noop_streak = SourceRunLog.noop_streak(source.id)
+      body << "noop_streak: #{noop_streak}\n"
+      # #1498: `noop_streak` は `sample_size` で頭打ちになる。いつから空振りかは時刻で読む
+      body << "noop_since: #{source.noop_since(noop_streak)&.iso8601}\n"
       # #1505: 静かなだけと分かっているなら `bin/shrieker source ack ID` で緑に戻せる
       body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
       body << "silence_baseline_origin: #{source.silence_baseline_origin}\n"

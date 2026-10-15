@@ -552,6 +552,24 @@ module TomatoShrieker
       return @run_log_delivered_at
     end
 
+    # このソースの run を観測し始めた時刻 (#1483)。⚠ nil もメモする (#1472)。
+    def observed_since
+      @observed_since = SourceRunLog.observed_since(id) unless defined?(@observed_since)
+      return @observed_since
+    end
+
+    # 🔴 **空振りが続いている起点 (#1498)。**`noop_streak` は直近 `sample_size` 件しか数えない
+    # ので 50 で頭打ちになり、沈黙が深いほど情報を失う。時刻なら窓に縛られない。
+    #
+    # 最後に実際に配信できた run の時刻。一度も配信していなければ観測開始（＝少なくとも
+    # そこから）。⚠ 配信できた行は prune から守られている（`last_delivered_ids`）ので、保持期間で
+    # 起点がずれることはない。⚠ いま空振りしていない（`noop_streak` が 0）なら nil。
+    # ⚠ どちらも沈黙の判定（`silence_baseline_entry`）が引く値なので、クエリは増えない。
+    def noop_since(noop_streak)
+      return nil unless noop_streak.positive?
+      return run_log_delivered_at || observed_since
+    end
+
     def delivery_history
       @delivery_history ||= if at = run_log_delivered_at
         {at:, origin: 'run_log'}
@@ -622,7 +640,7 @@ module TomatoShrieker
       @silence_baseline_entry ||= {
         BASELINE_DELIVERY => run_log_delivered_at,
         BASELINE_ACKNOWLEDGEMENT => acknowledged_at,
-        BASELINE_OBSERVATION => SourceRunLog.observed_since(id),
+        BASELINE_OBSERVATION => observed_since,
       }.compact.max_by(&:last) || []
       return @silence_baseline_entry
     end
