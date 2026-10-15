@@ -143,8 +143,10 @@ module TomatoShrieker
     end
 
     def create_entry(event)
-      event = scan_rrule(event) if event.rrule.present?
+      # ⚠ **`DTEND` は `scan_rrule` より先に補う (#1693)。**icalendar-rrule は `DTEND` が無いと
+      # `DTSTART` の `to_i` で終了を作るが、終日（`Icalendar::Values::Date`）は `to_i` を持たず落ちる。
       event.dtend ||= event.dtstart
+      event = scan_rrule(event) if event.rrule.present?
       start_date = Time.parse(event.dtstart.to_s).getlocal
       end_date = Time.parse(event.dtend.to_s).getlocal
       data = {
