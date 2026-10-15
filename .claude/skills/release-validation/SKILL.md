@@ -149,9 +149,9 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4567/healthz
 
 # 2. ソースを 1 件足して reload
 bin/shrieker source add test-reload-probe   # ⚠ $EDITOR が開く。非対話で流すなら config/sources/test-reload-probe.yaml を直接書く
-bin/shrieker source reload
+bin/shrieker source reload --wait   # 4.17.0〜（#1529）。反映を待って added / removed / changed を出す
 
-# 3. ログで結果を見る（⚠ CLI は「要求した」までしか言えない = #1529）
+# 3. ログでも結果を見る（`--wait` が読む `/status.json` の `reload` と同じ回のはず）
 journalctl -t tomato-shrieker --since -1min --no-pager | grep '"scheduler":"reload"'
 
 # 4. 監視面に現れること
@@ -161,7 +161,8 @@ curl -s http://127.0.0.1:4567/status.json | jq -r '.sources[].id' | grep test-re
 bin/shrieker source delete test-reload-probe && bin/shrieker source reload   # ⚠ delete は確認の入力を待つ。非対話で流すなら rm config/sources/test-reload-probe.yaml
 ```
 
-⚠⚠ **「reload requested」は成功の証拠ではない。**必ず 3 と 4 で結果を確かめること。
+⚠⚠ **「reload requested」は成功の証拠ではない。**`--wait` なしなら必ず 3 と 4 で結果を確かめること。
+- [ ] `source reload --wait` が `added: test-reload-probe` と `reloaded at …` を出して 0 で終わる。壊れた YAML を置いて HUP を直接送った後の `/status.json` の `reload.error` に例外のクラス名が出る（#1529）
 
 - [ ] 追加が反映される（`added` にソース ID が出る）
 - [ ] 削除が反映される（`removed` にソース ID が出る）

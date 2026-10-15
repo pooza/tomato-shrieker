@@ -52,7 +52,14 @@ bin/shrieker source disable foo
 
 bin/shrieker source reload
 # reload requested (pid 1322485)
+
+bin/shrieker source reload --wait   # 反映を待つ（#1529）
+# reload requested (pid 1322485)
+#   changed: foo
+# reloaded at 2026-10-16T08:00:00+09:00
 ```
+
+⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `at` / `result` / `error`）を読み、HUP の前から `count` が進むまで待つ（既定 30 秒・`--timeout`）。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
 
 ⚠ **reload は設定ファイル（`local.yaml` / `application.yaml`）も読み直すが、起動時に組み立てたもの（Sentry の初期化・監視サーバーの `bind` / `port` など）には効かない。**漏洩対応でマスク設定やトークンを差し替えたときは、「reload requested」を見て反映済みと思わず、**再起動する**（#1575）。
 
