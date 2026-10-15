@@ -54,8 +54,10 @@ module TomatoShrieker
     # ⚠ IPv6 のアドレスは `URI` の部品として渡す（文字列に埋めると `http://::1:4567` になって
     # 読めない・#1716 の Codex P2）。`hostname` は角括弧を付けて持つ。
     def uri
-      host = Config.instance['/monitor/bind'].to_s
-      host = '127.0.0.1' if ['0.0.0.0', '::', ''].include?(host)
+      # ⚠ `::` は `::1` へ（#1716 の Codex P2）。IPv6 だけで待ち受ける環境では 127.0.0.1 に届かない。
+      host = {'0.0.0.0' => '127.0.0.1', '::' => '::1', '' => '127.0.0.1'}.fetch(
+        Config.instance['/monitor/bind'].to_s, Config.instance['/monitor/bind'].to_s
+      )
       uri = URI::HTTP.build(port: Config.instance['/monitor/port'], path: '/status.json')
       uri.hostname = host
       return uri

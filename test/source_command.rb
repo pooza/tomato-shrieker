@@ -283,9 +283,11 @@ module TomatoShrieker
       config['/monitor/bind'] = '0.0.0.0'
 
       assert_equal('127.0.0.1', ReloadWaiter.new(timeout: 1).uri.host)
-      config['/monitor/bind'] = '::1'
+      ['::1', '::'].each do |bind|
+        config['/monitor/bind'] = bind
 
-      assert_equal("http://[::1]:#{config['/monitor/port']}/status.json", ReloadWaiter.new(timeout: 1).uri.to_s)
+        assert_equal("http://[::1]:#{config['/monitor/port']}/status.json", ReloadWaiter.new(timeout: 1).uri.to_s)
+      end
     end
 
     private
