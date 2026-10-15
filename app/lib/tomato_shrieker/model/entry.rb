@@ -9,10 +9,15 @@ module TomatoShrieker
 
     alias to_h values
 
+    # 🔴 **`Entry.create` は作ったソースをそのまま渡す (#1489)。**以前はエントリごとに
+    # `FeedSource.all` で全ソースを作り直し、テンプレート（`File.read` + ERB のコンパイル）も
+    # エントリごとにやり直していた。⚠ ここで探すのは、ソースを渡されずに読み出した行だけ。
     def feed
       @feed ||= FeedSource.all.find {|v| v.id == values[:feed]}
       return @feed
     end
+
+    attr_writer :feed
 
     def enclosures
       unless @enclosures
@@ -108,7 +113,9 @@ module TomatoShrieker
         parser.feed = feed if feed
         id = Entry.insert(parser.parse)
         inserted = true
-        return deliverable(Entry[id], feed)
+        record = Entry[id]
+        record.feed = feed if feed
+        return deliverable(record, feed)
       rescue Sequel::UniqueConstraintViolation
         # 既知のエントリ＝異常ではないので nil を返して読み飛ばす
         return nil
