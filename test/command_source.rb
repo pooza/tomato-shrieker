@@ -239,6 +239,52 @@ module TomatoShrieker
       assert_equal(keys.sort, CommandRunner::DEST_SECRET_KEYS.sort)
     end
 
+    # 🔴 **#1477: 依存が欠けていたら、登録の時点でログと Sentry に出す（起動は止めない）。**
+    # ⚠ 自動の `bundle install` は `bundle` で始まるコマンドにしか走らないので、直接実行の定義
+    # （本番の 7 件）はこれが無いと、走るたびに `Bundler::GemNotFound` で落ちるまで気づけない。
+    def test_command_bundle_problem
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        problem = build_secret_source(['bin/run.rb']).tap {|v| v.command.dir = dir}.command_bundle_problem
+
+        assert_include(problem, 'bundle check failed')
+        assert_include(problem, 'tomato-shrieker-missing-gem-1477')
+      end
+    end
+
+    # ⚠ **Gemfile.lock も置く。**lock が無いと `bundle check` は解決のためにネットワークへ出る
+    # （サテライトはどれも lock を持っている）。
+    def write_missing_gem_bundle(dir)
+      gem = 'tomato-shrieker-missing-gem-1477'
+      File.write(File.join(dir, 'Gemfile'), "source 'https://rubygems.org'\ngem '#{gem}'\n")
+      File.write(File.join(dir, 'Gemfile.lock'), [
+        'GEM', '  remote: https://rubygems.org/', '  specs:', "    #{gem} (0.0.1)", '',
+        'PLATFORMS', '  ruby', '', 'DEPENDENCIES', "  #{gem}", ''
+      ].join("\n"))
+    end
+
+    # ⚠ Gemfile の無い `dir` は見ない。存在しない `dir` は問題として返す（走らせると必ず落ちる）。
+    def test_command_bundle_problem_without_gemfile
+      Dir.mktmpdir do |dir|
+        assert_nil(build_secret_source.tap {|v| v.command.dir = dir}.command_bundle_problem)
+      end
+      params = secret_params
+      params['source']['dir'] = '/nonexistent/__test_1477__'
+
+      assert_equal('/source/dir not found: /nonexistent/__test_1477__', CommandSource.new(params).command_bundle_problem)
+    end
+
+    # ⚠ 検査は登録を止めない（ログに出して、そのまま登録する）。
+    def test_register_continues_when_bundle_is_broken
+      source = build_secret_source
+      source.define_singleton_method(:command_bundle_problem) {'bundle check failed in /x: missing'}
+      registered = false
+      source.define_singleton_method(:schedule) {|*| registered = true}
+      source.register
+
+      assert_true(registered)
+    end
+
     SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze

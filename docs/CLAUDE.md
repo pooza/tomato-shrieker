@@ -128,7 +128,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 
 ⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
 
-⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**⚠ 真になるのは**配列で書いたとき**だけ（文字列は `sh -c …` に包まれるので偽）。`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。
+⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**⚠ 真になるのは**配列で書いたとき**だけ（文字列は `sh -c …` に包まれるので偽）。`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。📌 **代わりに `register` は `dir` で `bundle check` を走らせ、依存が欠けていればログと Sentry に出す（起動は止めない・直さない・#1477）。**デプロイ前の確認（deploy スキルの `pending_sources.sh`）も同じ検査を通す。
 
 🔴 **動作確認のつもりで設定どおりのコマンドを手で叩いてはいけない。**サテライト側が「通知済み」状態を持っていることがあり、実行しただけで**次の定期実行ぶんを食い潰す**。実例: `loquat reserves` は `-n`（保存しない）を付けないと `tmp/cache/reserves-*.json` を更新するので、`precure-reserve`（`-n` なし）を手動実行すると未告知の予約が投稿されないまま消える（2026-08-04 に発生。キャッシュを消して再告知した）。⚠ **`dqdai-reserve` には `-n` が付いており、同じ `loquat reserves` でも挙動が違う。**復旧確認は各ソースの定義を読んでから、副作用のない形（`-n` 相当があるか / 冪等か）を確かめて行う。
 
