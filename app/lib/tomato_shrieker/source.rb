@@ -14,6 +14,7 @@ module TomatoShrieker
 
     def initialize(params)
       @params = params
+      @shrieker_mutex = Mutex.new
     end
 
     def [](name)
@@ -167,13 +168,14 @@ module TomatoShrieker
     def clear
     end
 
-    def shriekers
+    # 🔴 **宛先は排他の中でまとめて取り出し、外で配る（#1712 の Codex P2）。**`IcalendarSource` は
+    # 日次の実行とリマインドが別々のジョブで、どちらも始めに `reset_shriekers` する。1 つずつ
+    # `mastodon?` → `mastodon` と読むと、その間に作り直されて nil を掴み、その配信を落とす。
+    # ⚠ 配る間は排他を持たない（`Parallel.each` のスレッドどうしを直列にしない）。取り出した
+    # オブジェクトは作り直されても使い続けられる。
+    def shriekers(&)
       return enum_for(__method__) unless block_given?
-      yield mastodon if mastodon?
-      yield misskey if misskey?
-      yield line if line?
-      yield piefed if piefed?
-      yield nostr if nostr?
+      shrieker_snapshot.each(&)
       (self['/dest/hooks'] || []).each do |hook|
         # ⚠ `new` ではなく `create`。hook の `type` で Shrieker を選ぶ (#1493)。
         yield WebhookShrieker.create(hook)
@@ -189,9 +191,18 @@ module TomatoShrieker
     # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
     # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
     # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
+    # 設定のある宛先（webhook 以外）を、排他の中でまとめて取り出す。⚠ 理由は `shriekers`。
+    def shrieker_snapshot
+      return @shrieker_mutex.synchronize do
+        [mastodon, misskey, line, piefed, nostr].select(&:present?)
+      end
+    end
+
     def reset_shriekers
-      [:@mastodon, :@misskey, :@line, :@piefed, :@nostr].each do |name|
-        remove_instance_variable(name) if instance_variable_defined?(name)
+      @shrieker_mutex.synchronize do
+        [:@mastodon, :@misskey, :@line, :@piefed, :@nostr].each do |name|
+          remove_instance_variable(name) if instance_variable_defined?(name)
+        end
       end
     end
 
