@@ -41,6 +41,8 @@ dest:
 
 `/source/ical` に URL ではなくコマンドを書くと、その標準出力を iCalendar として読む。事前告知（`/source/days` 日前から当日まで毎日）・テンプレート（`views/calendar.erb`）・リマインド・監視は URL のときと同じ。
 
+予定の告知でない記念日（命日など）は `dest.template: anniversary` で `views/anniversary.erb` を使う。「❗️本日❗️」などの見出しを付けず「4月9日は、〈題名〉。」＋説明の形で出す（#1707）。
+
 ```yaml
 source:
   ical:

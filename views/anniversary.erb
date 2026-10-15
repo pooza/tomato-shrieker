@@ -1,0 +1,7 @@
+<%= entry[:start_date].month %>月<%= entry[:start_date].day %>日は、<%= entry[:title] %>。
+<% if entry[:body].present? -%>
+<%= entry[:body].chomp %>
+<% end -%>
+<% if @params[:tag] && @params[:source] -%>
+<%= @params[:source].tags.map(&:to_hashtag).join(' ') %>
+<% end -%>
