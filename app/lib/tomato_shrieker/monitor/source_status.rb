@@ -134,7 +134,7 @@ module TomatoShrieker
       logs = SourceRunLog.recent_for(
         @source.id, SourceRunLog.streak_window(@source.monitor_error_streak_threshold)
       )
-      return SourceRunLog.summary_of(logs).merge(
+      return SourceRunLog.summary_of(logs).merge(noop_status(logs)).merge(
         dest_count: @source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
@@ -166,6 +166,13 @@ module TomatoShrieker
         error_rate_24h: SourceRunLog.error_rate(@source.id),
         **threshold_status(logs),
       )
+    end
+
+    # #1498: `noop_streak` は `sample_size` で頭打ちになるので、起点の時刻も出す。
+    # ⚠ 数え方は `summary_of` と同じ（`sample_size` で切った窓）。追加のクエリは無い。
+    def noop_status(logs)
+      streak = SourceRunLog.noop_streak_of(logs.first(SourceRunLog.sample_size))
+      return {noop_since: @source.noop_since(streak)&.iso8601}
     end
 
     def loss_status

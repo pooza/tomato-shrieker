@@ -189,6 +189,7 @@ bin/shrieker source ack ID
       "error_streak_threshold": 1,
       "entry_stage": false,
       "noop_streak": 0,
+      "noop_since": null,
       "silence_tolerance_seconds": null,
       "silent": false,
       "silence_baseline": "2026-04-14T14:00:01+09:00",
@@ -211,6 +212,8 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 | `run_log` | 保持期間内の実配信記録 |
 | `fallback` | ソース種別ごとの永続データ由来。`FeedSource` 系は `entry` テーブルの最新 `published` |
 | `null` | どちらからも取れない（＝配信実績を確認できない） |
+
+`noop_since` は**いま続いている空振りの起点** (#1498)。最後に実際に配信できた run の時刻で、一度も配信していなければ観測開始（＝少なくともそこから）。空振りしていなければ `null`。⚠ `noop_streak` は直近 `sample_size` 件しか数えないので **50 で頭打ち**になる（`every: 5m` なら約 4 時間で飽和）。どれだけ長く空振りしているかは `noop_since` で読む。`/healthz/source/:id` の沈黙の 503 本文にも出す。
 
 ⚠ **`fallback` は人間が読むための参考値で、`silent?` は使わない (#1483)。**`entry.published` は上流フィードが自称する公開時刻で、`Entry` の行は配信の成否と無関係に INSERT される。**配信できていなくても上流に新着があるかぎり前進し続ける**ので、判定に使うと「配信していないのに健全」になる（Google News の pubDate が信用できない件と同根）。一次情報は `run_log` 側。
 

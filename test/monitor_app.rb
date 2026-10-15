@@ -577,6 +577,33 @@ module TomatoShrieker
       assert_include(body.first, 'noop_streak: 1')
     end
 
+    # 🔴 **#1498: `noop_streak` が `sample_size` で頭打ちになっても、空振りの起点は時刻で読める。**
+    def test_noop_since
+      delivered_at = Time.now - 172_800
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: delivered_at)
+      60.times {|i| record(SILENT_ID, at: delivered_at + ((i + 1) * 60))}
+      row = source_status(SILENT_ID)
+
+      assert_equal(SourceRunLog.sample_size, row['noop_streak'], '頭打ちの前提が崩れている')
+      assert_equal(delivered_at.iso8601, row['noop_since'])
+      _status, _headers, body = call("/healthz/source/#{SILENT_ID}")
+
+      assert_include(body.first, "noop_since: #{delivered_at.iso8601}")
+    end
+
+    # #1498: 一度も配信していなければ観測開始（少なくともそこから）。空振りしていなければ null。
+    def test_noop_since_without_delivery
+      observed_at = Time.now - 3600
+      record(FIXTURE_ID, at: observed_at)
+      record(FIXTURE_ID, at: Time.now - 60)
+
+      assert_equal(observed_at.iso8601, source_status(FIXTURE_ID)['noop_since'])
+
+      record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, at: Time.now)
+
+      assert_nil(source_status(FIXTURE_ID)['noop_since'])
+    end
+
     # #1505: 静かなだけと分かったら運用者が確認して緑に戻せる
     def test_healthz_source_silence_acknowledged
       record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
