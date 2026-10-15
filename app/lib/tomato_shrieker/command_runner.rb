@@ -63,10 +63,16 @@ module TomatoShrieker
     # 出力はエンコーディングが不定で、不正なバイト列（Shift_JIS の stderr など）があると
     # `presence` / `blank?` / `split` が `ArgumentError` を上げる。⚠⚠ そうなると**本来の失敗の
     # 理由が `invalid byte sequence` にすり替わり**、stderr の中身はどこにも残らない。
+    #
+    # 🔴 **`exec` が上げた例外も伏せる (#1670)。**argv0 や `dir` に資格情報を含むパスを書くと、
+    # `Errno::ENOENT` のメッセージにそのまま載る。⚠ `exception` で作り直すので、型と
+    # バックトレースは元のまま。
     def capture_command
       return @command_mutex.synchronize do
         Bundler.with_unbundled_env {command.exec}
         [command.stdout.to_s.scrub, command.stderr.to_s.scrub, command.status]
+      rescue => e
+        raise e.exception(command.masked(e.message))
       end
     end
 
@@ -121,11 +127,53 @@ module TomatoShrieker
     # キー名（`TOKEN` など）で判定するので、`PUSH_URL` のような名前の値は素通りする。
     # ⚠ 宛先の資格情報（webhook URL・トークン）も入れる。コマンドの引数へ書き写して
     # 渡す定義を書いても、黙って漏れない。
+    #
+    # ⚠ **宛先の資格情報には `SECRET_MIN_LENGTH` を掛けない (#1670)。**短くても資格情報で
+    # あることは確かなので、読みやすさより伏せる側を取る。
     def command_secrets
-      values = (command_params['env'] || {}).values
-      values.concat(DEST_SECRET_KEYS.map {|key| self[key]})
+      values = (command_params['env'] || {}).values.compact.map(&:to_s)
+        .select {|v| v.length >= SECRET_MIN_LENGTH}
+      values.concat(dest_secrets)
+      return values.flat_map {|v| secret_variants(v)}.uniq
+    end
+
+    # 🔴 **暗号化して書いた資格情報は、復号した値も入れる (#1670)。**コマンドへ渡るのも、
+    # 宛先が使うのも復号した値。⚠ 復号できなければ平文で書かれている。
+    def dest_secrets
+      values = DEST_SECRET_KEYS.filter_map {|key| self[key]&.to_s}
+      values.concat(values.filter_map {|v| Crypt.new.decrypt(v) rescue nil})
       values.concat((self['/dest/hooks'] || []).map {|hook| hook.is_a?(Hash) ? hook['url'] : hook})
-      return values.compact.map(&:to_s).select {|v| v.length >= SECRET_MIN_LENGTH}
+      return values.compact.map(&:to_s).reject(&:empty?)
+    end
+
+    # 資格情報が出力に載るときの、生の形以外の形 (#1670)。上流の `masked` が当てるのは生の形と
+    # shellescape した形だけなので、ここで足す。
+    #
+    # - URL: パス＋クエリ・クエリ抜きの URL・パス・最後のパスセグメント（`curl` などのエラーや
+    #   HTTP のログ行は、URL を丸ごとではなくこの形で書く）
+    # - JSON の `\/`・HTML の `&amp;`・URL エンコード
+    #
+    # ⚠ 切り出した部分は `SECRET_MIN_LENGTH` 未満なら入れない（`/` や `api` まで伏せない）。
+    def secret_variants(value)
+      variants = [value, *url_secret_parts(value)]
+      variants.concat(variants.map {|v| v.gsub('/') {'\\/'}})
+      variants.concat(variants.map {|v| CGI.escapeHTML(v)})
+      variants.push(CGI.escape(value))
+      return variants.uniq
+    end
+
+    # ⚠ **URI として読めない値でも、上のエスケープ形は作る（#1709 の Codex P1）。**解析の失敗で
+    # 抜けてよいのは URL から切り出す部分だけ。
+    def url_secret_parts(value)
+      uri = Ginseng::URI.parse(value)
+      return [] unless uri&.absolute? && uri.host
+      stripped = uri.dup
+      stripped.query = nil
+      stripped.fragment = nil
+      parts = [uri.request_uri, uri.path, uri.path.split('/').last, stripped.to_s]
+      return parts.compact.select {|v| v.length >= SECRET_MIN_LENGTH}
+    rescue Addressable::URI::InvalidURIError
+      return []
     end
   end
 end

@@ -35,7 +35,7 @@ dest:
 | YouTubeChannelSource | `/source/youtube/channel/id`（`/source/youtube/channel/url` でも可） | FeedSource の設定項目も利用可（`/source/keyword` など） |
 | GitHubRepositorySource | `/source/github/repository`（`/source/github/repos` でも可） | `owner/name` の形。`/source/github/timeline`（`releases` / `commits`） |
 
-🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ 8 文字未満の値は伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。⚠⚠ **伏せるのは「書いたとおりの形」（とシェルエスケープした形）だけ。**コマンドが加工して書き出した形（URL のパスだけ・クエリを落とした URL・JSON や HTML のエスケープ・URL エンコード・Base64・途中で折り返された値）は伏せられない。
+🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ env の値は 8 文字未満なら伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。宛先の資格情報は短くても伏せ、暗号化して書いたものは復号した値も伏せる (#1670)。⚠⚠ **伏せる形は決まっている (#1670)。**書いたとおりの形・シェルエスケープした形に加え、URL ならパス＋クエリ・クエリを落とした URL・パス・最後のパスセグメント（いずれも 8 文字以上）、それぞれの JSON の `\/` エスケープ・HTML エスケープ、値全体の URL エンコード。**Base64・途中で折り返された値・改行で分かれた値は伏せられない。**`exec` 自体が上げる例外（存在しないコマンドのパスなど）のメッセージも伏せる。
 
 ### コマンドの出力を iCalendar として読む（IcalendarSource・#1691）
 

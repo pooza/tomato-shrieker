@@ -153,6 +153,92 @@ module TomatoShrieker
       assert_not_include(error.message, SECRET_ENV)
     end
 
+    # 🔴 **#1670: 資格情報が生の形以外で出力に載っても伏せる。**`curl` などのエラーや HTTP の
+    # ログ行は、URL を丸ごとではなくパスだけ・クエリ抜きで書く。JSON / HTML / URL エンコードも同じ。
+    def test_command_masks_secret_variants
+      command = build_secret_source.command
+      [
+        'GET /api/push/AbCdEf123456?status=up&msg=OK failed',
+        'POST https://kuma.example.test/api/push/AbCdEf123456 failed',
+        'push AbCdEf123456 rejected',
+        '{"url":"https:\\/\\/kuma.example.test\\/api\\/push\\/AbCdEf123456?status=up&msg=OK"}',
+        '<a href="https://kuma.example.test/api/push/AbCdEf123456?status=up&amp;msg=OK">',
+        "url=#{CGI.escape(SECRET_ENV)}",
+        'POST /services/T000/B000/XXXXXXXX 403',
+      ].each do |line|
+        masked = command.masked(line)
+
+        assert_not_include(masked, 'AbCdEf123456', line)
+        assert_not_include(masked, 'XXXXXXXX', line)
+      end
+    end
+
+    # #1709 の Codex P1: URI として読めない値（`Addressable::URI::InvalidURIError`）でも、
+    # エスケープした形は伏せる。
+    def test_command_masks_escaped_forms_of_non_uri_secret
+      secret = 'a b:c/%%&secret-0123'
+      params = secret_params
+      params['source']['env']['API_SECRET'] = secret
+      command = CommandSource.new(params).command
+
+      [CGI.escape(secret), CGI.escapeHTML(secret), secret.gsub('/') {'\\/'}].each do |form|
+        assert_not_include(command.masked("leaked: #{form}"), 'secret-0123', form)
+      end
+    end
+
+    # ⚠ URL から切り出す部分も短ければ入れない（`/` や `/api` まで伏せると読めなくなる）。
+    def test_command_secret_variants_skip_short_parts
+      secrets = build_secret_source.command.secrets
+
+      assert_not_include(secrets, '/')
+      assert_not_include(secrets, 'push')
+    end
+
+    # 🔴 **#1670: `exec` 自体が上げる例外も伏せる。**argv0 に資格情報を含むパスを書くと、
+    # `Errno::ENOENT` のメッセージにそのまま載る。⚠ 型は元のまま（Sentry のまとまりを変えない）。
+    def test_exec_masks_secrets_in_spawn_error
+      source = build_secret_source(["/nonexistent/#{SECRET_TOKEN}/run"])
+      error = assert_raise(Errno::ENOENT) {source.exec}
+
+      assert_include(error.message, '/nonexistent/')
+      assert_not_include(error.message, SECRET_TOKEN)
+    end
+
+    # #1670: 宛先の資格情報は、短くても伏せる（env の値とは違い、資格情報であることが確か）。
+    def test_command_secrets_keep_short_dest_secrets
+      params = secret_params
+      params['dest']['mastodon']['token'] = 'tk12'
+
+      assert_include(CommandSource.new(params).command.secrets, 'tk12')
+    end
+
+    # #1670: 暗号化して書いた資格情報は、復号した値も伏せる（コマンドへ渡るのは復号した値）。
+    # ⚠ 鍵（`/crypt/password`）は開発機にも CI にも無いので、ここで置く（teardown で読み直す）。
+    def test_command_secrets_include_decrypted_values
+      config['/crypt/password'] = 'test-crypt-password-0123'
+      params = secret_params
+      params['dest']['piefed'] = {'url' => 'https://piefed.example.test', 'user' => 'bot',
+                                  'password' => Crypt.new.encrypt('piefed-password-0123')}
+
+      assert_include(CommandSource.new(params).command.secrets, 'piefed-password-0123')
+    end
+
+    # 🔴 **#1670: `DEST_SECRET_KEYS` をスキーマと突き合わせる。**宛先を足したときに、
+    # 資格情報のキーを足し忘れると黙って漏れる。
+    def test_dest_secret_keys_match_schema
+      schema = YAML.load_file(File.join(Environment.dir, 'config/schema/source.yaml'))
+      keys = []
+      walk = lambda do |node, path|
+        (node['properties'] || {}).each do |name, child|
+          keys.push("#{path}/#{name}") if name.match?(/token|password|private_key|secret/)
+          walk.call(child, "#{path}/#{name}") if child.is_a?(Hash)
+        end
+      end
+      walk.call(schema.dig('properties', 'dest'), '/dest')
+
+      assert_equal(keys.sort, CommandRunner::DEST_SECRET_KEYS.sort)
+    end
+
     SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
