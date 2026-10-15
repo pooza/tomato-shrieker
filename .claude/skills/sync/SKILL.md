@@ -67,7 +67,9 @@ description: セッション開始時の進捗同期。「進捗を同期して�
 .claude/skills/sync/scripts/ginseng_pin_drift.sh
 ```
 
-⚠ **タグ固定の gem（`ginseng-style` は `tag: v1.1.12` など）は main と比べない。**main には未タグのコミットが常に積まれているので、比べると**追随済みでも「6 件遅れ」のように出る**（2026-09-17 まで実際にそう出ていた）。最新タグと比べ、違えば `v1.1.11 → v1.1.12` の形で出す。追随は Gemfile の `tag:` を書き換える。
+📌 **ginseng-* は版を固定しない**（2026-09-17 に決めた。`branch: main` で取り、下の `--patch` で追随する）。⚠ 上流 ginseng-style の `gem-watch` の `consumers` ジョブは `branch: main` の利用側を「未固定」と `::warning::` で鳴らすが、**この決定によるもので、直す対象ではない**（#1575）。
+
+⚠ **タグで固定した gem（`ginseng-style` のように `tag:` で指定したもの）は main と比べない。**main には未タグのコミットが常に積まれているので、比べると**追随済みでも「6 件遅れ」のように出る**（2026-09-17 まで実際にそう出ていた）。最新タグと比べ、違えば `<いまのタグ> → <最新のタグ>` の形で出す。追随は Gemfile の `tag:` を書き換える。
 
 遅れがあれば `bundle update <gem> --patch` で追随する。⚠ **`--patch` を付ける。**付けないと ginseng の依存まで上がる（2026-09-17 の実測: net-protocol 0.3 → 0.4、サテライトでは json 2 → 3）。⚠ **`--conservative` は使わない。**git ソースの version 行が古いまま残って lock が壊れる（`Could not find ginseng-core-1.23.5 ... at main@b6e736d`）。⚠ **ルーチンの `Gemfile.lock` 最新化は PR 不要・`develop` 直コミットでよい**（[ginseng-style の workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md)）。ただし**溜めてから一気に追随するときは単独 PR にして、本番で挙動を観察する**。
 

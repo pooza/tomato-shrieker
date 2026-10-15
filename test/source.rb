@@ -584,14 +584,14 @@ module TomatoShrieker
       record_run(at: Time.now - 60, delivered_count: 1)
 
       assert_false(source.silent?)
-      assert_equal('delivery', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_DELIVERY, source.silence_baseline_origin)
 
       # 配信実績が無く観測も浅い ＝ 判定不能
       source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
       record_run(at: Time.now - 60)
 
       assert_nil(source.silent?)
-      assert_equal('observation', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_OBSERVATION, source.silence_baseline_origin)
 
       # しきい値未設定は「この機能を使っていない」＝判定不能ではない
       source = silent_source
@@ -610,7 +610,7 @@ module TomatoShrieker
       SilenceAck.acknowledge(SILENT_ID)
 
       assert_false(source.silent?)
-      assert_equal('acknowledgement', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_ACKNOWLEDGEMENT, source.silence_baseline_origin)
     ensure
       SourceRunLog.where(source_id: SILENT_ID).delete
       SilenceAck.where(source_id: SILENT_ID).delete
@@ -622,7 +622,7 @@ module TomatoShrieker
       source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
       record_run(at: Time.now - 60, delivered_count: 1)
 
-      assert_equal('delivery', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_DELIVERY, source.silence_baseline_origin)
     ensure
       SourceRunLog.where(source_id: SILENT_ID).delete
     end
