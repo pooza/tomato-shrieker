@@ -92,6 +92,26 @@ module TomatoShrieker
       assert_nil(source.instance_variable_get(:@piefed))
     end
 
+    # 🔴 **#1712 の Codex P1: 宛先のオブジェクトは run ごとに作り直す。**スケジューラのソースは
+    # run をまたいで生きるので、作り直さないと PieFed の期限切れの JWT がずっと残る。
+    def test_exec_with_run_log_resets_shriekers
+      id = '__test_source_reset_shriekers__'
+      source = TextSource.new({
+        'id' => id,
+        'source' => {'text' => 'body'},
+        'dest' => {'mastodon' => {'url' => 'https://mastodon.example.test', 'token' => 'token-0123'}},
+      })
+      source.define_singleton_method(:exec) {nil}
+      first = source.mastodon
+
+      assert_same(first, source.mastodon, 'run の中では共有する')
+      source.send(:exec_with_run_log, :every, '5m')
+
+      assert_not_same(first, source.mastodon)
+    ensure
+      SourceRunLog.where(source_id: id).delete
+    end
+
     # #1473: token を消したような半端な宛先を 1 と数えると、shriekers が 0 件なのに
     # dest? が真になり、塞いだはずの「永久に no-op success」がそのまま残る
     def test_dest_count_requires_complete_destination

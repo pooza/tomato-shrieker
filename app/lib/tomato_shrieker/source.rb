@@ -184,6 +184,24 @@ module TomatoShrieker
       return (self['/dest/hooks'] || []).present?
     end
 
+    # 🔴 **宛先のオブジェクトは run ごとに作り直す（#1712 の Codex P1）。**スケジューラが持つ
+    # ソースのインスタンスは run をまたいで生きるので、メモした宛先も生き続ける。⚠⚠ PieFed は
+    # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
+    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
+    # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
+    def reset_shriekers
+      [:@mastodon, :@misskey, :@line, :@piefed, :@nostr].each do |name|
+        remove_instance_variable(name) if instance_variable_defined?(name)
+      end
+    end
+
+    # `exec_with_run_log` を通らない配信（`IcalendarSource#remind`）の前に呼ぶ。宛先を作り直し、
+    # テンプレートを `Parallel.each` の前に暖める (#1489)。
+    def prepare_delivery
+      reset_shriekers
+      templates
+    end
+
     def mastodon
       unless @mastodon
         return nil unless uri = self['/dest/mastodon/url']
@@ -706,6 +724,7 @@ module TomatoShrieker
     def exec_with_run_log(method, spec)
       started_at = Time.now
       @delivery_stats = DeliveryStats.new
+      reset_shriekers
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
       unless dest?
