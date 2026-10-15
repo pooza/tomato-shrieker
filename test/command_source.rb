@@ -275,12 +275,6 @@ module TomatoShrieker
       source.define_singleton_method(:command) {command}
     end
 
-    def attach_stats(source)
-      stats = DeliveryStats.new
-      source.instance_variable_set(:@delivery_stats, stats)
-      return stats
-    end
-
     def test_delimiter
       CommandSource.all.reject(&:disable?).each do |source|
         assert_kind_of(Regexp, source.delimiter)

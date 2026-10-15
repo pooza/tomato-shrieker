@@ -250,10 +250,10 @@ module TomatoShrieker
 
     # 取得済みの logs から出す版。⚠ **呼び出し側が logs を別の用途にも使うとき**
     # （`entry_level_error?` の判定等）に、同じ行を 2 回引かないため (#1558)。
-    def self.summary_of(logs)
+    def self.summary_of(logs, cutoff = retention_cutoff)
       sample = logs.first(sample_size)
       return {
-        error_streak: error_streak_of(logs),
+        error_streak: error_streak_of(logs, cutoff),
         noop_streak: noop_streak_of(sample),
         duration_ms: duration_stats_of(sample),
         shrieker_errors: shrieker_error_distribution_of(sample),

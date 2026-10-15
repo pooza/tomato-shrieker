@@ -55,7 +55,12 @@ module TomatoShrieker
     def start_reload_worker
       @reload_queue = Thread::Queue.new
       @reload_ready = Thread::Queue.new
-      trap('HUP') {@reload_queue.push(true)}
+      trap('HUP') do
+        @reload_queue.push(true)
+      rescue ClosedQueueError
+        # ⚠ 停止中（`stop` が `close` した後）の HUP は捨てる (#1575)
+        nil
+      end
       @reload_thread = Thread.new {process_reloads if @reload_ready.pop}
     end
 
@@ -92,7 +97,7 @@ module TomatoShrieker
 
     # 最後の 1 手はマスク経路にも Sentry にも依存させない (#1549 と同じ形)。
     def report_reload_fallback(error, log_error)
-      ::Syslog::Logger.new(Package.name).error(
+      Syslog::Logger.new(Package.name).error(
         "scheduler reload failed: #{error.class} (logging failed: #{log_error.class})",
       )
     rescue StandardError

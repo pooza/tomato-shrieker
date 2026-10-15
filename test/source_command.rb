@@ -214,6 +214,19 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **#1506 の眼目: 未達と沈黙の両方に効き、両方を言う。**（#1575: 以前の `ack` のテストは
+    # どれも `silence_tolerance` 無しで、この経路が一度も実行されていなかった）
+    def test_ack_reports_undelivered_and_silence
+      said = ack_with(stub_source(259_200, undelivered: true))
+
+      assert_include(said, 'undelivered')
+      assert_include(said, 'silence_tolerance (3日)')
+      assert_not_include(said, '未設定')
+      assert_not_nil(SilenceAck.acknowledged_at(ACK_ID), '確認が記録されていない')
+    ensure
+      SilenceAck.where(source_id: ACK_ID).delete
+    end
+
     private
 
     # `source status` を回し、終了コードを返す。出力は捨てる。

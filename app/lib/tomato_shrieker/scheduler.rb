@@ -122,6 +122,8 @@ module TomatoShrieker
     # reload はスキーマ検証をしないので不正な cron 式もここへ来る）。先に消すと、
     # **失敗したソースが次の reload までジョブ 1 本無いまま放置される**。
     def swap(id, sources, action)
+      # ⚠ 先に空で置く (#1575)。`jobs` 自体が上げると、rescue の `except: old` が nil になる。
+      old = []
       old = @scheduler.jobs(tag: id)
       sources.each(&:register)
       old.each(&:unschedule)

@@ -47,12 +47,6 @@ module TomatoShrieker
       )
     end
 
-    def attach_stats(source)
-      stats = DeliveryStats.new
-      source.instance_variable_set(:@delivery_stats, stats)
-      return stats
-    end
-
     def test_keyword
       IcalendarSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)
