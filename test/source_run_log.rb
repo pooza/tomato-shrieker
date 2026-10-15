@@ -573,6 +573,23 @@ module TomatoShrieker
       assert_in_delta(0.25, SourceRunLog.error_rate(SOURCE_ID))
     end
 
+    # #1472: SQL で数えるようにしても、`error?` と同じ規則で数える。partial はエラーに数えず、
+    # 窓の外（24 時間より前）の行は分母にも入れない。
+    def test_error_rate_counts_like_error?
+      create_logs(
+        {status: SourceRunLog::STATUS_ERROR},
+        {status: SourceRunLog::STATUS_PARTIAL},
+        {status: SourceRunLog::STATUS_SUCCESS},
+      )
+      SourceRunLog.create({
+        source_id: SOURCE_ID, executed_at: Time.now - (25 * 3600),
+        status: SourceRunLog::STATUS_ERROR, duration_ms: 100, attempted_count: 0, delivered_count: 0
+      })
+
+      assert_in_delta(0.333, SourceRunLog.error_rate(SOURCE_ID))
+      assert_in_delta(0.5, SourceRunLog.error_rate(SOURCE_ID, hours: 48))
+    end
+
     def test_summary_for
       create_logs(
         {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 1, delivered_count: 1},

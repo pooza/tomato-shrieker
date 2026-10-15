@@ -122,7 +122,7 @@ module TomatoShrieker
 
     # #1433 (統計) と #1470 (サイレント不発) の指標。
     def delivery_status
-      attempted = SourceRunLog.last_attempted(@source.id)
+      attempted = @source.last_attempted_log
       # 🔴 **窓もしきい値も /healthz/source/:id と完全に同じものを使う（Codex P2・#1558）。**
       # 既定の窓はグローバルのしきい値しか見ないので、ソース側で sample_size (50) を
       # 超える値に上書きすると **503 にしている当人が `error_streak: 50 / 100` という
@@ -162,7 +162,7 @@ module TomatoShrieker
         # ⚠ **キーは `acknowledged_at` (#1567)。**確認はサイレント不発にも未達にも効く (#1506)
         # ので、`silence_` を付けると「未達がなぜ緑なのか」を探す人が行き当たらない。
         # ⚠ 内部の名前（`SilenceAck` / `silence_ack` テーブル）は据え置き。
-        acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
+        acknowledged_at: @source.acknowledged_at&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(@source.id),
         **threshold_status(logs),
       )
