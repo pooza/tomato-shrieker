@@ -65,11 +65,9 @@ module TomatoShrieker
     # 何も出ない**」＝ #1467 が塞ごうとした状態に戻る。
     #
     # ⚠ **出すのは例外のクラス名だけ。**メッセージを載せると、伏せるはずだった
-    # 値をマスク無しで書くことになる。
-    # ⚠ **`warn` は使えない。**`bin/scheduler_daemon.rb` が
-    # `$stderr.reopen(File::NULL)` するので本番では丸ごと消える。
+    # 値をマスク無しで書くことになる。⚠ `warn` を使わない理由は `report_drop` と同じ。
     def report_drop_fallback(error, log_error)
-      ::Syslog::Logger.new(Package.name).error(
+      Syslog::Logger.new(Package.name).error(
         'sentry before_send: event dropped (scrub failed):' \
           " #{error.class} (logging failed: #{log_error.class})",
       )

@@ -171,22 +171,10 @@ module TomatoShrieker
       return payload(@scrubber.scrub(event))
     end
 
-    # マスク対象を 1 つ足して `Config#reload` する。
-    #
-    # ⚠ **`raw` の鍵は設定ファイルの basename**（`local` / `application` / `lib` /
-    # hostname）で、優先順は `Config#basenames` の順。`raw['logger']` へ書いても
-    # 効かないし、低い側へ書いても高い側の値に上書きされる。**実在するうち
-    # いちばん強い basename** へ足す。
-    def with_mask_field(field)
-      key = config.basenames.find {|v| config.raw.key?(v)}
-      original = config.raw[key]['logger']
-      config.raw[key]['logger'] = (original || {}).deep_dup
-      config.raw[key]['logger']['mask_fields'] = config['/logger/mask_fields'] + [field]
-      config.reload
-      yield
-    ensure
-      config.raw[key]['logger'] = original
-      config.reload
+    # マスク対象を 1 つ足して `Config#reload` する（書く先の選び方は `TestCase#with_raw_config`）。
+    def with_mask_field(field, &)
+      fields = config['/logger/mask_fields'] + [field]
+      with_raw_config('logger', ->(original) {(original || {}).merge('mask_fields' => fields)}, &)
     end
 
     def error_event(error)

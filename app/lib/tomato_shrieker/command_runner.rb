@@ -97,6 +97,58 @@ module TomatoShrieker
       Bundler.with_unbundled_env {command.bundle_install}
     end
 
+    # 登録の前の準備。`bundle` で始まるコマンドなら依存を入れ、どれも依存を検査する。
+    def prepare_command
+      install_command_bundle
+      check_command_bundle
+    end
+
+    # 🔴 **登録の時点で、コマンドの依存が壊れていないかを見る (#1477)。**
+    #
+    # ⚠⚠ 自動の `bundle install` は `bundle` で始まるコマンドにしか走らず、本番の定義
+    # （`bin/loquat.rb` のような直接実行）では一度も発火していない。Ruby を上げてサテライトの
+    # `bundle install` を忘れると、**登録は通って、走るたびに `Bundler::GemNotFound` で落ちる**
+    # （2026-08-03 に 7 ソースが約 24 時間）。
+    # ⚠ **検査するだけ。**起動は止めず、直しもしない（デプロイ漏れをコードで隠さない）。
+    # 見つけたらログと Sentry に出す。
+    def check_command_bundle
+      return unless problem = command_bundle_problem
+      error = RuntimeError.new(problem)
+      logger.error(source: id, class: self.class.to_s, error:)
+      Sentry.capture_exception(error, tags: {source: id}) if Sentry.initialized?
+    end
+
+    # 依存の問題の説明。無ければ nil。⚠ デプロイ前の確認（deploy スキルの `enabled_sources.rb`）
+    # からも呼ぶ。⚠ 子プロセスと同じく bundler の痕跡を消した環境で、`dir` の Gemfile を見る
+    # （`RBENV_VERSION` は消えないので、本体と同じ Ruby の gem を見る）。
+    #
+    # 🔴 **`Bundler.with_unbundled_env` で囲まない。**あれはプロセス全体の `ENV` を差し替えて
+    # 戻すので、**`register` は並列（`Scheduler#apply` の `Parallel.map`）だから、別のスレッドが
+    # 差し替え後の `ENV` を控えて戻し、`ENV` が消える**（テストで `ENV['TEST']` が消えて実際に
+    # 踏んだ）。子プロセスに渡す環境だけを組み立てて `unsetenv_others` で渡す。
+    def command_bundle_problem
+      dir = command.dir
+      # ⚠ パスにも資格情報が入りうる（#1714 の Codex P1）。実行時の spawn の例外と同じく伏せる。
+      return command.masked("#{command_root}/dir not found: #{dir}") unless File.directory?(dir)
+      gemfile = File.join(dir, 'Gemfile')
+      return nil unless File.exist?(gemfile)
+      # 🔴 **実行時と同じ環境で見る（#1714 の Codex P2）。**`/source/env` の `BUNDLE_PATH` /
+      # `GEM_HOME` などは結果を変える。上流が子へ渡す `child_env`（`RBENV_VERSION` 等を外し、
+      # ソースの env と `BUNDLE_GEMFILE` を重ねたもの）をそのまま使う。
+      env = Bundler.unbundled_env.merge(command.send(:child_env), 'BUNDLE_GEMFILE' => gemfile)
+      output, status = begin
+        Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
+      rescue SystemCallError => e
+        # 🔴 **走らせられなかったことも問題として返す。上げない（#1714 の Codex P1）。**ソースの env が
+        # `PATH` を差し替えて `bundle` が見つからないと `Errno::ENOENT` になり、上げると
+        # `register_all` が起動ごと倒れる（この検査は起動を止めない約束）。
+        return command.masked("bundle check could not run in #{dir}: #{e.class}")
+      end
+      return nil if status.success?
+      detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)
+      return command.masked("bundle check failed in #{dir}: #{detail}")
+    end
+
     def command
       unless @command
         @command = Ginseng::CommandLine.new(command_args)

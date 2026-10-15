@@ -109,14 +109,14 @@ module TomatoShrieker
     def test_test_sources_are_loaded
       ids = Source.all.map(&:id)
 
-      # ⚠ `__entry_fixture__` は EntryTest がフィクスチャを紐づける先 (#1597)。
+      # ⚠ `__test_entry_fixture__` は EntryTest がフィクスチャを紐づける先 (#1597)。
       ids_to_check = [
         'mastodon-dest',
         'misskey-dest',
         'line-dest',
         'piefed-dest',
         'webhook-dest',
-        '__entry_fixture__',
+        '__test_entry_fixture__',
       ]
 
       ids_to_check.each do |id|

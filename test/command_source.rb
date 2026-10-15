@@ -239,6 +239,90 @@ module TomatoShrieker
       assert_equal(keys.sort, CommandRunner::DEST_SECRET_KEYS.sort)
     end
 
+    # 🔴 **#1477: 依存が欠けていたら、登録の時点でログと Sentry に出す（起動は止めない）。**
+    # ⚠ 自動の `bundle install` は `bundle` で始まるコマンドにしか走らないので、直接実行の定義
+    # （本番の 7 件）はこれが無いと、走るたびに `Bundler::GemNotFound` で落ちるまで気づけない。
+    def test_command_bundle_problem
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        problem = build_secret_source(['bin/run.rb']).tap {|v| v.command.dir = dir}.command_bundle_problem
+
+        assert_include(problem, 'bundle check failed')
+        assert_include(problem, 'tomato-shrieker-missing-gem-1477')
+      end
+    end
+
+    # ⚠ **Gemfile.lock も置く。**lock が無いと `bundle check` は解決のためにネットワークへ出る
+    # （サテライトはどれも lock を持っている）。
+    def write_missing_gem_bundle(dir, group: nil)
+      gem = 'tomato-shrieker-missing-gem-1477'
+      line = group ? "group :#{group} do\n  gem '#{gem}'\nend" : "gem '#{gem}'"
+      File.write(File.join(dir, 'Gemfile'), "source 'https://rubygems.org'\n#{line}\n")
+      File.write(File.join(dir, 'Gemfile.lock'), [
+        'GEM', '  remote: https://rubygems.org/', '  specs:', "    #{gem} (0.0.1)", '',
+        'PLATFORMS', '  ruby', '', 'DEPENDENCIES', "  #{gem}", ''
+      ].join("\n"))
+    end
+
+    # #1714 の Codex P2: 実行時と同じ環境（`/source/env`）で見る。`BUNDLE_WITHOUT` で外した
+    # グループの欠落は、コマンドが走るときにも問題にならない。
+    def test_command_bundle_problem_uses_source_env
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir, group: 'extra')
+        params = secret_params(['bin/run.rb'])
+        params['source']['dir'] = dir
+
+        assert_not_nil(CommandSource.new(params).command_bundle_problem)
+        params['source']['env']['BUNDLE_WITHOUT'] = 'extra'
+
+        assert_nil(CommandSource.new(params).command_bundle_problem)
+      end
+    end
+
+    # #1714 の Codex P1（2 巡目）: `bundle` が見つからなくても上げない（起動を止めない）。
+    def test_command_bundle_problem_when_bundle_is_missing
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        params = secret_params(['/bin/true'])
+        params['source']['dir'] = dir
+        params['source']['env']['PATH'] = '/nonexistent'
+
+        assert_include(CommandSource.new(params).command_bundle_problem, 'bundle check could not run')
+      end
+    end
+
+    # #1714 の Codex P1: 存在しない `dir` のパスに資格情報が入っていても伏せる。
+    def test_command_bundle_problem_masks_dir
+      params = secret_params
+      params['source']['dir'] = "/nonexistent/#{SECRET_TOKEN}"
+      problem = CommandSource.new(params).command_bundle_problem
+
+      assert_include(problem, 'dir not found')
+      assert_not_include(problem, SECRET_TOKEN)
+    end
+
+    # ⚠ Gemfile の無い `dir` は見ない。存在しない `dir` は問題として返す（走らせると必ず落ちる）。
+    def test_command_bundle_problem_without_gemfile
+      Dir.mktmpdir do |dir|
+        assert_nil(build_secret_source.tap {|v| v.command.dir = dir}.command_bundle_problem)
+      end
+      params = secret_params
+      params['source']['dir'] = '/nonexistent/__test_1477__'
+
+      assert_equal('/source/dir not found: /nonexistent/__test_1477__', CommandSource.new(params).command_bundle_problem)
+    end
+
+    # ⚠ 検査は登録を止めない（ログに出して、そのまま登録する）。
+    def test_register_continues_when_bundle_is_broken
+      source = build_secret_source
+      source.define_singleton_method(:command_bundle_problem) {'bundle check failed in /x: missing'}
+      registered = false
+      source.define_singleton_method(:schedule) {|*| registered = true}
+      source.register
+
+      assert_true(registered)
+    end
+
     SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
@@ -273,12 +357,6 @@ module TomatoShrieker
       command = Ginseng::CommandLine.new
       command.args = args
       source.define_singleton_method(:command) {command}
-    end
-
-    def attach_stats(source)
-      stats = DeliveryStats.new
-      source.instance_variable_set(:@delivery_stats, stats)
-      return stats
     end
 
     def test_delimiter

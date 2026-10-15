@@ -19,7 +19,7 @@ module TomatoShrieker
     end
 
     def register
-      install_command_bundle
+      prepare_command
       return super
     end
 

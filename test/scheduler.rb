@@ -345,6 +345,27 @@ module TomatoShrieker
       assert_nil(state[:result])
     end
 
+    # #1717 の Codex P2: 古いジョブの取得そのものが落ちたら、巻き戻さない（既存のジョブを残す）。
+    def test_swap_keeps_jobs_when_lookup_fails
+      job = jobs(FIXTURE_ID).first
+      rufus = @scheduler.scheduler
+      original = rufus.method(:jobs)
+      calls = 0
+      rufus.define_singleton_method(:jobs) do |*args, **kwargs|
+        calls += 1
+        raise 'lookup failed' if calls == 1
+        original.call(*args, **kwargs)
+      end
+      source = Source.all.find {|v| v.id == FIXTURE_ID}
+
+      assert_false(@scheduler.send(:swap, FIXTURE_ID, [source], 'reload'))
+      rufus.singleton_class.remove_method(:jobs)
+
+      assert_equal([job.job_id], jobs(FIXTURE_ID).map(&:job_id))
+    ensure
+      rufus.singleton_class.remove_method(:jobs) if rufus&.singleton_methods&.include?(:jobs)
+    end
+
     def test_reload_keeps_jobs_when_config_is_broken
       job = jobs(FIXTURE_ID).first
       File.write(fixture_path(BROKEN_ID), "source:\n  feed: \"unterminated\n")

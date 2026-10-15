@@ -23,7 +23,7 @@ dest:
 
 ⚠ トップレベルに書けるのは `source` / `dest` / `schedule` / `monitor` / `keep` / `enclosure` / `disable` / `test` だけ（`additionalProperties: false`）。旧形式の `sources:` 配列は `config/local.yaml` でだけ読める（そこでは `id` を書く）。
 
-### Source 設定項目
+## Source 設定項目
 
 | Source | 主要キー | 備考 |
 |--------|----------|------|
@@ -37,7 +37,7 @@ dest:
 
 🔴 **CommandSource に資格情報を渡すなら `/source/env` に書く (#1623)。**`/source/env` の値は、キー名を見ずに全部がログ（`"command":` / `"env":`）と失敗時の例外メッセージから伏せられる。宛先の資格情報（`/dest/hooks` の URL・`/dest/mastodon/token` など）も同じく伏せる。⚠ **`/source/command` の中に直接書いた資格情報は、上のどれとも一致しなければ伏せられない**（webhook URL や Uptime Kuma の push URL はトークンがパスに入るので、上流のキー名・URL のマスクでも拾えない）。⚠ env の値は 8 文字未満なら伏せない（`DEBUG: '1'` まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる）。宛先の資格情報は短くても伏せ、暗号化して書いたものは復号した値も伏せる (#1670)。⚠⚠ **伏せる形は決まっている (#1670)。**書いたとおりの形・シェルエスケープした形に加え、URL ならパス＋クエリ・クエリを落とした URL・パス・最後のパスセグメント（いずれも 8 文字以上）、それぞれの JSON の `\/` エスケープ・HTML エスケープ、値全体の URL エンコード。**Base64・途中で折り返された値・改行で分かれた値は伏せられない。**`exec` 自体が上げる例外（存在しないコマンドのパスなど）のメッセージも伏せる。
 
-### コマンドの出力を iCalendar として読む（IcalendarSource・#1691）
+## コマンドの出力を iCalendar として読む（IcalendarSource・#1691）
 
 `/source/ical` に URL ではなくコマンドを書くと、その標準出力を iCalendar として読む。事前告知（`/source/days` 日前から当日まで毎日）・テンプレート（`views/calendar.erb`）・リマインド・監視は URL のときと同じ。
 
@@ -70,7 +70,7 @@ dest:
 - ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る
 - ⚠ 終日の予定に `DTEND` を書くなら注意。iCalendar の規格では終了日は「翌日」だが、1 日戻すのは Google カレンダーのとき（`/source/google`）だけ。書かなければ開始日と同じ日になる
 
-### URL の検証（`source validate`・#1461）
+## URL の検証（`source validate`・#1461）
 
 スキーマの `format: uri`（`/source/feed`・`/source/url`・`/source/calendar`・`/source/ical`・`/source/news/url`・`/dest/hooks` など）は、**絶対 URI（スキーム必須）**を要求する。`example.com/feed` や空文字は NG。
 
@@ -78,18 +78,18 @@ dest:
 - ⚠ **`host:port/path`（スキームの書き忘れ）は通る。**`localhost:3000/clean` は規格上 `localhost` というスキームの絶対 URI として読める。スキームは絞っていない（`webcal:` などを弾くため）
 - `source.news` は `phrase`（空文字・空白だけは NG）か `url` のどちらかが要る。どちらも無い定義は「どのクラスにもマッチしない」で NG になる
 
-### キーワードフィルタ（FeedSource 系共通）
+## キーワードフィルタ（FeedSource 系共通）
 
 - `/source/keyword` — 含むエントリのみ対象（正規表現可）
 - `/source/negative_keyword` — 含まないエントリのみ対象（正規表現可）
 
-### 実装に無いキー（FeedSource）
+## 実装に無いキー（FeedSource）
 
 ⚠ 以前ここにあった `/dest/multi_entries` / `/dest/limit` / `/source/title/unique` は実装に無い（書くと `source validate` が NG にする）。
 
 ⚠ **`/dest/category` は書けるが、絞り込みには使われていない。**読むのは `FeedSource#category` だけで、`bin/shrieker source fetch` のサマリーに値がそのまま出る。エントリを絞るなら `/source/keyword` / `/source/negative_keyword` を使う。
 
-### Shrieker 設定項目
+## Shrieker 設定項目
 
 | Shrieker | 主要キー | 備考 |
 |----------|----------|------|
@@ -112,7 +112,7 @@ dest:
 - ⚠ **タグの出どころはテンプレートに合わせる**: フィードのエントリは自分のタグ、本文を持つもの（テキスト・コマンド）はソースのタグ＋リモートのタグ付け、予定はソースのタグだけ
 - 経緯: 4.13.0 までは同じソースの他の宛先しだい（単独ならタグなし・Mastodon / Misskey と併用なら本文とタイトルの両方・LINE と併用ならタグなし）。4.14.0（#1484）で「本文にだけ付ける」に揃えたが、PieFed 側でタグとして扱われなかった
 
-#### Webhook 宛先の指定形式
+### Webhook 宛先の指定形式
 
 `/dest/hooks` の各要素は **URL 文字列**か**オブジェクト**のどちらでもよい。オブジェクト形式は [matrix-webhook](https://github.com/tsunagal/matrix-webhook) 宛に送信先ルームを指定するためのもの。
 
@@ -139,7 +139,7 @@ dest:
 
 ⚠ **`channel` / `room_id` は matrix-webhook 側の解釈**で、`WebhookShrieker` はペイロードに載せるだけ。Slack / Discord / モロヘイヤ宛に書いても無視される。
 
-##### `type: tsunagal` — Tsunagal（matrix-webhook）宛 (#1493)
+#### `type: tsunagal` — Tsunagal（matrix-webhook）宛 (#1493)
 
 🔴 **matrix-webhook は `text` / `channel` / `room_id` / `format` しか見ない。**未知のフィールドは黙って無視されるので、`WebhookShrieker` が積む `spoiler_text` は**エラーにもならずに落ちていた**。同じソースをモロヘイヤと matrix-webhook の両方へ流すと、**Matrix 宛だけ CW の内容が消える。**
 
@@ -149,7 +149,7 @@ dest:
 
 ⚠ **クラス名が `Matrix～` でないのは意図的。**喋る相手は Matrix の Client-Server API ではなく `tsunagal/matrix-webhook` という HTTP webhook なので、`MatrixShrieker` は将来 C-S API を実装するときのために空けてある。
 
-### 第三者が書ける URL を取りにいく経路 (#1666)
+## 第三者が書ける URL を取りにいく経路 (#1666)
 
 フィードの書き手（第三者）が決める URL を、tomato 自身が GET する経路は 2 つある。どちらも**取りにいく先のホストを検証する**（`Ginseng::PublicHost.validator`。初段もリダイレクトの各ホップも）。
 
@@ -164,33 +164,33 @@ dest:
 - リモートのタグ付けが拒否されたら、ソースのタグだけで投稿する（ログに error）
 - ⚠ **添付の検証は gem（ginseng-fediverse 6.0.0 以降）の既定。**tomato 側に自前の検証は置いていない＝版を戻すと守りも消える（`RemoteAttachmentTest` が赤くなる）
 
-### モロヘイヤ連携
+## モロヘイヤ連携
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（**既定は false**。`true` と書いたときだけ有効。`/dest/mulukhiya` を書くなら `enable` は必須）
 - `/dest/mulukhiya/url`, `/dest/mulukhiya/tagging/enable` — ハッシュタグ自動付与
 - Webhook digest・カスタムフィード連携の詳細: [mulukhiya-toot-proxy 連携ドキュメント](https://github.com/pooza/mulukhiya-toot-proxy/blob/develop/docs/tomato-shrieker-integration.md)
 
-#### タグ処理の責務分担
+### タグ処理の責務分担
 
 - tomato-shrieker は `dest.tags` / `extra_tags` / モロヘイヤ remote_tagging で集めたタグを**そのまま投稿に乗せる**（短いタグも含めて素通し）
 - 短いタグや表示上ノイズになるタグの除外はモロヘイヤ側の責務。短タグフィルタは表示・配信品質ポリシーが集まるあちら側で実装する
 - v4.1.2 以前は `Source#create_tags` / `Entry#tags` に 2 文字以下を落とす `select!` が入っていたが、Ruby 4.0 で `Ginseng::Fediverse::TagContainer#delete` が無限再帰するインシデント (#1447) を機に削除した
 
-#### Webhook digest の取り扱い (運用注意)
+### Webhook digest の取り扱い (運用注意)
 
 WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}` で、digest = `SHA256(SNS URI + OAuth トークン + 暗号化 salt)`。**3 要素のいずれかが変わると全 Webhook URL が無効になる** (モロヘイヤ #4106 / v5.2.1 で `/crypt/salt` 廃止試行 → 全投稿 404 のインシデント)。回帰テストはモロヘイヤ側の `test/unit/model/webhook_digest.rb`。
 
-### CommandSource
+## CommandSource
 
 - `/ruby/jit` — `true` なら CommandSource の子プロセスに `RUBY_YJIT_ENABLE=yes` を渡す。既定は `false`（本番は `local.yaml` で `yes`）
 - ⚠ **v4.13.0 より前は既定値が無く、`local.yaml` に書いていない環境では CommandSource に触れた時点で `ConfigError` になっていた (#1614)**
 
-### 暗号化
+## 暗号化
 
 - `/crypt/password` — アクセストークン等の暗号化用パスワード（PieFedShrieker で使用）
 - `bin/crypt.rb` で暗号化、`bin/decrypt.rb` で復号
 
-### スケジュール形式
+## スケジュール形式
 
 3形式から選択。指定方法は [rufus-scheduler](https://github.com/jmettraux/rufus-scheduler) に準じる。
 

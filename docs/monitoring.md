@@ -4,7 +4,7 @@
 
 scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サーバを同居させ、Kuma 等の外形監視ツールから叩ける HTTP エンドポイントを提供する。UI は持たず、Kuma のダッシュボードが一次情報となる設計。
 
-### エンドポイント
+## エンドポイント
 
 | パス | 用途 | 応答 |
 |------|------|------|
@@ -12,11 +12,11 @@ scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サ
 | `/healthz/source/:id` | ソース別ヘルスチェック | 200 / 503 / 404 |
 | `/status.json` | 全体ステータス（人間/ダッシュボード向け） | 200 (JSON) |
 
-#### `/healthz` の判定
+### `/healthz` の判定
 
 scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、すべて満たせば 200。いずれかが NG なら 503。
 
-#### `/healthz/source/:id` の判定
+### `/healthz/source/:id` の判定
 
 該当ソースが以下をすべて満たせば 200:
 
@@ -28,7 +28,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - **配信へ進む前に失ったエントリが残っていない (lost_entries でない・#1574)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
 
-##### 配信へ進む前に失ったエントリ (#1574)
+#### 配信へ進む前に失ったエントリ (#1574)
 
 `Entry.insert` は配信より先に走るので、その後（テンプレートの描画・添付の取り出しなど）で落ちたエントリは unique 制約で二度と取得されない。⚠⚠ **同じ run で他のエントリが 1 件でも届くと、run は `partial`・`attempted == delivered` になり、未達（`undelivered`）も連続エラー（`error_streak`）も立たない**＝ 4.14.0 までは、エントリを恒久的に失ったのに healthz 200・エラー率 0% だった。
 
@@ -43,7 +43,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` だけ（Sentry にも出ない）
 - ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
 
-##### 定義は在るが読めないソース (#1605)
+#### 定義は在るが読めないソース (#1605)
 
 判別キー（`source/feed` など）を打ち間違えた定義（unmatched）は、どのソースクラスにも一致しないので `Source.all` に現れない。⚠ **それでも reload は古いジョブを残す（#1572）ので、古い定義のまま走り続けている。**
 
@@ -51,7 +51,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - `/status.json` には `{id, class: null, error}` の行が残る（4.14.0 までは行ごと消えた）。`source status` の `PROBLEMS` 列は `unmatched`
 - ⚠ `disable: true` の定義は対象外（止めたのだから問題にしない＝ 404・行なし）
 
-##### まだ走っていないソース (#1560)
+#### まだ走っていないソース (#1560)
 
 run が 1 行も無いソースは、**初回の実行期限**までは 200（本文は `OK (awaiting first run, due by <期限>)`）、期限を過ぎても走っていなければ 503（`No run recorded yet` と `first_run_deadline:`）。
 
@@ -63,7 +63,7 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 - `/status.json` の `first_run_deadline` で期限が読める（1 度でも走ったら `null`）。CLI の `PROBLEMS` 列には目印 `awaiting_first_run` が出る（問題ではないので `--problems` には出ない）
 - ⚠ `every` のソースは daemon の再起動で位相が変わる（初回は再起動の 1 周期後）。足した直後に再起動を挟むと、期限のほうが先に来ることがある
 
-##### 宛先の一部にだけ届かない (undelivered・#1504)
+#### 宛先の一部にだけ届かない (undelivered・#1504)
 
 **宛先の一部にだけ配信できていない状態を検知する (#1504)。**直近の「配信を試みた run」(`attempted_count > 0`) で `delivered_count < attempted_count` なら 503。
 
@@ -156,10 +156,11 @@ bin/shrieker source ack ID
 | `delivery` | run_log 上の実配信が起点。判定は確か |
 | `acknowledgement` | 運用者の確認が起点 (#1505)。緑なのは健全だからではない |
 | `observation` | **観測開始が起点。配信実績も確認記録も無い**＝ `silent` は `null` か、下限だけを根拠にした `true` |
+| `null` | run が 1 件も無い（まだ一度も走っていない）。`silent` は `false`（#1560 の初回の期限の領分） |
 
 ⚠ **初回 run でいきなり配信できたソースは `observed_since` と時刻が一致する**が、`delivery` が勝つ（同着は宣言順）。
 
-#### `/status.json` の中身
+### `/status.json` の中身
 
 ```json
 {
@@ -239,7 +240,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 **腐った設定と「正常に静か」の見分け方**は `silent` と `last_delivered_at` を突き合わせる。`last_status` は「run が完走した」を意味するだけで「配信した」ではないので、これだけを見てはいけない。
 
-### `Bad response 3xx` の読み方
+## `Bad response 3xx` の読み方
 
 4.14.0 から、宛先（Webhook / LINE / PieFed / Mastodon / Misskey）はリダイレクトを追わない。宛先が 3xx を返すと、run_log・`/healthz/source/:id`・`/status.json`・Sentry には **`Ginseng::GatewayError: Bad response 301`**（302 / 307 / 308 も同じ形）としか出ない。再送はしない。
 
@@ -248,7 +249,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 - 監視は効く: `attempted > 0 / delivered = 0` の error になるので、`errored` と `undelivered` で `/healthz/source/:id` が 503 になる
 - ⚠ フィードの取得（FeedSource / IcalendarSource など）は従来どおりリダイレクトを追う
 
-### CLI で横断して問い合わせる (#1561)
+## CLI で横断して問い合わせる (#1561)
 
 `/status.json` を全部舐めなくても、本番で次のように引ける（⚠ 本番では `sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && bin/shrieker ..."`）。HTTP を経由せずプロセス内で DB を読むので、**daemon が止まっていても答えられる**。
 
@@ -274,7 +275,7 @@ bin/shrieker source collisions --hours=24     # 同じ秒に発火したソー�
 
 ⚠ `collisions` は**定義ではなく run_log の実績**から見る。`every` の位相は起動時刻で決まるので、定義を突き合わせても同時発火は分からない。
 
-### 設定
+## 設定
 
 | キー | 既定値 | 意味 |
 |------|--------|------|
@@ -303,7 +304,7 @@ monitor:
   silence_tolerance: 30d
 ```
 
-#### `error_streak_threshold` の上書き (#1558)
+### `error_streak_threshold` の上書き (#1558)
 
 ⚠ **外部の安定度はソースの性質。**YouTube の `feeds/videos.xml` は**チャンネルが生きていても 24h で 7〜10% 失敗する**一方、GitHub の `releases.atom` は 0%。グローバル値だけだと、上げれば安定したソースの検知が鈍り、下げようもない。
 
@@ -333,7 +334,7 @@ monitor:
 
 ⚠ **`bin/shrieker source validate` が WARN で指摘する。**NG にしないのは、妥当かどうかの判定に実行間隔が要り、**スキーマでは表現できない**ため。⚠ 1 つの定義が複数のクラスにマッチする場合は各インスタンスの最大の和で見る。密で長周期の cron（`* * * 1-11 *` など）は走査の上限で判定を諦め、警告しない
 
-#### 🔴 緩められるのは「エントリを 1 件も失っていない失敗」だけ
+### 🔴 緩められるのは「エントリを 1 件も失っていない失敗」だけ
 
 ⚠⚠ **しきい値をいくつにしても、エントリを失いうる段まで進んでから落ちた失敗は 1 回で 503 になる。**
 
@@ -360,7 +361,7 @@ monitor:
 
 ⚠ **opt-in なので「書き忘れ」と「意図的に検知しない」が設定上は区別できない。**`bin/shrieker source validate` は監視対象なのに `silence_tolerance` が無いソースを `WARN` として出す（スキーマ上は妥当なので `NG` にはせず、終了コードも倒さない）。年単位で静かなソースは意図的に未設定のままでよい。
 
-### 実行ログテーブル `source_run_log`
+## 実行ログテーブル `source_run_log`
 
 各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`, `migration/010`）:
 
@@ -377,7 +378,7 @@ monitor:
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
 
-#### run の status は `delivered_count` で決まる (#1482)
+### run の status は `delivered_count` で決まる (#1482)
 
 | その run のエラー | `delivered_count` | `status` | `error_streak` |
 |------|------|------|------|
@@ -395,7 +396,7 @@ monitor:
 
 `Source#schedule` のラッパで成功/失敗を記録するため、CLI からの `bin/shrieker` 直接実行や rake タスクは記録対象外（スケジューラ起因の稼働だけを監視する設計）。
 
-### Kuma の登録例
+## Kuma の登録例
 
 ```
 HTTP(s) Monitor:
@@ -407,7 +408,7 @@ HTTP(s) Monitor:
 
 ソース別に追跡したい場合は `http://<host>:4567/healthz/source/<source-id>` を別モニターとして追加する。
 
-### 運用: 監視ホストから tomato-shrieker への到達経路
+## 運用: 監視ホストから tomato-shrieker への到達経路
 
 `/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト (Kuma 等) から /healthz を叩く経路は環境に応じて選択する:
 

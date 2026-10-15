@@ -122,6 +122,9 @@ module TomatoShrieker
       # 落ちる run（YouTube の 404 等）は**取得段**なので、ここへは到達しない
       # ＝ しきい値の緩和が効いてよい側。
       targets = entries.reject {|v| ignore_entry?(v)}
+      # ⚠ `templates` のメモ（`||=`）はスレッドセーフでないので、`Parallel.each` の前に暖める
+      # (#1489)。暖めないと初回だけスレッドの数だけ ERB をコンパイルしうる（結果は壊れない）。
+      templates
       Parallel.each(targets, in_threads:) do |entry|
         # 🔴🔴 **段は `create_record` が配信対象の行を返してから立てる (#1622)。**
         #

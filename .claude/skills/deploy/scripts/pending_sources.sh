@@ -28,11 +28,18 @@ if [ -n "$ng" ]; then
   echo '🔴 起動で倒れる定義がある＝このまま再起動しない（直すか disable する）' >&2
   exit 1
 fi
+# 🔴 #1477: コマンドの依存が欠けているソース。起動は通るが、走るたびに落ちる。
+bundle_ng=$(awk -F'\t' '$1=="BUNDLE"{print "BUNDLE\t" $2 "\t" $3}' <<< "$out")
+if [ -n "$bundle_ng" ]; then
+  printf '%s\n' "$bundle_ng"
+  echo '🔴 コマンドの依存が欠けている＝そのディレクトリで bundle install してから再起動する' >&2
+  exit 1
+fi
 # ⚠ 「起動できる」とは言わない（#1674 の Codex P1）。見ているのは `source reload` の拒否と同じ
-# 検査（スケジュールと判別キー）だけで、登録の途中で起きる失敗（`command:` のソースの
-# `bundle install`・`/source/dir` の誤り）は見ていない。そこは pull.sh の `bundle check` と、
-# 再起動の後の verify.sh（`not started` の件数・NRestarts）で受ける。
-echo 'スケジュール・判別キーで倒れる定義は無い（登録時の失敗は見ていない）'
+# 検査（スケジュールと判別キー）とコマンドの依存（#1477）だけで、登録の途中で起きるほかの失敗
+# （`command:` のソースが `bundle …` で始まるときの `bundle install` の失敗など）は見ていない。
+# そこは再起動の後の verify.sh（`not started` の件数・NRestarts）で受ける。
+echo 'スケジュール・判別キー・コマンドの依存で倒れる定義は無い（登録時のほかの失敗は見ていない）'
 printf '%s\n' "$running" >| "$before"
 echo "稼働中 $(wc -l < "$before") 件"
 # ⚠ 差分があっても 0 で終わる（増減は運用者が確かめるもので、失敗ではない）。diff 自体の失敗（2 以上）だけ伝える

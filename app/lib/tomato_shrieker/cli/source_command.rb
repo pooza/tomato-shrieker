@@ -143,7 +143,7 @@ module TomatoShrieker
       say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
       # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
       # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
-      say '  ⚠ silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
+      say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
