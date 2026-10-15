@@ -122,15 +122,17 @@ module TomatoShrieker
     # reload はスキーマ検証をしないので不正な cron 式もここへ来る）。先に消すと、
     # **失敗したソースが次の reload までジョブ 1 本無いまま放置される**。
     def swap(id, sources, action)
-      # ⚠ 先に空で置く (#1575)。`jobs` 自体が上げると、rescue の `except: old` が nil になる。
-      old = []
+      # ⚠ 先に nil で置く (#1575)。`jobs` 自体が上げたら、何も立てていないので巻き戻さない。
+      # ⚠⚠ 空の配列で置くと、rescue の `unschedule(id, except: [])` が**既存のジョブを全部消す**
+      # （#1717 の Codex P2）。
+      old = nil
       old = @scheduler.jobs(tag: id)
       sources.each(&:register)
       old.each(&:unschedule)
       return true
     rescue => e
       # 立った分だけ巻き戻して、古いジョブをそのまま残す。
-      unschedule(id, except: old)
+      unschedule(id, except: old) if old
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(scheduler: action, source: id, error: e)
       return false
