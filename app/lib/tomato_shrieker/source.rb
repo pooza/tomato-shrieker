@@ -377,7 +377,7 @@ module TomatoShrieker
     # また赤くなる。#1505 の「起点が前に進むだけ」と同じ規則。
     def undelivered?
       return false unless log = undelivered_log
-      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return true unless acknowledged_at = self.acknowledged_at
       # ⚠⚠ **開始時刻ではなく終了時刻で比べる。**`executed_at` は run の開始時刻なので、
       # **ack の直前に始まって直後に未達で終わった run を消してしまう**（本番の最長 run
       # は 62.6 秒）。運用者が見ていないものを「確認済み」にしない。
@@ -386,9 +386,26 @@ module TomatoShrieker
 
     # 未達の根拠になっている run (#1506)。確認済みかどうかは見ない。
     def undelivered_log
-      @undelivered_log ||= SourceRunLog.last_attempted(id)
-      return nil unless @undelivered_log&.undelivered?
-      return @undelivered_log
+      return nil unless last_attempted_log&.undelivered?
+      return last_attempted_log
+    end
+
+    # 直近の「配信を試みた run」(#1504)。未達でなくても返す。
+    #
+    # 🔴 **`/status.json` の 1 行の中では、同じ行を 1 回だけ引く (#1472)。**`undelivered?` と
+    # `last_attempted_*` の両方がこれを読む。⚠ **nil もメモする**（一度も試行していないソースは、
+    # `attempted_count > 0` の行を探して全行を舐める）。⚠ インスタンスは `Source.all` が
+    # 呼ぶたびに作るので、メモはリクエストの内側でしか生きない。
+    def last_attempted_log
+      @last_attempted_log = SourceRunLog.last_attempted(id) unless defined?(@last_attempted_log)
+      return @last_attempted_log
+    end
+
+    # 運用者が確認した時刻 (#1505 / #1506)。⚠ 未達・取りこぼし・沈黙の 3 つが読むので、
+    # nil も含めて 1 回だけ引く (#1472)。
+    def acknowledged_at
+      @acknowledged_at = SilenceAck.acknowledged_at(id) unless defined?(@acknowledged_at)
+      return @acknowledged_at
     end
 
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
@@ -398,7 +415,7 @@ module TomatoShrieker
     # ⚠ 確認が消すのは「確認したその run」だけ（終了時刻で比べる。`undelivered?` と同じ規則）。
     def lost_entries?
       return false unless log = lost_entries_log
-      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return true unless acknowledged_at = self.acknowledged_at
       return log.finished_at > acknowledged_at
     end
 
@@ -527,8 +544,16 @@ module TomatoShrieker
       return nil
     end
 
+    # run_log 上の最後の実配信。⚠ `delivery_history` と `silence_baseline_entry` の両方が読むので、
+    # nil も含めて 1 回だけ引く (#1472)。
+    def run_log_delivered_at
+      return @run_log_delivered_at if defined?(@run_log_delivered_at)
+      @run_log_delivered_at = SourceRunLog.last_delivered_at(id)
+      return @run_log_delivered_at
+    end
+
     def delivery_history
-      @delivery_history ||= if at = SourceRunLog.last_delivered_at(id)
+      @delivery_history ||= if at = run_log_delivered_at
         {at:, origin: 'run_log'}
       elsif at = last_delivered_at_fallback
         {at:, origin: 'fallback'}
@@ -595,8 +620,8 @@ module TomatoShrieker
     # になる（`observed_since` と同じ行なので時刻が一致する）。
     def silence_baseline_entry
       @silence_baseline_entry ||= {
-        BASELINE_DELIVERY => SourceRunLog.last_delivered_at(id),
-        BASELINE_ACKNOWLEDGEMENT => SilenceAck.acknowledged_at(id),
+        BASELINE_DELIVERY => run_log_delivered_at,
+        BASELINE_ACKNOWLEDGEMENT => acknowledged_at,
         BASELINE_OBSERVATION => SourceRunLog.observed_since(id),
       }.compact.max_by(&:last) || []
       return @silence_baseline_entry

@@ -376,11 +376,17 @@ module TomatoShrieker
       return index.clamp(0, size - 1)
     end
 
+    # 🔴 **SQL で数える (#1472)。**以前は 24 時間ぶんの行を全部モデルに読み込んでから数えて
+    # いて、`/status.json` でいちばん重い 1 本だった。⚠ `error?` と同じく `status = 'error'` だけを
+    # 数える（partial は数えない）。
     def self.error_rate(source_id, hours: 24)
       since = Time.now - (hours * 3600)
-      logs = where(source_id:).where(Sequel.lit('executed_at >= ?', since)).all
-      return nil if logs.empty?
-      return (logs.count(&:error?).to_f / logs.size).round(3)
+      errors = Sequel.case({{status: STATUS_ERROR} => 1}, 0)
+      row = where(source_id:).where(Sequel.lit('executed_at >= ?', since))
+        .select {[count.function.*.as(:total), sum(errors).as(:errors)]}
+        .naked.first
+      return nil unless row && row[:total].to_i.positive?
+      return (row[:errors].to_f / row[:total]).round(3)
     end
 
     # 直近 N 件の shrieker 別エラー件数 (#1433)。
