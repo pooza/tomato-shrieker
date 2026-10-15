@@ -136,7 +136,14 @@ module TomatoShrieker
       # `GEM_HOME` などは結果を変える。上流が子へ渡す `child_env`（`RBENV_VERSION` 等を外し、
       # ソースの env と `BUNDLE_GEMFILE` を重ねたもの）をそのまま使う。
       env = Bundler.unbundled_env.merge(command.send(:child_env), 'BUNDLE_GEMFILE' => gemfile)
-      output, status = Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
+      output, status = begin
+        Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
+      rescue SystemCallError => e
+        # 🔴 **走らせられなかったことも問題として返す。上げない（#1714 の Codex P1）。**ソースの env が
+        # `PATH` を差し替えて `bundle` が見つからないと `Errno::ENOENT` になり、上げると
+        # `register_all` が起動ごと倒れる（この検査は起動を止めない約束）。
+        return command.masked("bundle check could not run in #{dir}: #{e.class}")
+      end
       return nil if status.success?
       detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)
       return command.masked("bundle check failed in #{dir}: #{detail}")

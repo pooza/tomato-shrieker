@@ -279,6 +279,18 @@ module TomatoShrieker
       end
     end
 
+    # #1714 の Codex P1（2 巡目）: `bundle` が見つからなくても上げない（起動を止めない）。
+    def test_command_bundle_problem_when_bundle_is_missing
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        params = secret_params(['/bin/true'])
+        params['source']['dir'] = dir
+        params['source']['env']['PATH'] = '/nonexistent'
+
+        assert_include(CommandSource.new(params).command_bundle_problem, 'bundle check could not run')
+      end
+    end
+
     # #1714 の Codex P1: 存在しない `dir` のパスに資格情報が入っていても伏せる。
     def test_command_bundle_problem_masks_dir
       params = secret_params
