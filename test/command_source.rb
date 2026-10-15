@@ -254,13 +254,39 @@ module TomatoShrieker
 
     # ⚠ **Gemfile.lock も置く。**lock が無いと `bundle check` は解決のためにネットワークへ出る
     # （サテライトはどれも lock を持っている）。
-    def write_missing_gem_bundle(dir)
+    def write_missing_gem_bundle(dir, group: nil)
       gem = 'tomato-shrieker-missing-gem-1477'
-      File.write(File.join(dir, 'Gemfile'), "source 'https://rubygems.org'\ngem '#{gem}'\n")
+      line = group ? "group :#{group} do\n  gem '#{gem}'\nend" : "gem '#{gem}'"
+      File.write(File.join(dir, 'Gemfile'), "source 'https://rubygems.org'\n#{line}\n")
       File.write(File.join(dir, 'Gemfile.lock'), [
         'GEM', '  remote: https://rubygems.org/', '  specs:', "    #{gem} (0.0.1)", '',
         'PLATFORMS', '  ruby', '', 'DEPENDENCIES', "  #{gem}", ''
       ].join("\n"))
+    end
+
+    # #1714 の Codex P2: 実行時と同じ環境（`/source/env`）で見る。`BUNDLE_WITHOUT` で外した
+    # グループの欠落は、コマンドが走るときにも問題にならない。
+    def test_command_bundle_problem_uses_source_env
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir, group: 'extra')
+        params = secret_params(['bin/run.rb'])
+        params['source']['dir'] = dir
+
+        assert_not_nil(CommandSource.new(params).command_bundle_problem)
+        params['source']['env']['BUNDLE_WITHOUT'] = 'extra'
+
+        assert_nil(CommandSource.new(params).command_bundle_problem)
+      end
+    end
+
+    # #1714 の Codex P1: 存在しない `dir` のパスに資格情報が入っていても伏せる。
+    def test_command_bundle_problem_masks_dir
+      params = secret_params
+      params['source']['dir'] = "/nonexistent/#{SECRET_TOKEN}"
+      problem = CommandSource.new(params).command_bundle_problem
+
+      assert_include(problem, 'dir not found')
+      assert_not_include(problem, SECRET_TOKEN)
     end
 
     # ⚠ Gemfile の無い `dir` は見ない。存在しない `dir` は問題として返す（走らせると必ず落ちる）。

@@ -128,10 +128,14 @@ module TomatoShrieker
     # 踏んだ）。子プロセスに渡す環境だけを組み立てて `unsetenv_others` で渡す。
     def command_bundle_problem
       dir = command.dir
-      return "#{command_root}/dir not found: #{dir}" unless File.directory?(dir)
+      # ⚠ パスにも資格情報が入りうる（#1714 の Codex P1）。実行時の spawn の例外と同じく伏せる。
+      return command.masked("#{command_root}/dir not found: #{dir}") unless File.directory?(dir)
       gemfile = File.join(dir, 'Gemfile')
       return nil unless File.exist?(gemfile)
-      env = Bundler.unbundled_env.merge('BUNDLE_GEMFILE' => gemfile)
+      # 🔴 **実行時と同じ環境で見る（#1714 の Codex P2）。**`/source/env` の `BUNDLE_PATH` /
+      # `GEM_HOME` などは結果を変える。上流が子へ渡す `child_env`（`RBENV_VERSION` 等を外し、
+      # ソースの env と `BUNDLE_GEMFILE` を重ねたもの）をそのまま使う。
+      env = Bundler.unbundled_env.merge(command.send(:child_env), 'BUNDLE_GEMFILE' => gemfile)
       output, status = Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
       return nil if status.success?
       detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)
