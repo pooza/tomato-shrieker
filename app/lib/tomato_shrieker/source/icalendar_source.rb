@@ -183,7 +183,7 @@ module TomatoShrieker
 
     def register
       return if disable?
-      install_command_bundle if command?
+      prepare_command if command?
       schedule_remind if remind?
       return super
     end
