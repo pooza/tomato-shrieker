@@ -176,6 +176,21 @@ module TomatoShrieker
       assert_false(stats2.entry_stage?, '重複で緩和を潰している')
     end
 
+    # 🔴 **#1489: 作ったエントリは、渡したソースそのものを持つ。**以前は配信のたびに
+    # `FeedSource.all` で全ソースを作り直していた（テンプレートの ERB もエントリごとに再コンパイル）。
+    def test_create_keeps_given_source
+      Entry.where(feed: FEED_ID, url: stage_values[:url]).delete
+      source = stage_source(DeliveryStats.new)
+      created = nil
+      original = Entry.method(:deliverable)
+      Entry.define_singleton_method(:deliverable) {|entry, _feed| created = entry}
+      Entry.create(stage_values, source)
+
+      assert_same(source, created.feed)
+    ensure
+      Entry.define_singleton_method(:deliverable, original) if original
+    end
+
     def stage_source(stats)
       source = FeedSource.new(
         'id' => FEED_ID,

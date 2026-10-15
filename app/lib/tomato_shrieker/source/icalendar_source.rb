@@ -69,6 +69,7 @@ module TomatoShrieker
       # なり、取得段の失敗が `entry_stage: true` で保存される。
       targets = entries.to_a
       @delivery_stats&.enter_entry_stage! if targets.present?
+      templates # ⚠ `Parallel.each` の前に暖める (#1489・`FeedSource#fetch` と同じ)
       Parallel.each(targets, in_threads:) do |entry|
         template = create_template
         template[:entry] = entry
@@ -81,6 +82,7 @@ module TomatoShrieker
       return if disable?
       return unless remind?
       in_threads = Parallel.processor_count * 2
+      templates # ⚠ `exec` と同じく `Parallel.each` の前に暖める (#1489)
       Parallel.each(entries.select {|v| remind_entry?(v)}, in_threads:) do |entry|
         template = create_template
         template[:entry] = entry
