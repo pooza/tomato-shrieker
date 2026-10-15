@@ -187,6 +187,22 @@ module TomatoShrieker
       assert_true(entry[:all_day])
     end
 
+    # #1707: 命日など、予定の告知でない記念日は見出し（「❗️本日❗️」）を付けない。
+    def test_anniversary_template
+      params = command_params
+      params['dest']['template'] = 'anniversary'
+      source = IcalendarSource.new(params)
+      date = Date.today
+      stub_output(source, command_ics(date))
+      template = source.create_template
+      template[:entry] = source.entries.to_a.first
+
+      assert_equal(
+        "#{date.month}月#{date.day}日は、「ドラゴンクエストV 天空の花嫁」の発売日から34周年。\n#dq5\n",
+        template.to_s,
+      )
+    end
+
     # ⚠ `days`（何日前から出すか）の外の予定は出さない。コマンドは今年と来年のぶんを全部返す。
     def test_command_entries_outside_days
       source = build_command_source
