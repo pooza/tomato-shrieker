@@ -167,6 +167,26 @@ module TomatoShrieker
       assert_equal('「ドラゴンクエストV 天空の花嫁」の発売日から34周年', entry[:title])
     end
 
+    # #1693: `RRULE` つきの終日予定に `DTEND` が無くても落ちない（規格上は 1 日の予定）。
+    def test_rrule_all_day_without_dtend
+      source = build_command_source
+      date = Date.today - 10
+      stub_output(source, [
+        'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//fixture//JA',
+        'BEGIN:VEVENT', 'DTSTAMP:20260101T000000Z', 'UID:rrule-0@fixture',
+        "DTSTART;VALUE=DATE:#{date.strftime('%Y%m%d')}",
+        'RRULE:FREQ=DAILY', 'SUMMARY:毎日の予定',
+        'END:VEVENT', 'END:VCALENDAR'
+      ].join("\n"))
+      entry = source.entries.to_a.first
+
+      assert_equal(1, source.entries.count)
+      assert_equal(Date.today, entry[:start_date].to_date)
+      assert_equal(Date.today, entry[:end_date].to_date)
+      assert_true(entry[:is_today])
+      assert_true(entry[:all_day])
+    end
+
     # #1707: 命日など、予定の告知でない記念日は見出し（「❗️本日❗️」）を付けない。
     def test_anniversary_template
       params = command_params
