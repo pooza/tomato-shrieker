@@ -173,6 +173,19 @@ module TomatoShrieker
       end
     end
 
+    # #1709 の Codex P1: URI として読めない値（`Addressable::URI::InvalidURIError`）でも、
+    # エスケープした形は伏せる。
+    def test_command_masks_escaped_forms_of_non_uri_secret
+      secret = 'a b:c/%%&secret-0123'
+      params = secret_params
+      params['source']['env']['API_SECRET'] = secret
+      command = CommandSource.new(params).command
+
+      [CGI.escape(secret), CGI.escapeHTML(secret), secret.gsub('/') {'\\/'}].each do |form|
+        assert_not_include(command.masked("leaked: #{form}"), 'secret-0123', form)
+      end
+    end
+
     # ⚠ URL から切り出す部分も短ければ入れない（`/` や `/api` まで伏せると読めなくなる）。
     def test_command_secret_variants_skip_short_parts
       secrets = build_secret_source.command.secrets

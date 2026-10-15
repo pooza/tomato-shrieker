@@ -155,22 +155,25 @@ module TomatoShrieker
     #
     # ⚠ 切り出した部分は `SECRET_MIN_LENGTH` 未満なら入れない（`/` や `api` まで伏せない）。
     def secret_variants(value)
-      variants = [value]
-      uri = Ginseng::URI.parse(value)
-      if uri&.absolute? && uri.host
-        parts = [uri.request_uri, uri.path, uri.path.split('/').last]
-        stripped = uri.dup
-        stripped.query = nil
-        stripped.fragment = nil
-        parts.push(stripped.to_s)
-        variants.concat(parts.compact.select {|v| v.length >= SECRET_MIN_LENGTH})
-      end
+      variants = [value, *url_secret_parts(value)]
       variants.concat(variants.map {|v| v.gsub('/') {'\\/'}})
       variants.concat(variants.map {|v| CGI.escapeHTML(v)})
       variants.push(CGI.escape(value))
       return variants.uniq
+    end
+
+    # ⚠ **URI として読めない値でも、上のエスケープ形は作る（#1709 の Codex P1）。**解析の失敗で
+    # 抜けてよいのは URL から切り出す部分だけ。
+    def url_secret_parts(value)
+      uri = Ginseng::URI.parse(value)
+      return [] unless uri&.absolute? && uri.host
+      stripped = uri.dup
+      stripped.query = nil
+      stripped.fragment = nil
+      parts = [uri.request_uri, uri.path, uri.path.split('/').last, stripped.to_s]
+      return parts.compact.select {|v| v.length >= SECRET_MIN_LENGTH}
     rescue Addressable::URI::InvalidURIError
-      return [value]
+      return []
     end
   end
 end
