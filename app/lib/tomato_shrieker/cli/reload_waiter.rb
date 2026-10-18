@@ -46,8 +46,14 @@ module TomatoShrieker
       seconds = [deadline - Time.now, 1].max
       options = {open_timeout: seconds, read_timeout: seconds}
       response = Net::HTTP.start(uri.hostname, uri.port, **options) {|http| http.get(uri.request_uri)}
-      return JSON.parse(response.body).fetch('reload') if response.is_a?(Net::HTTPSuccess)
-      raise Ginseng::GatewayError, "#{uri} returned #{response.code}"
+      unless response.is_a?(Net::HTTPSuccess)
+        raise Ginseng::GatewayError, "#{uri} returned #{response.code}"
+      end
+      # ⚠ **`reload` が無いのは、`--wait` を知らない古い daemon（4.16.1 以前）。**pull した後・
+      # 再起動する前に打つとここに来る（4.17.0 リリース前レビュー）。HUP の前に断る。
+      return JSON.parse(response.body).fetch('reload') do
+        raise Ginseng::GatewayError, '稼働中の daemon が --wait に対応していません（再起動の前？）'
+      end
     end
 
     # ⚠ `bind: 0.0.0.0`（本番）はつなぎ先ではないので、ループバックへ向ける。
@@ -55,9 +61,8 @@ module TomatoShrieker
     # 読めない・#1716 の Codex P2）。`hostname` は角括弧を付けて持つ。
     def uri
       # ⚠ `::` は `::1` へ（#1716 の Codex P2）。IPv6 だけで待ち受ける環境では 127.0.0.1 に届かない。
-      host = {'0.0.0.0' => '127.0.0.1', '::' => '::1', '' => '127.0.0.1'}.fetch(
-        Config.instance['/monitor/bind'].to_s, Config.instance['/monitor/bind'].to_s
-      )
+      bind = Config.instance['/monitor/bind'].to_s
+      host = {'0.0.0.0' => '127.0.0.1', '::' => '::1', '' => '127.0.0.1'}.fetch(bind, bind)
       uri = URI::HTTP.build(port: Config.instance['/monitor/port'], path: '/status.json')
       uri.hostname = host
       return uri

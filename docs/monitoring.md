@@ -169,6 +169,7 @@ bin/shrieker source ack ID
   "ruby": {"version": "4.0.7", "yjit_available": true, "yjit_enabled": true},
   "reload": {
     "count": 3,
+    "action": "reload",
     "at": "2026-10-16T08:00:00+09:00",
     "result": {"added": [], "removed": [], "changed": ["matrix-news"], "failed": [], "unmatched": []},
     "error": null
@@ -213,7 +214,7 @@ bin/shrieker source ack ID
 
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
 
-`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
+`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
 
 `last_delivered_at_origin` は配信時刻の出どころ:
 
@@ -363,7 +364,7 @@ monitor:
 
 ## 実行ログテーブル `source_run_log`
 
-各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`, `migration/010`）:
+各 source の Rufus ジョブが発火するたびに INSERT される（`migration/009`, `migration/010`）。`/status.json` の集計用に、`attempted_count > 0` と `entry_stage = 1` の行だけを持つ部分索引が 2 本ある（`migration/014`・#1472・起動時に自動で当たる）:
 
 - `source_id`, `executed_at`, `status` (`success` | `partial` | `error`), `error_message`, `duration_ms`
 - `attempted_count` / `delivered_count` — その run で配信を試みた件数 / 実際に配信できた件数

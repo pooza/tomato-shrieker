@@ -319,7 +319,6 @@ module TomatoShrieker
       assert_equal(job.job_id, jobs(FIXTURE_ID).first.job_id)
     end
 
-    # 🔴 壊れた定義を掴んだら、ジョブは 1 本も触らずに古い定義のまま走り続ける。
     # 🔴 **#1529: 読んだ回数と結果を持つ。**`source reload --wait` が `count` の前進を待つ。
     def test_load_state
       before = @scheduler.load_state[:count]
@@ -366,6 +365,7 @@ module TomatoShrieker
       rufus.singleton_class.remove_method(:jobs) if rufus&.singleton_methods&.include?(:jobs)
     end
 
+    # 🔴 壊れた定義を掴んだら、ジョブは 1 本も触らずに古い定義のまま走り続ける。
     def test_reload_keeps_jobs_when_config_is_broken
       job = jobs(FIXTURE_ID).first
       File.write(fixture_path(BROKEN_ID), "source:\n  feed: \"unterminated\n")

@@ -186,11 +186,6 @@ module TomatoShrieker
       return (self['/dest/hooks'] || []).present?
     end
 
-    # 🔴 **宛先のオブジェクトは run ごとに作り直す（#1712 の Codex P1）。**スケジューラが持つ
-    # ソースのインスタンスは run をまたいで生きるので、メモした宛先も生き続ける。⚠⚠ PieFed は
-    # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
-    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
-    # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
     # 設定のある宛先（webhook 以外）を、排他の中でまとめて取り出す。⚠ 理由は `shriekers`。
     def shrieker_snapshot
       return @shrieker_mutex.synchronize do
@@ -198,6 +193,11 @@ module TomatoShrieker
       end
     end
 
+    # 🔴 **宛先のオブジェクトは run ごとに作り直す（#1712 の Codex P1）。**スケジューラが持つ
+    # ソースのインスタンスは run をまたいで生きるので、メモした宛先も生き続ける。⚠⚠ PieFed は
+    # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
+    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
+    # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
     def reset_shriekers
       @shrieker_mutex.synchronize do
         [:@mastodon, :@misskey, :@line, :@piefed, :@nostr].each do |name|

@@ -277,6 +277,15 @@ module TomatoShrieker
       WebMock.disable_net_connect!
     end
 
+    # 🔴 `--wait` を知らない古い daemon（`reload` が無い）には、素の `KeyError` でなく
+    # `GatewayError` を返す＝ `monitor_call` が Thor のエラーにする（4.17.0 リリース前レビュー）。
+    def test_reload_waiter_with_old_daemon
+      waiter = ReloadWaiter.new(timeout: 1)
+      stub_request(:get, waiter.uri.to_s).to_return(status: 200, body: {sources: []}.to_json)
+
+      assert_raise(Ginseng::GatewayError) {waiter.state}
+    end
+
     # ⚠ 本番は `bind: 0.0.0.0`。つなぎ先はループバックにする。⚠ IPv6 は角括弧で包む
     # （#1716 の Codex P2）。
     def test_reload_waiter_uri
