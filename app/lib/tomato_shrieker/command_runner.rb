@@ -63,11 +63,31 @@ module TomatoShrieker
     # 出力はエンコーディングが不定で、不正なバイト列（Shift_JIS の stderr など）があると
     # `presence` / `blank?` / `split` が `ArgumentError` を上げる。⚠⚠ そうなると**本来の失敗の
     # 理由が `invalid byte sequence` にすり替わり**、stderr の中身はどこにも残らない。
+    #
+    # 🔴 **`exec` が上げた例外も伏せる (#1670)。**argv0 や `dir` に資格情報を含むパスを書くと、
+    # `Errno::ENOENT` のメッセージにそのまま載る。⚠ 型とバックトレースは元のまま。
+    #
+    # 🔴🔴 **`cause` を付けない（4.17.0 リリース前レビュー）。**`rescue` の中で投げ直すと、伏せる前の
+    # 例外が `cause` に付き、sentry-ruby が連鎖ごと送る＝ **Sentry にだけ平文で届いていた**。
+    # ⚠ `e.exception(msg)` は複製なので、元の例外がすでに持つ `cause` も残る（`raise ..., cause: nil`
+    # でも消えない）。**同じクラスの新しいインスタンスを作り、`rescue` の外で投げる。**
     def capture_command
-      return @command_mutex.synchronize do
+      error = nil
+      result = @command_mutex.synchronize do
         Bundler.with_unbundled_env {command.exec}
         [command.stdout.to_s.scrub, command.stderr.to_s.scrub, command.status]
+      rescue => e
+        error = masked_exception(e)
+        nil
       end
+      raise error if error
+      return result
+    end
+
+    def masked_exception(error)
+      masked = error.class.allocate.exception(command.masked(error.message))
+      masked.set_backtrace(error.backtrace)
+      return masked
     end
 
     # ⚠ `status` は wait status（`exit 2` が 512）。下位 7 ビットはシグナル。
@@ -89,6 +109,60 @@ module TomatoShrieker
     def install_command_bundle
       return unless bundler?
       Bundler.with_unbundled_env {command.bundle_install}
+    end
+
+    # 登録の前の準備。`bundle` で始まるコマンドなら依存を入れ、どれも依存を検査する。
+    def prepare_command
+      install_command_bundle
+      check_command_bundle
+    end
+
+    # 🔴 **登録の時点で、コマンドの依存が壊れていないかを見る (#1477)。**
+    #
+    # ⚠⚠ 自動の `bundle install` は `bundle` で始まるコマンドにしか走らず、本番の定義
+    # （`bin/loquat.rb` のような直接実行）では一度も発火していない。Ruby を上げてサテライトの
+    # `bundle install` を忘れると、**登録は通って、走るたびに `Bundler::GemNotFound` で落ちる**
+    # （2026-08-03 に 7 ソースが約 24 時間）。
+    # ⚠ **検査するだけ。**起動は止めず、直しもしない（デプロイ漏れをコードで隠さない）。
+    # 見つけたらログと Sentry に出す。
+    def check_command_bundle
+      return unless problem = command_bundle_problem
+      error = RuntimeError.new(problem)
+      logger.error(source: id, class: self.class.to_s, error:)
+      Sentry.capture_exception(error, tags: {source: id}) if Sentry.initialized?
+    end
+
+    # 依存の問題の説明。無ければ nil。⚠ デプロイ前の確認（deploy スキルの `enabled_sources.rb`）
+    # からも呼ぶ。⚠ 子プロセスと同じく bundler の痕跡を消した環境で、`dir` の Gemfile を見る
+    # ⚠ `RBENV_VERSION` は `child_env` が外すが、rbenv が版の bin を `PATH` の先頭に置いているので、
+    # 本体と同じ Ruby の gem を見る。
+    #
+    # 🔴 **`Bundler.with_unbundled_env` で囲まない。**あれはプロセス全体の `ENV` を差し替えて
+    # 戻すので、**`register` は並列（`Scheduler#apply` の `Parallel.map`）だから、別のスレッドが
+    # 差し替え後の `ENV` を控えて戻し、`ENV` が消える**（テストで `ENV['TEST']` が消えて実際に
+    # 踏んだ）。子プロセスに渡す環境だけを組み立てて `unsetenv_others` で渡す。
+    def command_bundle_problem
+      dir = command.dir
+      # ⚠ パスにも資格情報が入りうる（#1714 の Codex P1）。実行時の spawn の例外と同じく伏せる。
+      return command.masked("#{command_root}/dir not found: #{dir}") unless File.directory?(dir)
+      gemfile = File.join(dir, 'Gemfile')
+      return nil unless File.exist?(gemfile)
+      # 🔴 **実行時と同じ環境で見る（#1714 の Codex P2）。**`/source/env` の `BUNDLE_PATH` /
+      # `GEM_HOME` などは結果を変える。上流が子へ渡す `child_env`（`RBENV_VERSION` 等を外し、
+      # ソースの env と `BUNDLE_GEMFILE` を重ねたもの）をそのまま使う。
+      env = Bundler.unbundled_env.merge(command.send(:child_env), 'BUNDLE_GEMFILE' => gemfile)
+      output, status = Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
+      return nil if status.success?
+      detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)
+      return command.masked("bundle check failed in #{dir}: #{detail}")
+    rescue => e
+      # 🔴 **走らせられなかったことも問題として返す。上げない（#1714 の Codex P1）。**ソースの env が
+      # `PATH` を差し替えて `bundle` が見つからないと `Errno::ENOENT` になり、上げると
+      # `register_all` が起動ごと倒れる（この検査は起動を止めない約束）。
+      # ⚠ `SystemCallError` だけでは足りない（4.17.0 リリース前レビュー）。env の値が文字列でない
+      # （`PORT: 3000`）と spawn が `TypeError`、NUL を含むと `ArgumentError`、`dir` が文字列でないと
+      # `File.directory?` が `TypeError` を上げる。
+      return command.masked("bundle check could not run in #{dir}: #{e.class}")
     end
 
     def command
@@ -121,11 +195,53 @@ module TomatoShrieker
     # キー名（`TOKEN` など）で判定するので、`PUSH_URL` のような名前の値は素通りする。
     # ⚠ 宛先の資格情報（webhook URL・トークン）も入れる。コマンドの引数へ書き写して
     # 渡す定義を書いても、黙って漏れない。
+    #
+    # ⚠ **宛先の資格情報には `SECRET_MIN_LENGTH` を掛けない (#1670)。**短くても資格情報で
+    # あることは確かなので、読みやすさより伏せる側を取る。
     def command_secrets
-      values = (command_params['env'] || {}).values
-      values.concat(DEST_SECRET_KEYS.map {|key| self[key]})
+      values = (command_params['env'] || {}).values.compact.map(&:to_s)
+        .select {|v| v.length >= SECRET_MIN_LENGTH}
+      values.concat(dest_secrets)
+      return values.flat_map {|v| secret_variants(v)}.uniq
+    end
+
+    # 🔴 **暗号化して書いた資格情報は、復号した値も入れる (#1670)。**コマンドへ渡るのも、
+    # 宛先が使うのも復号した値。⚠ 復号できなければ平文で書かれている。
+    def dest_secrets
+      values = DEST_SECRET_KEYS.filter_map {|key| self[key]&.to_s}
+      values.concat(values.filter_map {|v| Crypt.new.decrypt(v) rescue nil})
       values.concat((self['/dest/hooks'] || []).map {|hook| hook.is_a?(Hash) ? hook['url'] : hook})
-      return values.compact.map(&:to_s).select {|v| v.length >= SECRET_MIN_LENGTH}
+      return values.compact.map(&:to_s).reject(&:empty?)
+    end
+
+    # 資格情報が出力に載るときの、生の形以外の形 (#1670)。上流の `masked` が当てるのは生の形と
+    # shellescape した形だけなので、ここで足す。
+    #
+    # - URL: パス＋クエリ・クエリ抜きの URL・パス・最後のパスセグメント（`curl` などのエラーや
+    #   HTTP のログ行は、URL を丸ごとではなくこの形で書く）
+    # - JSON の `\/`・HTML の `&amp;`・URL エンコード
+    #
+    # ⚠ 切り出した部分は `SECRET_MIN_LENGTH` 未満なら入れない（`/` や `api` まで伏せない）。
+    def secret_variants(value)
+      variants = [value, *url_secret_parts(value)]
+      variants.concat(variants.map {|v| v.gsub('/') {'\\/'}})
+      variants.concat(variants.map {|v| CGI.escapeHTML(v)})
+      variants.push(CGI.escape(value))
+      return variants.uniq
+    end
+
+    # ⚠ **URI として読めない値でも、上のエスケープ形は作る（#1709 の Codex P1）。**解析の失敗で
+    # 抜けてよいのは URL から切り出す部分だけ。
+    def url_secret_parts(value)
+      uri = Ginseng::URI.parse(value)
+      return [] unless uri&.absolute? && uri.host
+      stripped = uri.dup
+      stripped.query = nil
+      stripped.fragment = nil
+      parts = [uri.request_uri, uri.path, uri.path.split('/').last, stripped.to_s]
+      return parts.compact.select {|v| v.length >= SECRET_MIN_LENGTH}
+    rescue Addressable::URI::InvalidURIError
+      return []
     end
   end
 end

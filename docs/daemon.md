@@ -8,7 +8,7 @@ daemon-spawn gem は廃止済み（#1388）。`Ginseng::Daemon` はスタンド�
 - **Linux (systemd)**: `Type=simple`、`ExecStop=/bin/kill -TERM $MAINPID`
 - **デプロイ時**: rc.d スクリプト / systemd unit の更新が必要（[config/sample/](../config/sample/) 参照）
 
-### 起動チェーン
+## 起動チェーン
 
 ```
 systemd/rc.d → bin/scheduler_daemon.rb start
@@ -24,7 +24,7 @@ systemd/rc.d → bin/scheduler_daemon.rb start
 
 systemd/rc.d からは bin スクリプトを直接呼ぶ。`rake start` / `rake restart` は廃止済み（#1410）。
 
-### pid の再利用と `process_pattern` (#1654)
+## pid の再利用と `process_pattern` (#1654)
 
 pid ファイルは異常終了（KILL・OOM・ホスト落ち）で残る。⚠ 正常停止（TERM）では消える — `SchedulerDaemon` は `exec` しないので TERM の trap が生きている（実測。残るのは `SchedulerDaemon.pid.lock` だけ）。**残った番号を別のプロセスが引くと、`start` は「already running」で上がらず、`stop` と `source reload` は無関係なプロセスへシグナルを送る。**`SchedulerDaemon#process_pattern` が「うちの常駐」のコマンド行を宣言しており、`Ginseng::Daemon` は生きている番号の `ps -ww -o command= -p <pid>` と突き合わせ、一致しなければ「居ない」と答える（warn `process identity mismatch` を 1 行残す）。
 
@@ -33,13 +33,15 @@ pid ファイルは異常終了（KILL・OOM・ホスト落ち）で残る。⚠
 - ⚠ 見抜けるのは同じユーザー（か root から見た）のプロセスだけ。`ps` が無い・コマンド行が取れないときは従来どおり「生きている」扱い
 - ⚠ FreeBSD の `ps` では実測していない
 
-### 起動時マイグレーション
+⚠ **起動（`start` の中の `register_all` など）が例外で落ちたら、上流 `Ginseng::Daemon#run_start` が pid ファイルを戻し、`start failed` を `/var/log/tomato-shrieker.log` に出して exit 1 する**（ginseng-core 1.24.0〜）。⚠ stderr は `bin/scheduler_daemon.rb` が `/dev/null` へ付け替えているので、**理由はログで読む**（#1575）。
+
+## 起動時マイグレーション
 
 **未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
 
 ⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
 
-### ソース定義の reload (#1459)
+## ソース定義の reload (#1459)
 
 **稼働中の scheduler にソース定義を読み直させる。**`bin/shrieker source add / edit / delete / disable / enable` はファイルを書くだけなので、以前は反映に再起動が要った。
 
@@ -50,7 +52,16 @@ bin/shrieker source disable foo
 
 bin/shrieker source reload
 # reload requested (pid 1322485)
+
+bin/shrieker source reload --wait   # 反映を待つ（#1529）
+# reload requested (pid 1322485)
+#   changed: foo
+# reloaded at 2026-10-16T08:00:00+09:00
 ```
+
+⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `action` / `at` / `result` / `error`）を読み、HUP の前から `count` が進み、かつ `action: reload` の回が来るまで待つ（既定 30 秒・`--timeout`）。⚠ 起動時の登録（`action: register`）の完了では返さない（#1716）。⚠ **daemon を再起動するまでは使えない。**pull した後・再起動する前の古い daemon は `reload` を持たないので、HUP を送る前にエラーで断る。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
+
+⚠ **reload は設定ファイル（`local.yaml` / `application.yaml`）も読み直すが、起動時に組み立てたもの（Sentry の初期化・監視サーバーの `bind` / `port` など）には効かない。**漏洩対応でマスク設定やトークンを差し替えたときは、「reload requested」を見て反映済みと思わず、**再起動する**（#1575）。
 
 `source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
 
@@ -75,23 +86,23 @@ bin/shrieker source reload
   - 🔴 **`Source.all` を回して検査してはいけない。**unmatched な定義は定義上 `Source.all` に現れないので、**reload は通るのに次の起動で全ソースが止まる**（4.10.0 のリリース前レビューで検出）。`/sources` の生の定義を見る
   - ⚠ **スキーマの `source` は `minProperties: 1` しか見ない**ので、`source: {keyword: ...}` / `source: {news: {}}` のような unmatched 形もスキーマは通る。判別キーの検査はスキーマではなく `startup_errors` の担当
   - ⚠ **スキーマの `pattern` では解けない**（完全な cron 正規表現は書けない）ので、`Source#register` が渡す先と同じパーサを直接呼んでいる。⚠ **総称の `Rufus::Scheduler.parse` は使わない** — cron 文字列も通るので `every: '0 0 * * *'` のような取り違えを見逃す
-  - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**daemon 側へ結果を出す話は #1529
+  - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**結果は `/status.json` の `reload` で読める（#1529）
 
 ⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
 
-⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...],"unmatched":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）。⚠ **`failed` は register が例外を上げたもの、`unmatched` は判別キーがどのソースクラスにも一致しなかったもの**で、どちらも古いジョブがあればそのまま残る（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
+⚠ **シグナルは非同期なので、`--wait` なしの CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...],"unmatched":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）。⚠ **`failed` は register が例外を上げたもの、`unmatched` は判別キーがどのソースクラスにも一致しなかったもの**で、どちらも古いジョブがあればそのまま残る（同期で受け取るなら `--wait`・#1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
-### デプロイ手順
+## デプロイ手順
 
 🔴 **正本は [deploy スキル](../.claude/skills/deploy/SKILL.md)**（#1577 で移した。`/deploy` で呼ぶ・明示呼び出しのみ）。
 
-### 本番操作の注意
+## 本番操作の注意
 
 - ⚠ **本番のチェックアウトを `git` で覗くときは必ず `deploy` ユーザーで。**`ssh oscura 'git -C ~deploy/repos/tomato-shrieker log'` は `detected dubious ownership` で落ちる。`sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && git log"` と書く（`sudo -u deploy` では rbenv が効かず system ruby になるので `-i` が要る）。⚠ **`-iu` は改行を潰す**ので、複数行のコマンドは `sudo -H -u deploy bash -lc "…"` で書く
 - 本番デーモンは必ず OS のサービス管理経由 (`systemctl restart tomato-shrieker` / `service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
 - Monit を停止/再開する際は事前にユーザーに確認する
 
-### seas (FreeBSD) 固有
+## seas (FreeBSD) 固有
 
 - v4.0 の sample rc.d (`config/sample/freebsd/tomato_shrieker`) は `bash -lc` でデーモンを起動する。pooza の rbenv init は `.zshenv` にしかなく bash login shell では拾えないため、`~/.bash_profile` に `eval "$(rbenv init - bash)"` を追加してある。この dotfile が消えると rc.d が system ruby を掴んで `Bundler::RubyVersionMismatch` になる
 - 監視エンドポイントの `/monitor/bind` は Tailscale IP `100.99.186.51` 固定で loopback 以外に漏らさない。ipfw は `tailscale0 interface 全許可` ルール (60020) を `/usr/local/etc/ipfw.rules` に永続化済。Kuma からは MagicDNS で `http://seas.tailf29562.ts.net:4567/healthz` を叩く

@@ -14,6 +14,7 @@ module TomatoShrieker
 
     def initialize(params)
       @params = params
+      @shrieker_mutex = Mutex.new
     end
 
     def [](name)
@@ -167,13 +168,14 @@ module TomatoShrieker
     def clear
     end
 
-    def shriekers
+    # 🔴 **宛先は排他の中でまとめて取り出し、外で配る（#1712 の Codex P2）。**`IcalendarSource` は
+    # 日次の実行とリマインドが別々のジョブで、どちらも始めに `reset_shriekers` する。1 つずつ
+    # `mastodon?` → `mastodon` と読むと、その間に作り直されて nil を掴み、その配信を落とす。
+    # ⚠ 配る間は排他を持たない（`Parallel.each` のスレッドどうしを直列にしない）。取り出した
+    # オブジェクトは作り直されても使い続けられる。
+    def shriekers(&)
       return enum_for(__method__) unless block_given?
-      yield mastodon if mastodon?
-      yield misskey if misskey?
-      yield line if line?
-      yield piefed if piefed?
-      yield nostr if nostr?
+      shrieker_snapshot.each(&)
       (self['/dest/hooks'] || []).each do |hook|
         # ⚠ `new` ではなく `create`。hook の `type` で Shrieker を選ぶ (#1493)。
         yield WebhookShrieker.create(hook)
@@ -182,6 +184,33 @@ module TomatoShrieker
 
     def webhook?
       return (self['/dest/hooks'] || []).present?
+    end
+
+    # 設定のある宛先（webhook 以外）を、排他の中でまとめて取り出す。⚠ 理由は `shriekers`。
+    def shrieker_snapshot
+      return @shrieker_mutex.synchronize do
+        [mastodon, misskey, line, piefed, nostr].select(&:present?)
+      end
+    end
+
+    # 🔴 **宛先のオブジェクトは run ごとに作り直す（#1712 の Codex P1）。**スケジューラが持つ
+    # ソースのインスタンスは run をまたいで生きるので、メモした宛先も生き続ける。⚠⚠ PieFed は
+    # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
+    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
+    # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
+    def reset_shriekers
+      @shrieker_mutex.synchronize do
+        [:@mastodon, :@misskey, :@line, :@piefed, :@nostr].each do |name|
+          remove_instance_variable(name) if instance_variable_defined?(name)
+        end
+      end
+    end
+
+    # `exec_with_run_log` を通らない配信（`IcalendarSource#remind`）の前に呼ぶ。宛先を作り直し、
+    # テンプレートを `Parallel.each` の前に暖める (#1489)。
+    def prepare_delivery
+      reset_shriekers
+      templates
     end
 
     def mastodon
@@ -377,7 +406,7 @@ module TomatoShrieker
     # また赤くなる。#1505 の「起点が前に進むだけ」と同じ規則。
     def undelivered?
       return false unless log = undelivered_log
-      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return true unless acknowledged_at = self.acknowledged_at
       # ⚠⚠ **開始時刻ではなく終了時刻で比べる。**`executed_at` は run の開始時刻なので、
       # **ack の直前に始まって直後に未達で終わった run を消してしまう**（本番の最長 run
       # は 62.6 秒）。運用者が見ていないものを「確認済み」にしない。
@@ -386,9 +415,26 @@ module TomatoShrieker
 
     # 未達の根拠になっている run (#1506)。確認済みかどうかは見ない。
     def undelivered_log
-      @undelivered_log ||= SourceRunLog.last_attempted(id)
-      return nil unless @undelivered_log&.undelivered?
-      return @undelivered_log
+      return nil unless last_attempted_log&.undelivered?
+      return last_attempted_log
+    end
+
+    # 直近の「配信を試みた run」(#1504)。未達でなくても返す。
+    #
+    # 🔴 **`/status.json` の 1 行の中では、同じ行を 1 回だけ引く (#1472)。**`undelivered?` と
+    # `last_attempted_*` の両方がこれを読む。⚠ **nil もメモする**（一度も試行していないソースは、
+    # `attempted_count > 0` の行を探して全行を舐める）。⚠ インスタンスは `Source.all` が
+    # 呼ぶたびに作るので、メモはリクエストの内側でしか生きない。
+    def last_attempted_log
+      @last_attempted_log = SourceRunLog.last_attempted(id) unless defined?(@last_attempted_log)
+      return @last_attempted_log
+    end
+
+    # 運用者が確認した時刻 (#1505 / #1506)。⚠ 未達・取りこぼし・沈黙の 3 つが読むので、
+    # nil も含めて 1 回だけ引く (#1472)。
+    def acknowledged_at
+      @acknowledged_at = SilenceAck.acknowledged_at(id) unless defined?(@acknowledged_at)
+      return @acknowledged_at
     end
 
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
@@ -398,7 +444,7 @@ module TomatoShrieker
     # ⚠ 確認が消すのは「確認したその run」だけ（終了時刻で比べる。`undelivered?` と同じ規則）。
     def lost_entries?
       return false unless log = lost_entries_log
-      return true unless acknowledged_at = SilenceAck.acknowledged_at(id)
+      return true unless acknowledged_at = self.acknowledged_at
       return log.finished_at > acknowledged_at
     end
 
@@ -527,8 +573,34 @@ module TomatoShrieker
       return nil
     end
 
+    # run_log 上の最後の実配信。⚠ `delivery_history` と `silence_baseline_entry` の両方が読むので、
+    # nil も含めて 1 回だけ引く (#1472)。
+    def run_log_delivered_at
+      return @run_log_delivered_at if defined?(@run_log_delivered_at)
+      @run_log_delivered_at = SourceRunLog.last_delivered_at(id)
+      return @run_log_delivered_at
+    end
+
+    # このソースの run を観測し始めた時刻 (#1483)。⚠ nil もメモする (#1472)。
+    def observed_since
+      @observed_since = SourceRunLog.observed_since(id) unless defined?(@observed_since)
+      return @observed_since
+    end
+
+    # 🔴 **空振りが続いている起点 (#1498)。**`noop_streak` は直近 `sample_size` 件しか数えない
+    # ので 50 で頭打ちになり、沈黙が深いほど情報を失う。時刻なら窓に縛られない。
+    #
+    # 最後に実際に配信できた run の時刻。一度も配信していなければ観測開始（＝少なくとも
+    # そこから）。⚠ 配信できた行は prune から守られている（`last_delivered_ids`）ので、保持期間で
+    # 起点がずれることはない。⚠ いま空振りしていない（`noop_streak` が 0）なら nil。
+    # ⚠ どちらも沈黙の判定（`silence_baseline_entry`）が引く値なので、クエリは増えない。
+    def noop_since(noop_streak)
+      return nil unless noop_streak.positive?
+      return run_log_delivered_at || observed_since
+    end
+
     def delivery_history
-      @delivery_history ||= if at = SourceRunLog.last_delivered_at(id)
+      @delivery_history ||= if at = run_log_delivered_at
         {at:, origin: 'run_log'}
       elsif at = last_delivered_at_fallback
         {at:, origin: 'fallback'}
@@ -595,9 +667,9 @@ module TomatoShrieker
     # になる（`observed_since` と同じ行なので時刻が一致する）。
     def silence_baseline_entry
       @silence_baseline_entry ||= {
-        BASELINE_DELIVERY => SourceRunLog.last_delivered_at(id),
-        BASELINE_ACKNOWLEDGEMENT => SilenceAck.acknowledged_at(id),
-        BASELINE_OBSERVATION => SourceRunLog.observed_since(id),
+        BASELINE_DELIVERY => run_log_delivered_at,
+        BASELINE_ACKNOWLEDGEMENT => acknowledged_at,
+        BASELINE_OBSERVATION => observed_since,
       }.compact.max_by(&:last) || []
       return @silence_baseline_entry
     end
@@ -681,6 +753,7 @@ module TomatoShrieker
     def exec_with_run_log(method, spec)
       started_at = Time.now
       @delivery_stats = DeliveryStats.new
+      reset_shriekers
       logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
       # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
       unless dest?

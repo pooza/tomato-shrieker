@@ -143,7 +143,7 @@ module TomatoShrieker
       say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
       # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
       # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
-      say '  ⚠ silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
+      say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
@@ -156,16 +156,22 @@ module TomatoShrieker
     #
     # ⚠ **逃げ道は `disable`。**直せないソースは止めれば検査対象から外れて reload は通る
     # （`SourceValidator.schedule_errors` のコメント参照）。
+    method_option :wait, type: :boolean, default: false,
+      desc: '反映を待って結果を出す（/status.json を読む・監視が有効なときだけ）'
+    method_option :timeout, type: :numeric, default: 30, desc: '--wait で待つ秒数'
     def reload
       refuse_unless_startable!
+      waiter = reload_waiter if options[:wait]
       daemon = SchedulerDaemon.new
       case daemon.alive_state
       when :alive
+        before = monitor_call {waiter&.count}
         pid = daemon.pid
         Process.kill('HUP', pid)
         say "reload requested (pid #{pid})"
-        # ⚠ シグナルは非同期なので、CLI は「要求した」までしか言えない (#1529)。
-        say '  結果はログの {"scheduler":"reload",...} 行で確認できます。'
+        return report_reload(monitor_call {waiter.wait(before)}) if waiter
+        # ⚠ シグナルは非同期なので、`--wait` なしでは「要求した」までしか言えない (#1529)。
+        say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
       when :unknown
         # ⚠ :unknown（EPERM）を :dead と混ぜない。プロセスは生きている可能性がある。
         raise Thor::Error, "PID #{daemon.pid} exists but is not ours. reload できません。"
@@ -200,6 +206,39 @@ module TomatoShrieker
     end
 
     private
+
+    # ⚠ **HUP を送る前に断る。**監視が無効なら読む先が無く、送った後では「待てない」と
+    # 言うしかない（reload 自体は走るので、利用者には成否が分からないまま）。
+    def reload_waiter
+      raise Thor::Error, '--wait には監視（/monitor/enabled: true）が要ります。' unless ReloadWaiter.available?
+      return ReloadWaiter.new(timeout: options[:timeout])
+    end
+
+    # ⚠ 読めない・締切を過ぎたは Thor のエラーにする（終了コードで伝える・#1668）。
+    # ⚠ `SocketError`（`bind` にホスト名を書いて引けない）と `JSON::ParserError`（監視でない
+    # ものが応答した）も同じ（4.17.0 リリース前レビュー）。
+    def monitor_call
+      return yield
+    rescue *monitor_errors => e
+      raise Thor::Error, "--wait: #{e.message}"
+    end
+
+    def monitor_errors
+      return [Ginseng::GatewayError, SocketError, SystemCallError, JSON::ParserError, Timeout::Error]
+    end
+
+    # `--wait` の結果。⚠ **失敗・登録できなかった・判別キーの合わない定義があれば非 0 で終わる。**
+    # 「reload requested」と同じ 0 で終わると、スクリプトから成否が分からない。
+    def report_reload(state)
+      raise Thor::Error, "reload failed: #{state['error']}（ログを確認してください）" if state['error']
+      result = state['result'] || {}
+      ['added', 'removed', 'changed', 'failed', 'unmatched'].each do |key|
+        say "  #{key}: #{Array(result[key]).join(', ')}" if Array(result[key]).any?
+      end
+      problems = Array(result['failed']) + Array(result['unmatched'])
+      raise Thor::Error, "反映できなかった定義があります: #{problems.join(', ')}" if problems.any?
+      say "reloaded at #{state['at']}"
+    end
 
     # ⚠⚠ **スキーマ違反では止めない (#1570)。**起動はスキーマを見ない
     # （`Scheduler#reload` のコメント）ので、ここで NG を全部止めると

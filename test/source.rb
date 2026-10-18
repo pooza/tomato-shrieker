@@ -92,6 +92,62 @@ module TomatoShrieker
       assert_nil(source.instance_variable_get(:@piefed))
     end
 
+    # 🔴 **#1712 の Codex P1: 宛先のオブジェクトは run ごとに作り直す。**スケジューラのソースは
+    # run をまたいで生きるので、作り直さないと PieFed の期限切れの JWT がずっと残る。
+    def test_exec_with_run_log_resets_shriekers
+      id = '__test_source_reset_shriekers__'
+      source = TextSource.new({
+        'id' => id,
+        'source' => {'text' => 'body'},
+        'dest' => {'mastodon' => {'url' => 'https://mastodon.example.test', 'token' => 'token-0123'}},
+      })
+      source.define_singleton_method(:exec) {nil}
+      first = source.mastodon
+
+      assert_same(first, source.mastodon, 'run の中では共有する')
+      source.send(:exec_with_run_log, :every, '5m')
+
+      assert_not_same(first, source.mastodon)
+    ensure
+      SourceRunLog.where(source_id: id).delete
+    end
+
+    # 🔴 **#1712 の Codex P2: 宛先を取り出している途中に、作り直しが割り込まない。**
+    # `IcalendarSource` は日次の実行とリマインドが別々のジョブで、どちらも始めに
+    # `reset_shriekers` する。割り込まれると、`mastodon?` と `mastodon` の間で nil を掴む。
+    # ⚠ 偶然の競合では再現しない（GVL の下では窓が小さい）ので、取り出しの途中で止めて確かめる。
+    def test_reset_waits_for_shrieker_snapshot
+      source = TextSource.new({
+        'id' => '__test_source_concurrent_reset__',
+        'source' => {'text' => 'body'},
+        'dest' => {'mastodon' => {'url' => 'https://mastodon.example.test', 'token' => 'token-0123'}},
+      })
+      entered = Thread::Queue.new
+      release = Thread::Queue.new
+      original = source.method(:mastodon)
+      source.define_singleton_method(:mastodon) do
+        entered.push(true)
+        release.pop
+        original.call
+      end
+      reader = Thread.new {source.shriekers.to_a}
+      entered.pop
+      reset_done = false
+      resetter = Thread.new do
+        source.reset_shriekers
+        reset_done = true
+      end
+      sleep(0.2)
+
+      assert_false(reset_done, '取り出しの途中で作り直された')
+      2.times {release.push(true)}
+
+      assert_equal(1, reader.value.size)
+      resetter.join
+
+      assert_true(reset_done)
+    end
+
     # #1473: token を消したような半端な宛先を 1 と数えると、shriekers が 0 件なのに
     # dest? が真になり、塞いだはずの「永久に no-op success」がそのまま残る
     def test_dest_count_requires_complete_destination
@@ -528,14 +584,14 @@ module TomatoShrieker
       record_run(at: Time.now - 60, delivered_count: 1)
 
       assert_false(source.silent?)
-      assert_equal('delivery', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_DELIVERY, source.silence_baseline_origin)
 
       # 配信実績が無く観測も浅い ＝ 判定不能
       source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
       record_run(at: Time.now - 60)
 
       assert_nil(source.silent?)
-      assert_equal('observation', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_OBSERVATION, source.silence_baseline_origin)
 
       # しきい値未設定は「この機能を使っていない」＝判定不能ではない
       source = silent_source
@@ -554,7 +610,7 @@ module TomatoShrieker
       SilenceAck.acknowledge(SILENT_ID)
 
       assert_false(source.silent?)
-      assert_equal('acknowledgement', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_ACKNOWLEDGEMENT, source.silence_baseline_origin)
     ensure
       SourceRunLog.where(source_id: SILENT_ID).delete
       SilenceAck.where(source_id: SILENT_ID).delete
@@ -566,7 +622,7 @@ module TomatoShrieker
       source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
       record_run(at: Time.now - 60, delivered_count: 1)
 
-      assert_equal('delivery', source.silence_baseline_origin)
+      assert_equal(Source::BASELINE_DELIVERY, source.silence_baseline_origin)
     ensure
       SourceRunLog.where(source_id: SILENT_ID).delete
     end

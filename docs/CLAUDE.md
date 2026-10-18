@@ -126,15 +126,15 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 `Bundler.with_unbundled_env` で囲む（親の RUBYOPT, GEM_HOME 等の漏洩防止）。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（with_unbundled_env で一掃された後、子プロセスに正しい Gemfile 位置を教える役割）。
 
-⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
+⚠ **子プロセスは本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される。**`RBENV_VERSION` は ginseng-core の `CommandLine` が子へ渡す環境から外す（`UNSET_ENV_KEYS`）が、`PATH` はそのまま渡り、rbenv が本体の版の bin を先頭に置いているので同じ Ruby が選ばれる。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
 
-⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**⚠ 真になるのは**配列で書いたとき**だけ（文字列は `sh -c …` に包まれるので偽）。`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。
+⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**⚠ 真になるのは**配列で書いたとき**だけ（文字列は `sh -c …` に包まれるので偽）。`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。📌 **代わりに `register` は `dir` で `bundle check` を走らせ、依存が欠けていればログと Sentry に出す（起動は止めない・直さない・#1477）。**デプロイ前の確認（deploy スキルの `pending_sources.sh`）も同じ検査を通す。
 
 🔴 **動作確認のつもりで設定どおりのコマンドを手で叩いてはいけない。**サテライト側が「通知済み」状態を持っていることがあり、実行しただけで**次の定期実行ぶんを食い潰す**。実例: `loquat reserves` は `-n`（保存しない）を付けないと `tmp/cache/reserves-*.json` を更新するので、`precure-reserve`（`-n` なし）を手動実行すると未告知の予約が投稿されないまま消える（2026-08-04 に発生。キャッシュを消して再告知した）。⚠ **`dqdai-reserve` には `-n` が付いており、同じ `loquat reserves` でも挙動が違う。**復旧確認は各ソースの定義を読んでから、副作用のない形（`-n` 相当があるか / 冪等か）を確かめて行う。
 
 ### ginseng-\* gem のデフォルトブランチ
 
-全て `main` に統一済み。Gemfile で `branch: 'main'` を明示指定する。
+全て `main` に統一済み。Gemfile で `branch: 'main'` を明示指定する。⚠ **`ginseng-style`（development）だけはタグで固定する**（`tag: 'v1.1.x'`）。追随のしかたは [sync スキル](../.claude/skills/sync/SKILL.md) の「ginseng-* のピン棚卸し」。
 
 ## 設定構造
 
@@ -199,6 +199,7 @@ app/lib/tomato_shrieker/
   service/        # SlackService, MulukhiyaService
   cli/            # CLI コマンド (Thor)
   monitor/        # 監視用 HTTP (MonitorApp / MonitorServer)・SourceStatus・SourceCollisions
+app/migration/     # Sequel のマイグレーション（起動時に自動で当たる・CI は rake migration:run）
 app/task/
   migration.rb    # DB マイグレーション
   bundle.rb, config.rb, test.rb  # ビルド系 rake タスク
@@ -224,6 +225,7 @@ test/                  # テストファイル
 | [docs/workflow.md](https://github.com/pooza/ginseng-style/blob/main/docs/workflow.md) | Issue 駆動・ブランチ・サイズラベル・リリース前レビュー・`ginseng-*` の変更手順 |
 | [docs/writing.md](https://github.com/pooza/ginseng-style/blob/main/docs/writing.md) | 表記規約（用語・パスとキーの書き方・⚠ マーカーの使い方） |
 | [docs/rationale.md](https://github.com/pooza/ginseng-style/blob/main/docs/rationale.md) | なぜ正本化したか |
+| [docs/skills.md](https://github.com/pooza/ginseng-style/blob/main/docs/skills.md) | スキルの置き方・自動起動の可否。⚠ **Codex レビューの採否・返信・待ち方の正本は [codex-review スキル](https://github.com/pooza/ginseng-style/blob/main/plugins/ginseng/skills/codex-review/SKILL.md)** |
 
 RuboCop の設定も同じ gem が持つ（`.rubocop.yml` は `inherit_gem` で差分だけ）。⚠ **共通に見える緩和をこちら側に足さないこと。** 共通化したい場合は ginseng-style に Issue を立てる。
 

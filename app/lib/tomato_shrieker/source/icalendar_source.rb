@@ -69,6 +69,7 @@ module TomatoShrieker
       # なり、取得段の失敗が `entry_stage: true` で保存される。
       targets = entries.to_a
       @delivery_stats&.enter_entry_stage! if targets.present?
+      templates # ⚠ `Parallel.each` の前に暖める (#1489・`FeedSource#fetch` と同じ)
       Parallel.each(targets, in_threads:) do |entry|
         template = create_template
         template[:entry] = entry
@@ -81,6 +82,8 @@ module TomatoShrieker
       return if disable?
       return unless remind?
       in_threads = Parallel.processor_count * 2
+      # ⚠ リマインドは `exec_with_run_log` を通らない別のジョブなので、ここで宛先を作り直す
+      prepare_delivery
       Parallel.each(entries.select {|v| remind_entry?(v)}, in_threads:) do |entry|
         template = create_template
         template[:entry] = entry
@@ -143,8 +146,10 @@ module TomatoShrieker
     end
 
     def create_entry(event)
-      event = scan_rrule(event) if event.rrule.present?
+      # ⚠ **`DTEND` は `scan_rrule` より先に補う (#1693)。**icalendar-rrule は `DTEND` が無いと
+      # `DTSTART` の `to_i` で終了を作るが、終日（`Icalendar::Values::Date`）は `to_i` を持たず落ちる。
       event.dtend ||= event.dtstart
+      event = scan_rrule(event) if event.rrule.present?
       start_date = Time.parse(event.dtstart.to_s).getlocal
       end_date = Time.parse(event.dtend.to_s).getlocal
       data = {
@@ -178,7 +183,7 @@ module TomatoShrieker
 
     def register
       return if disable?
-      install_command_bundle if command?
+      prepare_command if command?
       schedule_remind if remind?
       return super
     end

@@ -124,6 +124,35 @@ module TomatoShrieker
       WebMock.reset!
     end
 
+    # 設定の 1 節を差し替えて `Config#reload` し、ブロックの後で戻す（#1575 で 2 本の複製を寄せた）。
+    # `replace` は差し替え前の節（の複製・無ければ nil）を受けて、新しい節を返す。
+    #
+    # ⚠ **`raw` の鍵は設定ファイルの basename**（`local` / `application` / `lib` / hostname）で、
+    # 優先順は `Config#basenames` の順。`raw['logger']` へ書いても効かず、低い側へ書いても高い側の
+    # 値に上書きされる。**実在するうちいちばん強い basename** へ書く。
+    #
+    # 🔴🔴 **キーを消すのでは効かない。**`Config#load` は basename ごとに `update(key_flatten)` する
+    # ので、**強い側で消しても弱い側の値がそのまま残る**。⚠ 実際に踏んだ: 手元には `local.yaml` が
+    # 無いので通ったが、**CI は `local_sample.yaml` を `local.yaml` へコピーする**ため落ちなかった。
+    # **nil で明示的に上書きする**（`Config#[]` は nil を「無い」として扱う）。
+    def with_raw_config(section, replace)
+      key = config.basenames.find {|v| config.raw.key?(v)}
+      original = config.raw[key][section]
+      config.raw[key][section] = replace.call(original.deep_dup)
+      config.reload
+      yield
+    ensure
+      config.raw[key][section] = original if key
+      config.reload
+    end
+
+    # ソースに配信の集計を付けて返す（#1575 で 2 本の複製を寄せた）。
+    def attach_stats(source)
+      stats = DeliveryStats.new
+      source.instance_variable_set(:@delivery_stats, stats)
+      return stats
+    end
+
     # 🔴 **`TEST` を立てたら設定を読み直す（#1596 の Codex P2）。**
     #
     # ⚠⚠ `require 'tomato_shrieker'` の時点で（Sentry の初期化などで）`Config.instance` は

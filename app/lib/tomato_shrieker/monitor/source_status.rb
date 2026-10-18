@@ -19,8 +19,11 @@ module TomatoShrieker
     # 📌 緩められるのは「エントリを 1 件も読めていない失敗」＝フィード取得そのものの
     # 失敗だけ。#1558 の動機である YouTube の 404 はこちら。
     # ⚠ `/healthz/source/:id` の判定もこれを使う。
-    def self.effective_error_streak_threshold(source, logs)
-      return 1 if SourceRunLog.entry_level_error?(logs)
+    #
+    # ⚠ `entry_stage` は呼び出し側が求めた値を渡せる（同じ述語を 2 回評価しない・#1575）。
+    def self.effective_error_streak_threshold(source, logs, entry_stage: nil)
+      entry_stage = SourceRunLog.entry_level_error?(logs) if entry_stage.nil?
+      return 1 if entry_stage
       return source.monitor_error_streak_threshold
     end
 
@@ -31,13 +34,13 @@ module TomatoShrieker
     def self.checks(source, latest)
       next_run = source.next_run_at(latest.executed_at)
       # 連続エラーで判定する (#1457)。何回で倒すかは error_streak_threshold で調整する。
-      # ⚠ **しきい値はソース単位で上書きできる (#1558)。**読む行数もそれに従わせないと、
-      # しきい値だけ大きくしても窓が足りず、到達し得ないまま健全扱いになる。
-      logs = SourceRunLog.recent_for(
-        source.id, SourceRunLog.streak_window(source.monitor_error_streak_threshold)
-      )
-      streak = SourceRunLog.error_streak_of(logs)
-      threshold = effective_error_streak_threshold(source, logs)
+      logs = streak_logs(source)
+      # 🔴 **保持期間の境界は 1 回だけ求める (#1575)。**述語ごとに `Time.now` から求めると、境界を
+      # またぐ行で `error_streak: 0` なのに `entry_stage: true` のような自己矛盾が出うる。
+      cutoff = SourceRunLog.retention_cutoff
+      streak = SourceRunLog.error_streak_of(logs, cutoff)
+      entry_stage = SourceRunLog.entry_level_error?(logs, cutoff)
+      threshold = effective_error_streak_threshold(source, logs, entry_stage:)
       return {
         next_run:,
         stale: Time.now > next_run + source.monitor_grace_seconds,
@@ -47,7 +50,7 @@ module TomatoShrieker
         # ⚠⚠ **直近の行だけを見て本文に出すと嘘になる。**エントリ処理段の失敗の後に
         # 取得段の失敗が来ると `error_streak: 2 / 1` なのに `entry_stage: false` と
         # 出て、**しきい値が 1 に倒れた理由が読めなくなる**。
-        entry_stage: SourceRunLog.entry_level_error?(logs),
+        entry_stage:,
         errored: streak >= threshold,
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
@@ -62,6 +65,13 @@ module TomatoShrieker
         lost_entries: source.lost_entries?,
         lost_entries_log: source.lost_entries_log,
       }
+    end
+
+    # ⚠ **しきい値はソース単位で上書きできる (#1558)。**読む行数もそれに従わせないと、
+    # しきい値だけ大きくしても窓が足りず、到達し得ないまま健全扱いになる。
+    def self.streak_logs(source)
+      window = SourceRunLog.streak_window(source.monitor_error_streak_threshold)
+      return SourceRunLog.recent_for(source.id, window)
     end
 
     # `checks` のうち立っているものの名前。空なら健全。
@@ -122,7 +132,7 @@ module TomatoShrieker
 
     # #1433 (統計) と #1470 (サイレント不発) の指標。
     def delivery_status
-      attempted = SourceRunLog.last_attempted(@source.id)
+      attempted = @source.last_attempted_log
       # 🔴 **窓もしきい値も /healthz/source/:id と完全に同じものを使う（Codex P2・#1558）。**
       # 既定の窓はグローバルのしきい値しか見ないので、ソース側で sample_size (50) を
       # 超える値に上書きすると **503 にしている当人が `error_streak: 50 / 100` という
@@ -131,10 +141,8 @@ module TomatoShrieker
       # `/healthz` が `1 / 1` で 503 なのに `/status.json` は `4` と言う。
       # ⚠ **2 つのエンドポイントが同名フィールドで違う数字を出す**のは 4.8.0 の
       # レビューで `last_attempted_count` で潰した型の不具合なので、繰り返さない。
-      logs = SourceRunLog.recent_for(
-        @source.id, SourceRunLog.streak_window(@source.monitor_error_streak_threshold)
-      )
-      return SourceRunLog.summary_of(logs).merge(
+      logs = self.class.streak_logs(@source)
+      return SourceRunLog.summary_of(logs, cutoff).merge(noop_status(logs)).merge(
         dest_count: @source.dest_count,
         # #1504: 直近の配信試行の内訳。undelivered が true なら未解決の取りこぼしがある
         last_attempted_at: attempted&.executed_at&.iso8601,
@@ -162,10 +170,17 @@ module TomatoShrieker
         # ⚠ **キーは `acknowledged_at` (#1567)。**確認はサイレント不発にも未達にも効く (#1506)
         # ので、`silence_` を付けると「未達がなぜ緑なのか」を探す人が行き当たらない。
         # ⚠ 内部の名前（`SilenceAck` / `silence_ack` テーブル）は据え置き。
-        acknowledged_at: SilenceAck.acknowledged_at(@source.id)&.iso8601,
+        acknowledged_at: @source.acknowledged_at&.iso8601,
         error_rate_24h: SourceRunLog.error_rate(@source.id),
         **threshold_status(logs),
       )
+    end
+
+    # #1498: `noop_streak` は `sample_size` で頭打ちになるので、起点の時刻も出す。
+    # ⚠ 数え方は `summary_of` と同じ（`sample_size` で切った窓）。追加のクエリは無い。
+    def noop_status(logs)
+      streak = SourceRunLog.noop_streak_of(logs.first(SourceRunLog.sample_size))
+      return {noop_since: @source.noop_since(streak)&.iso8601}
     end
 
     def loss_status
@@ -179,13 +194,21 @@ module TomatoShrieker
 
     # ⚠ `logs` は `delivery_status` が取った窓をそのまま受ける＝ 503 本文と同じ値・追加クエリなし。
     def threshold_status(logs)
+      entry_stage = SourceRunLog.entry_level_error?(logs, cutoff)
       return {
         # #1558: 「なぜこのソースはまだ緑なのか」を外から説明できるようにする
-        error_streak_threshold: self.class.effective_error_streak_threshold(@source, logs),
+        error_streak_threshold:
+          self.class.effective_error_streak_threshold(@source, logs, entry_stage:),
         # #1624: しきい値が 1 に倒されている理由。⚠ 503 本文にしか無いと、503 になる前
         # （`error_streak: 0`）には「28 と宣言したのに 1 と出ている」理由がどこからも読めない。
-        entry_stage: SourceRunLog.entry_level_error?(logs),
+        entry_stage:,
       }
+    end
+
+    # ⚠ 1 行ぶんで 1 回だけ求める（`checks` と同じ理由・#1575）。
+    def cutoff
+      @cutoff ||= SourceRunLog.retention_cutoff
+      return @cutoff
     end
   end
 end

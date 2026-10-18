@@ -16,7 +16,7 @@ module TomatoShrieker
     # この ID の行を無条件に消すので、**開発機に同名の実ソースがあると実データを
     # 消してしまう**（`bin/test.rb` は運用と同じ永続 DB を使う）。
     # ⚠ `__test_feed_source__` / `__test_source_run_log__` と同じ命名に揃える。
-    FEED_ID = '__entry_fixture__'.freeze
+    FEED_ID = '__test_entry_fixture__'.freeze
 
     # ⚠ **1 件目はエンクロージャあり、2 件目は無し。**どちらの経路も必ず通す。
     # ⚠ `entry` テーブルの unique index は (feed, title, url) なので両方ずらす。
@@ -174,6 +174,21 @@ module TomatoShrieker
       Entry.create(values, stage_source(stats2))
 
       assert_false(stats2.entry_stage?, '重複で緩和を潰している')
+    end
+
+    # 🔴 **#1489: 作ったエントリは、渡したソースそのものを持つ。**以前は配信のたびに
+    # `FeedSource.all` で全ソースを作り直していた（テンプレートの ERB もエントリごとに再コンパイル）。
+    def test_create_keeps_given_source
+      Entry.where(feed: FEED_ID, url: stage_values[:url]).delete
+      source = stage_source(DeliveryStats.new)
+      created = nil
+      original = Entry.method(:deliverable)
+      Entry.define_singleton_method(:deliverable) {|entry, _feed| created = entry}
+      Entry.create(stage_values, source)
+
+      assert_same(source, created.feed)
+    ensure
+      Entry.define_singleton_method(:deliverable, original) if original
     end
 
     def stage_source(stats)

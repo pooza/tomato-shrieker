@@ -153,6 +153,194 @@ module TomatoShrieker
       assert_not_include(error.message, SECRET_ENV)
     end
 
+    # 🔴 **#1670: 資格情報が生の形以外で出力に載っても伏せる。**`curl` などのエラーや HTTP の
+    # ログ行は、URL を丸ごとではなくパスだけ・クエリ抜きで書く。JSON / HTML / URL エンコードも同じ。
+    def test_command_masks_secret_variants
+      command = build_secret_source.command
+      [
+        'GET /api/push/AbCdEf123456?status=up&msg=OK failed',
+        'POST https://kuma.example.test/api/push/AbCdEf123456 failed',
+        'push AbCdEf123456 rejected',
+        '{"url":"https:\\/\\/kuma.example.test\\/api\\/push\\/AbCdEf123456?status=up&msg=OK"}',
+        '<a href="https://kuma.example.test/api/push/AbCdEf123456?status=up&amp;msg=OK">',
+        "url=#{CGI.escape(SECRET_ENV)}",
+        'POST /services/T000/B000/XXXXXXXX 403',
+      ].each do |line|
+        masked = command.masked(line)
+
+        assert_not_include(masked, 'AbCdEf123456', line)
+        assert_not_include(masked, 'XXXXXXXX', line)
+      end
+    end
+
+    # #1709 の Codex P1: URI として読めない値（`Addressable::URI::InvalidURIError`）でも、
+    # エスケープした形は伏せる。
+    def test_command_masks_escaped_forms_of_non_uri_secret
+      secret = 'a b:c/%%&secret-0123'
+      params = secret_params
+      params['source']['env']['API_SECRET'] = secret
+      command = CommandSource.new(params).command
+
+      [CGI.escape(secret), CGI.escapeHTML(secret), secret.gsub('/') {'\\/'}].each do |form|
+        assert_not_include(command.masked("leaked: #{form}"), 'secret-0123', form)
+      end
+    end
+
+    # ⚠ URL から切り出す部分も短ければ入れない（`/` や `/api` まで伏せると読めなくなる）。
+    def test_command_secret_variants_skip_short_parts
+      secrets = build_secret_source.command.secrets
+
+      assert_not_include(secrets, '/')
+      assert_not_include(secrets, 'push')
+    end
+
+    # 🔴 **#1670: `exec` 自体が上げる例外も伏せる。**argv0 に資格情報を含むパスを書くと、
+    # `Errno::ENOENT` のメッセージにそのまま載る。⚠ 型は元のまま（Sentry のまとまりを変えない）。
+    def test_exec_masks_secrets_in_spawn_error
+      source = build_secret_source(["/nonexistent/#{SECRET_TOKEN}/run"])
+      error = assert_raise(Errno::ENOENT) {source.exec}
+
+      assert_include(error.message, '/nonexistent/')
+      assert_not_include(error.message, SECRET_TOKEN)
+      # 🔴 伏せる前の例外を `cause` に残さない。sentry-ruby は連鎖ごと送る（4.17.0 リリース前レビュー）。
+      assert_nil(error.cause)
+    end
+
+    # #1670: 宛先の資格情報は、短くても伏せる（env の値とは違い、資格情報であることが確か）。
+    def test_command_secrets_keep_short_dest_secrets
+      params = secret_params
+      params['dest']['mastodon']['token'] = 'tk12'
+
+      assert_include(CommandSource.new(params).command.secrets, 'tk12')
+    end
+
+    # #1670: 暗号化して書いた資格情報は、復号した値も伏せる（コマンドへ渡るのは復号した値）。
+    # ⚠ 鍵（`/crypt/password`）は開発機にも CI にも無いので、ここで置く（teardown で読み直す）。
+    def test_command_secrets_include_decrypted_values
+      config['/crypt/password'] = 'test-crypt-password-0123'
+      params = secret_params
+      params['dest']['piefed'] = {
+        'url' => 'https://piefed.example.test',
+        'user' => 'bot',
+        'password' => Crypt.new.encrypt('piefed-password-0123'),
+      }
+
+      assert_include(CommandSource.new(params).command.secrets, 'piefed-password-0123')
+    end
+
+    # 🔴 **#1670: `DEST_SECRET_KEYS` をスキーマと突き合わせる。**宛先を足したときに、
+    # 資格情報のキーを足し忘れると黙って漏れる。
+    def test_dest_secret_keys_match_schema
+      schema = YAML.load_file(File.join(Environment.dir, 'config/schema/source.yaml'))
+      keys = []
+      walk = lambda do |node, path|
+        (node['properties'] || {}).each do |name, child|
+          keys.push("#{path}/#{name}") if name.match?(/token|password|private_key|secret/)
+          walk.call(child, "#{path}/#{name}") if child.is_a?(Hash)
+        end
+      end
+      walk.call(schema.dig('properties', 'dest'), '/dest')
+
+      assert_equal(keys.sort, CommandRunner::DEST_SECRET_KEYS.sort)
+    end
+
+    # 🔴 **#1477: 依存が欠けていたら、登録の時点でログと Sentry に出す（起動は止めない）。**
+    # ⚠ 自動の `bundle install` は `bundle` で始まるコマンドにしか走らないので、直接実行の定義
+    # （本番の 7 件）はこれが無いと、走るたびに `Bundler::GemNotFound` で落ちるまで気づけない。
+    def test_command_bundle_problem
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        problem = build_secret_source(['bin/run.rb']).tap {|v| v.command.dir = dir}.command_bundle_problem
+
+        assert_include(problem, 'bundle check failed')
+        assert_include(problem, 'tomato-shrieker-missing-gem-1477')
+      end
+    end
+
+    # ⚠ **Gemfile.lock も置く。**lock が無いと `bundle check` は解決のためにネットワークへ出る
+    # （サテライトはどれも lock を持っている）。
+    def write_missing_gem_bundle(dir, group: nil)
+      gem = 'tomato-shrieker-missing-gem-1477'
+      line = group ? "group :#{group} do\n  gem '#{gem}'\nend" : "gem '#{gem}'"
+      File.write(File.join(dir, 'Gemfile'), "source 'https://rubygems.org'\n#{line}\n")
+      File.write(File.join(dir, 'Gemfile.lock'), [
+        'GEM', '  remote: https://rubygems.org/', '  specs:', "    #{gem} (0.0.1)", '',
+        'PLATFORMS', '  ruby', '', 'DEPENDENCIES', "  #{gem}", ''
+      ].join("\n"))
+    end
+
+    # #1714 の Codex P2: 実行時と同じ環境（`/source/env`）で見る。`BUNDLE_WITHOUT` で外した
+    # グループの欠落は、コマンドが走るときにも問題にならない。
+    def test_command_bundle_problem_uses_source_env
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir, group: 'extra')
+        params = secret_params(['bin/run.rb'])
+        params['source']['dir'] = dir
+
+        assert_not_nil(CommandSource.new(params).command_bundle_problem)
+        params['source']['env']['BUNDLE_WITHOUT'] = 'extra'
+
+        assert_nil(CommandSource.new(params).command_bundle_problem)
+      end
+    end
+
+    # #1714 の Codex P1（2 巡目）: `bundle` が見つからなくても上げない（起動を止めない）。
+    def test_command_bundle_problem_when_bundle_is_missing
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        params = secret_params(['/bin/true'])
+        params['source']['dir'] = dir
+        params['source']['env']['PATH'] = '/nonexistent'
+
+        assert_include(CommandSource.new(params).command_bundle_problem, 'bundle check could not run')
+      end
+    end
+
+    # 🔴 型の合わない env でも上げない（4.17.0 リリース前レビュー）。spawn が `TypeError` を上げると、
+    # `register_all` が起動ごと倒れて全ソースが止まる。
+    def test_command_bundle_problem_with_non_string_env
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        params = secret_params(['/bin/true'])
+        params['source']['dir'] = dir
+        params['source']['env']['PORT'] = 3000
+
+        assert_include(CommandSource.new(params).command_bundle_problem, 'bundle check could not run')
+      end
+    end
+
+    # #1714 の Codex P1: 存在しない `dir` のパスに資格情報が入っていても伏せる。
+    def test_command_bundle_problem_masks_dir
+      params = secret_params
+      params['source']['dir'] = "/nonexistent/#{SECRET_TOKEN}"
+      problem = CommandSource.new(params).command_bundle_problem
+
+      assert_include(problem, 'dir not found')
+      assert_not_include(problem, SECRET_TOKEN)
+    end
+
+    # ⚠ Gemfile の無い `dir` は見ない。存在しない `dir` は問題として返す（走らせると必ず落ちる）。
+    def test_command_bundle_problem_without_gemfile
+      Dir.mktmpdir do |dir|
+        assert_nil(build_secret_source.tap {|v| v.command.dir = dir}.command_bundle_problem)
+      end
+      params = secret_params
+      params['source']['dir'] = '/nonexistent/__test_1477__'
+
+      assert_equal('/source/dir not found: /nonexistent/__test_1477__', CommandSource.new(params).command_bundle_problem)
+    end
+
+    # ⚠ 検査は登録を止めない（ログに出して、そのまま登録する）。
+    def test_register_continues_when_bundle_is_broken
+      source = build_secret_source
+      source.define_singleton_method(:command_bundle_problem) {'bundle check failed in /x: missing'}
+      registered = false
+      source.define_singleton_method(:schedule) {|*| registered = true}
+      source.register
+
+      assert_true(registered)
+    end
+
     SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
@@ -187,12 +375,6 @@ module TomatoShrieker
       command = Ginseng::CommandLine.new
       command.args = args
       source.define_singleton_method(:command) {command}
-    end
-
-    def attach_stats(source)
-      stats = DeliveryStats.new
-      source.instance_variable_set(:@delivery_stats, stats)
-      return stats
     end
 
     def test_delimiter

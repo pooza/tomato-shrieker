@@ -250,10 +250,10 @@ module TomatoShrieker
 
     # 取得済みの logs から出す版。⚠ **呼び出し側が logs を別の用途にも使うとき**
     # （`entry_level_error?` の判定等）に、同じ行を 2 回引かないため (#1558)。
-    def self.summary_of(logs)
+    def self.summary_of(logs, cutoff = retention_cutoff)
       sample = logs.first(sample_size)
       return {
-        error_streak: error_streak_of(logs),
+        error_streak: error_streak_of(logs, cutoff),
         noop_streak: noop_streak_of(sample),
         duration_ms: duration_stats_of(sample),
         shrieker_errors: shrieker_error_distribution_of(sample),
@@ -376,11 +376,17 @@ module TomatoShrieker
       return index.clamp(0, size - 1)
     end
 
+    # 🔴 **SQL で数える (#1472)。**以前は 24 時間ぶんの行を全部モデルに読み込んでから数えて
+    # いて、`/status.json` でいちばん重い 1 本だった。⚠ `error?` と同じく `status = 'error'` だけを
+    # 数える（partial は数えない）。
     def self.error_rate(source_id, hours: 24)
       since = Time.now - (hours * 3600)
-      logs = where(source_id:).where(Sequel.lit('executed_at >= ?', since)).all
-      return nil if logs.empty?
-      return (logs.count(&:error?).to_f / logs.size).round(3)
+      errors = Sequel.case({{status: STATUS_ERROR} => 1}, 0)
+      row = where(source_id:).where(Sequel.lit('executed_at >= ?', since))
+        .select {[count.function.*.as(:total), sum(errors).as(:errors)]}
+        .naked.first
+      return nil unless row && row[:total].to_i.positive?
+      return (row[:errors].to_f / row[:total]).round(3)
     end
 
     # 直近 N 件の shrieker 別エラー件数 (#1433)。

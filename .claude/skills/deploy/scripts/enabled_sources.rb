@@ -13,3 +13,13 @@ unstartable.each do |id, errors|
   puts "NG\t#{id}"
   errors.each {|v| puts "    - #{v}"}
 end
+# 🔴 #1477: コマンドの依存が欠けているソースを `BUNDLE\t<id>\t<説明>` で出す。起動は通るが、
+# 走るたびに `Bundler::GemNotFound` で落ちる。⚠ 起動で倒れる定義があると `Source.all` 自体が
+# 落ちうるので、NG が無いときだけ見る。
+if unstartable.empty?
+  TomatoShrieker::Source.all(entries).each do |source|
+    next unless source.is_a?(TomatoShrieker::CommandRunner) && source.command?
+    next unless problem = source.command_bundle_problem
+    puts "BUNDLE\t#{source.id}\t#{problem}"
+  end
+end
