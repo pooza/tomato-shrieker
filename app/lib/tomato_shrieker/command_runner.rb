@@ -65,15 +65,29 @@ module TomatoShrieker
     # 理由が `invalid byte sequence` にすり替わり**、stderr の中身はどこにも残らない。
     #
     # 🔴 **`exec` が上げた例外も伏せる (#1670)。**argv0 や `dir` に資格情報を含むパスを書くと、
-    # `Errno::ENOENT` のメッセージにそのまま載る。⚠ `exception` で作り直すので、型と
-    # バックトレースは元のまま。
+    # `Errno::ENOENT` のメッセージにそのまま載る。⚠ 型とバックトレースは元のまま。
+    #
+    # 🔴🔴 **`cause` を付けない（4.17.0 リリース前レビュー）。**`rescue` の中で投げ直すと、伏せる前の
+    # 例外が `cause` に付き、sentry-ruby が連鎖ごと送る＝ **Sentry にだけ平文で届いていた**。
+    # ⚠ `e.exception(msg)` は複製なので、元の例外がすでに持つ `cause` も残る（`raise ..., cause: nil`
+    # でも消えない）。**同じクラスの新しいインスタンスを作り、`rescue` の外で投げる。**
     def capture_command
-      return @command_mutex.synchronize do
+      error = nil
+      result = @command_mutex.synchronize do
         Bundler.with_unbundled_env {command.exec}
         [command.stdout.to_s.scrub, command.stderr.to_s.scrub, command.status]
       rescue => e
-        raise e.exception(command.masked(e.message))
+        error = masked_exception(e)
+        nil
       end
+      raise error if error
+      return result
+    end
+
+    def masked_exception(error)
+      masked = error.class.allocate.exception(command.masked(error.message))
+      masked.set_backtrace(error.backtrace)
+      return masked
     end
 
     # ⚠ `status` は wait status（`exit 2` が 512）。下位 7 ビットはシグナル。
@@ -120,7 +134,8 @@ module TomatoShrieker
 
     # 依存の問題の説明。無ければ nil。⚠ デプロイ前の確認（deploy スキルの `enabled_sources.rb`）
     # からも呼ぶ。⚠ 子プロセスと同じく bundler の痕跡を消した環境で、`dir` の Gemfile を見る
-    # （`RBENV_VERSION` は消えないので、本体と同じ Ruby の gem を見る）。
+    # ⚠ `RBENV_VERSION` は `child_env` が外すが、rbenv が版の bin を `PATH` の先頭に置いているので、
+    # 本体と同じ Ruby の gem を見る。
     #
     # 🔴 **`Bundler.with_unbundled_env` で囲まない。**あれはプロセス全体の `ENV` を差し替えて
     # 戻すので、**`register` は並列（`Scheduler#apply` の `Parallel.map`）だから、別のスレッドが
@@ -136,17 +151,18 @@ module TomatoShrieker
       # `GEM_HOME` などは結果を変える。上流が子へ渡す `child_env`（`RBENV_VERSION` 等を外し、
       # ソースの env と `BUNDLE_GEMFILE` を重ねたもの）をそのまま使う。
       env = Bundler.unbundled_env.merge(command.send(:child_env), 'BUNDLE_GEMFILE' => gemfile)
-      output, status = begin
-        Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
-      rescue SystemCallError => e
-        # 🔴 **走らせられなかったことも問題として返す。上げない（#1714 の Codex P1）。**ソースの env が
-        # `PATH` を差し替えて `bundle` が見つからないと `Errno::ENOENT` になり、上げると
-        # `register_all` が起動ごと倒れる（この検査は起動を止めない約束）。
-        return command.masked("bundle check could not run in #{dir}: #{e.class}")
-      end
+      output, status = Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
       return nil if status.success?
       detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)
       return command.masked("bundle check failed in #{dir}: #{detail}")
+    rescue => e
+      # 🔴 **走らせられなかったことも問題として返す。上げない（#1714 の Codex P1）。**ソースの env が
+      # `PATH` を差し替えて `bundle` が見つからないと `Errno::ENOENT` になり、上げると
+      # `register_all` が起動ごと倒れる（この検査は起動を止めない約束）。
+      # ⚠ `SystemCallError` だけでは足りない（4.17.0 リリース前レビュー）。env の値が文字列でない
+      # （`PORT: 3000`）と spawn が `TypeError`、NUL を含むと `ArgumentError`、`dir` が文字列でないと
+      # `File.directory?` が `TypeError` を上げる。
+      return command.masked("bundle check could not run in #{dir}: #{e.class}")
     end
 
     def command

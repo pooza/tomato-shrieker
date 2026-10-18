@@ -207,11 +207,6 @@ module TomatoShrieker
 
     private
 
-    # ⚠⚠ **スキーマ違反では止めない (#1570)。**起動はスキーマを見ない
-    # （`Scheduler#reload` のコメント）ので、ここで NG を全部止めると
-    # **「起動はできるのに reload は拒否される」定義が生まれる**＝ 食い違いの向きが
-    # 変わるだけで、この issue が直そうとしたものと同じ形になる。
-    # **止めるのは、起動が実際に倒れるもの＝ schedule のパース失敗だけ。**
     # ⚠ **HUP を送る前に断る。**監視が無効なら読む先が無く、送った後では「待てない」と
     # 言うしかない（reload 自体は走るので、利用者には成否が分からないまま）。
     def reload_waiter
@@ -220,10 +215,16 @@ module TomatoShrieker
     end
 
     # ⚠ 読めない・締切を過ぎたは Thor のエラーにする（終了コードで伝える・#1668）。
+    # ⚠ `SocketError`（`bind` にホスト名を書いて引けない）と `JSON::ParserError`（監視でない
+    # ものが応答した）も同じ（4.17.0 リリース前レビュー）。
     def monitor_call
       return yield
-    rescue Ginseng::GatewayError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout => e
+    rescue *monitor_errors => e
       raise Thor::Error, "--wait: #{e.message}"
+    end
+
+    def monitor_errors
+      return [Ginseng::GatewayError, SocketError, SystemCallError, JSON::ParserError, Timeout::Error]
     end
 
     # `--wait` の結果。⚠ **失敗・登録できなかった・判別キーの合わない定義があれば非 0 で終わる。**
@@ -239,6 +240,11 @@ module TomatoShrieker
       say "reloaded at #{state['at']}"
     end
 
+    # ⚠⚠ **スキーマ違反では止めない (#1570)。**起動はスキーマを見ない
+    # （`Scheduler#reload` のコメント）ので、ここで NG を全部止めると
+    # **「起動はできるのに reload は拒否される」定義が生まれる**＝ 食い違いの向きが
+    # 変わるだけで、この issue が直そうとしたものと同じ形になる。
+    # **止めるのは、起動が実際に倒れるもの＝ schedule のパース失敗だけ。**
     def refuse_unless_startable!
       unstartable = unstartable_sources
       return if unstartable.empty?

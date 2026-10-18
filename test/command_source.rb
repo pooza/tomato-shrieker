@@ -202,6 +202,8 @@ module TomatoShrieker
 
       assert_include(error.message, '/nonexistent/')
       assert_not_include(error.message, SECRET_TOKEN)
+      # 🔴 伏せる前の例外を `cause` に残さない。sentry-ruby は連鎖ごと送る（4.17.0 リリース前レビュー）。
+      assert_nil(error.cause)
     end
 
     # #1670: 宛先の資格情報は、短くても伏せる（env の値とは違い、資格情報であることが確か）。
@@ -217,8 +219,11 @@ module TomatoShrieker
     def test_command_secrets_include_decrypted_values
       config['/crypt/password'] = 'test-crypt-password-0123'
       params = secret_params
-      params['dest']['piefed'] = {'url' => 'https://piefed.example.test', 'user' => 'bot',
-                                  'password' => Crypt.new.encrypt('piefed-password-0123')}
+      params['dest']['piefed'] = {
+        'url' => 'https://piefed.example.test',
+        'user' => 'bot',
+        'password' => Crypt.new.encrypt('piefed-password-0123'),
+      }
 
       assert_include(CommandSource.new(params).command.secrets, 'piefed-password-0123')
     end
@@ -286,6 +291,19 @@ module TomatoShrieker
         params = secret_params(['/bin/true'])
         params['source']['dir'] = dir
         params['source']['env']['PATH'] = '/nonexistent'
+
+        assert_include(CommandSource.new(params).command_bundle_problem, 'bundle check could not run')
+      end
+    end
+
+    # 🔴 型の合わない env でも上げない（4.17.0 リリース前レビュー）。spawn が `TypeError` を上げると、
+    # `register_all` が起動ごと倒れて全ソースが止まる。
+    def test_command_bundle_problem_with_non_string_env
+      Dir.mktmpdir do |dir|
+        write_missing_gem_bundle(dir)
+        params = secret_params(['/bin/true'])
+        params['source']['dir'] = dir
+        params['source']['env']['PORT'] = 3000
 
         assert_include(CommandSource.new(params).command_bundle_problem, 'bundle check could not run')
       end

@@ -59,7 +59,7 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
 # reloaded at 2026-10-16T08:00:00+09:00
 ```
 
-⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `at` / `result` / `error`）を読み、HUP の前から `count` が進むまで待つ（既定 30 秒・`--timeout`）。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
+⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `action` / `at` / `result` / `error`）を読み、HUP の前から `count` が進み、かつ `action: reload` の回が来るまで待つ（既定 30 秒・`--timeout`）。⚠ 起動時の登録（`action: register`）の完了では返さない（#1716）。⚠ **daemon を再起動するまでは使えない。**pull した後・再起動する前の古い daemon は `reload` を持たないので、HUP を送る前にエラーで断る。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
 
 ⚠ **reload は設定ファイル（`local.yaml` / `application.yaml`）も読み直すが、起動時に組み立てたもの（Sentry の初期化・監視サーバーの `bind` / `port` など）には効かない。**漏洩対応でマスク設定やトークンを差し替えたときは、「reload requested」を見て反映済みと思わず、**再起動する**（#1575）。
 
@@ -86,11 +86,11 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
   - 🔴 **`Source.all` を回して検査してはいけない。**unmatched な定義は定義上 `Source.all` に現れないので、**reload は通るのに次の起動で全ソースが止まる**（4.10.0 のリリース前レビューで検出）。`/sources` の生の定義を見る
   - ⚠ **スキーマの `source` は `minProperties: 1` しか見ない**ので、`source: {keyword: ...}` / `source: {news: {}}` のような unmatched 形もスキーマは通る。判別キーの検査はスキーマではなく `startup_errors` の担当
   - ⚠ **スキーマの `pattern` では解けない**（完全な cron 正規表現は書けない）ので、`Source#register` が渡す先と同じパーサを直接呼んでいる。⚠ **総称の `Rufus::Scheduler.parse` は使わない** — cron 文字列も通るので `every: '0 0 * * *'` のような取り違えを見逃す
-  - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**daemon 側へ結果を出す話は #1529
+  - ⚠ **CLI を通さず HUP だけ送る経路は素通りする。**結果は `/status.json` の `reload` で読める（#1529）
 
 ⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
 
-⚠ **シグナルは非同期なので、CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...],"unmatched":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）。⚠ **`failed` は register が例外を上げたもの、`unmatched` は判別キーがどのソースクラスにも一致しなかったもの**で、どちらも古いジョブがあればそのまま残る（同期で受け取る手段は #1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
+⚠ **シグナルは非同期なので、`--wait` なしの CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...],"unmatched":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）。⚠ **`failed` は register が例外を上げたもの、`unmatched` は判別キーがどのソースクラスにも一致しなかったもの**で、どちらも古いジョブがあればそのまま残る（同期で受け取るなら `--wait`・#1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
 ## デプロイ手順
 

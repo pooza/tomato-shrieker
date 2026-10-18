@@ -126,7 +126,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 `Bundler.with_unbundled_env` で囲む（親の RUBYOPT, GEM_HOME 等の漏洩防止）。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（with_unbundled_env で一掃された後、子プロセスに正しい Gemfile 位置を教える役割）。
 
-⚠ **`with_unbundled_env` は `RBENV_VERSION` と `PATH` は消さない。**したがって子プロセスは**本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される**。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
+⚠ **子プロセスは本体と同じ Ruby で動き、サテライト側の `.ruby-version` は無視される。**`RBENV_VERSION` は ginseng-core の `CommandLine` が子へ渡す環境から外す（`UNSET_ENV_KEYS`）が、`PATH` はそのまま渡り、rbenv が本体の版の bin を先頭に置いているので同じ Ruby が選ばれる。サテライトの gem は本体と同じバージョンの gem ディレクトリに入っている必要がある（[deploy スキル](../.claude/skills/deploy/SKILL.md) 参照）。
 
 ⚠ **`register` の自動 `bundle_install` は `bundler?`（コマンドが `bundle` または `bundler` で始まる）が真のときだけ走る。**⚠ 真になるのは**配列で書いたとき**だけ（文字列は `sh -c …` に包まれるので偽）。`bin/loquat.rb` のように直接実行する定義では走らないので、サテライトの `bundle install` はデプロイ手順の側で担保する。📌 **代わりに `register` は `dir` で `bundle check` を走らせ、依存が欠けていればログと Sentry に出す（起動は止めない・直さない・#1477）。**デプロイ前の確認（deploy スキルの `pending_sources.sh`）も同じ検査を通す。
 

@@ -1342,7 +1342,6 @@ module TomatoShrieker
       return out.join("\n")
     end
 
-    # 保存時の正規化を迂回して、正規化前に書かれた行を再現する
     # 🔴 **#1472: `/status.json` の 1 行を組むとき、同じクエリを 2 回打たない。**直近の試行・
     # 確認時刻・最後の実配信は、未達・取りこぼし・沈黙の判定と表示用の欄の両方が読む。
     # ⚠ 一度も試行していない・確認していないソース（nil）でも 1 回にする（nil もメモする）。
@@ -1361,6 +1360,7 @@ module TomatoShrieker
       assert_equal(selects.uniq, selects, selects.tally.select {|_, n| n > 1}.keys.join("\n"))
     end
 
+    # 保存時の正規化を迂回して、正規化前に書かれた行を再現する
     def record_with_binary_error(source_id, message)
       record(source_id, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)
       SourceRunLog.latest_for(source_id).this
