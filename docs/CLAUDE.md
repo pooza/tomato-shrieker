@@ -107,9 +107,10 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | MastodonShrieker | Ginseng::Fediverse::MastodonService | Mastodon/Pleroma |
 | MisskeyShrieker | Ginseng::Fediverse::MisskeyService | Misskey |
 | LineShrieker | Ginseng::LineService | LINE メッセージング |
-| PiefedShrieker | (独自実装) | PieFed コミュニティ投稿 |
+| PiefedShrieker | Ginseng::Piefed::Service | PieFed コミュニティ投稿 |
 | NostrShrieker | (独自実装) | Nostr イベント ⚠ **動作保証対象外** |
 | WebhookShrieker | SlackService | Webhook (Slack, Discord等) |
+| TsunagalWebhookShrieker | WebhookShrieker | matrix-webhook 宛（`type: tsunagal`・[sources.md](sources.md)） |
 
 ⚠ **NostrShrieker は動作保証の対象外。**運用者が使っておらず、実運用での検証経路が無いため。リリース前検証（[release-validation スキル](../.claude/skills/release-validation/SKILL.md)）にも含めない。
 
@@ -186,6 +187,7 @@ ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (applica
 GitHub Actions (`.github/workflows/test.yml`):
 
 - Ruby 4.0 / Ubuntu
+- `config/local_sample.yaml` を `config/local.yaml` へ写す → `bundle install` → `rake bundle:update`（⚠ **ginseng-* を main の先頭へ上げてから走る**＝手元の `Gemfile.lock` とは版が違いうる）→ `rake bundle:check`
 - `bundle exec rake migration:run` → `bundle exec rubocop` → `bundle exec rake config:lint` → `bundle exec rake test`
 
 ## ディレクトリ構成（主要）
@@ -193,9 +195,9 @@ GitHub Actions (`.github/workflows/test.yml`):
 ```text
 app/lib/tomato_shrieker/
   source/         # データソース (7種)
-  shrieker/       # 投稿先 (6種)
+  shrieker/       # 投稿先
   daemon/         # SchedulerDaemon
-  model/          # Entry (Sequel::Model)
+  model/          # Entry・SourceRunLog・SilenceAck (Sequel::Model)
   service/        # SlackService, MulukhiyaService
   cli/            # CLI コマンド (Thor)
   monitor/        # 監視用 HTTP (MonitorApp / MonitorServer)・SourceStatus・SourceCollisions
@@ -293,13 +295,14 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 - **プロジェクト共有すべき知見** → `docs/` 配下の git 管理下のファイルに記載する。⚠ **メモリにだけ置かない**
 - 🔴 **書く先を間違えない。**`CLAUDE.md` は**毎回読む必要があるもの**だけに絞る（自動ロードされる唯一のファイルなので、太らせると毎回のコストになる）。領域ごとの詳細は [monitoring.md](monitoring.md) / [sources.md](sources.md) / [daemon.md](daemon.md) / [sync スキル](../.claude/skills/sync/SKILL.md) へ。⚠ **どちらか迷うなら「この話を知らずに作業を始めると事故るか」で決める**
-- **進捗の同期** → `MEMORY.md` だけでなく `docs/` 側も更新すること
+- **仕様が変わったら** → `MEMORY.md` だけでなく `docs/` 側も更新すること（進捗は GitHub の Issue / Milestone が正本）
 
 ## 関連リポジトリ
 
 - [ginseng-core](https://github.com/pooza/ginseng-core) — 基盤ライブラリ（branch: main）
 - [ginseng-fediverse](https://github.com/pooza/ginseng-fediverse) — Fediverse 対応
 - [ginseng-youtube](https://github.com/pooza/ginseng-youtube) — YouTube 対応
+- [ginseng-piefed](https://github.com/pooza/ginseng-piefed) — PieFed 対応
 - [mulukhiya-toot-proxy](https://github.com/pooza/mulukhiya-toot-proxy) — 姉妹プロジェクト（構成が類似）
 - [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) — Google News redirect URL 解決ツール（scylla 上で systemd 稼働、Node.js + Playwright）。tomato-shrieker の管理対象に含む
 - [chubo2](https://github.com/pooza/chubo2) — itamae ベースの構成管理。インフラ課題の issue 管理先

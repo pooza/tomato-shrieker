@@ -6,7 +6,8 @@ daemon-spawn gem は廃止済み（#1388）。`Ginseng::Daemon` はスタンド�
 
 - **FreeBSD (rc.d)**: `daemon(8)` でバックグラウンド化。stop は `bin/scheduler_daemon.rb stop`（PID ファイル経由で TERM 送信）
 - **Linux (systemd)**: `Type=simple`、`ExecStop=/bin/kill -TERM $MAINPID`
-- **デプロイ時**: rc.d スクリプト / systemd unit の更新が必要（[config/sample/](../config/sample/) 参照）
+- 3.x から上げるときは、起動方式が変わったので unit / rc.d を差し替える（[config/sample/](../config/sample/)）
+- ⚠ sample は rc.d / systemd とも `bash -lc` で起動する＝ rbenv の初期化が bash の login shell で効いている必要がある（効いていないと system ruby を掴んで `Bundler::RubyVersionMismatch`）
 
 ## 起動チェーン
 
@@ -61,7 +62,7 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
 
 ⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `action` / `at` / `result` / `error`）を読み、HUP の前から `count` が進み、かつ `action: reload` の回が来るまで待つ（既定 30 秒・`--timeout`）。⚠ 起動時の登録（`action: register`）の完了では返さない（#1716）。⚠ **daemon を再起動するまでは使えない。**pull した後・再起動する前の古い daemon は `reload` を持たないので、HUP を送る前にエラーで断る。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
 
-⚠ **reload は設定ファイル（`local.yaml` / `application.yaml`）も読み直すが、起動時に組み立てたもの（Sentry の初期化・監視サーバーの `bind` / `port` など）には効かない。**漏洩対応でマスク設定やトークンを差し替えたときは、「reload requested」を見て反映済みと思わず、**再起動する**（#1575）。
+⚠ **reload は設定ファイル（`local.yaml` / `application.yaml`）を読み直さない**（下の「reload するのは『ソース定義』だけ」）。漏洩対応でマスク設定やトークンを差し替えたときは、**再起動する**（#1575）。
 
 `source reload` は `tmp/pids/SchedulerDaemon.pid` を読んで **SIGHUP** を送る。daemon 側は trap で Queue に積み、専用スレッドが `Scheduler#reload` を呼ぶ。⚠ **trap 文脈では Mutex を取れない**（`ThreadError`）ので、trap で直接 reload してはいけない。
 
@@ -101,8 +102,3 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
 - ⚠ **本番のチェックアウトを `git` で覗くときは必ず `deploy` ユーザーで。**`ssh oscura 'git -C ~deploy/repos/tomato-shrieker log'` は `detected dubious ownership` で落ちる。`sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && git log"` と書く（`sudo -u deploy` では rbenv が効かず system ruby になるので `-i` が要る）。⚠ **`-iu` は改行を潰す**ので、複数行のコマンドは `sudo -H -u deploy bash -lc "…"` で書く
 - 本番デーモンは必ず OS のサービス管理経由 (`systemctl restart tomato-shrieker` / `service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
 - Monit を停止/再開する際は事前にユーザーに確認する
-
-## seas (FreeBSD) 固有
-
-- v4.0 の sample rc.d (`config/sample/freebsd/tomato_shrieker`) は `bash -lc` でデーモンを起動する。pooza の rbenv init は `.zshenv` にしかなく bash login shell では拾えないため、`~/.bash_profile` に `eval "$(rbenv init - bash)"` を追加してある。この dotfile が消えると rc.d が system ruby を掴んで `Bundler::RubyVersionMismatch` になる
-- 監視エンドポイントの `/monitor/bind` は Tailscale IP `100.99.186.51` 固定で loopback 以外に漏らさない。ipfw は `tailscale0 interface 全許可` ルール (60020) を `/usr/local/etc/ipfw.rules` に永続化済。Kuma からは MagicDNS で `http://seas.tailf29562.ts.net:4567/healthz` を叩く

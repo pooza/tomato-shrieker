@@ -179,7 +179,7 @@ bin/shrieker source ack ID
       "id": "matrix-news",
       "class": "TomatoShrieker::FeedSource",
       "schedule": {"type": "every", "value": "5m"},
-      "grace_seconds": 600,
+      "grace_seconds": 7200,
       "last_run_at": "2026-04-14T14:00:00+09:00",
       "first_run_deadline": null,
       "next_run_at": "2026-04-14T14:05:00+09:00",
@@ -206,7 +206,7 @@ bin/shrieker source ack ID
       "acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
-      "shrieker_errors": {"MastodonShrieker": 1}
+      "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1}
     }
   ]
 }
@@ -411,14 +411,6 @@ HTTP(s) Monitor:
 
 ## 運用: 監視ホストから tomato-shrieker への到達経路
 
-`/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト (Kuma 等) から /healthz を叩く経路は環境に応じて選択する:
+`/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト（Kuma 等）から `/healthz` を叩く経路（VPN・SSH トンネル・同居・ファイアウォールでの IP 制限）の選び方は、利用者向けに Wiki「監視」にある。
 
-| 方式 | Pros | Cons / 注意点 |
-|------|------|----------------|
-| **Tailscale** | お手軽、ACL 一式、暗号化、NAT 越え | FreeBSD では Tier 2 扱い (`pkg install tailscale`、ports `net/tailscale`)。userspace で動くがカーネル統合はない |
-| **WireGuard** | ネイティブ、軽量、FreeBSD は kernel module あり | ACL 等は別途 |
-| **Reverse SSH tunnel** | 既存の SSH 鍵運用に乗せられる | tunnel プロセスの監視が別途必要 |
-| **同一ホストに Kuma 同居** | ネットワーク経路ゼロ、127.0.0.1 で完結 | Kuma の UI を見る側で別途 SSH ポートフォワード等が必要 |
-| **Firewall + IP 制限** | VPN 不要 | 監視ホストの固定 IP が前提。bind を 0.0.0.0 にする必要あり |
-
-⚠ この表は本番が seas (FreeBSD) だった頃の検討。**いまの本番は oscura（Ubuntu / systemd）で、`local.yaml` で `bind: 0.0.0.0` にして LAN / VPN 内の Kuma から叩いている**（アクセス制限が無い点は #1531）。Tailscale が動かない OS でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。
+本番は `local.yaml` で `bind: 0.0.0.0` にし、ホストのファイアウォールで 4567 を監視ホストにだけ開けている（構成管理は chubo2・#1531 → chubo2#200）。どの OS でも上の代替のどれかで届くので、**監視機能の有無で OS サポートの判断を変える必要はない**。
