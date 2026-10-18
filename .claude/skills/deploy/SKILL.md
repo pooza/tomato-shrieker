@@ -17,7 +17,7 @@ disable-model-invocation: true
 .claude/skills/deploy/scripts/pull.sh
 ```
 
-本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝CommandSource の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
+本体と、サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`＝コマンドを走らせるソース（CommandSource と `/source/ical/command` の IcalendarSource）の実行対象。それぞれ独立した Gemfile を持つ）を pull し、`bundle install` して `bundle check` で確かめる。⚠ 再起動はしない。
 
 ## 2. 再起動で増減するソースと、起動で倒れる定義の確認
 
@@ -64,7 +64,7 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 - **Ruby のマイナー更新**（例: 4.0.5 → 4.0.6）で gem ディレクトリが総入れ替えになる。本体だけ `bundle install` してサテライトを忘れると、**サテライトだけが `Bundler::GemNotFound` で全滅**する（2026-08-03 に実際に発生。`loquat` / `shooby-do-bop` / `dqdai-anniv` の 7 ソースが `timecop` 欠落で 24 時間エラー）
 - ginseng-\* gem は `branch: main` 追いなので、`Gemfile.lock` が同じでも中身が動く
 
-⚠ **サテライトの `.ruby-version` は当てにならない。**scheduler_daemon の環境には `RBENV_VERSION` が入っており、それが子プロセスへそのまま継承される。つまりサテライトは自分の `.ruby-version` ではなく **本体と同じ Ruby で動く**（[CommandSource の子プロセス実行](../../../docs/CLAUDE.md#commandsource-の子プロセス実行) 参照）。`bundle install` も同じバージョンを明示して実行すること。
+⚠ **サテライトの `.ruby-version` は当てにならない。**サテライトは自分の `.ruby-version` ではなく **本体と同じ Ruby で動く**（理由は [docs/CLAUDE.md](../../../docs/CLAUDE.md) の「コマンドを走らせるソース（CommandRunner）の子プロセス実行」）。`bundle install` も同じバージョンを明示して実行すること（`pull.sh` は `RBENV_VERSION=$RV`）。
 
 ⚠ `git pull` を引数なしで打つと `There is no tracking information for the current branch.` で止まる。itamae の `git` リソースが upstream 追跡を持たないローカルブランチ `deploy` に着地させるため。本体は必ず **`git pull origin main`** と書く（ブランチ名が実行ユーザー名と同じなのは偶然）。
 

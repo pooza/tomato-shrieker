@@ -23,7 +23,7 @@ disable-model-invocation: true
 
    ⚠ **`gh release create vX.Y.Z --target main` は使わない。**projects-classic 廃止の GraphQL エラーで落ちることがある。リリースノートの方針は [docs/CLAUDE.md](../../../docs/CLAUDE.md#リリースノート)
 6. **デプロイ**: [deploy スキル](../deploy/SKILL.md)。⚠ **本番に出す＝リリースする。**タグを打っていない版を本番へ出さない。⚠ これも明示呼び出しなので、ユーザーに `/deploy` の実行を頼む
-7. **Issue を閉じる。**⚠ `develop` 向けの PR は Issue を自動で閉じないので、マイルストーンの Issue はリリースで閉じる。マイルストーンも閉じる
+7. **Issue を閉じる。**⚠ `develop` 向けの PR は Issue を自動で閉じないので、マイルストーンの Issue はリリースで閉じる。⚠ コミットメッセージに `#N` と書いただけの参照も、main へのマージでは閉じない。マイルストーンも閉じる
 8. **docs の追従**: リリースで変わった仕様が `docs/` に反映されているか確かめる
 9. **[Wiki](https://github.com/pooza/tomato-shrieker/wiki) を追従させる**（クローンは `~/repos/tomato-shrieker.wiki`・ブランチは `master`）。⚠ **Wiki は利用者向けの正本。**`docs/` は開発者向けなので、両方を更新しないと利用者から見た仕様が古いまま残る
 

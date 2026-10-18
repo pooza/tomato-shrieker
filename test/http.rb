@@ -2,11 +2,9 @@ module TomatoShrieker
   class HTTPTest < TestCase
     URL = 'https://example.com/feed.rss'.freeze
 
-    # ⚠ TestCase は webmock を require して WebMock::API を include しているだけで、
-    # WebMock.enable! を呼んでいない (#1468)。有効化しないと stub_request は何も
-    # 傍受せず、実 example.com の 404 を拾って通ってしまう（実際に踏んだ）。
-    # ⚠ 全体で有効化すると実サーバーへ出ている既存テストが全部落ちるので、
-    # このテストケースの中だけで開閉する。
+    # ⚠ 有効化しないと stub_request は何も傍受せず、実 example.com の 404 を拾って
+    # 通ってしまう（#1468 で実際に踏んだ）。いまは TestCase が毎テスト有効化しているが、
+    # このケースは傍受が前提なので、ここでも明示しておく。
     def setup
       WebMock.enable!
       WebMock.disable_net_connect!

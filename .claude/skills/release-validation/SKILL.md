@@ -16,8 +16,8 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 ## 前提
 
 - ローカルに `bundle install` 済みで `bin/shrieker` が動くこと
-- Google News Cleaner (`http://scylla.b-shock.local:3000/clean`) に到達できること（GoogleNewsSource の検証時のみ）。⚠ 2026-08-01 に kues から scylla へ移設済み
-- PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82) に投稿可能なアカウント情報。**2026-08-03 に疎通を確認したのは `tkoishi+test@b-shock.co.jp`**（`user_id` にメールアドレスをそのまま書ける）。⚠ **パスワードはリポジトリにも本番にも無い。**`config/sources/test-google-news-piefed.yaml` はローカルにしか存在せず（`config/sources/.gitignore` が `*`）、oscura / seas の `config/local.yaml` にも piefed の項目は無い
+- Google News Cleaner (`http://scylla.b-shock.local:3000/clean`) に到達できること（GoogleNewsSource の検証時のみ）
+- PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82) に投稿可能なアカウント情報。疎通を確認したアカウントはメモリにある（`user_id` にメールアドレスをそのまま書ける）。⚠ **パスワードはリポジトリにも本番にも無い。**`config/sources/test-google-news-piefed.yaml` はローカルにしか存在せず（`config/sources/.gitignore` が `*`）、本番の `config/local.yaml` にも piefed の項目は無い
 
 ## テスト用ソースの配置
 
@@ -29,7 +29,7 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 .claude/skills/release-validation/scripts/install_sources.sh
 ```
 
-⚠ **既にあるファイルは上書きしない。**`test-google-news-piefed.yaml` はテンプレートの `password` が置き換え前のままなので、**新しく置いたときだけ**手でテストアカウントのパスワードを入れる。
+⚠ **既にあるファイルは上書きしない。**`test-google-news-piefed.yaml` はテンプレートの `user_id` と `password` が置き換え前のままなので、**新しく置いたときだけ**手でテストアカウントの値を入れる（アカウントはメモリにある）。
 
 ⚠ **`test-google-news-piefed.yaml` 以外は `bin/shrieker source validate` が NG を返す。これは想定どおりで、検証手順上は正常。**4.5.0 (#1473) でスキーマに「有効なソースは `dest` に配信先を 1 つ以上持つ」を入れたため、意図的に投稿先を持たないこれらのテンプレートは契約違反になる。⚠ **検証を邪魔しないよう `source validate` はチェックリストに入れていない**が、他の目的で流したときに新規の不具合と誤読しないこと。宛先をステージングに向けて解消する作業は #1481。
 
@@ -184,7 +184,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload   # �
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
 - [ ] ⚠ **PieFed の実投稿は、タグ以外も見る (#1673)。**投稿ページにタグのリンクが出る／本文に `#tag` の文字が残っていない／タイトル・本文・URL・サムネイルが作成時のまま／「編集済み」と出る（仕様）／ログに `tags not attached` が無い
 - [ ] ⚠ **監視の新しい判定を 1 回ずつ通す（4.15.0）。**reload の節の `test-reload-probe` を足した直後に `curl -s http://127.0.0.1:4567/healthz/source/test-reload-probe` が 200 `OK (awaiting first run, due by …)`（#1560）／定義の判別キーを打ち間違えて（`feed` → `feeed`）HUP を直接送ると 503 `no source class matched`・`/status.json` に `class: null` の行（#1605。⚠ `source reload` は拒否するので `kill -HUP` で）／`/status.json` の行に `acknowledged_at`・`lost_entries`・`entry_stage`・`first_run_deadline` があり、`silence_acknowledged_at` が無い（#1567）
-- [ ] ⚠ **`/status.json` の所要時間を測る（#1472）。**予算は 900ms。4.16.0 の本番は 0.94〜1.01 秒で超えていた。4.17.0 で重複クエリをまとめ（1 ソース 11 本 → 8 本）、`error_rate` を SQL で数え、部分索引（migration 014）を足した。本番 DB のコピーでは全ソースの組み立てが 430〜700ms → 130〜220ms。`curl -s -o /dev/null -w '%{time_total}\n' http://127.0.0.1:4567/status.json` を 3 回
+- [ ] ⚠ **`/status.json` の所要時間を測る（#1472）。**予算は 900ms（4.17.0 の本番は 0.26〜0.28 秒）。`curl -s -o /dev/null -w '%{time_total}\n' http://127.0.0.1:4567/status.json` を 3 回
 - [ ] ⚠ **`ginseng-fediverse` のタグ判定が動いたリリースでは、配信済みエントリの新旧差分を取る**（上記 5）。差分が出たら**全角 ＃ 系（`precure-petitcure`）と `#NNN` 系（GitHub releases）の投稿本文**を投稿先で実視認する
 - [ ] ⚠ **`partial` / `undelivered` を意図的に起こして 503 の本文を確かめる。**本番の run_log には `partial` も `undelivered` も `shrieker_errors` も **1 件も無い**（2026-09-05 実測）ので、#1506 / #1507 で直した経路は**実データでは一度も通っていない**。ステージング宛ソースの宛先を 1 つ壊して起こすこと。📌 4.10.0 では `test-google-news-piefed.yaml` を写した一時ソースに届かない webhook（`https://example.test/...`）を足し、数分後の cron で 1 回だけ daemon に走らせた＝ PieFed へ 1 件・webhook は失敗で `partial` / `undelivered: true` の 503 になる。⚠ run_log は daemon 経由の実行でしか書かれない（`source shriek` では書かれない）
   - 🔴 **一時ソースの ID を使い回すなら、発火の前に `bin/shrieker source clear <id>` する。**⚠⚠ **Entry が残ったまま走らせると「新着を全部投稿」になる**（最新 1 件だけなのは初回だけ）

@@ -28,6 +28,7 @@ description: セッション開始時の進捗同期。「進捗を同期して�
 
 - `gh api repos/pooza/tomato-shrieker/dependabot/alerts` で open アラートを確認
 - 0件なら対応不要、あれば提案
+- ⚠ 手元で `bundler-audit` を回すなら `bundle exec` を付けずに `bundler-audit check --update`（Gemfile に入っていないのでシステムの gem を使う）
 
 ## 4. Codexレビューコメントの確認
 
@@ -57,7 +58,7 @@ description: セッション開始時の進捗同期。「進捗を同期して�
 
 🔴 **毎回必ず実行する。**`Gemfile.lock` は git 参照のリビジョンを固定するので、**放っておくと何ヶ月も進まず、security 修正だけが届かない状態になる**。2026-08-21 の sync では `ginseng-core` が **82 コミット遅れ**（1.15.28 → 1.19.0）で、SSRF 対策・ログの資格情報スクラブが丸ごと未達だった。⚠ **この手順が空だったことが原因**。
 
-⚠ **サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`）も対象。**本体だけ追随すると CommandSource の 7 ソースだけ古い gem で動き続ける。
+⚠ **サテライト 3 本（`loquat` / `shooby-do-bop` / `dqdai-anniv`）も対象。**本体だけ追随すると、コマンドを走らせるソースだけ古い gem で動き続ける。
 
 🔴 **tomato 自身は `origin/develop` から読む (#1550)。**⚠ **`origin/HEAD` は `main` ＝ リリース済みの版**で、日常の作業は `develop`。main と develop でピンが違う期間、`origin/HEAD` を読むと**すでに `develop` で追随済みのものをもう一度上げようとするか、`develop` 側の乖離を見落とす**。⚠ **サテライト 3 本はそれぞれの default ブランチのまま**（`shooby-do-bop` は `master`）。
 
@@ -101,7 +102,7 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 
 ### サテライト 3 本の open PR / issue と CI
 
-🔴 **毎回実行する。**`loquat` / `shooby-do-bop` / `dqdai-anniv` は **CommandSource の 7 ソースの実体**だが、tomato 側からは見えないので**放置されても誰も気づかない**。⚠ **上流（`ginseng-style` / `ginseng-*`）はこちらへ PR / Issue を送ってくるので、受け取りが止まると横断の変更がここで詰まる。**
+🔴 **毎回実行する。**`loquat` / `shooby-do-bop` / `dqdai-anniv` は **コマンドを走らせるソース（CommandSource と `/source/ical/command` の IcalendarSource）の実体**だが、tomato 側からは見えないので**放置されても誰も気づかない**。⚠ **上流（`ginseng-style` / `ginseng-*`）はこちらへ PR / Issue を送ってくるので、受け取りが止まると横断の変更がここで詰まる。**
 
 ```sh
 .claude/skills/sync/scripts/satellites.sh
@@ -115,7 +116,7 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 
 🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。
 
-📌 **2026-09-05 時点で 56 ソース / 56 モニターが一致し、全部 active。**（2026-08-21 は 39 に対し 24＝15 ソースが不可視だった。）**「登録を義務づける運用」で塞ぐ**という #1508 の案 A が成立している状態なので、**この突き合わせがその唯一の担保**になる。
+📌 **2026-09-05 に初めてソースとモニターが全件一致した**（2026-08-21 は 39 に対し 24＝15 ソースが不可視だった。いまの件数は MEMORY の「現在の状態」）。**「登録を義務づける運用」で塞ぐ**という #1508 の案 A が成立している状態なので、**この突き合わせがその唯一の担保**になる。
 
 ```sh
 .claude/skills/sync/scripts/kuma_diff.sh
@@ -128,7 +129,7 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 
 🔴 **ソース側へ `error_streak_threshold` を移したら、そのモニターの `maxretries` は 0 に戻す (#1558)。**⚠⚠ **両方残すと猶予が掛け算になる**（ソース側 N run × Kuma の再試行）。⚠ Kuma の登録は UI での手作業なので、移行は 1 セットで扱うこと。
 
-⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。📌 **YouTube 4 本は 2026-10-01 に 0 へ戻した（#1584）**＝しきい値はソース側の `error_streak_threshold: 28` に一本化。いまの `maxretries` は **0×39 / 2×17**。⚠ **残り 17 本は GitHub の `releases.atom`（エラー率 0%）なので漏れ出しではなく単なる余裕**＝触らない。
+⚠ **`interval` / `maxretries` のばらつきも読む。**⚠⚠ **ここに散らばりがあるのは、ソース側に置けない調整が Kuma へ漏れ出している印**（#1558）。2026-09-05 の実測は `interval` が 300s×35 / 900s×4 / 1800s×17、`maxretries` が 0×35 / 2×21 で、**2 が付いている 21 本＝ YouTube 4 本＋新規リポジトリ 17 本**＝外部が不安定なぶんを Kuma 側で吸収している。📌 **YouTube 4 本は 2026-10-01 に 0 へ戻した（#1584）**＝しきい値はソース側の `error_streak_threshold: 28` に一本化。⚠ **残りの 2 は GitHub の `releases.atom`（エラー率 0%）なので漏れ出しではなく単なる余裕**＝触らない。
 
 ⚠ **機械的に全部足すのが正解とは限らない。**モニターが増えると Kuma 側（SQLite の単一ライタ）が詰まるので、[chubo2 の infra-note](https://github.com/pooza/chubo2/blob/main/docs/infra-note.md) のチェック間隔ティア分けに沿って、**赤で気づきたいものを選んで足す**。
 
@@ -136,11 +137,10 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 
 ⚠ **アプリ側で回避策を持たない。**gem を直せば済むと分かったら、**該当 gem のリポジトリに Issue を立てる**。横断の話（RuboCop 設定・規約・CI）は [pooza/ginseng-style](https://github.com/pooza/ginseng-style) へ。ginseng-* は自走しており、Issue / PR は埋もれない。
 
-> **TODO**: chubo2 インフラノート（`pooza/chubo2` の `docs/infra-note.md`）との連携が整ったタイミングで手順を追加する。
 
 ## 7. マイルストーンの状態確認
 
-- `docs/CLAUDE.md` と MEMORY.md に記載された次期マイルストーンの Issue が、実際の GitHub 上の状態（open/closed）と一致しているか確認
+- MEMORY.md に書いた次期マイルストーンの Issue が、実際の GitHub 上の状態（open/closed）と一致しているか確認
 - クローズ済みの Issue があれば MEMORY.md から除外し、`docs/CLAUDE.md` も必要に応じて更新
 
 ### 未割当と保留の確認
