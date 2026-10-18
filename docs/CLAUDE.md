@@ -170,6 +170,19 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
   本番のスケジューラに登録される。⚠ テストファイルの `at_exit` は掃除に使えない
   （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）
 
+### テストの罠
+
+どれも実際に踏んだもの。
+
+- 🔴 **`rake test` は同時に 2 本走らせない。**DB を共有しているので、並走すると偽のエラーが出る（#1573 の後も 2〜9 件）。レビューのエージェントを並列で回すときも、エージェントには走らせない
+- 🔴 **結果は本数も見る (#1668)。**テストの途中で `exit` が呼ばれると、残りが走らないまま「0 failures・100% passed」で終わる（410 → 137 本になったのを本数で気づいた。CI は本数を見ない）。CLI の終了コードは `exit` ではなく `Thor::Error` で返す
+- **omissions が増えていたら、書いたテストが走っていないことを疑う。**Shrieker のテストクラスは `disable?` でケースごと省略される（#1520）
+- **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする
+- **`Sentry.initialized?` は Sentry 自身の singleton class に生えている。**`remove_method` で戻すと本物ごと消えるので、元の `Method` を保存して差し戻す
+- **`stub_request(...).to_return(body: <組み立て>)` は、本文の組み立てで例外が出ると、応答を定義していない stub だけが残って空の 200 を返す。**本文を先に組んでから登録する
+- **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（4 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
+- **tomato に Timecop は無い。**時刻を差し替えるなら `Time.now` を stub する。⚠ `Time#utc` は破壊的なので、同じ `Time` を返すと途中で UTC に変わる（`{fake.dup}` で返す）
+
 ### Schema 設計の指針 (required の意味論)
 
 ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (application.yaml + local.yaml) を検証する。これに伴い required の意味は **「merged 後の最終 config に必ず存在すべきキー」** に統一されている。
@@ -235,6 +248,14 @@ RuboCop の設定も同じ gem が持つ（`.rubocop.yml` は `inherit_gem` で�
 
 - テスト: test-unit (`TomatoShrieker::TestCase` 基底クラス)
 - `.rubocop.yml` に残している差分は `TargetRubyVersion` と `rubocop-sequel`（`Sequel/*`）だけ
+
+### 資格情報のマスクは `Ginseng::Masking` に任せる
+
+- **利用側で同じものを書かない。**伏せる対象の一覧が 2 か所に分かれて、必ずずれる。public なのは `mask` / `mask_url` / `mask_urls_in` だけ
+- **通せなかったら出さない（fail closed）。**Sentry はイベントを捨て、`Package.error_message` は例外のクラス名だけを残す。素通しで送るほうが事故が大きい
+- ⚠ **`to_utf8` の後でマスクを通す。**不正なバイト列のまま `gsub` すると `ArgumentError` になり、マスクごと素通りする
+- ⚠ 資格情報を含まない URL は残す（`channel_id` まで消すと、どのフィードが壊れたのか分からなくなる）
+- **テストは「マスクを呼んでいる」ではなく「出力に含まれていない」を見る。**Sentry は `event.to_json_compatible.to_json`（実際に送られる形）で確かめる
 
 ### 例外メッセージは `Package.error_message` を通す
 

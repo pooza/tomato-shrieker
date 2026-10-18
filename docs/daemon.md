@@ -91,6 +91,8 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
 
 ⚠ **自動 reload はしない。**`add` / `edit` の契約を 1 つずつのままに保つため（`source add` は $EDITOR を開く**前に**スキーマ妥当な雛形を書くので、ファイル監視だと `example.com` へ投げるジョブが即座に立つ）。⚠ **監視エンドポイントに `POST /reload` も置かない。**読み取り専用だった監視面が制御面になる。
 
+⚠ rufus-scheduler の挙動で踏みやすいもの: 過去の時刻を指した `at` のジョブは捨てられる（登録しても発火しない）。`every` の戻り値はジョブではなく job_id の文字列。
+
 ⚠ **シグナルは非同期なので、`--wait` なしの CLI は「要求した」までしか言えない。**結果はログの `{"scheduler":"reload","added":[...],"removed":[...],"changed":[...],"failed":[...],"unmatched":[...]}` 行で見る（起動時の初回登録は `"scheduler":"register"`）。⚠ **`failed` は register が例外を上げたもの、`unmatched` は判別キーがどのソースクラスにも一致しなかったもの**で、どちらも古いジョブがあればそのまま残る（同期で受け取るなら `--wait`・#1529）。daemon が停止中なら「次回起動時に読み込まれます」と言って正常終了し、`:unknown`（EPERM ＝ pid のプロセスに触れない）はエラーにする。⚠ **`:unknown` を `:dead` と混ぜない。**
 
 ## デプロイ手順
@@ -102,3 +104,4 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
 - ⚠ **本番のチェックアウトを `git` で覗くときは必ず `deploy` ユーザーで。**`ssh oscura 'git -C ~deploy/repos/tomato-shrieker log'` は `detected dubious ownership` で落ちる。`sudo -iu deploy bash -lc "cd ~/repos/tomato-shrieker && git log"` と書く（`sudo -u deploy` では rbenv が効かず system ruby になるので `-i` が要る）。⚠ **`-iu` は改行を潰す**ので、複数行のコマンドは `sudo -H -u deploy bash -lc "…"` で書く
 - 本番デーモンは必ず OS のサービス管理経由 (`systemctl restart tomato-shrieker` / `service tomato_shrieker restart` 等) で操作する。SSH ワンライナーで `scheduler_daemon.rb start` を直接呼ぶとセッション切断時にプロセスが死ぬ（v3.9.10 インシデントの教訓）
 - Monit を停止/再開する際は事前にユーザーに確認する
+- **配信を 1 件だけ流し直すときは `source clear` を使わない。**`clear` は Entry を全部消すので、次の実行でフィードの全件を投稿し直す。消すのは対象の 1 件だけ（sqlite で該当の entry を DELETE）にして `bin/shrieker source shriek <ID>`。⚠ 宛先が複数あるソースでは、届いていたほうにも重複が 1 件出る。⚠ `source shriek` は run_log を書かないので、成否は HTTP のログで見る

@@ -28,6 +28,7 @@ description: セッション開始時の進捗同期。「進捗を同期して�
 
 - `gh api repos/pooza/tomato-shrieker/dependabot/alerts` で open アラートを確認
 - 0件なら対応不要、あれば提案
+- ⚠ 手元で `bundler-audit` を回すなら `bundle exec` を付けずに `bundler-audit check --update`（Gemfile に入っていないのでシステムの gem を使う）
 
 ## 4. Codexレビューコメントの確認
 

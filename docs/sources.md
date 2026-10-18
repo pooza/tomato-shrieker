@@ -83,6 +83,10 @@ dest:
 - `/source/keyword` — 含むエントリのみ対象（正規表現可）
 - `/source/negative_keyword` — 含まないエントリのみ対象（正規表現可）
 
+## 取得の 404 の再送（FeedSource）
+
+FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found`・#1500。取得元が間欠的に 404 を返すことがあるため）。⚠ **効かせるのは取得の GET だけ。**全体で有効にすると、宛先への POST の恒久的な 404（#1455）まで再送してしまう。既定の `false` を崩さない。
+
 ## 実装に無いキー（FeedSource）
 
 ⚠ 以前ここにあった `/dest/multi_entries` / `/dest/limit` / `/source/title/unique` は実装に無い（書くと `source validate` が NG にする）。
