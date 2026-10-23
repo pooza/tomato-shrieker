@@ -10,15 +10,15 @@ for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
     /github\.com\/pooza\/ginseng-/{g=$2; sub(/.*\//,"",g); sub(/\.git/,"",g); r=""; t="-"; f=1}
     f&&/revision:/{r=$2} f&&/ tag:/{t=$2} f&&/specs:/{print g, r, t; f=0}' |
   while read -r gem rev tag; do
-    if [ "$tag" != - ]; then
-      # タグ固定の gem は main と比べない（main には未タグのコミットが常に積まれている）。
-      # gh api は HTTP エラーでも本文を標準出力へ出すので、終了コードで見る。
-      latest=$(gh api "repos/pooza/$gem/tags" --jq '.[0].name' 2>/dev/null) || latest=""
-      if [ -z "$latest" ]; then lag=""
-      elif [ "$tag" = "$latest" ]; then lag=0
-      else lag="$tag → $latest"; fi
+    # main とは比べない。タグ前のコミットは追随しないので、遅れは最新タグまでで数える。
+    # gh api は HTTP エラーでも本文を標準出力へ出すので、終了コードで見る。
+    latest=$(gh api "repos/pooza/$gem/tags" --jq '.[0].name' 2>/dev/null) || latest=""
+    if [ -z "$latest" ]; then lag=""
+    elif [ "$tag" != - ]; then
+      if [ "$tag" = "$latest" ]; then lag=0; else lag="$tag → $latest"; fi
     else
-      lag=$(gh api "repos/pooza/$gem/compare/$rev...main" --jq .ahead_by 2>/dev/null) || lag=""
+      lag=$(gh api "repos/pooza/$gem/compare/$rev...$latest" --jq .ahead_by 2>/dev/null) || lag=""
+      [ -n "$lag" ] && [ "$lag" != 0 ] && lag="$lag（→ $latest）"
     fi
     printf '%-16s %-18s %s\n' "$d" "$gem" "${lag:-?}"
   done
