@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 92d2a2fead467493cc25e1cdb2bd7daef2d84cec
+  revision: 839d73090c0be958f4f701fe9556283788b493b8
   branch: main
   specs:
-    ginseng-core (4.0.0)
+    ginseng-core (4.1.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -43,10 +43,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 2f216baf34d06132fe4ebcff5f64903b503ebab8
+  revision: 3e9ad942aac9a454465efbffc989535e196095fb
   branch: main
   specs:
-    ginseng-piefed (0.4.0)
+    ginseng-piefed (0.4.1)
       ginseng-core (>= 2.0.0)
 
 GIT
@@ -108,7 +108,7 @@ GEM
     crack (1.0.1)
       bigdecimal
       rexml
-    crass (1.0.7)
+    crass (1.0.8)
     csv (3.3.6)
     date (3.5.1)
     drb (2.2.3)
@@ -257,8 +257,8 @@ GEM
     ruby-progressbar (1.13.0)
     rufus-scheduler (3.9.2)
       fugit (~> 1.1, >= 1.11.1)
-    sanitize (7.0.0)
-      crass (~> 1.0.2)
+    sanitize (7.0.1)
+      crass (~> 1.0.8)
       nokogiri (>= 1.16.8)
     sax-machine (1.3.2)
     securerandom (0.4.1)
