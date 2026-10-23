@@ -171,7 +171,7 @@ bin/shrieker source ack ID
 {
   "scheduler": true,
   "database": true,
-  "ruby": {"version": "4.0.7", "yjit_available": true, "yjit_enabled": true},
+  "ruby": {"version": "4.0.9", "yjit_available": true, "yjit_enabled": true},
   "reload": {
     "count": 3,
     "action": "reload",
