@@ -8,7 +8,7 @@ keep:
 dest:
   piefed:
     host: pf.korako.me
-    user_id: tkoishi+test@b-shock.co.jp
+    user_id: <テストアカウントの user_id>
     password: <テストアカウントのパスワード>
     community_id: 82
   tags:

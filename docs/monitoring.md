@@ -104,6 +104,11 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 
 **サイレント不発の判定 (#1470)** は `silence_tolerance` を宣言したソースだけが対象（opt-in）。`chikanan` のように年単位で正常に静かなソースがあるため、一律の既定値は置かない。
 
+**値の決め方**: 観測した最大の無配信間隔の **2 倍以上**で丸める（`p95` ではなく `max`。過検知は監視の信頼を壊す）。⚠ run_log から根拠を取るときの罠が 2 つある。
+
+- ⚠ **測れるのは `retention_days`（14 日）まで。**それより長い間隔は run_log からは見えない
+- ⚠ **prune の保護行（最古の run など）を窓に混ぜると、偽の巨大な間隔が出る。**必ず `executed_at >= <今日 - retention_days>` で窓を切ってから測る
+
 **沈黙を測る起点は「配信・確認・観測開始のうち最も新しいもの」(#1505)。**
 
 ```
@@ -166,7 +171,7 @@ bin/shrieker source ack ID
 {
   "scheduler": true,
   "database": true,
-  "ruby": {"version": "4.0.7", "yjit_available": true, "yjit_enabled": true},
+  "ruby": {"version": "4.0.9", "yjit_available": true, "yjit_enabled": true},
   "reload": {
     "count": 3,
     "action": "reload",
@@ -179,7 +184,7 @@ bin/shrieker source ack ID
       "id": "matrix-news",
       "class": "TomatoShrieker::FeedSource",
       "schedule": {"type": "every", "value": "5m"},
-      "grace_seconds": 600,
+      "grace_seconds": 7200,
       "last_run_at": "2026-04-14T14:00:00+09:00",
       "first_run_deadline": null,
       "next_run_at": "2026-04-14T14:05:00+09:00",
@@ -206,7 +211,7 @@ bin/shrieker source ack ID
       "acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
-      "shrieker_errors": {"MastodonShrieker": 1}
+      "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1}
     }
   ]
 }
@@ -411,14 +416,13 @@ HTTP(s) Monitor:
 
 ## 運用: 監視ホストから tomato-shrieker への到達経路
 
-`/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト (Kuma 等) から /healthz を叩く経路は環境に応じて選択する:
+`/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト（Kuma 等）から `/healthz` を叩く経路（VPN・SSH トンネル・同居・ファイアウォールでの IP 制限）の選び方は、利用者向けに Wiki「監視」にある。
 
-| 方式 | Pros | Cons / 注意点 |
-|------|------|----------------|
-| **Tailscale** | お手軽、ACL 一式、暗号化、NAT 越え | FreeBSD では Tier 2 扱い (`pkg install tailscale`、ports `net/tailscale`)。userspace で動くがカーネル統合はない |
-| **WireGuard** | ネイティブ、軽量、FreeBSD は kernel module あり | ACL 等は別途 |
-| **Reverse SSH tunnel** | 既存の SSH 鍵運用に乗せられる | tunnel プロセスの監視が別途必要 |
-| **同一ホストに Kuma 同居** | ネットワーク経路ゼロ、127.0.0.1 で完結 | Kuma の UI を見る側で別途 SSH ポートフォワード等が必要 |
-| **Firewall + IP 制限** | VPN 不要 | 監視ホストの固定 IP が前提。bind を 0.0.0.0 にする必要あり |
+本番は `local.yaml` で `bind: 0.0.0.0` にし、ホストのファイアウォールで 4567 を監視ホストにだけ開けている（構成管理は chubo2・#1531 → chubo2#200）。どの OS でも上の代替のどれかで届くので、**監視機能の有無で OS サポートの判断を変える必要はない**。
 
-⚠ この表は本番が seas (FreeBSD) だった頃の検討。**いまの本番は oscura（Ubuntu / systemd）で、`local.yaml` で `bind: 0.0.0.0` にして LAN / VPN 内の Kuma から叩いている**（アクセス制限が無い点は #1531）。Tailscale が動かない OS でも上記の代替で詰まないため、監視機能の有無で OS サポート判断を変える必要はない。
+## 本番のログと値を読むときの罠
+
+- **`next_run_at` は「直近の run ＋ 周期」で計算する。**`every` のソースは位相が起動時刻で決まるので、**再起動の直後の `next_run_at` は当てにならない**（初回は再起動の 1 周期後に来る）。一度も走っていないソースでは `null`
+- **ログは日次でローテートされる（本番は 00 時台）。**深夜をまたぐ集計や「今日のエラー 0」の判断では、ローテート済みの `.log.1.gz` も `zgrep` で含める。午前に今日のファイルだけを見ると、前日の夜のぶんを落とす
+- **ログの `"status":0` は、`"command"` キーと同居していればコマンドの終了コード（成功）。**HTTP の status ではない
+- **`source shriek` は run_log を書かない。**手で流し直しても `/status.json` と個別 healthz の 503 は次の定時実行まで消えない。成否は HTTP のログ（`"method":"POST"` と `status`）で数える

@@ -107,9 +107,10 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 | MastodonShrieker | Ginseng::Fediverse::MastodonService | Mastodon/Pleroma |
 | MisskeyShrieker | Ginseng::Fediverse::MisskeyService | Misskey |
 | LineShrieker | Ginseng::LineService | LINE メッセージング |
-| PiefedShrieker | (独自実装) | PieFed コミュニティ投稿 |
+| PiefedShrieker | Ginseng::Piefed::Service | PieFed コミュニティ投稿 |
 | NostrShrieker | (独自実装) | Nostr イベント ⚠ **動作保証対象外** |
 | WebhookShrieker | SlackService | Webhook (Slack, Discord等) |
+| TsunagalWebhookShrieker | WebhookShrieker | matrix-webhook 宛（`type: tsunagal`・[sources.md](sources.md)） |
 
 ⚠ **NostrShrieker は動作保証の対象外。**運用者が使っておらず、実運用での検証経路が無いため。リリース前検証（[release-validation スキル](../.claude/skills/release-validation/SKILL.md)）にも含めない。
 
@@ -169,6 +170,19 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
   本番のスケジューラに登録される。⚠ テストファイルの `at_exit` は掃除に使えない
   （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）
 
+### テストの罠
+
+どれも実際に踏んだもの。
+
+- 🔴 **`rake test` は同時に 2 本走らせない。**DB を共有しているので、並走すると偽のエラーが出る（#1573 の後も 2〜9 件）。レビューのエージェントを並列で回すときも、エージェントには走らせない
+- 🔴 **結果は本数も見る (#1668)。**テストの途中で `exit` が呼ばれると、残りが走らないまま「0 failures・100% passed」で終わる（410 → 137 本になったのを本数で気づいた。CI は本数を見ない）。CLI の終了コードは `exit` ではなく `Thor::Error` で返す
+- **omissions が増えていたら、書いたテストが走っていないことを疑う。**Shrieker のテストクラスは `disable?` でケースごと省略される（#1520）
+- **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする
+- **`Sentry.initialized?` は Sentry 自身の singleton class に生えている。**`remove_method` で戻すと本物ごと消えるので、元の `Method` を保存して差し戻す
+- **`stub_request(...).to_return(body: <組み立て>)` は、本文の組み立てで例外が出ると、応答を定義していない stub だけが残って空の 200 を返す。**本文を先に組んでから登録する
+- **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（4 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
+- **tomato に Timecop は無い。**時刻を差し替えるなら `Time.now` を stub する。⚠ `Time#utc` は破壊的なので、同じ `Time` を返すと途中で UTC に変わる（`{fake.dup}` で返す）
+
 ### Schema 設計の指針 (required の意味論)
 
 ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (application.yaml + local.yaml) を検証する。これに伴い required の意味は **「merged 後の最終 config に必ず存在すべきキー」** に統一されている。
@@ -186,6 +200,7 @@ ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (applica
 GitHub Actions (`.github/workflows/test.yml`):
 
 - Ruby 4.0 / Ubuntu
+- `config/local_sample.yaml` を `config/local.yaml` へ写す → `bundle install` → `rake bundle:update`（⚠ **ginseng-* を main の先頭へ上げてから走る**＝手元の `Gemfile.lock` とは版が違いうる）→ `rake bundle:check`
 - `bundle exec rake migration:run` → `bundle exec rubocop` → `bundle exec rake config:lint` → `bundle exec rake test`
 
 ## ディレクトリ構成（主要）
@@ -193,9 +208,9 @@ GitHub Actions (`.github/workflows/test.yml`):
 ```text
 app/lib/tomato_shrieker/
   source/         # データソース (7種)
-  shrieker/       # 投稿先 (6種)
+  shrieker/       # 投稿先
   daemon/         # SchedulerDaemon
-  model/          # Entry (Sequel::Model)
+  model/          # Entry・SourceRunLog・SilenceAck (Sequel::Model)
   service/        # SlackService, MulukhiyaService
   cli/            # CLI コマンド (Thor)
   monitor/        # 監視用 HTTP (MonitorApp / MonitorServer)・SourceStatus・SourceCollisions
@@ -233,6 +248,14 @@ RuboCop の設定も同じ gem が持つ（`.rubocop.yml` は `inherit_gem` で�
 
 - テスト: test-unit (`TomatoShrieker::TestCase` 基底クラス)
 - `.rubocop.yml` に残している差分は `TargetRubyVersion` と `rubocop-sequel`（`Sequel/*`）だけ
+
+### 資格情報のマスクは `Ginseng::Masking` に任せる
+
+- **利用側で同じものを書かない。**伏せる対象の一覧が 2 か所に分かれて、必ずずれる。public なのは `mask` / `mask_url` / `mask_urls_in` だけ
+- **通せなかったら出さない（fail closed）。**Sentry はイベントを捨て、`Package.error_message` は例外のクラス名だけを残す。素通しで送るほうが事故が大きい
+- ⚠ **`to_utf8` の後でマスクを通す。**不正なバイト列のまま `gsub` すると `ArgumentError` になり、マスクごと素通りする
+- ⚠ 資格情報を含まない URL は残す（`channel_id` まで消すと、どのフィードが壊れたのか分からなくなる）
+- **テストは「マスクを呼んでいる」ではなく「出力に含まれていない」を見る。**Sentry は `event.to_json_compatible.to_json`（実際に送られる形）で確かめる
 
 ### 例外メッセージは `Package.error_message` を通す
 
@@ -293,13 +316,14 @@ Nostr 対応は外部ユーザーのリクエストで実装された機能。�
 
 - **プロジェクト共有すべき知見** → `docs/` 配下の git 管理下のファイルに記載する。⚠ **メモリにだけ置かない**
 - 🔴 **書く先を間違えない。**`CLAUDE.md` は**毎回読む必要があるもの**だけに絞る（自動ロードされる唯一のファイルなので、太らせると毎回のコストになる）。領域ごとの詳細は [monitoring.md](monitoring.md) / [sources.md](sources.md) / [daemon.md](daemon.md) / [sync スキル](../.claude/skills/sync/SKILL.md) へ。⚠ **どちらか迷うなら「この話を知らずに作業を始めると事故るか」で決める**
-- **進捗の同期** → `MEMORY.md` だけでなく `docs/` 側も更新すること
+- **仕様が変わったら** → `MEMORY.md` だけでなく `docs/` 側も更新すること（進捗は GitHub の Issue / Milestone が正本）
 
 ## 関連リポジトリ
 
 - [ginseng-core](https://github.com/pooza/ginseng-core) — 基盤ライブラリ（branch: main）
 - [ginseng-fediverse](https://github.com/pooza/ginseng-fediverse) — Fediverse 対応
 - [ginseng-youtube](https://github.com/pooza/ginseng-youtube) — YouTube 対応
+- [ginseng-piefed](https://github.com/pooza/ginseng-piefed) — PieFed 対応
 - [mulukhiya-toot-proxy](https://github.com/pooza/mulukhiya-toot-proxy) — 姉妹プロジェクト（構成が類似）
 - [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) — Google News redirect URL 解決ツール（scylla 上で systemd 稼働、Node.js + Playwright）。tomato-shrieker の管理対象に含む
 - [chubo2](https://github.com/pooza/chubo2) — itamae ベースの構成管理。インフラ課題の issue 管理先
