@@ -88,14 +88,19 @@ module TomatoShrieker
     # 🔴 **タグは本文にもタイトルにも並べない (#1673)。**編集で付けるので、本文にも
     # 並べると二重に見える。⚠ `[:tag]` は必ず明示する (#1484) — 立てずに描画すると、
     # 同じソースの他の宛先が立てたフラグで結果が変わる。
-    # ⚠ 描画は 1 回だけ。タイトルはその結果の空白を潰した 1 行。URL は消す前に控えておく。
+    # ⚠ 描画は 1 回だけ。URL は消す前に控えておく。
+    # ⚠ **タイトルは URL を消した本文から作る (#1671)。**URL を残すと、長さの上限で URL の途中に
+    # `…` が入る。URL だけの本文ではタイトルが空になるので、そのときは最初の URL を使う。
     def post_data(template)
       template[:tag] = false
       body = template.to_s
-      title = body.gsub(/[\r\n[:blank:]]+/, ' ')
-      title.ellipsize!(TomatoShrieker::Config.instance['/piefed/subject/max_length'])
       uris = Ginseng::URI.scan(body).to_a
-      uris.each {|uri| body.gsub!(uri.to_s, '')}
+      # 🔴 **長い URL から消す (#1671)。**短いほうを先に消すと、それを接頭辞に持つ長い URL の
+      # 残り（`https://example.com/a` に対する `https://example.com/ab` の `b`）が本文に残る。
+      uris.map(&:to_s).uniq.sort_by {|v| -v.length}.each {|v| body.gsub!(v, '')}
+      title = body.gsub(/[\r\n[:blank:]]+/, ' ').strip
+      title = uris.first.to_s if title.empty?
+      title.ellipsize!(TomatoShrieker::Config.instance['/piefed/subject/max_length'])
       data = {title:, body:, community_id: template.source['/dest/piefed/community_id']}
       uri = (template.entry || template.source).uri rescue uris.first
       data[:url] = uri.to_s if uri
