@@ -17,8 +17,11 @@ for d in tomato-shrieker loquat shooby-do-bop dqdai-anniv; do
     elif [ "$tag" != - ]; then
       if [ "$tag" = "$latest" ]; then lag=0; else lag="$tag → $latest"; fi
     else
-      lag=$(gh api "repos/pooza/$gem/compare/$rev...$latest" --jq .ahead_by 2>/dev/null) || lag=""
+      cmp=$(gh api "repos/pooza/$gem/compare/$rev...$latest" --jq '"\(.ahead_by) \(.behind_by)"' 2>/dev/null) || cmp=""
+      read -r lag extra <<<"$cmp"
       [ -n "$lag" ] && [ "$lag" != 0 ] && lag="$lag（→ $latest）"
+      # ロックがタグより先のコミットを指している（版の番号は同じでも入りうる）。
+      [ -n "$extra" ] && [ "$extra" != 0 ] && lag="$lag・タグ外 $extra"
     fi
     printf '%-16s %-18s %s\n' "$d" "$gem" "${lag:-?}"
   done
