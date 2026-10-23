@@ -164,6 +164,15 @@ module TomatoShrieker
       assert_equal('本文', data[:body].strip)
     end
 
+    # #1671: URL の直後の句点から先を URL ごと消さない（ginseng-core 4.1.0・pooza/ginseng-core#721）。
+    def test_post_data_keeps_text_after_url
+      template = tagged_source.create_template(:default, '本文 https://example.com/a。次の文')
+      data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+      assert_equal('本文 。次の文', data[:title])
+      assert_include(data[:body], '。次の文')
+    end
+
     def stub_create(body = {post_view: {post: {id: 123}}})
       return stub_request(:post, %r{/api/[^/]+/post\z}).to_return(
         status: 200, body: body.to_json, headers: {'Content-Type' => 'application/json'},
