@@ -23,7 +23,6 @@ module TomatoShrieker
     # 走り出した後は落とさない。⚠ 稼働中の daemon を「ジョブが 1 回こけた」で
     # 止める理由は無い。
     def run_jobs
-      @serving = true
       schedule_maintenance
       @scheduler.join
     rescue => e
@@ -66,19 +65,6 @@ module TomatoShrieker
     # 値を出しうる（`SchedulerDaemon#report_reload_failure` と同じ判断）。
     def load_state
       return @load_state
-    end
-
-    # 🔴 **daemon が登録を終えて待ち受けに入ったか (#1686)。**入っていれば、初回の実行期限の
-    # 起点は登録した時刻（`registered_at`）になる。⚠ CLI・テスト・起動の途中は偽で、定義ファイルの
-    # 更新時刻へ倒れる。⚠ `exec` の頭で立てない — 起動の登録（`register_all`）が倒れても残る。
-    def serving?
-      return @serving == true
-    end
-
-    # そのソースのジョブが登録された時刻。ジョブが無ければ nil（登録に失敗した・無効にした）。
-    # ⚠ 定義が変わらなかったジョブは reload で張り直さないので、時刻も前のまま。
-    def registered_at(id)
-      return @scheduler.jobs(tag: id).filter_map(&:scheduled_at).min&.to_t
     end
 
     # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。

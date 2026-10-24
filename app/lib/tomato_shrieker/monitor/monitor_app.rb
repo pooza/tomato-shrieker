@@ -86,8 +86,6 @@ module TomatoShrieker
       end
       body = +"No run recorded yet\n"
       body << "first_run_deadline: #{deadline.iso8601}\n" if deadline
-      # #1686: ジョブが無い（登録に失敗した）から期限が無い、を本文で読めるようにする。
-      body << "not scheduled\n" if Scheduler.instance.serving? && !Scheduler.instance.registered_at(source.id)
       return [503, HEADERS, [body]]
     end
 
