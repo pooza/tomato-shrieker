@@ -39,6 +39,20 @@ module TomatoShrieker
       return @scheduler.scheduler.jobs(tag: id)
     end
 
+    # #1686: ジョブの登録時刻。⚠ 同じ tag のジョブ（IcalendarSource のリマインドなど）はいちばん古いもの。
+    def test_registered_at
+      at = @scheduler.registered_at(FIXTURE_ID)
+
+      assert_kind_of(Time, at)
+      assert_in_delta(Time.now.to_f, at.to_f, 60)
+      assert_nil(@scheduler.registered_at(OTHER_ID))
+    end
+
+    # ⚠ 起動の登録が倒れたら、待ち受けに入ったことにしない（`exec` の頭で立てない）。
+    def test_not_serving_without_run_jobs
+      assert_false(@scheduler.serving?)
+    end
+
     def test_reload_adds_source
       assert_empty(jobs(OTHER_ID))
       write_fixture(OTHER_ID, {})
