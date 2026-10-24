@@ -1,0 +1,15 @@
+# WebhookShrieker（モロヘイヤ経由・本番の全ソースと同じ経路）の検証用 (#1481)。宛先はステージングの
+# st2.precure.ml（dev25）のモロヘイヤの webhook（@tomato_test_bot として投稿される）。
+# ⚠ webhook URL は資格情報。scripts/staging_dests.sh が埋める。
+# ⚠ 投稿は `source shriek` のときだけ。間隔を長くして、検証で daemon を立てても発火しないようにしてある。
+source:
+  text: |
+    tomato-shrieker 検証用の投稿です（WebhookShrieker・モロヘイヤ経由）。
+    https://github.com/pooza/tomato-shrieker
+schedule:
+  every: 30d
+dest:
+  hooks:
+    - __WEBHOOK_URL__
+  tags:
+    - test

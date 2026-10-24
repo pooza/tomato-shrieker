@@ -1,0 +1,15 @@
+# MastodonShrieker（API へ直接投稿）の検証用 (#1481)。宛先はステージングの st2.precure.ml（dev25）の
+# @tomato_test_bot。誤投稿しても構わない場所。⚠ トークンは scripts/staging_dests.sh が埋める。
+# ⚠ 投稿は `source shriek` のときだけ。間隔を長くして、検証で daemon を立てても発火しないようにしてある。
+source:
+  text: |
+    tomato-shrieker 検証用の投稿です（MastodonShrieker・直接投稿）。
+    https://github.com/pooza/tomato-shrieker
+schedule:
+  every: 30d
+dest:
+  mastodon:
+    url: https://st2.precure.ml
+    token: __MASTODON_TOKEN__
+  tags:
+    - test
