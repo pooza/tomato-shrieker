@@ -477,16 +477,26 @@ module TomatoShrieker
     # 「壊れている」と同じ 503 にすると、**ソースを足すたびに最大 1 周期ぶん赤くなる**
     # （30 分間隔のソースを 17 本足して 16 本が一斉に鳴った）。
     #
-    # ⚠ **起点は定義ファイルの更新時刻。**そこから見た初回の発火予定＋猶予までは待つ。
+    # ⚠ **起点（`first_run_origin`）から見た初回の発火予定＋猶予までは待つ。**
     # ⚠⚠ **期限を過ぎても走っていなければ、従来どおり 503。**期限なしで緑に倒すと、
     # 登録しただけで一度も走っていないソースが緑のまま残る（#1504 で塞いだ形へ戻る）。
-    # ⚠ 定義を置いてから reload までに間が空くと、そのぶん早く期限が来る＝従来と同じ
-    # 503 になるだけで、緑に化ける方向には外れない。
     # ⚠ ファイルから読んでいないソース（`Source.new` で直に作ったもの）と `post_at` は nil。
     def first_run_deadline
-      return nil unless (defined_at = Config.instance.source_defined_at(id))
-      return nil unless (due = next_run_at(defined_at))
+      return nil unless (origin = first_run_origin)
+      return nil unless (due = next_run_at(origin))
       return due + monitor_grace_seconds
+    end
+
+    # 🔴 **daemon の中では、scheduler がジョブを登録した時刻 (#1686)。**
+    #
+    # ⚠⚠ 定義ファイルの更新時刻を起点にすると、**登録に失敗したソースがジョブの無いまま期限まで
+    # 緑**（日次 cron で最長約 26 時間）で、**更新と reload の間に cron の時刻が挟まると、実際の
+    # 初回より前に期限が来て赤**だった。ジョブが無ければ nil ＝期限なし＝すぐ 503。
+    # ⚠ CLI は scheduler を持たないので、定義ファイルの更新時刻（いまのディスク）で答える。
+    def first_run_origin
+      scheduler = Scheduler.instance
+      return scheduler.registered_at(id) if scheduler.serving?
+      return Config.instance.source_defined_at(id)
     end
 
     # run_log が無く、まだ初回の実行期限の内にいるか。⚠ run_log の有無は呼び出し側が見る。
