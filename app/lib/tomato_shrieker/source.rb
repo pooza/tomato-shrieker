@@ -15,6 +15,7 @@ module TomatoShrieker
     def initialize(params)
       @params = params
       @shrieker_mutex = Mutex.new
+      @run_mutex = Mutex.new
     end
 
     def [](name)
@@ -761,7 +762,14 @@ module TomatoShrieker
     end
 
     # ⚠ `attempt` はやり直しの何回目か（本来の発火は 0・#1585）。
+    # 🔴 **run は 1 本ずつ（#1741 の Codex P1）。**`overlap: false` はジョブの中でしか効かず、やり直しの
+    # ジョブと次の定期実行は別のジョブなので重なりうる。重なると `@delivery_stats` を上書きし合い、
+    # 配信済みの run が「0 件」と読まれてやり直す＝二重投稿の防止が破れる。
     def exec_with_run_log(method, spec, attempt: 0)
+      @run_mutex.synchronize {run_with_log(method, spec, attempt)}
+    end
+
+    def run_with_log(method, spec, attempt)
       started_at = Time.now
       @delivery_stats = DeliveryStats.new
       reset_shriekers
@@ -797,7 +805,7 @@ module TomatoShrieker
       return if @delivery_stats&.delivered_count&.positive?
       next_attempt = attempt + 1
       Scheduler.instance.scheduler.in(retry_interval, {tag: id, overlap: false}) do
-        exec_with_run_log(:retry, next_attempt, attempt: next_attempt)
+        exec_retry(next_attempt)
       end
       logger.warn(source: id, class: self.class.to_s, action: 'retry scheduled',
         attempt: next_attempt, times: retry_times, in: retry_interval)
@@ -807,6 +815,24 @@ module TomatoShrieker
 
     # ⚠ 有無は `@params` で見る。`self[]` は値が Hash のキーに nil を返すので、`retry: {}`（既定のまま
     # opt-in）を読み落とす。
+    # 🔴 **やり直す前に、この定義がまだ生きているかを見る（#1741 の Codex P2）。**reload は走っている
+    # run を完走させ、登録済みのジョブだけを外す。完走した古い run が後から落ちると、古い定義の
+    # インスタンスでやり直しを立ててしまい、消した宛先へ投稿しうる。⚠ daemon の外では見ない。
+    def exec_retry(attempt)
+      return exec_with_run_log(:retry, attempt, attempt:) if current_definition?
+      logger.warn(source: id, class: self.class.to_s, action: 'retry dropped', attempt:,
+        message: 'definition changed or removed')
+    end
+
+    # 稼働中の定義（scheduler が登録したもの）がこのインスタンスと同じか。
+    def current_definition?
+      scheduler = Scheduler.instance
+      return true unless scheduler.serving?
+      group = Source.all.select {|v| v.id == id}.reject(&:disable?)
+      return false unless scheduler.registry[id] == Scheduler.digest(group)
+      return group.any? {|v| v.to_h == to_h}
+    end
+
     def retry_times
       return 0 unless @params.dig('schedule', 'retry').is_a?(Hash)
       return self['/schedule/retry/times'] || 1

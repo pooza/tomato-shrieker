@@ -143,6 +143,51 @@ module TomatoShrieker
       cleanup_retry
     end
 
+    # 🔴 **#1741 の Codex P1: やり直しと定期実行が重なっても、互いの集計を上書きしない。**
+    # ⚠ ゆっくり落ちる run の最中に、すぐ配信できる run が割り込む形。直列にしないと、落ちた run が
+    # 割り込んだ run の集計（配信 1 件）を読み、やり直さない。
+    def test_runs_are_serialized
+      source = retry_source({}) do
+        raise 'upstream is down' unless Thread.current[:fast]
+        @delivery_stats.record_success(Object.new)
+      end
+      slow = source.method(:exec)
+      source.define_singleton_method(:exec) do
+        sleep(0.3) unless Thread.current[:fast]
+        slow.call
+      end
+      failing = Thread.new {source.send(:exec_with_run_log, :cron, '1 0 * * *')}
+      sleep(0.1)
+      Thread.new do
+        Thread.current[:fast] = true
+        source.send(:exec_with_run_log, :cron, '1 0 * * *')
+      end.join
+      failing.join
+
+      assert_equal(1, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # 🔴 **#1741 の Codex P2: daemon の中では、定義が変わった・消えたソースのやり直しを捨てる。**
+    def test_retry_dropped_when_definition_is_gone
+      source = retry_source({}) {nil}
+      scheduler = Scheduler.instance
+
+      assert_true(source.send(:current_definition?), 'daemon の外では見ない')
+      scheduler.define_singleton_method(:serving?) {true}
+
+      assert_false(source.send(:current_definition?))
+      ran = false
+      source.define_singleton_method(:exec_with_run_log) {|*| ran = true}
+      source.send(:exec_retry, 1)
+
+      assert_false(ran)
+    ensure
+      scheduler.singleton_class.send(:remove_method, :serving?) if scheduler.singleton_methods.include?(:serving?)
+      cleanup_retry
+    end
+
     # ⚠ 宛先で全部落ちた（配信 0 件の error）run もやり直す。
     def test_retry_when_nothing_delivered
       source = retry_source({}) {@delivery_stats.record_error(Object.new, RuntimeError.new('500'))}
