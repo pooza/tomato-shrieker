@@ -17,6 +17,7 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 
 - ローカルに `bundle install` 済みで `bin/shrieker` が動くこと
 - Google News Cleaner (`http://scylla.b-shock.local:3000/clean`) に到達できること（GoogleNewsSource の検証時のみ）
+- ステージングの dev25 / dev27 に ssh できること（`test-mastodon` / `test-misskey` / `test-webhook` の宛先を取ってくる・#1481）
 - PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82) に投稿可能なアカウント情報。疎通を確認したアカウントはメモリにある（`user_id` にメールアドレスをそのまま書ける）。⚠ **パスワードはリポジトリにも本番にも無い。**`config/sources/test-google-news-piefed.yaml` はローカルにしか存在せず（`config/sources/.gitignore` が `*`）、本番の `config/local.yaml` にも piefed の項目は無い
 
 ## テスト用ソースの配置
@@ -29,9 +30,15 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 .claude/skills/release-validation/scripts/install_sources.sh
 ```
 
+続けて、ステージング宛ての 3 本（`test-mastodon` / `test-misskey` / `test-webhook`）のトークンと webhook URL を、ステージングから取ってきて埋める。値は画面に出ない。埋め済みのファイルは触らない。
+
+```sh
+.claude/skills/release-validation/scripts/staging_dests.sh
+```
+
 ⚠ **既にあるファイルは上書きしない。**`test-google-news-piefed.yaml` はテンプレートの `user_id` と `password` が置き換え前のままなので、**新しく置いたときだけ**手でテストアカウントの値を入れる（アカウントはメモリにある）。
 
-⚠ **`test-google-news-piefed.yaml` 以外は `bin/shrieker source validate` が NG を返す。これは想定どおりで、検証手順上は正常。**4.5.0 (#1473) でスキーマに「有効なソースは `dest` に配信先を 1 つ以上持つ」を入れたため、意図的に投稿先を持たないこれらのテンプレートは契約違反になる。⚠ **検証を邪魔しないよう `source validate` はチェックリストに入れていない**が、他の目的で流したときに新規の不具合と誤読しないこと。宛先をステージングに向けて解消する作業は #1481。
+⚠ **宛先を持つ 4 本（`test-google-news-piefed` とステージング宛ての 3 本）以外は `bin/shrieker source validate` が NG を返す。これは想定どおりで、検証手順上は正常。**4.5.0 (#1473) でスキーマに「有効なソースは `dest` に配信先を 1 つ以上持つ」を入れたため、意図的に投稿先を持たないこれらのテンプレートは契約違反になる。⚠ **検証を邪魔しないよう `source validate` はチェックリストに入れていない**が、他の目的で流したときに新規の不具合と誤読しないこと。⚠ 取得系のテンプレートに宛先を足さないのは、検証で daemon を立てたときに定期で投稿させないため（#1481）。
 
 | テンプレート | 対象 | 備考 |
 | --- | --- | --- |
@@ -44,6 +51,9 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 | [test-text.yaml](sources/test-text.yaml) | TextSource |  |
 | [test-google-news-cleaner.yaml](sources/test-google-news-cleaner.yaml) | GoogleNewsSource + cleaner（認証不要） | PieFed の認証情報が無くても cleaner 連携だけは検証できる。`dest` に投稿先を持たないので `fetch` しか通らないが、チェックリストの「実 publisher URL が取れている」はこれで満たせる。 |
 | [test-google-news-piefed.yaml](sources/test-google-news-piefed.yaml) | GoogleNewsSource + cleaner + PieFed | PieFed 投稿の経路を実投稿で検証するための唯一のソース。`dest.piefed` を持つ。 |
+| [test-mastodon.yaml](sources/test-mastodon.yaml) | TextSource → MastodonShrieker（直接投稿） | st2.precure.ml（dev25）の `@tomato_test_bot`。#1481 |
+| [test-misskey.yaml](sources/test-misskey.yaml) | TextSource → MisskeyShrieker（直接投稿） | st2.misskey.delmulin.com（dev27）の `@tomato_test`。#1481 |
+| [test-webhook.yaml](sources/test-webhook.yaml) | TextSource → WebhookShrieker（モロヘイヤ経由） | dev25 のモロヘイヤ。本番の全ソースと同じ経路。#1481 |
 
 ## 検証コマンド
 
@@ -85,6 +95,18 @@ curl -sS "https://pf.korako.me/api/alpha/post/list?community_id=82&sort=New&limi
 ```
 
 注: `bin/shrieker source shriek` は初回（DB に Entry 履歴なし）のみ「最新 1 件のみ投稿」、2 回目以降は新規 entry を全て投稿する。連投したくない場合は事前に `clear` する。
+
+### 4a. Mastodon / Misskey の直接投稿とモロヘイヤ経由（ステージング・#1481）
+
+🔴 **運用者は Webhook（モロヘイヤ経由）しか使っていないが、Mastodon / Misskey の API へ直接投稿している外部ユーザーがいる**（docs/CLAUDE.md「投稿先ごとのテスト厚みの非対称」）。直接経路はここでしか実際に通らない。⚠ 宛先はステージング＝誤投稿しても構わない場所。
+
+```sh
+for id in test-mastodon test-misskey test-webhook; do bundle exec bin/shrieker source shriek $id; done
+```
+
+- Misskey は公開 API で確かめられる: `curl -s -X POST -H 'Content-Type: application/json' -d '{"username":"tomato_test"}' https://st2.misskey.delmulin.com/api/users/show`（`notesCount` が増える）
+- ⚠ **ステージングの Mastodon は限定連合モードで、未認証では読めない。**dev25 で `Account.find_local('tomato_test_bot').statuses` を `bin/rails runner -` で見る（`application` がモロヘイヤ経由・直接投稿とも `mulukhiya-toot-proxy` なのは、トークンがモロヘイヤのアプリのものだから）
+- アカウント: Mastodon は chubo2 の `tools/bot-webhook/create.rb dev25 <定義>` で作った（トークン ID と webhook URL は dev25 の `~mastodon/bot-webhook/tomato_test_bot/`）。Misskey は dev27 の管理者のトークンで `POST /api/admin/accounts/create` して、`~misskey/misskey_accounts.txt`（0600）に `tomato_test` の行を足した（2026-10-25）
 
 ### 5. ハッシュタグ無毒化の新旧差分（ginseng-fediverse のタグ判定が動いたリリースのみ）
 
@@ -181,6 +203,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload   # �
 - [ ] FeedSource (matrix-* 等)・IcalendarSource・YouTubeChannelSource・GitHubRepositorySource・GoogleNewsSource の `fetch` が成功
 - [ ] cleaner 経由 (test-google-news-piefed) で実 publisher URL が取れている
 - [ ] PieFed テストコミュニティに実投稿が反映される
+- [ ] ステージングに Mastodon 直接・Misskey 直接・モロヘイヤ経由の 3 件が反映される（上記 4a・#1481）
 - [ ] 稼働中の reload（上記の 8 項目・#1459）
 - [ ] ⚠ **PieFed の実投稿は、タグ以外も見る (#1673)。**投稿ページにタグのリンクが出る／本文に `#tag` の文字が残っていない／タイトル・本文・URL・サムネイルが作成時のまま／「編集済み」と出る（仕様）／ログに `tags not attached` が無い
 - [ ] ⚠ **監視の新しい判定を 1 回ずつ通す（4.15.0）。**reload の節の `test-reload-probe` を足した直後に `curl -s http://127.0.0.1:4567/healthz/source/test-reload-probe` が 200 `OK (awaiting first run, due by …)`（#1560）／定義の判別キーを打ち間違えて（`feed` → `feeed`）HUP を直接送ると 503 `no source class matched`・`/status.json` に `class: null` の行（#1605。⚠ `source reload` は拒否するので `kill -HUP` で）／`/status.json` の行に `acknowledged_at`・`lost_entries`・`entry_stage`・`first_run_deadline` があり、`silence_acknowledged_at` が無い（#1567）
@@ -193,6 +216,7 @@ bin/shrieker source delete test-reload-probe && bin/shrieker source reload   # �
 ## 後始末
 
 - **テスト用 `config/sources/test-*.yaml` は消さずに残す**（手順を毎回作り直すと安定しないため）。`config/sources/.gitignore` が `*` なので commit はされない
+- ⚠ ステージング宛ての 3 本はトークン・webhook URL が平文で入る（0600）。正本はステージング側なので、別の端末では `staging_dests.sh` で埋め直せる
 - ⚠ **`test-google-news-piefed.yaml` にはパスワードが平文で入る。**この端末にしか無い＝**他の端末で検証するときは作り直しになる**ことを織り込んでおく（リポジトリにも本番にも置いていない）
 - 検証で蓄積された `tmp/db/db.sqlite3` の Entry レコードはそのまま残しても問題ないが、繰り返し検証する場合は `bin/shrieker source clear <id>` で消す
 
