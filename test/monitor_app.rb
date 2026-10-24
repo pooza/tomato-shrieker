@@ -53,6 +53,20 @@ module TomatoShrieker
       assert_not_nil(source_status(FIXTURE_ID))
     end
 
+    # #1672: 行の `digest` は scheduler が登録した定義のもの。登録が無ければ null。
+    def test_status_json_has_registered_digest
+      registry = Scheduler.instance.registry
+      original = registry[FIXTURE_ID]
+      registry.delete(FIXTURE_ID)
+
+      assert_nil(source_status(FIXTURE_ID)['digest'])
+      registry[FIXTURE_ID] = Scheduler.digest([Source.create(FIXTURE_ID)])
+
+      assert_equal(registry[FIXTURE_ID], source_status(FIXTURE_ID)['digest'])
+    ensure
+      original ? registry[FIXTURE_ID] = original : registry&.delete(FIXTURE_ID)
+    end
+
     def test_not_found
       status, = call('/nope')
 
@@ -1262,9 +1276,10 @@ module TomatoShrieker
     end
 
     # 🔴 **#1561: `source status --json` が `/status.json` の `sources[]` と同じ行を出すこと。**
+    # ⚠ `digest` だけは除く (#1672)。scheduler の中でしか分からない値で、CLI が出すと常に null になる。
     def test_source_status_json_matches_status_json
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
-      expected = source_status(FIXTURE_ID)
+      expected = source_status(FIXTURE_ID).except('digest')
       rows = JSON.parse(run_source_status(json: true))
 
       assert_equal(expected, rows.find {|v| v['id'] == FIXTURE_ID})

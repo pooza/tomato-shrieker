@@ -211,7 +211,8 @@ bin/shrieker source ack ID
       "acknowledged_at": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
-      "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1}
+      "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1},
+      "digest": "3f2a…"
     }
   ]
 }
@@ -220,6 +221,8 @@ bin/shrieker source ack ID
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
 
 `reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
+
+`digest` は**いま scheduler に登録されている定義**のハッシュ (#1672)。`Scheduler.digest` で、reload が変更を見分けるのと同じもの。ディスク上の定義と比べれば、編集したまま reload していない定義（再起動で黙って有効になる）が分かる（deploy スキルの `pending_sources.sh`）。登録に失敗したソースと読めない定義の行は `null`。⚠ CLI の `source status` は scheduler の外で動くので出さない。
 
 `last_delivered_at_origin` は配信時刻の出どころ:
 
@@ -418,7 +421,7 @@ HTTP(s) Monitor:
 
 `/monitor/bind` のデフォルトは `127.0.0.1` で、外向けには公開されない。監視ホスト（Kuma 等）から `/healthz` を叩く経路（VPN・SSH トンネル・同居・ファイアウォールでの IP 制限）の選び方は、利用者向けに Wiki「監視」にある。
 
-本番は `local.yaml` で `bind: 0.0.0.0` にし、ホストのファイアウォールで 4567 を監視ホストにだけ開けている（構成管理は chubo2・#1531 → chubo2#200）。どの OS でも上の代替のどれかで届くので、**監視機能の有無で OS サポートの判断を変える必要はない**。
+本番は `local.yaml` の `/monitor/bind` を `0.0.0.0` にし、ホストのファイアウォールで 4567 を監視ホストにだけ開けている（構成管理は chubo2・#1531 → chubo2#200）。どの OS でも上の代替のどれかで届くので、**監視機能の有無で OS サポートの判断を変える必要はない**。
 
 ## 本番のログと値を読むときの罠
 

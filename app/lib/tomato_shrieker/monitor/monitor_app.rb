@@ -190,13 +190,6 @@ module TomatoShrieker
       # 途中で reload が挟まりうる。別々に読むと、読めなくなった定義が「古い健全な行」と
       # 「新しい error の行」の両方に出たり、直した定義がどちらにも出なかったりする。
       entries = Source.config['/sources']
-      # ⚠ **1 つの id に行は 1 つ。読めない定義が勝つ（#1682 の Codex P2・2 巡目）。**同じ id の
-      # 読める定義の行も並べると、id で引く消費者が健全な行を先に拾う（healthz は 503 なのに）。
-      unmatched = Source.unmatched_ids(entries)
-      sources = Source.all(entries).reject {|s| s.disable? || unmatched.include?(s.id)}
-        .map {|s| source_status(s)}
-      # #1605: 読めない定義も行として残す（消えると、Kuma に無いソースでは誰も気づけない）。
-      sources.concat(unmatched.uniq.map {|id| SourceStatus.unmatched(id)})
       payload = {
         scheduler: scheduler_alive?,
         database: database_alive?,
@@ -204,12 +197,25 @@ module TomatoShrieker
         ruby: Environment.ruby_health,
         # #1529: `source reload --wait` が `count` の前進を待って結果を読む
         reload: Scheduler.instance.load_state,
-        sources:,
+        sources: status_rows(entries),
       }
       return [200, JSON_HEADERS, ["#{JSON.pretty_generate(payload)}\n"]]
     rescue => e
       Sentry.capture_exception(e, tags: {stage: 'status_json'}) if Sentry.initialized?
       return [500, JSON_HEADERS, ["#{JSON.dump(error: Package.error_message(e))}\n"]]
+    end
+
+    def status_rows(entries)
+      # ⚠ **1 つの id に行は 1 つ。読めない定義が勝つ（#1682 の Codex P2・2 巡目）。**同じ id の
+      # 読める定義の行も並べると、id で引く消費者が健全な行を先に拾う（healthz は 503 なのに）。
+      unmatched = Source.unmatched_ids(entries)
+      # #1672: `digest` は scheduler が登録した定義のもの（稼働中の定義）。デプロイ前の確認が
+      # ディスク上の定義と比べ、reload していない編集を見つける。登録に失敗したソースは null。
+      registry = Scheduler.instance.registry
+      rows = Source.all(entries).reject {|s| s.disable? || unmatched.include?(s.id)}
+        .map {|s| source_status(s).merge(digest: registry[s.id])}
+      # #1605: 読めない定義も行として残す（消えると、Kuma に無いソースでは誰も気づけない）。
+      return rows.concat(unmatched.uniq.map {|id| SourceStatus.unmatched(id)})
     end
 
     # 1 ソースの失敗で payload 全体を落とさない。壊れた側は error として可視化する。

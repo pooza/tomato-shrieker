@@ -23,9 +23,9 @@ end
 
 module TomatoShrieker
   # ⚠ 上の PiefedShriekerTest は dest に piefed を持つテスト用ソースが手元に無いと
-  # `disable?` で丸ごと落ちる (#1520)。login の遅延だけは環境に依らず見たいので、
-  # webmock で閉じた独立のテストケースにする。
-  class PiefedShriekerLoginTest < TestCase
+  # `disable?` で丸ごと落ちる (#1520)。login の遅延・リダイレクト・投稿本文の組み立ては
+  # 環境に依らず見たいので、webmock で閉じた独立のテストケースにする。
+  class PiefedShriekerOfflineTest < TestCase
     PARAMS = {
       host: 'piefed.example.com',
       user_id: 'user@example.com',

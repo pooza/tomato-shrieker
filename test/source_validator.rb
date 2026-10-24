@@ -650,7 +650,7 @@ module TomatoShrieker
       assert_not_include(warnings.join, digest, 'webhook の digest を出さない')
     end
 
-    # ⚠ `schedule.at`（1 回きり）のソースは silence_tolerance の指摘を出さないが、
+    # ⚠ `/schedule/at`（1 回きり）のソースは silence_tolerance の指摘を出さないが、
     # 宛先の指摘は間隔に関係なく出す。無効なソースには何も出さない。
     def test_warnings_insecure_dest_regardless_of_schedule
       once = {
