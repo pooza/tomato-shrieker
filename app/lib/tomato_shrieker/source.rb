@@ -760,23 +760,60 @@ module TomatoShrieker
       return job
     end
 
-    def exec_with_run_log(method, spec)
+    # ⚠ `attempt` はやり直しの何回目か（本来の発火は 0・#1585）。
+    def exec_with_run_log(method, spec, attempt: 0)
       started_at = Time.now
       @delivery_stats = DeliveryStats.new
       reset_shriekers
-      logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
-      # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
-      unless dest?
-        logger.warn(source: id, class: self.class.to_s, message: 'no destination configured')
-      end
+      log_exec_start(method, spec)
       exec
       finalize_run_log(started_at)
+      retry_failed_run(attempt) if @delivery_stats.error?
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       record_exec_abort(e)
       SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(source: id, error: e)
+      retry_failed_run(attempt)
+    end
+
+    def log_exec_start(method, spec)
+      logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
+      # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
+      return if dest?
+      logger.warn(source: id, class: self.class.to_s, message: 'no destination configured')
+    end
+
+    # 🔴 **1 件も配信できずに error で終わった run を、あとでやり直す (#1585・opt-in)。**
+    #
+    # 日付で中身が決まるソース（記念日・予定）は、取得先が数分おかしいだけでその日ぶんを丸ごと失い、
+    # 翌日の run では取り返せない。HTTP の再送は全部使い切った後なので、run ごとやり直す。
+    # ⚠⚠ **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。
+    # ⚠ やり直しは一度きりのジョブ（同じ tag）。定義を変えた reload では本体と一緒に外れる。
+    # ⚠ やり直しの run も run_log に 1 行ずつ残る（落ちた事実は消えず、成功すれば error_streak が切れる）。
+    def retry_failed_run(attempt)
+      return unless attempt < retry_times
+      return if @delivery_stats&.delivered_count&.positive?
+      next_attempt = attempt + 1
+      Scheduler.instance.scheduler.in(retry_interval, {tag: id, overlap: false}) do
+        exec_with_run_log(:retry, next_attempt, attempt: next_attempt)
+      end
+      logger.warn(source: id, class: self.class.to_s, action: 'retry scheduled',
+        attempt: next_attempt, times: retry_times, in: retry_interval)
+    rescue => e
+      logger.error(source: id, action: 'retry', error: e)
+    end
+
+    # ⚠ 有無は `@params` で見る。`self[]` は値が Hash のキーに nil を返すので、`retry: {}`（既定のまま
+    # opt-in）を読み落とす。
+    def retry_times
+      return 0 unless @params.dig('schedule', 'retry').is_a?(Hash)
+      return self['/schedule/retry/times'] || 1
+    end
+
+    def retry_interval
+      return self['/schedule/retry/interval'] || '15m'
     end
 
     # 🔴 **エントリ処理の途中で run ごと落ちたら、それを取りこぼしとして数える (#1574)。**

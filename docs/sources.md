@@ -208,3 +208,22 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 | 定期実行 | `/schedule/every` | `5m`, `1h`, `1d` |
 | cron | `/schedule/cron` | `'0 6 * * *'` |
 | 指定時刻 | `/schedule/at` | `'2026/5/18 18:00'` |
+
+### 失敗した run のやり直し（`/schedule/retry`・#1585）
+
+**1 件も配信できずに error で終わった run を、あとでやり直す。**日付で中身が決まるソース（記念日・予定）向けの opt-in。取得先が数分おかしいだけで、その日ぶんを丸ごと失い、翌日の run では取り返せないため（#1578・dqdai-anniv の GAS の不調）。
+
+```yaml
+schedule:
+  cron: '1 0 * * *'
+  retry:
+    times: 2        # やり直す回数の上限（既定 1）
+    interval: 15m   # 失敗からやり直すまでの間（既定 15m）
+```
+
+- `retry: {}` と書けば既定のまま有効になる。書かなければやり直さない
+- 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。やり直すのは「取得で落ちた」「宛先が全部落ちた」run だけ
+- やり直しの run も `source_run_log` に 1 行ずつ残る。落ちた事実は消えず、成功すれば `error_streak` が切れる。⚠ やり直しを待つ間は、`error_streak_threshold` に達していれば healthz は 503
+- やり直しは一度きりのジョブ（同じ tag）。定義を変えた `source reload` や再起動で、本体のジョブと一緒に外れる（待っていたやり直しは走らない）
+- ⚠ HTTP の再送（`/http/retry/limit`）を使い切った後の話。間隔は取得先が立ち直るのを待つ長さにする
+- IcalendarSource のリマインド（`schedule.remind`）はやり直さない
