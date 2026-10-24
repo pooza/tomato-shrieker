@@ -13,8 +13,11 @@
 # ⚠ pipefail を付け、両方の一覧を受け取ってから比べる。付けないと ssh / curl / jq が
 # 失敗しても末尾の sort が 0 を返し、空どうしを比べて「一致」と答える。
 set -euo pipefail
-before="${TMPDIR:-/tmp}/tomato-shrieker-sources-before.txt"
-running=$(ssh oscura 'curl -sf http://127.0.0.1:4567/status.json' | jq -er '.sources[].id' | sort -u)
+# ⚠ 控えはリポジトリの tmp/ に置く (#1672)。共有の /tmp に決まった名前で置くと、`>|` が
+# 他人の置いたシンボリックリンクを辿る。
+before="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/tmp/deploy-sources-before.txt"
+status=$(ssh oscura 'curl -sf http://127.0.0.1:4567/status.json')
+running=$(jq -er '.sources[].id' <<< "$status" | sort -u)
 out=$(ssh oscura 'sudo -H -u deploy bash -lc "cd ~/repos/tomato-shrieker && bundle exec ruby -Iapp/lib -rtomato_shrieker -"' \
   < "$(dirname "$0")/enabled_sources.rb")
 disk=$(awk -F'\t' '$1=="ID"{print $2}' <<< "$out" | sort -u)
@@ -40,6 +43,7 @@ fi
 # （`command:` のソースが `bundle …` で始まるときの `bundle install` の失敗など）は見ていない。
 # そこは再起動の後の verify.sh（`not started` の件数・NRestarts）で受ける。
 echo 'スケジュール・判別キー・コマンドの依存で倒れる定義は無い（登録時のほかの失敗は見ていない）'
+mkdir -p "$(dirname "$before")"
 printf '%s\n' "$running" >| "$before"
 echo "稼働中 $(wc -l < "$before") 件"
 # ⚠ 差分があっても 0 で終わる（増減は運用者が確かめるもので、失敗ではない）。diff 自体の失敗（2 以上）だけ伝える
@@ -50,3 +54,19 @@ case $rc in
   1) echo '⚠ 再起動でソースが増減する。意図したものかを確かめる' ;;
   *) exit "$rc" ;;
 esac
+# 🔴 #1672: 編集したまま reload していない定義。再起動で黙って有効になる（宛先やスケジュールの変更）。
+# 稼働中の digest（scheduler が登録した定義）とディスク上の定義の digest を、両方にある id で比べる。
+# ⚠ 稼働中の digest が null のソース（登録に失敗している）は比べない。⚠ 4.17 以前の版は digest を
+# 出さないので、そのときは「変更なし」と言わずに比べていないと出す。⚠ join は sort と同じ照合順が要る。
+running_digests=$(jq -r '.sources[] | select(.digest != null) | "\(.id)\t\(.digest)"' <<< "$status" | LC_ALL=C sort)
+changed=$(LC_ALL=C join -t $'\t' <(printf '%s\n' "$running_digests") \
+  <(awk -F'\t' '$1=="DIGEST"{print $2 "\t" $3}' <<< "$out" | LC_ALL=C sort) \
+  | awk -F'\t' '$2 != $3 {print $1}')
+if [ -z "$running_digests" ]; then
+  echo '⚠ 稼働中の版が digest を出していない＝定義の変更は比べていない'
+elif [ -n "$changed" ]; then
+  printf '~ %s\n' $changed
+  echo '⚠ 再起動で定義が変わるソースがある（reload していない編集）。意図したものかを確かめる'
+else
+  echo '定義の変更なし（reload していない編集は無い）'
+fi

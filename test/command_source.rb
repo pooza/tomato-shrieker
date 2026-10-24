@@ -1,5 +1,9 @@
 module TomatoShrieker
   class CommandSourceTest < TestCase
+    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
+    SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
+    SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
+
     # 🔴 **#1614: CI でも 1 本は回ること。**`test/sources/command.yaml` が無いと
     # 下のループは 1 度も回らず、何も確かめずに緑になる（#1593 の族）。
     def test_fixture_loaded
@@ -340,10 +344,6 @@ module TomatoShrieker
 
       assert_true(registered)
     end
-
-    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
-    SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
-    SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
 
     def build_secret_source(script = nil)
       return CommandSource.new(secret_params(script))

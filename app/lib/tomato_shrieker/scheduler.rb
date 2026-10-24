@@ -67,6 +67,20 @@ module TomatoShrieker
       return @load_state
     end
 
+    # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。
+    #
+    # 🔴 **group の全要素をハッシュする (#1571)。**⚠⚠ 以前は `sources.first` だけを
+    # 見ていたので、**同じ id を持つ定義が 2 つある状態で片方を消す / `disable` すると、
+    # group は縮むのに digest が変わらない**＝ `stale` に入らず、**消したほうのジョブが
+    # unschedule されずに走り続ける**。⚠ ログの `changed` / `removed` にも出ないので、
+    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
+    #
+    # 📌 `/status.json` の `digest` と、デプロイ前の確認（deploy スキルの `pending_sources.sh`）が
+    # ディスク上の定義と比べるのにも使う (#1672)。
+    def self.digest(sources)
+      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
+    end
+
     private
 
     def initialize
@@ -207,15 +221,8 @@ module TomatoShrieker
       @scheduler.jobs(tag: id).reject {|v| kept.include?(v.job_id)}.each(&:unschedule)
     end
 
-    # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。
-    #
-    # 🔴 **group の全要素をハッシュする (#1571)。**⚠⚠ 以前は `sources.first` だけを
-    # 見ていたので、**同じ id を持つ定義が 2 つある状態で片方を消す / `disable` すると、
-    # group は縮むのに digest が変わらない**＝ `stale` に入らず、**消したほうのジョブが
-    # unschedule されずに走り続ける**。⚠ ログの `changed` / `removed` にも出ないので、
-    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
     def digest(sources)
-      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
+      return self.class.digest(sources)
     end
 
     def schedule_maintenance

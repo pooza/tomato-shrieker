@@ -163,10 +163,10 @@ module TomatoShrieker
       refuse_unless_startable!
       waiter = reload_waiter if options[:wait]
       daemon = SchedulerDaemon.new
-      case daemon.alive_state
+      pid, state = reload_target(daemon)
+      case state
       when :alive
         before = monitor_call {waiter&.count}
-        pid = daemon.pid
         Process.kill('HUP', pid)
         say "reload requested (pid #{pid})"
         return report_reload(monitor_call {waiter.wait(before)}) if waiter
@@ -174,7 +174,7 @@ module TomatoShrieker
         say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
       when :unknown
         # ⚠ :unknown（EPERM）を :dead と混ぜない。プロセスは生きている可能性がある。
-        raise Thor::Error, "PID #{daemon.pid} exists but is not ours. reload できません。"
+        raise Thor::Error, "PID #{pid} exists but is not ours. reload できません。"
       else
         say 'scheduler は停止しています。ソース定義は次回起動時に読み込まれます。'
       end
@@ -206,6 +206,16 @@ module TomatoShrieker
     end
 
     private
+
+    # ⚠ **身元を確かめた番号に HUP を送る (#1672)。**`alive_state` と `pid` を別々に読むと、
+    # 間に停止が入ったとき `Process.kill('HUP', nil)` が TypeError の生例外で落ちる。
+    # pid ファイルは 1 回だけ読み、その番号の状態を返す。
+    def reload_target(daemon)
+      pid = daemon.pid
+      return [pid, daemon.alive_state_of(pid)] if pid
+      # ⚠ 読めないファイルは :unknown のまま（:dead と混ぜない）。番号が無いのに :alive とは言わない。
+      return [nil, daemon.alive_state == :unknown ? :unknown : :dead]
+    end
 
     # ⚠ **HUP を送る前に断る。**監視が無効なら読む先が無く、送った後では「待てない」と
     # 言うしかない（reload 自体は走るので、利用者には成否が分からないまま）。

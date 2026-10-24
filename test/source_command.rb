@@ -312,7 +312,42 @@ module TomatoShrieker
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
+    # #1672: 身元を確かめた番号に HUP を送る。読みの間に停止が入っても生例外で落ちない。
+    def test_reload_treats_missing_pid_as_stopped
+      said = reload_with(pid: nil, state: :alive)
+
+      assert(said.any? {|v| v.include?('停止しています')})
+    end
+
+    def test_reload_keeps_unknown_without_pid
+      assert_raise(Thor::Error) {reload_with(pid: nil, state: :unknown)}
+    end
+
+    def test_reload_checks_state_of_read_pid
+      said = reload_with(pid: 2_147_483_647, state: :alive, state_of: :dead)
+
+      assert(said.any? {|v| v.include?('停止しています')})
+    end
+
     private
+
+    # `SchedulerDaemon.new` を、`pid` と状態を決め打ちした偽物に差し替えて reload を呼ぶ。
+    # ⚠ `state_of` を :alive にしないこと。本物の `Process.kill` が走る。
+    def reload_with(pid:, state:, state_of: :dead)
+      daemon = Object.new
+      daemon.define_singleton_method(:pid) {pid}
+      daemon.define_singleton_method(:alive_state) {state}
+      daemon.define_singleton_method(:alive_state_of) {|_pid| state_of}
+      said = []
+      @command.define_singleton_method(:refuse_unless_startable!) {nil}
+      @command.define_singleton_method(:say) {|message = ''| said.push(message.to_s)}
+      original = SchedulerDaemon.method(:new)
+      SchedulerDaemon.define_singleton_method(:new) {|*_args| daemon}
+      @command.reload
+      return said
+    ensure
+      SchedulerDaemon.define_singleton_method(:new, original)
+    end
 
     # `source status` を回し、終了コードを返す。出力は捨てる。
     # ⚠ CLI では `Thor::Error` が終了コード 1 になる（`MainCommand.exit_on_failure?`）。
