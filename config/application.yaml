@@ -1,3 +1,8 @@
+command:
+  # コマンドを走らせるソースの締切の既定 (#1703)。ソースごとに `/source/timeout`（iCalendar は
+  # `/source/ical/timeout`）で上書きできる。本番の最長は約 100 秒（2026-10-25 実測）。
+  timeout:
+    seconds: 600
 crypt:
   encoder: base64
   password: null

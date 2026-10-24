@@ -243,6 +243,19 @@ module TomatoShrieker
       assert_false(stats.entry_stage?)
     end
 
+    # 🔴 #1703: 締切は `/source/ical/timeout`（`/source/timeout` ではない）。締切で落ちた run は取得段の失敗。
+    def test_command_timeout
+      params = command_params('sleep 30')
+      params['source']['ical']['timeout'] = 1
+      params['source']['timeout'] = 600
+      source = IcalendarSource.new(params)
+      stats = attach_stats(source)
+
+      assert_equal(1, source.command_timeout)
+      assert_raise(Timeout::Error) {source.exec}
+      assert_false(stats.entry_stage?)
+    end
+
     # ⚠ 読めない出力を例外メッセージへ載せるときも、資格情報は伏せる（run_log・Sentry へ流れる）。
     def test_command_invalid_output_is_masked
       source = build_command_source("echo error at #{SECRET_ENV}")

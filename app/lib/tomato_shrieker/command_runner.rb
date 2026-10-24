@@ -27,6 +27,15 @@ module TomatoShrieker
       return params.is_a?(Hash) ? params : {}
     end
 
+    # 🔴 **締切 (#1703)。**無いと、戻らないコマンドがそのソースの実行を塞ぎ続ける
+    # （`overlap: false` なので以後の発火はすべてスキップされ、リマインドも `@command_mutex` で待たされる）。
+    # 締切が来たら上流が子のプロセスグループへ TERM → KILL して `Timeout::Error` を上げ、
+    # その run は取得段の失敗になる。⚠ `0` は締切なし（上流の意味のまま）。
+    def command_timeout
+      return parse_duration(command_params['timeout']) if command_params.key?('timeout')
+      return config['/command/timeout/seconds']
+    end
+
     # ⚠ **キーの有無で見る（#1692 の Codex P2）。**`present?` で見ると、空の `command`
     # （`''` / `[]`）を書いた定義が「コマンドではない」側へ流れる。
     def command?
@@ -74,7 +83,7 @@ module TomatoShrieker
     def capture_command
       error = nil
       result = @command_mutex.synchronize do
-        Bundler.with_unbundled_env {command.exec}
+        Bundler.with_unbundled_env {command.exec(timeout: command_timeout)}
         [command.stdout.to_s.scrub, command.stderr.to_s.scrub, command.status]
       rescue => e
         error = masked_exception(e)

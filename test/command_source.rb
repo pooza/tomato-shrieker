@@ -135,6 +135,31 @@ module TomatoShrieker
       assert_equal('command killed by signal 9', build_source.exit_description(9))
     end
 
+    # 🔴 #1703: 締切。未指定なら `/command/timeout/seconds`、ソースごとに秒か duration で上書きできる。
+    def test_command_timeout
+      assert_equal(config['/command/timeout/seconds'], build_secret_source.command_timeout)
+      {5 => 5, '2m' => 120, 0 => 0}.each do |value, expected|
+        params = secret_params
+        params['source']['timeout'] = value
+
+        assert_equal(expected, CommandSource.new(params).command_timeout, value.inspect)
+      end
+    end
+
+    # 🔴 #1703: 戻らないコマンドは締切で落ち、取得段の失敗になる。次の実行を塞がない。
+    def test_exec_stops_at_timeout
+      params = secret_params('sleep 30')
+      params['source']['timeout'] = 1
+      source = CommandSource.new(params)
+      started = Time.now
+
+      assert_raise(Timeout::Error) {source.exec}
+      # ⚠ 上流は締切 ＋ 最大 3 秒で戻る（TERM の猶予 2 ＋ 見切り 1）。
+      assert_operator(Time.now - started, :<, 10)
+      # ⚠ 締切で抜けた後も `@command_mutex` を握ったままにしない（同じソースのリマインドが待たされる）。
+      assert_false(source.instance_variable_get(:@command_mutex).locked?)
+    end
+
     # ⚠ stderr が空（nil ではない）でも、stdout に書かれた理由を例外メッセージに載せる。
     def test_exec_reports_stdout_when_stderr_is_empty
       source = build_secret_source('echo "only on stdout"; exit 2')
