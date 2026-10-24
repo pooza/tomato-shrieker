@@ -1,0 +1,15 @@
+# MisskeyShrieker（API へ直接投稿）の検証用 (#1481)。宛先はステージングの st2.misskey.delmulin.com（dev27）の
+# @tomato_test。誤投稿しても構わない場所。⚠ トークンは scripts/staging_dests.sh が埋める。
+# ⚠ 投稿は `source shriek` のときだけ。間隔を長くして、検証で daemon を立てても発火しないようにしてある。
+source:
+  text: |
+    tomato-shrieker 検証用の投稿です（MisskeyShrieker・直接投稿）。
+    https://github.com/pooza/tomato-shrieker
+schedule:
+  every: 30d
+dest:
+  misskey:
+    url: https://st2.misskey.delmulin.com
+    token: __MISSKEY_TOKEN__
+  tags:
+    - test
