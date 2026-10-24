@@ -138,7 +138,8 @@ module TomatoShrieker
     # 🔴 #1703: 締切。未指定なら `/command/timeout/seconds`、ソースごとに秒か duration で上書きできる。
     def test_command_timeout
       assert_equal(config['/command/timeout/seconds'], build_secret_source.command_timeout)
-      {5 => 5, '2m' => 120, 0 => 0}.each do |value, expected|
+      # ⚠ 端数の秒を落とさない（#1737 の Codex P2）。`'0.5s'` が 0 ＝締切なしに化けていた。
+      {5 => 5, '2m' => 120, 0 => 0, '0.5s' => 0.5, '1.5' => 1.5}.each do |value, expected|
         params = secret_params
         params['source']['timeout'] = value
 

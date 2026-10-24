@@ -31,9 +31,13 @@ module TomatoShrieker
     # （`overlap: false` なので以後の発火はすべてスキップされ、リマインドも `@command_mutex` で待たされる）。
     # 締切が来たら上流が子のプロセスグループへ TERM → KILL して `Timeout::Error` を上げ、
     # その run は取得段の失敗になる。⚠ `0` は締切なし（上流の意味のまま）。
+    # 🔴 **端数を落とさない（#1737 の Codex P2）。**`Source#parse_duration` は `to_i` するので、
+    # `'0.5s'` が 0 ＝締切なしに化け、短い締切を頼んだのに無期限で走る。上流は端数の秒を受け付ける。
     def command_timeout
-      return parse_duration(command_params['timeout']) if command_params.key?('timeout')
-      return config['/command/timeout/seconds']
+      return config['/command/timeout/seconds'] unless command_params.key?('timeout')
+      value = command_params['timeout']
+      return Rufus::Scheduler.parse_duration(value) if value.is_a?(String)
+      return value
     end
 
     # ⚠ **キーの有無で見る（#1692 の Codex P2）。**`present?` で見ると、空の `command`
