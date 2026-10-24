@@ -237,6 +237,18 @@ module TomatoShrieker
     end
 
     # 4.16.0 リリース前レビュー: 空の `/source/command` も、`/source/ical/command` と同じく NG。
+    # #1585: やり直しは回数（1 以上）と間隔（Rufus の duration）。
+    def test_schedule_retry_schema
+      base = {'source' => {'text' => 'a'}, 'dest' => {'hooks' => ['https://example.com/x']}}
+
+      [{}, {'times' => 2}, {'interval' => '15m'}, {'times' => 1, 'interval' => '1h30m'}].each do |value|
+        assert_empty(schema_errors(base.merge('schedule' => {'cron' => '1 0 * * *', 'retry' => value})), value.inspect)
+      end
+      [{'times' => 0}, {'interval' => '*/5 * * * *'}, {'limit' => 2}, true].each do |value|
+        assert_not_empty(schema_errors(base.merge('schedule' => {'cron' => '1 0 * * *', 'retry' => value})), value.inspect)
+      end
+    end
+
     # #1703: 締切は秒（0 以上）か Rufus の duration。cron や負の数は NG。
     def test_command_timeout_schema
       dest = {'hooks' => ['https://example.com/x']}
