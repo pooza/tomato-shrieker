@@ -60,6 +60,32 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 - ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む。⚠ **宛先のリダイレクト拒否（`redirect refused`）は、そのソースが次に配信したときに初めて出る**＝配信の少ないソース（本番 59 件のうち 26 件は直近 8 日に配信が無い・2026-10-11 実測）は、日を置いてもう一度見る
 - ログは `/var/log/tomato-shrieker.log`
 
+## 切り戻し
+
+前の版へ戻すとき。⚠ **本番に出す＝リリースするので、戻す先もタグを打った版にする。**
+
+🔴🔴 **マイグレーションを含む版から戻すときは、コードを戻す前に DB を DOWN する (#1722)。**古い版のコードは自分より新しい `schema_info` を開けない。起動時の判定（`Sequel::Migrator.is_current?`）が `Missing migration version(s) needed to migrate down` で倒れ、**起動に失敗して再起動を繰り返す**。⚠ DOWN のファイルは新しい版にしか無いので、**新しい版のチェックアウトのまま**流す。
+
+1. 止める: `ssh oscura 'sudo systemctl stop tomato-shrieker'`（⚠ 止めずに DOWN すると、再起動のたびに新しい版が UP し直す）
+2. DB の控えを取り、マイグレーションを含むなら DOWN する。`<前の版>` はタグ（例: `v4.16.1`）
+
+   ```sh
+   ssh oscura 'sudo -H -u deploy bash -lc "
+     set -e
+     cd ~/repos/tomato-shrieker
+     cp tmp/db/db.sqlite3 tmp/db/db.sqlite3.bak-\$(date +%Y%m%d%H%M)
+     git fetch origin tag <前の版> --no-tags
+     last=\$(git ls-tree --name-only <前の版> app/migration/ | tail -1 | xargs basename | cut -d_ -f1)
+     echo \"DOWN to \$last\"
+     bundle exec sequel -m app/migration -M \$((10#\$last)) sqlite://\$PWD/tmp/db/db.sqlite3"'
+   ```
+
+   - 戻す先と同じ本数なら何も起きない（マイグレーションを含まない版の切り戻しでもそのまま流してよい）
+   - ⚠⚠ **列やテーブルを足すマイグレーションの DOWN はデータを落とす。**流す前に、新しい版のリリースノートの「切り戻し」の欄（[release スキル](../release/SKILL.md) の 5.）と、該当する `app/migration/` の `down` を読む。014 は索引だけなので落ちるものは無い
+3. コードを戻す: `git reset --hard <前の版>`・`bundle install`・`bundle check`（`pull.sh` と同じく `sudo -H -u deploy bash -lc` の中で）。⚠ **`.ruby-version` が版で違う**ときは、前の版の Ruby が oscura に残っているかを先に確かめる。サテライト 3 本は本体と同じ Ruby で動くので、Ruby が戻るならサテライトも `RBENV_VERSION=<前の版の Ruby> bundle install` する
+4. 起こす: `ssh oscura 'sudo systemctl start tomato-shrieker'` → 4. の `verify.sh`
+5. 次のデプロイは 1. からそのまま流せる（`deploy` ブランチは main の祖先に戻っているので、`git pull origin main` は早送りになる）
+
 ## 注意
 
 🔴 **`bundle install` は本体・サテライトとも毎回必ず実行する。**冪等なので無駄打ちのコストはほぼ無い。省くと以下で壊れる。
