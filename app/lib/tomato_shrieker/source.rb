@@ -803,6 +803,7 @@ module TomatoShrieker
     def retry_failed_run(attempt)
       return unless attempt < retry_times
       return if @delivery_stats&.delivered_count&.positive?
+      return if @delivery_stats&.entry_stage? && !replays_entries?
       next_attempt = attempt + 1
       Scheduler.instance.scheduler.in(retry_interval, {tag: id, overlap: false}) do
         exec_retry(next_attempt)
@@ -831,6 +832,13 @@ module TomatoShrieker
       group = Source.all.select {|v| v.id == id}.reject(&:disable?)
       return false unless scheduler.registry[id] == Scheduler.digest(group)
       return group.any? {|v| v.to_h == to_h}
+    end
+
+    # やり直しの run が、前の run で処理したエントリをもう一度出せるか（#1741 の Codex P2）。
+    # ⚠ FeedSource 系は投稿の前にエントリを記録するので、やり直しても記録済みとして飛ばす＝
+    # 何も投稿しないまま成功で終わる。エントリの段に入った後の失敗はやり直さない（取得の失敗だけ）。
+    def replays_entries?
+      return true
     end
 
     def retry_times

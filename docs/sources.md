@@ -223,6 +223,7 @@ schedule:
 
 - `retry: {}` と書けば既定のまま有効になる。書かなければやり直さない
 - 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。やり直すのは「取得で落ちた」「宛先が全部落ちた」run だけ
+- ⚠ **FeedSource 系（GoogleNews・YouTube・GitHub を含む）は「取得で落ちた」run だけ。**投稿の前にエントリを記録するので、宛先が全部落ちた run をやり直しても、記録済みとして飛ばして何も投稿しない（#1741 の Codex P2）。CommandSource・IcalendarSource は毎回出力し直すので、宛先が全部落ちた run もやり直す
 - やり直しの run も `source_run_log` に 1 行ずつ残る。落ちた事実は消えず、成功すれば `error_streak` が切れる。⚠ やり直しを待つ間は、`error_streak_threshold` に達していれば healthz は 503
 - やり直しは一度きりのジョブ（同じ tag）。定義を変えた `source reload` や再起動で、本体のジョブと一緒に外れる（待っていたやり直しは走らない）
 - ⚠ HTTP の再送（`/http/retry/limit`）を使い切った後の話。間隔は取得先が立ち直るのを待つ長さにする

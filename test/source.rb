@@ -198,6 +198,31 @@ module TomatoShrieker
       cleanup_retry
     end
 
+    # ⚠ #1741 の Codex P2: FeedSource 系はエントリの段に入った後の失敗をやり直さない（記録済みとして
+    # 飛ばすので、やり直しても何も出ない）。段に入る前（取得の失敗）はやり直す。
+    def test_feed_retries_only_fetch_failures
+      params = {
+        'id' => RETRY_ID,
+        'source' => {'feed' => 'https://example.com/retry.rss'},
+        'schedule' => {'every' => '1d', 'retry' => {}},
+        'dest' => {'hooks' => ['https://hook.example.test/retry']},
+      }
+      source = FeedSource.new(params)
+      source.define_singleton_method(:exec) do
+        @delivery_stats.enter_entry_stage!
+        @delivery_stats.record_error(Object.new, RuntimeError.new('500'))
+      end
+      source.send(:exec_with_run_log, :every, '1d')
+
+      assert_equal(0, retry_jobs.size)
+      source.define_singleton_method(:exec) {raise 'feed is down'}
+      source.send(:exec_with_run_log, :every, '1d')
+
+      assert_equal(1, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
     # 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。
     def test_no_retry_after_partial_delivery
       source = retry_source({}) do
