@@ -185,6 +185,27 @@ module TomatoShrieker
       cleanup_retry
     end
 
+    # 🔴 **#1747 の Codex P2: 発火した瞬間に定期実行が走っていたら、ロックを取った後で判定する。**
+    # ⚠ 判定を先にすると、待っている間に定期実行が成功しても、やり直しがそのまま走る。
+    def test_retry_rechecks_after_waiting_for_run
+      runs = 0
+      source = retry_source({}) {runs += 1}
+      mutex = source.instance_variable_get(:@run_mutex)
+      periodic = Thread.new do
+        mutex.synchronize do
+          sleep(0.3)
+          source.instance_variable_set(:@succeeded_at, Time.now)
+        end
+      end
+      sleep(0.1)
+      source.send(:exec_retry, 1, Time.now - 60)
+      periodic.join
+
+      assert_equal(0, runs)
+    ensure
+      cleanup_retry
+    end
+
     # ⚠ #1746 の Codex P2: 同じ id の別のインスタンス（別のソースクラス）の成功では捨てない。
     # run_log はクラスを区別しないので、成功はインスタンスごとに見る。
     def test_retry_not_dropped_by_other_instance
@@ -210,7 +231,7 @@ module TomatoShrieker
 
       assert_false(source.send(:current_definition?))
       ran = false
-      source.define_singleton_method(:exec_with_run_log) {|*| ran = true}
+      source.define_singleton_method(:run_with_log) {|*| ran = true}
       source.send(:exec_retry, 1, Time.now)
 
       assert_false(ran)

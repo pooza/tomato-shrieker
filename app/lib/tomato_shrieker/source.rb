@@ -840,10 +840,15 @@ module TomatoShrieker
     # 短いソースでは、次の定期実行が先に成功して配信している。そこでやり直すと、CommandSource・
     # IcalendarSource は同じ出力をもう一度投稿する。
     # ⚠ 一度きりのジョブの中の例外は rufus の既定（$stderr）にしか出ないので、ここで受けて残す。
+    # 🔴 **判定は run のロックを取ってから（#1747 の Codex P2）。**発火した瞬間に定期実行が走っていると、
+    # 判定の時点では成功が無く、ロックを待つ間に定期実行が成功しても、そのまま走ってしまう。
+    # ⚠ `@run_mutex` は再入できないので、中では `exec_with_run_log` ではなく `run_with_log` を呼ぶ。
     def exec_retry(attempt, failed_at)
-      reason = retry_drop_reason(failed_at)
-      return log_retry('retry dropped', attempt:, reason:) if reason
-      return exec_with_run_log(:retry, attempt, attempt:)
+      @run_mutex.synchronize do
+        reason = retry_drop_reason(failed_at)
+        next log_retry('retry dropped', attempt:, reason:) if reason
+        run_with_log(:retry, attempt, attempt)
+      end
     rescue => e
       logger.error(source: id, action: 'retry', error: e)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
