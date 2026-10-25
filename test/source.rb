@@ -172,18 +172,30 @@ module TomatoShrieker
     # 🔴 **4.18.0 リリース前レビュー: 失敗の後に成功した run があれば、やり直しを捨てる。**周期がやり直しの
     # 間隔より短いソースでは、次の定期実行が先に成功している。やり直すと同じ出力をもう一度投稿する。
     def test_retry_dropped_after_later_success
-      source = retry_source({}) {nil}
-      ran = false
-      source.define_singleton_method(:exec_with_run_log) {|*| ran = true}
+      runs = 0
+      source = retry_source({}) {runs += 1}
       failed_at = Time.now - 60
       source.send(:exec_retry, 1, failed_at)
 
-      assert_true(ran, '後の成功が無ければやり直す')
-      ran = false
-      SourceRunLog.record_success(RETRY_ID, started_at: Time.now - 30)
+      assert_equal(1, runs, '後の成功が無ければやり直す')
       source.send(:exec_retry, 1, failed_at)
 
-      assert_false(ran)
+      assert_equal(1, runs, '1 回目のやり直しが成功した後は捨てる')
+    ensure
+      cleanup_retry
+    end
+
+    # ⚠ #1746 の Codex P2: 同じ id の別のインスタンス（別のソースクラス）の成功では捨てない。
+    # run_log はクラスを区別しないので、成功はインスタンスごとに見る。
+    def test_retry_not_dropped_by_other_instance
+      runs = 0
+      source = retry_source({}) {runs += 1}
+      other = retry_source({}) {nil}
+      failed_at = Time.now - 60
+      other.send(:exec_with_run_log, :cron, '1 0 * * *')
+      source.send(:exec_retry, 1, failed_at)
+
+      assert_equal(1, runs)
     ensure
       cleanup_retry
     end

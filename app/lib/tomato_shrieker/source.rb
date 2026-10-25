@@ -776,6 +776,8 @@ module TomatoShrieker
       log_exec_start(method, spec)
       exec
       finalize_run_log(started_at)
+      # ⚠ やり直しを捨てる判定（`succeeded_since?`）のために、このインスタンスが成功した時刻を控える。
+      @succeeded_at = started_at if !@delivery_stats.error? || delivered_any?
       retry_failed_run(attempt) if @delivery_stats.error?
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
@@ -853,9 +855,12 @@ module TomatoShrieker
       return nil
     end
 
+    # ⚠ **run_log ではなく、このインスタンスの成功で見る（#1746 の Codex P2）。**1 つの定義が複数の
+    # ソースクラスに当たると（`/source/command` と `/source/ical/command` を一緒に書くなど）、同じ id の
+    # 別のインスタンスが成功しただけで、このインスタンスのやり直しを捨ててしまう。run_log はクラスを
+    # 区別しない。⚠ やり直しのジョブも定期実行も同じインスタンスを掴んでいる。
     def succeeded_since?(time)
-      statuses = [SourceRunLog::STATUS_SUCCESS, SourceRunLog::STATUS_PARTIAL]
-      return SourceRunLog.where(source_id: id, status: statuses).where {executed_at >= time}.any?
+      return @succeeded_at.present? && @succeeded_at >= time
     end
 
     # 稼働中の定義（scheduler が登録したもの）がこのインスタンスと同じか。
