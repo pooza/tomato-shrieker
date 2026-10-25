@@ -28,7 +28,7 @@ dest:
 | Source | 主要キー | 備考 |
 |--------|----------|------|
 | TextSource | `/source/text` | 定型文 |
-| CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`） |
+| CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`）, `/source/timeout`（締切・下記） |
 | FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot`、`/enclosure/enable` / `/enclosure/negative_keyword` |
 | GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
 | IcalendarSource | `/source/ical`（`/source/calendar` でも可） | iCalendar (.ics) の URL、またはコマンド（`/source/ical/command`・下記）。`/source/days`（何日前から出すか・既定 3）、`/source/keyword` / `/source/negative_keyword`、`/source/google` |
@@ -52,6 +52,7 @@ source:
       - numbering_title
     dir: /home/deploy/repos/dqdai-anniv
     # env:              # 資格情報はここへ（値はログと例外メッセージから伏せる）
+    # timeout: 10m      # 締切（既定 600 秒・下記）
   days: 3
 dest:
   sanitize: html        # ⚠ 既定（fedi）は本文の `#タグ` を `# タグ` に崩す
@@ -59,14 +60,14 @@ dest:
     - https://...
 ```
 
-- 🔴 **`dir` / `env` は `/source/ical` の下に書く。**`/source/dir` / `/source/env` は CommandSource のもので、こちらでは読まない。⚠ `/source/command` を一緒に書くと CommandSource も立つ（1 つの定義から 2 つのソース）
+- 🔴 **`dir` / `env` / `timeout` は `/source/ical` の下に書く。**`/source/dir` / `/source/env` / `/source/timeout` は CommandSource のもので、こちらでは読まない。⚠ `/source/command` を一緒に書くと CommandSource も立つ（1 つの定義から 2 つのソース）
 - コマンドの組み立て（bundler・`BUNDLE_GEMFILE`・伏せ字・`bundle …` で始まるときの `bundle install`）は CommandSource と共有している（`CommandRunner`）。上の資格情報の注意もそのまま当てはまる。⚠ `bundle install` が走るのは `command` を**配列**で書いたときだけ（文字列は `sh -c` に包まれる。CommandSource も同じ）
 - 🔴 **空を正常として扱うので、「何も返さなくなった」コマンドは緑のまま。**取得先が空の一覧を返す・例外を握って 0 で終わる、といった壊れ方は error にならない。拾えるのは `/monitor/silence_tolerance`（無配信の許容期間）だけなので、**予定の間隔より少し長い値を必ず付ける**
-- ⚠ **`schedule.remind.enable: true` にすると、コマンドが `remind.minutes` 分ごとにも走る**（5 分なら 1 日 288 回）。`bin/shrieker source fetch` でも走る。副作用のあるコマンド・重いコマンドを書かない
-- ⚠ **実行する時刻は `schedule.cron` で書く。**IcalendarSource は既定の cron（`0 0 * * *`）を持ち、`schedule.every` より優先する（URL のときも同じ）
-- ⚠ コマンドに締切は無い。戻らないコマンドは、そのソースの以後の実行を塞ぐ（CommandSource も同じ）
+- ⚠ **`/schedule/remind/enable` を `true` にすると、コマンドが `/schedule/remind/minutes` 分ごとにも走る**（5 分なら 1 日 288 回）。`bin/shrieker source fetch` でも走る。副作用のあるコマンド・重いコマンドを書かない
+- ⚠ **実行する時刻は `/schedule/cron` で書く。**IcalendarSource は既定の cron（`0 0 * * *`）を持ち、`/schedule/every` より優先する（URL のときも同じ）
+- 締切は下の「CommandSource」の `/source/timeout` と同じ（こちらは `/source/ical/timeout`）
 - **空の出力は「該当なし」で正常**（予定 0 件の `VCALENDAR` と同じ）。🔴 **空でないのに iCalendar として読めない出力は error**（取得段の失敗）。コマンドが非 0 で終わったときも同じ
-- ⚠ **本文のハッシュタグを生かすなら `dest.sanitize: html` を付ける。**既定の `fedi` は、投稿先に再解釈させないために `#` / `@` の後ろへ空白を入れる。本番の予定のソース（`delmulin-numbering-title` など）はどれも `html`
+- ⚠ **本文のハッシュタグを生かすなら `/dest/sanitize` を `html` にする。**既定の `fedi` は、投稿先に再解釈させないために `#` / `@` の後ろへ空白を入れる。本番の予定のソース（`delmulin-numbering-title` など）はどれも `html`
 - ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る
 - ⚠ 終日の予定に `DTEND` を書くなら注意。iCalendar の規格では終了日は「翌日」だが、1 日戻すのは Google カレンダーのとき（`/source/google`）だけ。書かなければ開始日と同じ日になる
 
@@ -188,6 +189,10 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 
 - `/ruby/jit` — `true` なら CommandSource の子プロセスに `RUBY_YJIT_ENABLE=yes` を渡す。既定は `false`（本番は `local.yaml` で `yes`）
 - ⚠ **v4.13.0 より前は既定値が無く、`local.yaml` に書いていない環境では CommandSource に触れた時点で `ConfigError` になっていた (#1614)**
+- 🔴 **コマンドには締切がある (#1703)。**`/source/timeout`（IcalendarSource は `/source/ical/timeout`）に秒か Rufus の duration（`10m` など）で書く。未指定なら `/command/timeout/seconds`（既定 600 秒。本番の最長は約 100 秒・2026-10-25 実測）。`0` は締切なし
+  - 締切が来たら子のプロセスグループへ TERM → 2 秒の猶予 → KILL（ginseng-core#684）。その run は `Timeout::Error` の取得段の失敗になる
+  - ⚠ 4.17 までは締切が無く、戻らないコマンドはそのソースの以後の実行を塞いでいた（`overlap: false` なので発火はスキップされ続け、IcalendarSource のリマインドもコマンドの直列化で待たされる）
+  - ⚠ `sudo` で別のユーザーへ降りた子・`setsid` でグループを抜けた子孫は止められない。締切で戻りはするが、相手は動き続ける
 
 ## 暗号化
 
@@ -203,3 +208,23 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 | 定期実行 | `/schedule/every` | `5m`, `1h`, `1d` |
 | cron | `/schedule/cron` | `'0 6 * * *'` |
 | 指定時刻 | `/schedule/at` | `'2026/5/18 18:00'` |
+
+### 失敗した run のやり直し（`/schedule/retry`・#1585）
+
+**1 件も配信できずに error で終わった run を、あとでやり直す。**日付で中身が決まるソース（記念日・予定）向けの opt-in。取得先が数分おかしいだけで、その日ぶんを丸ごと失い、翌日の run では取り返せないため（#1578・dqdai-anniv の GAS の不調）。
+
+```yaml
+schedule:
+  cron: '1 0 * * *'
+  retry:
+    times: 2        # やり直す回数の上限（既定 1）
+    interval: 15m   # 失敗からやり直すまでの間（既定 15m）
+```
+
+- `retry: {}` と書けば既定のまま有効になる。書かなければやり直さない
+- 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。やり直すのは「取得で落ちた」「宛先が全部落ちた」run だけ
+- ⚠ **FeedSource 系（GoogleNews・YouTube・GitHub を含む）は「取得で落ちた」run だけ。**投稿の前にエントリを記録するので、宛先が全部落ちた run をやり直しても、記録済みとして飛ばして何も投稿しない（#1741 の Codex P2）。CommandSource・IcalendarSource は毎回出力し直すので、宛先が全部落ちた run もやり直す
+- やり直しの run も `source_run_log` に 1 行ずつ残る。落ちた事実は消えず、成功すれば `error_streak` が切れる。⚠ やり直しを待つ間は、`error_streak_threshold` に達していれば healthz は 503
+- やり直しは一度きりのジョブ（同じ tag）。定義を変えた `source reload` や再起動で、本体のジョブと一緒に外れる（待っていたやり直しは走らない）
+- ⚠ HTTP の再送（`/http/retry/limit`）を使い切った後の話。間隔は取得先が立ち直るのを待つ長さにする
+- IcalendarSource のリマインド（`/schedule/remind`）はやり直さない

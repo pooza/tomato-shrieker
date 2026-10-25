@@ -33,6 +33,11 @@ module TomatoShrieker
       end
     end
 
+    # 投稿の前にエントリを記録するので、やり直しでは出し直せない（`Source#replays_entries?`）。
+    def replays_entries?
+      return false
+    end
+
     def keep_years
       return self['/keep/years'] || 3
     end

@@ -1,5 +1,9 @@
 module TomatoShrieker
   class CommandSourceTest < TestCase
+    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
+    SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
+    SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
+
     # 🔴 **#1614: CI でも 1 本は回ること。**`test/sources/command.yaml` が無いと
     # 下のループは 1 度も回らず、何も確かめずに緑になる（#1593 の族）。
     def test_fixture_loaded
@@ -129,6 +133,51 @@ module TomatoShrieker
       # ⚠ wait status の下位 7 ビットはシグナル（`exit 2` は 512）。
       assert_equal('command exited with status 2', build_source.exit_description(512))
       assert_equal('command killed by signal 9', build_source.exit_description(9))
+    end
+
+    # 🔴 #1715: コマンドの実行中も、プロセスの `ENV` を差し替えない。`Bundler.with_unbundled_env` で
+    # 囲むと、走っている間だけ `BUNDLE_GEMFILE` などが消え、並列のスレッドがそれを控えて戻しうる。
+    def test_exec_does_not_touch_process_env
+      key = 'TOMATO_SHRIEKER_ENV_PROBE'
+      gemfile = ENV.fetch('BUNDLE_GEMFILE', nil)
+      ENV[key] = 'kept'
+      ENV['BUNDLE_GEMFILE'] ||= File.join(Environment.dir, 'Gemfile')
+      before = ENV.to_h
+      source = CommandSource.new(secret_params('sleep 1'))
+      running = Thread.new {source.send(:run_command)}
+      sleep(0.5)
+
+      assert_equal(before, ENV.to_h)
+      running.join
+    ensure
+      ENV.delete(key)
+      ENV['BUNDLE_GEMFILE'] = gemfile
+    end
+
+    # 🔴 #1703: 締切。未指定なら `/command/timeout/seconds`、ソースごとに秒か duration で上書きできる。
+    def test_command_timeout
+      assert_equal(config['/command/timeout/seconds'], build_secret_source.command_timeout)
+      # ⚠ 端数の秒を落とさない（#1737 の Codex P2）。`'0.5s'` が 0 ＝締切なしに化けていた。
+      {5 => 5, '2m' => 120, 0 => 0, '0.5s' => 0.5, '1.5' => 1.5}.each do |value, expected|
+        params = secret_params
+        params['source']['timeout'] = value
+
+        assert_equal(expected, CommandSource.new(params).command_timeout, value.inspect)
+      end
+    end
+
+    # 🔴 #1703: 戻らないコマンドは締切で落ち、取得段の失敗になる。次の実行を塞がない。
+    def test_exec_stops_at_timeout
+      params = secret_params('sleep 30')
+      params['source']['timeout'] = 1
+      source = CommandSource.new(params)
+      started = Time.now
+
+      assert_raise(Timeout::Error) {source.exec}
+      # ⚠ 上流は締切 ＋ 最大 3 秒で戻る（TERM の猶予 2 ＋ 見切り 1）。
+      assert_operator(Time.now - started, :<, 10)
+      # ⚠ 締切で抜けた後も `@command_mutex` を握ったままにしない（同じソースのリマインドが待たされる）。
+      assert_false(source.instance_variable_get(:@command_mutex).locked?)
     end
 
     # ⚠ stderr が空（nil ではない）でも、stdout に書かれた理由を例外メッセージに載せる。
@@ -340,10 +389,6 @@ module TomatoShrieker
 
       assert_true(registered)
     end
-
-    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
-    SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
-    SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
 
     def build_secret_source(script = nil)
       return CommandSource.new(secret_params(script))

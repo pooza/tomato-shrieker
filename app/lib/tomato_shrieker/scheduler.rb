@@ -23,6 +23,7 @@ module TomatoShrieker
     # 走り出した後は落とさない。⚠ 稼働中の daemon を「ジョブが 1 回こけた」で
     # 止める理由は無い。
     def run_jobs
+      @serving = true
       schedule_maintenance
       @scheduler.join
     rescue => e
@@ -65,6 +66,33 @@ module TomatoShrieker
     # 値を出しうる（`SchedulerDaemon#report_reload_failure` と同じ判断）。
     def load_state
       return @load_state
+    end
+
+    # 🔴 **daemon が登録を終えて待ち受けに入ったか (#1686)。**入っていれば、初回の実行期限の
+    # 起点は登録した時刻（`registered_at`）になる。⚠ CLI・テスト・起動の途中は偽で、定義ファイルの
+    # 更新時刻へ倒れる。⚠ `exec` の頭で立てない — 起動の登録（`register_all`）が倒れても残る。
+    def serving?
+      return @serving == true
+    end
+
+    # そのソースのジョブが登録された時刻。ジョブが無ければ nil（登録に失敗した・無効にした）。
+    # ⚠ 定義が変わらなかったジョブは reload で張り直さないので、時刻も前のまま。
+    def registered_at(id)
+      return @scheduler.jobs(tag: id).filter_map(&:scheduled_at).min&.to_t
+    end
+
+    # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。
+    #
+    # 🔴 **group の全要素をハッシュする (#1571)。**⚠⚠ 以前は `sources.first` だけを
+    # 見ていたので、**同じ id を持つ定義が 2 つある状態で片方を消す / `disable` すると、
+    # group は縮むのに digest が変わらない**＝ `stale` に入らず、**消したほうのジョブが
+    # unschedule されずに走り続ける**。⚠ ログの `changed` / `removed` にも出ないので、
+    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
+    #
+    # 📌 `/status.json` の `digest` と、デプロイ前の確認（deploy スキルの `pending_sources.sh`）が
+    # ディスク上の定義と比べるのにも使う (#1672)。
+    def self.digest(sources)
+      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
     end
 
     private
@@ -207,15 +235,8 @@ module TomatoShrieker
       @scheduler.jobs(tag: id).reject {|v| kept.include?(v.job_id)}.each(&:unschedule)
     end
 
-    # ⚠ `class` は除く。同じ定義が複数クラスにマッチしても digest は 1 つ。
-    #
-    # 🔴 **group の全要素をハッシュする (#1571)。**⚠⚠ 以前は `sources.first` だけを
-    # 見ていたので、**同じ id を持つ定義が 2 つある状態で片方を消す / `disable` すると、
-    # group は縮むのに digest が変わらない**＝ `stale` に入らず、**消したほうのジョブが
-    # unschedule されずに走り続ける**。⚠ ログの `changed` / `removed` にも出ないので、
-    # 運用者は「反映済み」と読む＝**侵害された宛先を外そうとしたときに効かない形**。
     def digest(sources)
-      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
+      return self.class.digest(sources)
     end
 
     def schedule_maintenance

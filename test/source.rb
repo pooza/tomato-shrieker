@@ -1,5 +1,7 @@
 module TomatoShrieker
   class SourceTest < TestCase
+    RETRY_ID = '__test_source_retry__'.freeze
+
     def test_all
       Source.all do |source|
         assert_kind_of(Source, source)
@@ -110,6 +112,190 @@ module TomatoShrieker
       assert_not_same(first, source.mastodon)
     ensure
       SourceRunLog.where(source_id: id).delete
+    end
+
+    # 🔴 **#1585: 1 件も配信できずに落ちた run は、`/schedule/retry` があればやり直す。**
+    def test_retry_failed_run
+      source = retry_source({'times' => 2, 'interval' => '10m'}) {raise 'upstream is down'}
+
+      assert_equal(0, retry_jobs.size)
+      source.send(:exec_with_run_log, :cron, '1 0 * * *')
+
+      assert_equal(1, retry_jobs.size)
+      # ⚠ 上限（times）に達したら、もうやり直さない。
+      source.send(:exec_with_run_log, :retry, 2, attempt: 2)
+
+      assert_equal(1, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # やり直しのジョブが実際に走り、run_log に 1 行ずつ残る。上限で止まる。
+    def test_retry_runs_and_stops
+      source = retry_source({'times' => 1, 'interval' => '0.3s'}) {raise 'upstream is down'}
+      source.send(:exec_with_run_log, :cron, '1 0 * * *')
+      deadline = Time.now + 5
+      sleep(0.1) while SourceRunLog.where(source_id: RETRY_ID).count < 2 && Time.now < deadline
+
+      assert_equal(2, SourceRunLog.where(source_id: RETRY_ID).count)
+      assert_equal(0, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # 🔴 **#1741 の Codex P1: やり直しと定期実行が重なっても、互いの集計を上書きしない。**
+    # ⚠ ゆっくり落ちる run の最中に、すぐ配信できる run が割り込む形。直列にしないと、落ちた run が
+    # 割り込んだ run の集計（配信 1 件）を読み、やり直さない。
+    def test_runs_are_serialized
+      source = retry_source({}) do
+        raise 'upstream is down' unless Thread.current[:fast]
+        @delivery_stats.record_success(Object.new)
+      end
+      slow = source.method(:exec)
+      source.define_singleton_method(:exec) do
+        sleep(0.3) unless Thread.current[:fast]
+        slow.call
+      end
+      failing = Thread.new {source.send(:exec_with_run_log, :cron, '1 0 * * *')}
+      sleep(0.1)
+      Thread.new do
+        Thread.current[:fast] = true
+        source.send(:exec_with_run_log, :cron, '1 0 * * *')
+      end.join
+      failing.join
+
+      assert_equal(1, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # 🔴 **4.18.0 リリース前レビュー: 失敗の後に成功した run があれば、やり直しを捨てる。**周期がやり直しの
+    # 間隔より短いソースでは、次の定期実行が先に成功している。やり直すと同じ出力をもう一度投稿する。
+    def test_retry_dropped_after_later_success
+      runs = 0
+      source = retry_source({}) {runs += 1}
+      failed_at = Time.now - 60
+      source.send(:exec_retry, 1, failed_at)
+
+      assert_equal(1, runs, '後の成功が無ければやり直す')
+      source.send(:exec_retry, 1, failed_at)
+
+      assert_equal(1, runs, '1 回目のやり直しが成功した後は捨てる')
+    ensure
+      cleanup_retry
+    end
+
+    # 🔴 **#1747 の Codex P2: 発火した瞬間に定期実行が走っていたら、ロックを取った後で判定する。**
+    # ⚠ 判定を先にすると、待っている間に定期実行が成功しても、やり直しがそのまま走る。
+    def test_retry_rechecks_after_waiting_for_run
+      runs = 0
+      source = retry_source({}) {runs += 1}
+      mutex = source.instance_variable_get(:@run_mutex)
+      periodic = Thread.new do
+        mutex.synchronize do
+          sleep(0.3)
+          source.instance_variable_set(:@succeeded_at, Time.now)
+        end
+      end
+      sleep(0.1)
+      source.send(:exec_retry, 1, Time.now - 60)
+      periodic.join
+
+      assert_equal(0, runs)
+    ensure
+      cleanup_retry
+    end
+
+    # ⚠ #1746 の Codex P2: 同じ id の別のインスタンス（別のソースクラス）の成功では捨てない。
+    # run_log はクラスを区別しないので、成功はインスタンスごとに見る。
+    def test_retry_not_dropped_by_other_instance
+      runs = 0
+      source = retry_source({}) {runs += 1}
+      other = retry_source({}) {nil}
+      failed_at = Time.now - 60
+      other.send(:exec_with_run_log, :cron, '1 0 * * *')
+      source.send(:exec_retry, 1, failed_at)
+
+      assert_equal(1, runs)
+    ensure
+      cleanup_retry
+    end
+
+    # 🔴 **#1741 の Codex P2: daemon の中では、定義が変わった・消えたソースのやり直しを捨てる。**
+    def test_retry_dropped_when_definition_is_gone
+      source = retry_source({}) {nil}
+      scheduler = Scheduler.instance
+
+      assert_true(source.send(:current_definition?), 'daemon の外では見ない')
+      scheduler.define_singleton_method(:serving?) {true}
+
+      assert_false(source.send(:current_definition?))
+      ran = false
+      source.define_singleton_method(:run_with_log) {|*| ran = true}
+      source.send(:exec_retry, 1, Time.now)
+
+      assert_false(ran)
+    ensure
+      scheduler.singleton_class.send(:remove_method, :serving?) if scheduler.singleton_methods.include?(:serving?)
+      cleanup_retry
+    end
+
+    # ⚠ 宛先で全部落ちた（配信 0 件の error）run もやり直す。
+    def test_retry_when_nothing_delivered
+      source = retry_source({}) {@delivery_stats.record_error(Object.new, RuntimeError.new('500'))}
+      source.send(:exec_with_run_log, :cron, '1 0 * * *')
+
+      assert_equal(1, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # ⚠ #1741 の Codex P2: FeedSource 系はエントリの段に入った後の失敗をやり直さない（記録済みとして
+    # 飛ばすので、やり直しても何も出ない）。段に入る前（取得の失敗）はやり直す。
+    def test_feed_retries_only_fetch_failures
+      params = {
+        'id' => RETRY_ID,
+        'source' => {'feed' => 'https://example.com/retry.rss'},
+        'schedule' => {'every' => '1d', 'retry' => {}},
+        'dest' => {'hooks' => ['https://hook.example.test/retry']},
+      }
+      source = FeedSource.new(params)
+      source.define_singleton_method(:exec) do
+        @delivery_stats.enter_entry_stage!
+        @delivery_stats.record_error(Object.new, RuntimeError.new('500'))
+      end
+      source.send(:exec_with_run_log, :every, '1d')
+
+      assert_equal(0, retry_jobs.size)
+      source.define_singleton_method(:exec) {raise 'feed is down'}
+      source.send(:exec_with_run_log, :every, '1d')
+
+      assert_equal(1, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。
+    def test_no_retry_after_partial_delivery
+      source = retry_source({}) do
+        @delivery_stats.record_success(Object.new)
+        raise 'failed after posting'
+      end
+      source.send(:exec_with_run_log, :cron, '1 0 * * *')
+
+      assert_equal(0, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
+    # ⚠ 書いていないソース（既定）と、成功した run はやり直さない。
+    def test_no_retry_without_config_or_on_success
+      retry_source(nil) {raise 'upstream is down'}.send(:exec_with_run_log, :cron, '1 0 * * *')
+      retry_source({}) {nil}.send(:exec_with_run_log, :cron, '1 0 * * *')
+
+      assert_equal(0, retry_jobs.size)
+    ensure
+      cleanup_retry
     end
 
     # 🔴 **#1712 の Codex P2: 宛先を取り出している途中に、作り直しが割り込まない。**
@@ -707,6 +893,30 @@ module TomatoShrieker
 
         assert_equal(Set['#実況', '#precure_fun'], tags)
       end
+    end
+
+    private
+
+    def retry_source(retry_params, &)
+      params = {
+        'id' => RETRY_ID,
+        'source' => {'text' => 'body'},
+        'schedule' => {'cron' => '1 0 * * *'},
+        'dest' => {'hooks' => ['https://hook.example.test/retry']},
+      }
+      params['schedule']['retry'] = retry_params if retry_params
+      source = TextSource.new(params)
+      source.define_singleton_method(:exec, &)
+      return source
+    end
+
+    def retry_jobs
+      return Scheduler.instance.scheduler.jobs(tag: RETRY_ID)
+    end
+
+    def cleanup_retry
+      retry_jobs.each(&:unschedule)
+      SourceRunLog.where(source_id: RETRY_ID).delete
     end
   end
 end

@@ -15,6 +15,7 @@ module TomatoShrieker
     def initialize(params)
       @params = params
       @shrieker_mutex = Mutex.new
+      @run_mutex = Mutex.new
     end
 
     def [](name)
@@ -477,16 +478,26 @@ module TomatoShrieker
     # 「壊れている」と同じ 503 にすると、**ソースを足すたびに最大 1 周期ぶん赤くなる**
     # （30 分間隔のソースを 17 本足して 16 本が一斉に鳴った）。
     #
-    # ⚠ **起点は定義ファイルの更新時刻。**そこから見た初回の発火予定＋猶予までは待つ。
+    # ⚠ **起点（`first_run_origin`）から見た初回の発火予定＋猶予までは待つ。**
     # ⚠⚠ **期限を過ぎても走っていなければ、従来どおり 503。**期限なしで緑に倒すと、
     # 登録しただけで一度も走っていないソースが緑のまま残る（#1504 で塞いだ形へ戻る）。
-    # ⚠ 定義を置いてから reload までに間が空くと、そのぶん早く期限が来る＝従来と同じ
-    # 503 になるだけで、緑に化ける方向には外れない。
     # ⚠ ファイルから読んでいないソース（`Source.new` で直に作ったもの）と `post_at` は nil。
     def first_run_deadline
-      return nil unless (defined_at = Config.instance.source_defined_at(id))
-      return nil unless (due = next_run_at(defined_at))
+      return nil unless (origin = first_run_origin)
+      return nil unless (due = next_run_at(origin))
       return due + monitor_grace_seconds
+    end
+
+    # 🔴 **daemon の中では、scheduler がジョブを登録した時刻 (#1686)。**
+    #
+    # ⚠⚠ 定義ファイルの更新時刻を起点にすると、**登録に失敗したソースがジョブの無いまま期限まで
+    # 緑**（日次 cron で最長約 26 時間）で、**更新と reload の間に cron の時刻が挟まると、実際の
+    # 初回より前に期限が来て赤**だった。ジョブが無ければ nil ＝期限なし＝すぐ 503。
+    # ⚠ CLI は scheduler を持たないので、定義ファイルの更新時刻（いまのディスク）で答える。
+    def first_run_origin
+      scheduler = Scheduler.instance
+      return scheduler.registered_at(id) if scheduler.serving?
+      return Config.instance.source_defined_at(id)
     end
 
     # run_log が無く、まだ初回の実行期限の内にいるか。⚠ run_log の有無は呼び出し側が見る。
@@ -750,23 +761,138 @@ module TomatoShrieker
       return job
     end
 
-    def exec_with_run_log(method, spec)
+    # ⚠ `attempt` はやり直しの何回目か（本来の発火は 0・#1585）。
+    # 🔴 **run は 1 本ずつ（#1741 の Codex P1）。**`overlap: false` はジョブの中でしか効かず、やり直しの
+    # ジョブと次の定期実行は別のジョブなので重なりうる。重なると `@delivery_stats` を上書きし合い、
+    # 配信済みの run が「0 件」と読まれてやり直す＝二重投稿の防止が破れる。
+    def exec_with_run_log(method, spec, attempt: 0)
+      @run_mutex.synchronize {run_with_log(method, spec, attempt)}
+    end
+
+    def run_with_log(method, spec, attempt)
       started_at = Time.now
       @delivery_stats = DeliveryStats.new
       reset_shriekers
-      logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
-      # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
-      unless dest?
-        logger.warn(source: id, class: self.class.to_s, message: 'no destination configured')
-      end
+      log_exec_start(method, spec)
       exec
       finalize_run_log(started_at)
+      # ⚠ やり直しを捨てる判定（`succeeded_since?`）のために、このインスタンスが成功した時刻を控える。
+      @succeeded_at = started_at if !@delivery_stats.error? || delivered_any?
+      retry_failed_run(attempt) if @delivery_stats.error?
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       record_exec_abort(e)
       SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
       Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
       logger.error(source: id, error: e)
+      retry_failed_run(attempt)
+    end
+
+    def log_exec_start(method, spec)
+      logger.info(source: id, class: self.class.to_s, action: 'exec start', method.to_sym => spec)
+      # 宛先ゼロは設定の腐りであって「静かなソース」ではない。run ごとに 1 回だけ出す (#1473)。
+      return if dest?
+      logger.warn(source: id, class: self.class.to_s, message: 'no destination configured')
+    end
+
+    # 🔴 **1 件も配信できずに error で終わった run を、あとでやり直す (#1585・opt-in)。**
+    #
+    # 日付で中身が決まるソース（記念日・予定）は、取得先が数分おかしいだけでその日ぶんを丸ごと失い、
+    # 翌日の run では取り返せない。HTTP の再送は全部使い切った後なので、run ごとやり直す。
+    # ⚠⚠ **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。
+    # ⚠ やり直しは一度きりのジョブ（同じ tag）。定義を変えた reload では本体と一緒に外れる。
+    # ⚠ やり直しの run も run_log に 1 行ずつ残る（落ちた事実は消えず、成功すれば error_streak が切れる）。
+    # ⚠ やり直さなかった・使い切ったときもログに残す（4.18.0 リリース前レビュー）。黙って return すると、
+    # 「やり直しが尽きた」のか「設定が効いていない」のかがログから読めない。
+    def retry_failed_run(attempt)
+      return if retry_times.zero?
+      return log_retry('retry exhausted', attempt:) unless attempt < retry_times
+      return log_retry('retry skipped', attempt:, reason: 'delivered') if delivered_any?
+      return log_retry('retry skipped', attempt:, reason: 'entries recorded') unless replayable?
+      next_attempt = attempt + 1
+      failed_at = Time.now
+      Scheduler.instance.scheduler.in(retry_interval, {tag: id, overlap: false}) do
+        exec_retry(next_attempt, failed_at)
+      end
+      log_retry('retry scheduled', attempt: next_attempt, times: retry_times, in: retry_interval)
+    rescue => e
+      logger.error(source: id, action: 'retry', error: e)
+    end
+
+    def delivered_any?
+      return @delivery_stats&.delivered_count&.positive?
+    end
+
+    # エントリの段に入った後の失敗を、やり直しで出し直せるか（`replays_entries?`）。
+    def replayable?
+      return true unless @delivery_stats&.entry_stage?
+      return replays_entries?
+    end
+
+    def log_retry(action, **)
+      logger.warn(source: id, class: self.class.to_s, action:, **)
+    end
+
+    # 🔴 **やり直す前に、この定義がまだ生きているかを見る（#1741 の Codex P2）。**reload は走っている
+    # run を完走させ、登録済みのジョブだけを外す。完走した古い run が後から落ちると、古い定義の
+    # インスタンスでやり直しを立ててしまい、消した宛先へ投稿しうる。⚠ daemon の外では見ない。
+    # 🔴 **失敗の後に成功した run があれば捨てる（4.18.0 リリース前レビュー）。**周期がやり直しの間隔より
+    # 短いソースでは、次の定期実行が先に成功して配信している。そこでやり直すと、CommandSource・
+    # IcalendarSource は同じ出力をもう一度投稿する。
+    # ⚠ 一度きりのジョブの中の例外は rufus の既定（$stderr）にしか出ないので、ここで受けて残す。
+    # 🔴 **判定は run のロックを取ってから（#1747 の Codex P2）。**発火した瞬間に定期実行が走っていると、
+    # 判定の時点では成功が無く、ロックを待つ間に定期実行が成功しても、そのまま走ってしまう。
+    # ⚠ `@run_mutex` は再入できないので、中では `exec_with_run_log` ではなく `run_with_log` を呼ぶ。
+    def exec_retry(attempt, failed_at)
+      @run_mutex.synchronize do
+        reason = retry_drop_reason(failed_at)
+        next log_retry('retry dropped', attempt:, reason:) if reason
+        run_with_log(:retry, attempt, attempt)
+      end
+    rescue => e
+      logger.error(source: id, action: 'retry', error: e)
+      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
+    end
+
+    def retry_drop_reason(failed_at)
+      return 'later run succeeded' if succeeded_since?(failed_at)
+      return 'definition changed' unless current_definition?
+      return nil
+    end
+
+    # ⚠ **run_log ではなく、このインスタンスの成功で見る（#1746 の Codex P2）。**1 つの定義が複数の
+    # ソースクラスに当たると（`/source/command` と `/source/ical/command` を一緒に書くなど）、同じ id の
+    # 別のインスタンスが成功しただけで、このインスタンスのやり直しを捨ててしまう。run_log はクラスを
+    # 区別しない。⚠ やり直しのジョブも定期実行も同じインスタンスを掴んでいる。
+    def succeeded_since?(time)
+      return @succeeded_at.present? && @succeeded_at >= time
+    end
+
+    # 稼働中の定義（scheduler が登録したもの）がこのインスタンスと同じか。
+    def current_definition?
+      scheduler = Scheduler.instance
+      return true unless scheduler.serving?
+      group = Source.all.select {|v| v.id == id}.reject(&:disable?)
+      return false unless scheduler.registry[id] == Scheduler.digest(group)
+      return group.any? {|v| v.to_h == to_h}
+    end
+
+    # やり直しの run が、前の run で処理したエントリをもう一度出せるか（#1741 の Codex P2）。
+    # ⚠ FeedSource 系は投稿の前にエントリを記録するので、やり直しても記録済みとして飛ばす＝
+    # 何も投稿しないまま成功で終わる。エントリの段に入った後の失敗はやり直さない（取得の失敗だけ）。
+    def replays_entries?
+      return true
+    end
+
+    # ⚠ 有無は `@params` で見る。`self[]` は値が Hash のキーに nil を返すので、`retry: {}`（既定のまま
+    # opt-in）を読み落とす。
+    def retry_times
+      return 0 unless @params.dig('schedule', 'retry').is_a?(Hash)
+      return self['/schedule/retry/times'] || 1
+    end
+
+    def retry_interval
+      return self['/schedule/retry/interval'] || '15m'
     end
 
     # 🔴 **エントリ処理の途中で run ごと落ちたら、それを取りこぼしとして数える (#1574)。**

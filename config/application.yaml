@@ -1,3 +1,8 @@
+command:
+  # コマンドを走らせるソースの締切の既定 (#1703)。ソースごとに `/source/timeout`（iCalendar は
+  # `/source/ical/timeout`）で上書きできる。本番の最長は約 100 秒（2026-10-25 実測）。
+  timeout:
+    seconds: 600
 crypt:
   encoder: base64
   password: null
@@ -55,8 +60,12 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.17.1
+  version: 4.18.0
 nostr:
+  # リレーが `OK`（NIP-20）を返すまで待つ秒数。返らなければそのリレーは失敗 (#1479)。
+  publish:
+    timeout:
+      seconds: 10
   relays:
     - wss://relay.damus.io
     - wss://nos.lol
@@ -70,7 +79,6 @@ piefed:
       - Moderating
   subject:
     max_length: 50
-  verify_peer: true
 ruby:
   jit: false
 scheduler: {}

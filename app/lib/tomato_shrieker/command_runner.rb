@@ -27,6 +27,19 @@ module TomatoShrieker
       return params.is_a?(Hash) ? params : {}
     end
 
+    # 🔴 **締切 (#1703)。**無いと、戻らないコマンドがそのソースの実行を塞ぎ続ける
+    # （`overlap: false` なので以後の発火はすべてスキップされ、リマインドも `@command_mutex` で待たされる）。
+    # 締切が来たら上流が子のプロセスグループへ TERM → KILL して `Timeout::Error` を上げ、
+    # その run は取得段の失敗になる。⚠ `0` は締切なし（上流の意味のまま）。
+    # 🔴 **端数を落とさない（#1737 の Codex P2）。**`Source#parse_duration` は `to_i` するので、
+    # `'0.5s'` が 0 ＝締切なしに化け、短い締切を頼んだのに無期限で走る。上流は端数の秒を受け付ける。
+    def command_timeout
+      return config['/command/timeout/seconds'] unless command_params.key?('timeout')
+      value = command_params['timeout']
+      return Rufus::Scheduler.parse_duration(value) if value.is_a?(String)
+      return value
+    end
+
     # ⚠ **キーの有無で見る（#1692 の Codex P2）。**`present?` で見ると、空の `command`
     # （`''` / `[]`）を書いた定義が「コマンドではない」側へ流れる。
     def command?
@@ -74,7 +87,10 @@ module TomatoShrieker
     def capture_command
       error = nil
       result = @command_mutex.synchronize do
-        Bundler.with_unbundled_env {command.exec}
+        # ⚠ `Bundler.with_unbundled_env` で囲まない（#1715）。プロセス全体の `ENV` を差し替えて戻すので、
+        # 並列のスレッドが差し替え後の `ENV` を控えて戻しうる。ginseng-core 4.2.0 から `exec` は `ENV` に
+        # 触らず、子へ渡す環境（`spawn_env`）だけを組む。
+        command.exec(timeout: command_timeout)
         [command.stdout.to_s.scrub, command.stderr.to_s.scrub, command.status]
       rescue => e
         error = masked_exception(e)
@@ -108,7 +124,7 @@ module TomatoShrieker
 
     def install_command_bundle
       return unless bundler?
-      Bundler.with_unbundled_env {command.bundle_install}
+      command.bundle_install
     end
 
     # 登録の前の準備。`bundle` で始まるコマンドなら依存を入れ、どれも依存を検査する。
@@ -134,7 +150,7 @@ module TomatoShrieker
 
     # 依存の問題の説明。無ければ nil。⚠ デプロイ前の確認（deploy スキルの `enabled_sources.rb`）
     # からも呼ぶ。⚠ 子プロセスと同じく bundler の痕跡を消した環境で、`dir` の Gemfile を見る
-    # ⚠ `RBENV_VERSION` は `child_env` が外すが、rbenv が版の bin を `PATH` の先頭に置いているので、
+    # ⚠ `RBENV_VERSION` は `spawn_env` が外すが、rbenv が版の bin を `PATH` の先頭に置いているので、
     # 本体と同じ Ruby の gem を見る。
     #
     # 🔴 **`Bundler.with_unbundled_env` で囲まない。**あれはプロセス全体の `ENV` を差し替えて
@@ -148,9 +164,9 @@ module TomatoShrieker
       gemfile = File.join(dir, 'Gemfile')
       return nil unless File.exist?(gemfile)
       # 🔴 **実行時と同じ環境で見る（#1714 の Codex P2）。**`/source/env` の `BUNDLE_PATH` /
-      # `GEM_HOME` などは結果を変える。上流が子へ渡す `child_env`（`RBENV_VERSION` 等を外し、
-      # ソースの env と `BUNDLE_GEMFILE` を重ねたもの）をそのまま使う。
-      env = Bundler.unbundled_env.merge(command.send(:child_env), 'BUNDLE_GEMFILE' => gemfile)
+      # `GEM_HOME` などは結果を変える。上流が子へ渡す環境（`spawn_env`・ginseng-core 4.2.0 で公開）を
+      # そのまま使う（#1715）。
+      env = command.spawn_env.merge('BUNDLE_GEMFILE' => gemfile)
       output, status = Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
       return nil if status.success?
       detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)

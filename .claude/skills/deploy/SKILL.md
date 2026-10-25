@@ -31,13 +31,16 @@ disable-model-invocation: true
 
 - `>` の行 ＝ **再起動で増えるソース**。意図したものかをユーザーに確かめる。意図していなければ `bin/shrieker source disable <id>` してから再起動する
 - `<` の行 ＝ 再起動で消えるソース（定義を消した・無効にしたまま reload していない）
+- `~` の行 ＝ **再起動で定義が変わるソース**（宛先やスケジュールを編集したまま reload していない・#1672）。`/status.json` の `digest`（稼働中の定義）とディスク上の定義を比べている。意図したものかをユーザーに確かめる。⚠ 稼働中の版が digest を出していない（4.17 以前）ときは比べず、そう出す
 - 🔴 **`NG` が出て非 0 で終わったら、再起動しない。**起動で倒れる定義が残っている。reload が拒否された後は古いジョブが動き続けるので、稼働中の一覧は緑のまま＝再起動して初めて起動ループになる。直すか `disable` してからやり直す
 - 🔴 **`BUNDLE` が出て非 0 で終わったら、再起動しない（#1477）。**コマンドを走らせるソースの `dir` で `bundle check` が通らない（または `dir` が無い）。起動は通るが、**走るたびに `Bundler::GemNotFound` で落ちる**。そのディレクトリで `bundle install` してからやり直す。⚠ daemon も登録の時点で同じ検査をして、ログと Sentry に出す（起動は止めない）
 - ⚠ **NG と BUNDLE が 0 でも「起動できる」とは限らない。**見ているのはスケジュール・判別キー・コマンドの依存だけで、登録の途中で起きるほかの失敗（`command:` のソースが `bundle …` で始まるときの `bundle install` の失敗など）は見ていない。そこは 4. の `not started` の件数・`NRestarts` で受ける
 - ⚠ 増減があるだけなら 0 で終わる（失敗ではなく、確かめる対象）
-- ⚠ 稼働中の ID は手元（`$TMPDIR/tomato-shrieker-sources-before.txt`）に控える。4. の `verify.sh` がこれと比べて増減を出す
+- ⚠ 稼働中の ID は手元のリポジトリの `tmp/cache/deploy-sources-before.txt` に控える（中身はソース ID だけ・`tmp/cache/` は git の無視対象）。4. の `verify.sh` がこれと比べて増減を出す
 
-🔴 **pull の後・再起動の前に実行する。**再起動で走るのは pull した後のコードなので、定義も同じコードで読む（新しい版で増えたソース種別の定義や、新しい版の検査で倒れる定義は、古いコードからは見えない）。⚠ **DB を読む CLI（`source status` など）は使っていない** — この時点のスキーマは古く、マイグレーションが要る版では落ちる（下の「順序は pull → 再起動 → CLI」）。
+🔴 **pull の後・再起動の前に実行する。**再起動で走るのは pull した後のコードなので、定義も同じコードで読む（新しい版で増えたソース種別の定義や、新しい版の検査で倒れる定義は、古いコードからは見えない）。⚠ **DB を読む CLI（`source status` など）は使っていない** — この時点のスキーマは古く、マイグレーションが要る版では落ちる（下の注意の「DB を読む CLI の順序は…」）。
+
+⚠ **この確認は手早く済ませる。**pull 済み・再起動前の間は、ディスクのコードと動いているコードが食い違っている。この段を挟んだぶん、その時間が延びている。
 
 ## 3. 再起動
 
@@ -56,6 +59,32 @@ ssh oscura 'sudo systemctl restart tomato-shrieker'
 - 版が上げたものになっていること、`ActiveEnterTimestamp` がいまの再起動であること、`NRestarts` が増えていないこと
 - ⚠ **再起動の直後は、まだ一度も走っていないソースがある。**内訳は次の発火を待ってからもう一度読む。⚠ **宛先のリダイレクト拒否（`redirect refused`）は、そのソースが次に配信したときに初めて出る**＝配信の少ないソース（本番 59 件のうち 26 件は直近 8 日に配信が無い・2026-10-11 実測）は、日を置いてもう一度見る
 - ログは `/var/log/tomato-shrieker.log`
+
+## 切り戻し
+
+前の版へ戻すとき。⚠ **本番に出す＝リリースするので、戻す先もタグを打った版にする。**
+
+🔴🔴 **マイグレーションを含む版から戻すときは、コードを戻す前に DB を DOWN する (#1722)。**古い版のコードは自分より新しい `schema_info` を開けない。起動時の判定（`Sequel::Migrator.is_current?`）が `Missing migration version(s) needed to migrate down` で倒れ、**起動に失敗して再起動を繰り返す**。⚠ DOWN のファイルは新しい版にしか無いので、**新しい版のチェックアウトのまま**流す。
+
+1. 止める: `ssh oscura 'sudo systemctl stop tomato-shrieker'`（⚠ 止めずに DOWN すると、再起動のたびに新しい版が UP し直す）
+2. DB の控えを取り、マイグレーションを含むなら DOWN する。`<前の版>` はタグ（例: `v4.16.1`）
+
+   ```sh
+   ssh oscura 'sudo -H -u deploy bash -lc "
+     set -e
+     cd ~/repos/tomato-shrieker
+     cp tmp/db/db.sqlite3 tmp/db/db.sqlite3.bak-\$(date +%Y%m%d%H%M)
+     git fetch origin tag <前の版> --no-tags
+     last=\$(git ls-tree --name-only <前の版> app/migration/ | tail -1 | xargs basename | cut -d_ -f1)
+     echo \"DOWN to \$last\"
+     bundle exec sequel -m app/migration -M \$((10#\$last)) sqlite://\$PWD/tmp/db/db.sqlite3"'
+   ```
+
+   - 戻す先と同じ本数なら何も起きない（マイグレーションを含まない版の切り戻しでもそのまま流してよい）
+   - ⚠⚠ **列やテーブルを足すマイグレーションの DOWN はデータを落とす。**流す前に、新しい版のリリースノートの「切り戻し」の欄（[release スキル](../release/SKILL.md) の 5.）と、該当する `app/migration/` の `down` を読む。014 は索引だけなので落ちるものは無い
+3. コードを戻す: `git reset --hard <前の版>`・`bundle install`・`bundle check`（`pull.sh` と同じく `sudo -H -u deploy bash -lc` の中で）。⚠ **`.ruby-version` が版で違う**ときは、前の版の Ruby が oscura に残っているかを先に確かめる。サテライト 3 本は本体と同じ Ruby で動くので、Ruby が戻るならサテライトも `RBENV_VERSION=<前の版の Ruby> bundle install` する
+4. 起こす: `ssh oscura 'sudo systemctl start tomato-shrieker'` → 4. の `verify.sh`
+5. 次のデプロイは 1. からそのまま流せる（`deploy` ブランチは main の祖先に戻っているので、`git pull origin main` は早送りになる）
 
 ## 注意
 

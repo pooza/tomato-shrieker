@@ -40,6 +40,8 @@ pid ファイルは異常終了（KILL・OOM・ホスト落ち）で残る。⚠
 
 **未適用のマイグレーションは起動時に自動適用される。**デプロイ手順に `rake migrate` を書き忘れても、スキーマが古いまま走ることはない。適用済みなら何もしない（`Sequel::Migrator.is_current?` で判定）。失敗した場合は起動させずに落とす — 古いスキーマのまま動くと、実行時に分かりにくい形で壊れるため。
 
+🔴 **逆向きは自動ではない (#1722)。**マイグレーションを当てた DB を前の版のコードで開くと、`is_current?` の判定が `Missing migration version(s) needed to migrate down` で倒れ、起動に失敗し続ける。切り戻しの手順（新しい版のチェックアウトのまま DOWN してからコードを戻す）は [deploy スキル](../.claude/skills/deploy/SKILL.md#切り戻し)。
+
 ⚠ もともと `rake start` / `rake restart` の前提タスク（`migration:run`）として走っていたが、#1410 で rake タスクを廃止したときに一緒に落ちて手動になっていた。`rake migrate` は手動実行用に残してある。
 
 ## ソース定義の reload (#1459)

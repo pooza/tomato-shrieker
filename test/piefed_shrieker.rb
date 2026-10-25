@@ -23,9 +23,9 @@ end
 
 module TomatoShrieker
   # ⚠ 上の PiefedShriekerTest は dest に piefed を持つテスト用ソースが手元に無いと
-  # `disable?` で丸ごと落ちる (#1520)。login の遅延だけは環境に依らず見たいので、
-  # webmock で閉じた独立のテストケースにする。
-  class PiefedShriekerLoginTest < TestCase
+  # `disable?` で丸ごと落ちる (#1520)。login の遅延・リダイレクト・投稿本文の組み立ては
+  # 環境に依らず見たいので、webmock で閉じた独立のテストケースにする。
+  class PiefedShriekerOfflineTest < TestCase
     PARAMS = {
       host: 'piefed.example.com',
       user_id: 'user@example.com',
@@ -131,6 +131,46 @@ module TomatoShrieker
       assert_equal(1, rendered)
       assert_equal('https://example.com/a', data[:url])
       assert_not_include(data[:body], 'https://example.com/a')
+    end
+
+    # 🔴 **#1671: タイトルに URL と末尾の空白を残さない。**URL を残すと上限で URL の途中に `…` が入る。
+    def test_post_data_title_has_no_urls
+      template = tagged_source.create_template(:default, "行1\n行2 https://example.com/a https://example.com/ab")
+      data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+      assert_equal('行1 行2', data[:title])
+    end
+
+    def test_post_data_title_is_stripped
+      data = PiefedShrieker.new(PARAMS).send(:post_data, tagged_source.create_template(:default, "短い本文\n"))
+
+      assert_equal('短い本文', data[:title])
+    end
+
+    # ⚠ URL だけの本文ではタイトルが空になるので、最初の URL を使う。
+    def test_post_data_title_falls_back_to_url
+      template = tagged_source.create_template(:default, 'https://example.com/a')
+      data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+      assert_equal('https://example.com/a', data[:title])
+    end
+
+    # 🔴 **#1671: 本文の URL は長い順に消す。**短いほうを先に消すと、長い URL の残りが本文に残る。
+    def test_post_data_removes_longer_urls_first
+      template = tagged_source.create_template(:default, '本文 https://example.com/a https://example.com/ab')
+      data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+      assert_not_include(data[:body], 'example.com')
+      assert_equal('本文', data[:body].strip)
+    end
+
+    # #1671: URL の直後の句点から先を URL ごと消さない（ginseng-core 4.1.0・pooza/ginseng-core#721）。
+    def test_post_data_keeps_text_after_url
+      template = tagged_source.create_template(:default, '本文 https://example.com/a。次の文')
+      data = PiefedShrieker.new(PARAMS).send(:post_data, template)
+
+      assert_equal('本文 。次の文', data[:title])
+      assert_include(data[:body], '。次の文')
     end
 
     def stub_create(body = {post_view: {post: {id: 123}}})

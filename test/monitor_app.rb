@@ -53,6 +53,20 @@ module TomatoShrieker
       assert_not_nil(source_status(FIXTURE_ID))
     end
 
+    # #1672: 行の `digest` は scheduler が登録した定義のもの。登録が無ければ null。
+    def test_status_json_has_registered_digest
+      registry = Scheduler.instance.registry
+      original = registry[FIXTURE_ID]
+      registry.delete(FIXTURE_ID)
+
+      assert_nil(source_status(FIXTURE_ID)['digest'])
+      registry[FIXTURE_ID] = Scheduler.digest([Source.create(FIXTURE_ID)])
+
+      assert_equal(registry[FIXTURE_ID], source_status(FIXTURE_ID)['digest'])
+    ensure
+      original ? registry[FIXTURE_ID] = original : registry&.delete(FIXTURE_ID)
+    end
+
     def test_not_found
       status, = call('/nope')
 
@@ -172,6 +186,17 @@ module TomatoShrieker
       assert_include(body.first, '__no_such_source__')
     end
 
+    # daemon の中（scheduler が待ち受けに入った後）を装う (#1686)。⚠ Singleton の特異メソッドに
+    # 生やすので、必ず消して戻す（本物はクラスにあるので消えない）。
+    def serving(registered_at:)
+      scheduler = Scheduler.instance
+      scheduler.define_singleton_method(:serving?) {true}
+      scheduler.define_singleton_method(:registered_at) {|_id| registered_at}
+      yield
+    ensure
+      [:serving?, :registered_at].each {|name| scheduler.singleton_class.send(:remove_method, name)}
+    end
+
     # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
     def backdate_fixture(id, seconds)
       at = Time.now - seconds
@@ -231,6 +256,36 @@ module TomatoShrieker
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
 
       assert_nil(source_status(FIXTURE_ID)['first_run_deadline'])
+    end
+
+    # 🔴 **#1686: daemon の中では、ジョブが無い（登録に失敗した）ソースはすぐ 503。**
+    # ⚠ 定義ファイルが新しくても、期限まで緑にしない。
+    def test_first_run_deadline_requires_job_when_serving
+      serving(registered_at: nil) do
+        status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+        assert_equal(503, status)
+        assert_include(body.first, 'not scheduled')
+        assert_nil(Source.create(FIXTURE_ID).first_run_deadline)
+        assert_equal([:no_run], SourceStatus.problems(Source.create(FIXTURE_ID)))
+      end
+    end
+
+    # 🔴 **#1686: daemon の中では、起点は登録した時刻。**定義を置いてから reload までに cron の
+    # 時刻が挟まっても、実際の初回（登録の後の発火）より前に赤くならない。
+    def test_first_run_deadline_follows_registration_when_serving
+      write_fixture(FIXTURE_ID, {'schedule' => {'cron' => '0 0 * * *'}})
+      backdate_fixture(FIXTURE_ID, 3 * 86_400)
+      registered = Time.now - 60
+
+      assert_equal(503, call("/healthz/source/#{FIXTURE_ID}").first, '前提: 更新時刻が起点なら期限切れ')
+      serving(registered_at: registered) do
+        source = Source.create(FIXTURE_ID)
+        due = Rufus::Scheduler.parse('0 0 * * *').next_time(registered).to_t
+
+        assert_in_delta((due + source.monitor_grace_seconds).to_f, source.first_run_deadline.to_f, 1)
+        assert_equal(200, call("/healthz/source/#{FIXTURE_ID}").first)
+      end
     end
 
     # ⚠ ファイルから読んでいないソースは起点が無い＝期限なし＝従来どおり `no_run`。
@@ -1262,9 +1317,10 @@ module TomatoShrieker
     end
 
     # 🔴 **#1561: `source status --json` が `/status.json` の `sources[]` と同じ行を出すこと。**
+    # ⚠ `digest` だけは除く (#1672)。scheduler の中でしか分からない値で、CLI が出すと常に null になる。
     def test_source_status_json_matches_status_json
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1)
-      expected = source_status(FIXTURE_ID)
+      expected = source_status(FIXTURE_ID).except('digest')
       rows = JSON.parse(run_source_status(json: true))
 
       assert_equal(expected, rows.find {|v| v['id'] == FIXTURE_ID})

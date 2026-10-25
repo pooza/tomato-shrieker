@@ -112,6 +112,18 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 
 ⚠ **上流から届いた PR がブランチを切った時点より default が進んでいることがある。**`chore/*-ginseng-style` は `/http/timeout/seconds` の設定より前から出ていたので、**そのままでは CI が `ConfigError` で落ちる**。**default をマージしてから通す。**
 
+### google-news-rss-cleaner
+
+🔴 **毎回実行する。**`precure-google-news` / `dqdai-google-news` の取得先だが、**ほかに面倒を見る人がいない**（2026-10-25 のユーザー依頼）。機能的にやることは残っていないので、見るのは依存の脆弱性と稼働状況。⚠ 2026-10-25 に初めて見たときは、Dependabot のアラートが 7 件（critical 1）・PR が 4 本、9 月から止まっていた。
+
+```sh
+.claude/skills/sync/scripts/cleaner.sh
+```
+
+- `feed-parse-error` は tomato へ 502 を返したもの。2026-10-24 の 5 件はどれも Google News の RSS 自体が返した一時的な 404 で、tomato の HTTP リトライで吸収されていた（Sentry に出ていない）。`via: timeout` は記事 1 件の解決の時間切れで、その記事を落とすだけ
+- クリーナーの応答待ちによるタイムアウト（Sentry TOMATO-SHRIEKER-B）は cleaner#19
+- ⚠ **Chromium が死んでも `/clean` は 200 ＋ 0 件を返す**（cleaner#13）。ここの数字が静かでも、Kuma の Google News 2 本の沈黙のほうも見る
+
 ### Kuma のモニターと有効ソースの突き合わせ
 
 🔴 **毎回実行する。**総合 `/healthz` は `undelivered` / `silent` を見ないので（#1508）、**Kuma に登録されていないソースは、配信が止まっていても誰も気づかない**。⚠ **登録は UI での手作業で自動化が無い**ため、ソースを足すたびに漏れうる。

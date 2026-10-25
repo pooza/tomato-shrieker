@@ -236,6 +236,31 @@ module TomatoShrieker
       assert_empty(SourceValidator.validate(piefed_params('api_version' => 'alpha')))
     end
 
+    # #1585: やり直しは回数（1 以上）と間隔（Rufus の duration）。
+    def test_schedule_retry_schema
+      base = {'source' => {'text' => 'a'}, 'dest' => {'hooks' => ['https://example.com/x']}}
+
+      [{}, {'times' => 2}, {'interval' => '15m'}, {'times' => 1, 'interval' => '1h30m'}].each do |value|
+        assert_empty(schema_errors(base.merge('schedule' => {'cron' => '1 0 * * *', 'retry' => value})), value.inspect)
+      end
+      [{'times' => 0}, {'interval' => '*/5 * * * *'}, {'limit' => 2}, true].each do |value|
+        assert_not_empty(schema_errors(base.merge('schedule' => {'cron' => '1 0 * * *', 'retry' => value})), value.inspect)
+      end
+    end
+
+    # #1703: 締切は秒（0 以上）か Rufus の duration。cron や負の数は NG。
+    def test_command_timeout_schema
+      dest = {'hooks' => ['https://example.com/x']}
+      [600, 0, '10m', '1h30m'].each do |value|
+        assert_empty(schema_errors('source' => {'command' => 'echo', 'timeout' => value}, 'dest' => dest), value.inspect)
+        assert_empty(schema_errors('source' => {'ical' => {'command' => 'echo', 'timeout' => value}}, 'dest' => dest))
+      end
+      [-1, '*/5 * * * *', 'ten minutes'].each do |value|
+        assert_not_empty(schema_errors('source' => {'command' => 'echo', 'timeout' => value}, 'dest' => dest), value.inspect)
+        assert_not_empty(schema_errors('source' => {'ical' => {'command' => 'echo', 'timeout' => value}}, 'dest' => dest))
+      end
+    end
+
     # 4.16.0 リリース前レビュー: 空の `/source/command` も、`/source/ical/command` と同じく NG。
     # ⚠ 4.16.0 から、空のコマンドは実行時にも error になる（以前は `sh -c ''` で無出力の success）。
     def test_blank_command_is_ng
@@ -650,7 +675,7 @@ module TomatoShrieker
       assert_not_include(warnings.join, digest, 'webhook の digest を出さない')
     end
 
-    # ⚠ `schedule.at`（1 回きり）のソースは silence_tolerance の指摘を出さないが、
+    # ⚠ `/schedule/at`（1 回きり）のソースは silence_tolerance の指摘を出さないが、
     # 宛先の指摘は間隔に関係なく出す。無効なソースには何も出さない。
     def test_warnings_insecure_dest_regardless_of_schedule
       once = {
