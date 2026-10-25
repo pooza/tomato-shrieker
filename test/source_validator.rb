@@ -236,7 +236,6 @@ module TomatoShrieker
       assert_empty(SourceValidator.validate(piefed_params('api_version' => 'alpha')))
     end
 
-    # 4.16.0 リリース前レビュー: 空の `/source/command` も、`/source/ical/command` と同じく NG。
     # #1585: やり直しは回数（1 以上）と間隔（Rufus の duration）。
     def test_schedule_retry_schema
       base = {'source' => {'text' => 'a'}, 'dest' => {'hooks' => ['https://example.com/x']}}
@@ -262,6 +261,7 @@ module TomatoShrieker
       end
     end
 
+    # 4.16.0 リリース前レビュー: 空の `/source/command` も、`/source/ical/command` と同じく NG。
     # ⚠ 4.16.0 から、空のコマンドは実行時にも error になる（以前は `sh -c ''` で無出力の success）。
     def test_blank_command_is_ng
       dest = {'hooks' => ['https://example.com/x']}

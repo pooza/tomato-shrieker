@@ -15,7 +15,7 @@
 set -euo pipefail
 # ⚠ 控えはリポジトリの tmp/ に置く (#1672)。共有の /tmp に決まった名前で置くと、`>|` が
 # 他人の置いたシンボリックリンクを辿る。
-before="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/tmp/deploy-sources-before.txt"
+before="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/tmp/cache/deploy-sources-before.txt"
 status=$(ssh oscura 'curl -sf http://127.0.0.1:4567/status.json')
 running=$(jq -er '.sources[].id' <<< "$status" | sort -u)
 out=$(ssh oscura 'sudo -H -u deploy bash -lc "cd ~/repos/tomato-shrieker && bundle exec ruby -Iapp/lib -rtomato_shrieker -"' \
@@ -59,11 +59,14 @@ esac
 # ⚠ 稼働中の digest が null のソース（登録に失敗している）は比べない。⚠ 4.17 以前の版は digest を
 # 出さないので、そのときは「変更なし」と言わずに比べていないと出す。⚠ join は sort と同じ照合順が要る。
 running_digests=$(jq -r '.sources[] | select(.digest != null) | "\(.id)\t\(.digest)"' <<< "$status" | LC_ALL=C sort)
-changed=$(LC_ALL=C join -t $'\t' <(printf '%s\n' "$running_digests") \
-  <(awk -F'\t' '$1=="DIGEST"{print $2 "\t" $3}' <<< "$out" | LC_ALL=C sort) \
+# ⚠ ディスク側の DIGEST 行が 0 件でも「変更なし」と言わない（空どうしの join は空＝一致に見える）。
+disk_digests=$(awk -F'\t' '$1=="DIGEST"{print $2 "\t" $3}' <<< "$out" | LC_ALL=C sort)
+changed=$(LC_ALL=C join -t $'\t' <(printf '%s\n' "$running_digests") <(printf '%s\n' "$disk_digests") \
   | awk -F'\t' '$2 != $3 {print $1}')
 if [ -z "$running_digests" ]; then
   echo '⚠ 稼働中の版が digest を出していない＝定義の変更は比べていない'
+elif [ -z "$disk_digests" ]; then
+  echo '⚠ ディスク上の定義の digest が取れていない＝定義の変更は比べていない'
 elif [ -n "$changed" ]; then
   printf '~ %s\n' $changed
   echo '⚠ 再起動で定義が変わるソースがある（reload していない編集）。意図したものかを確かめる'

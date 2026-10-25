@@ -186,7 +186,6 @@ module TomatoShrieker
       assert_include(body.first, '__no_such_source__')
     end
 
-    # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
     # daemon の中（scheduler が待ち受けに入った後）を装う (#1686)。⚠ Singleton の特異メソッドに
     # 生やすので、必ず消して戻す（本物はクラスにあるので消えない）。
     def serving(registered_at:)
@@ -198,6 +197,7 @@ module TomatoShrieker
       [:serving?, :registered_at].each {|name| scheduler.singleton_class.send(:remove_method, name)}
     end
 
+    # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
     def backdate_fixture(id, seconds)
       at = Time.now - seconds
       File.utime(at, at, fixture_path(id))

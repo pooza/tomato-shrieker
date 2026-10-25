@@ -139,6 +139,7 @@ module TomatoShrieker
     # 囲むと、走っている間だけ `BUNDLE_GEMFILE` などが消え、並列のスレッドがそれを控えて戻しうる。
     def test_exec_does_not_touch_process_env
       key = 'TOMATO_SHRIEKER_ENV_PROBE'
+      gemfile = ENV.fetch('BUNDLE_GEMFILE', nil)
       ENV[key] = 'kept'
       ENV['BUNDLE_GEMFILE'] ||= File.join(Environment.dir, 'Gemfile')
       before = ENV.to_h
@@ -150,6 +151,7 @@ module TomatoShrieker
       running.join
     ensure
       ENV.delete(key)
+      ENV['BUNDLE_GEMFILE'] = gemfile
     end
 
     # 🔴 #1703: 締切。未指定なら `/command/timeout/seconds`、ソースごとに秒か duration で上書きできる。

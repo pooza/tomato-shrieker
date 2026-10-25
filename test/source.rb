@@ -114,7 +114,7 @@ module TomatoShrieker
       SourceRunLog.where(source_id: id).delete
     end
 
-    # 🔴 **#1585: 1 件も配信できずに落ちた run は、`schedule.retry` があればやり直す。**
+    # 🔴 **#1585: 1 件も配信できずに落ちた run は、`/schedule/retry` があればやり直す。**
     def test_retry_failed_run
       source = retry_source({'times' => 2, 'interval' => '10m'}) {raise 'upstream is down'}
 
@@ -169,6 +169,25 @@ module TomatoShrieker
       cleanup_retry
     end
 
+    # 🔴 **4.18.0 リリース前レビュー: 失敗の後に成功した run があれば、やり直しを捨てる。**周期がやり直しの
+    # 間隔より短いソースでは、次の定期実行が先に成功している。やり直すと同じ出力をもう一度投稿する。
+    def test_retry_dropped_after_later_success
+      source = retry_source({}) {nil}
+      ran = false
+      source.define_singleton_method(:exec_with_run_log) {|*| ran = true}
+      failed_at = Time.now - 60
+      source.send(:exec_retry, 1, failed_at)
+
+      assert_true(ran, '後の成功が無ければやり直す')
+      ran = false
+      SourceRunLog.record_success(RETRY_ID, started_at: Time.now - 30)
+      source.send(:exec_retry, 1, failed_at)
+
+      assert_false(ran)
+    ensure
+      cleanup_retry
+    end
+
     # 🔴 **#1741 の Codex P2: daemon の中では、定義が変わった・消えたソースのやり直しを捨てる。**
     def test_retry_dropped_when_definition_is_gone
       source = retry_source({}) {nil}
@@ -180,7 +199,7 @@ module TomatoShrieker
       assert_false(source.send(:current_definition?))
       ran = false
       source.define_singleton_method(:exec_with_run_log) {|*| ran = true}
-      source.send(:exec_retry, 1)
+      source.send(:exec_retry, 1, Time.now)
 
       assert_false(ran)
     ensure
