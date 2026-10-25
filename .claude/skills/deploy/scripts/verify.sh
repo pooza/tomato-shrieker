@@ -8,7 +8,7 @@ ssh oscura 'curl -s -o /dev/null -w "healthz %{http_code}\n" http://127.0.0.1:45
 # 再起動の前（pending_sources.sh が控えた ID）からの増減。< は消えたソース、> は増えたソース
 # ⚠ 控えはリポジトリの tmp/ に置く (#1672)。共有の /tmp に決まった名前で置くと、`>|` が
 # 他人の置いたシンボリックリンクを辿る。
-before="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/tmp/deploy-sources-before.txt"
+before="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/tmp/cache/deploy-sources-before.txt"
 status=$(ssh oscura 'curl -s http://127.0.0.1:4567/status.json')
 if [ -e "$before" ]; then
   # ⚠ 控えは前回のデプロイのものが残りうる。時刻を出して、今回のものかを目で確かめられるようにする

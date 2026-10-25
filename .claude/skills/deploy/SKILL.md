@@ -36,7 +36,7 @@ disable-model-invocation: true
 - 🔴 **`BUNDLE` が出て非 0 で終わったら、再起動しない（#1477）。**コマンドを走らせるソースの `dir` で `bundle check` が通らない（または `dir` が無い）。起動は通るが、**走るたびに `Bundler::GemNotFound` で落ちる**。そのディレクトリで `bundle install` してからやり直す。⚠ daemon も登録の時点で同じ検査をして、ログと Sentry に出す（起動は止めない）
 - ⚠ **NG と BUNDLE が 0 でも「起動できる」とは限らない。**見ているのはスケジュール・判別キー・コマンドの依存だけで、登録の途中で起きるほかの失敗（`command:` のソースが `bundle …` で始まるときの `bundle install` の失敗など）は見ていない。そこは 4. の `not started` の件数・`NRestarts` で受ける
 - ⚠ 増減があるだけなら 0 で終わる（失敗ではなく、確かめる対象）
-- ⚠ 稼働中の ID は手元のリポジトリの `tmp/deploy-sources-before.txt` に控える（中身はソース ID だけ）。4. の `verify.sh` がこれと比べて増減を出す
+- ⚠ 稼働中の ID は手元のリポジトリの `tmp/cache/deploy-sources-before.txt` に控える（中身はソース ID だけ・`tmp/cache/` は git の無視対象）。4. の `verify.sh` がこれと比べて増減を出す
 
 🔴 **pull の後・再起動の前に実行する。**再起動で走るのは pull した後のコードなので、定義も同じコードで読む（新しい版で増えたソース種別の定義や、新しい版の検査で倒れる定義は、古いコードからは見えない）。⚠ **DB を読む CLI（`source status` など）は使っていない** — この時点のスキーマは古く、マイグレーションが要る版では落ちる（下の注意の「DB を読む CLI の順序は…」）。
 

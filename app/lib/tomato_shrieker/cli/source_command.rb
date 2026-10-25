@@ -23,7 +23,8 @@ module TomatoShrieker
     # 📌 HTTP を経由せずプロセス内で DB を読むので、daemon が止まっていても答えられる。
     method_option :sort, type: :string, enum: SourceStatusTable::SORTS.keys, desc: '並べ替え'
     method_option :problems, type: :boolean, default: false, desc: '緑でないソースだけ'
-    method_option :json, type: :boolean, default: false, desc: '/status.json の sources[] と同じキーで出す'
+    method_option :json, type: :boolean, default: false,
+      desc: '/status.json の sources[] と同じキーで出す（digest は除く）'
     method_option :all, type: :boolean, default: false, desc: '無効ソースも出す'
     def status(id = nil)
       rows = status_rows(id)

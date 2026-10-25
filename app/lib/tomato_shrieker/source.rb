@@ -776,6 +776,8 @@ module TomatoShrieker
       log_exec_start(method, spec)
       exec
       finalize_run_log(started_at)
+      # ⚠ やり直しを捨てる判定（`succeeded_since?`）のために、このインスタンスが成功した時刻を控える。
+      @succeeded_at = started_at if !@delivery_stats.error? || delivered_any?
       retry_failed_run(attempt) if @delivery_stats.error?
     rescue Exception => e # rubocop:disable Lint/RescueException
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
@@ -800,29 +802,65 @@ module TomatoShrieker
     # ⚠⚠ **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。
     # ⚠ やり直しは一度きりのジョブ（同じ tag）。定義を変えた reload では本体と一緒に外れる。
     # ⚠ やり直しの run も run_log に 1 行ずつ残る（落ちた事実は消えず、成功すれば error_streak が切れる）。
+    # ⚠ やり直さなかった・使い切ったときもログに残す（4.18.0 リリース前レビュー）。黙って return すると、
+    # 「やり直しが尽きた」のか「設定が効いていない」のかがログから読めない。
     def retry_failed_run(attempt)
-      return unless attempt < retry_times
-      return if @delivery_stats&.delivered_count&.positive?
-      return if @delivery_stats&.entry_stage? && !replays_entries?
+      return if retry_times.zero?
+      return log_retry('retry exhausted', attempt:) unless attempt < retry_times
+      return log_retry('retry skipped', attempt:, reason: 'delivered') if delivered_any?
+      return log_retry('retry skipped', attempt:, reason: 'entries recorded') unless replayable?
       next_attempt = attempt + 1
+      failed_at = Time.now
       Scheduler.instance.scheduler.in(retry_interval, {tag: id, overlap: false}) do
-        exec_retry(next_attempt)
+        exec_retry(next_attempt, failed_at)
       end
-      logger.warn(source: id, class: self.class.to_s, action: 'retry scheduled',
-        attempt: next_attempt, times: retry_times, in: retry_interval)
+      log_retry('retry scheduled', attempt: next_attempt, times: retry_times, in: retry_interval)
     rescue => e
       logger.error(source: id, action: 'retry', error: e)
     end
 
-    # ⚠ 有無は `@params` で見る。`self[]` は値が Hash のキーに nil を返すので、`retry: {}`（既定のまま
-    # opt-in）を読み落とす。
+    def delivered_any?
+      return @delivery_stats&.delivered_count&.positive?
+    end
+
+    # エントリの段に入った後の失敗を、やり直しで出し直せるか（`replays_entries?`）。
+    def replayable?
+      return true unless @delivery_stats&.entry_stage?
+      return replays_entries?
+    end
+
+    def log_retry(action, **)
+      logger.warn(source: id, class: self.class.to_s, action:, **)
+    end
+
     # 🔴 **やり直す前に、この定義がまだ生きているかを見る（#1741 の Codex P2）。**reload は走っている
     # run を完走させ、登録済みのジョブだけを外す。完走した古い run が後から落ちると、古い定義の
     # インスタンスでやり直しを立ててしまい、消した宛先へ投稿しうる。⚠ daemon の外では見ない。
-    def exec_retry(attempt)
-      return exec_with_run_log(:retry, attempt, attempt:) if current_definition?
-      logger.warn(source: id, class: self.class.to_s, action: 'retry dropped', attempt:,
-        message: 'definition changed or removed')
+    # 🔴 **失敗の後に成功した run があれば捨てる（4.18.0 リリース前レビュー）。**周期がやり直しの間隔より
+    # 短いソースでは、次の定期実行が先に成功して配信している。そこでやり直すと、CommandSource・
+    # IcalendarSource は同じ出力をもう一度投稿する。
+    # ⚠ 一度きりのジョブの中の例外は rufus の既定（$stderr）にしか出ないので、ここで受けて残す。
+    def exec_retry(attempt, failed_at)
+      reason = retry_drop_reason(failed_at)
+      return log_retry('retry dropped', attempt:, reason:) if reason
+      return exec_with_run_log(:retry, attempt, attempt:)
+    rescue => e
+      logger.error(source: id, action: 'retry', error: e)
+      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
+    end
+
+    def retry_drop_reason(failed_at)
+      return 'later run succeeded' if succeeded_since?(failed_at)
+      return 'definition changed' unless current_definition?
+      return nil
+    end
+
+    # ⚠ **run_log ではなく、このインスタンスの成功で見る（#1746 の Codex P2）。**1 つの定義が複数の
+    # ソースクラスに当たると（`/source/command` と `/source/ical/command` を一緒に書くなど）、同じ id の
+    # 別のインスタンスが成功しただけで、このインスタンスのやり直しを捨ててしまう。run_log はクラスを
+    # 区別しない。⚠ やり直しのジョブも定期実行も同じインスタンスを掴んでいる。
+    def succeeded_since?(time)
+      return @succeeded_at.present? && @succeeded_at >= time
     end
 
     # 稼働中の定義（scheduler が登録したもの）がこのインスタンスと同じか。
@@ -841,6 +879,8 @@ module TomatoShrieker
       return true
     end
 
+    # ⚠ 有無は `@params` で見る。`self[]` は値が Hash のキーに nil を返すので、`retry: {}`（既定のまま
+    # opt-in）を読み落とす。
     def retry_times
       return 0 unless @params.dig('schedule', 'retry').is_a?(Hash)
       return self['/schedule/retry/times'] || 1

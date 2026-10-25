@@ -27,6 +27,11 @@ module TomatoShrieker
   class NostrShriekerOfflineTest < TestCase
     RELAYS = ['wss://relay1.example.test', 'wss://relay2.example.test'].freeze
 
+    ACCEPT = proc {|client, event| client.emit(:message, ['OK', event.id, true, ''].to_json)}
+    REJECT = proc {|client, event| client.emit(:message, ['OK', event.id, false, 'blocked: spam'].to_json)}
+    OTHER_EVENT = proc {|client, _event| client.emit(:message, ['OK', 'f' * 64, true, ''].to_json)}
+    CLOSE = proc {|client, _event| client.emit(:close, 1006, 'gone')}
+
     # `connect` で `:connect` を出し、`publish` で決めた応答を返すだけのクライアント。
     class FakeClient
       include EventEmitter
@@ -43,11 +48,6 @@ module TomatoShrieker
         @reply&.call(self, event)
       end
     end
-
-    ACCEPT = proc {|client, event| client.emit(:message, ['OK', event.id, true, ''].to_json)}
-    REJECT = proc {|client, event| client.emit(:message, ['OK', event.id, false, 'blocked: spam'].to_json)}
-    OTHER_EVENT = proc {|client, _event| client.emit(:message, ['OK', 'f' * 64, true, ''].to_json)}
-    CLOSE = proc {|client, _event| client.emit(:close, 1006, 'gone')}
 
     def test_accepted
       assert_nothing_raised {publish_with(ACCEPT, ACCEPT)}
