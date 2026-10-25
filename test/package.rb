@@ -73,6 +73,20 @@ module TomatoShrieker
       assert_not_include(Package.error_class_of(message), 'SECRET')
     end
 
+    # 🔴 #1710: Slack / Discord の hook を `/dest/hooks` に直接書いても、POST のログ行（`url:`）に
+    # パスのトークンが出ないこと。⚠ ginseng-core 4.2.0 の `/logger/mask_url_host_paths` の既定に頼る。
+    # tomato の設定で既定を壊していないことを、実際のログの形で見る。
+    def test_logger_masks_slack_and_discord_hooks
+      entry = Logger.new.send(:create_entry, {
+        url: 'https://hooks.slack.com/services/T000/B000/SLACKSECRET',
+        hook: 'https://discord.com/api/webhooks/123/DISCORDSECRET?wait=true',
+      })
+
+      assert_not_include(entry, 'SLACKSECRET')
+      assert_not_include(entry, 'DISCORDSECRET')
+      assert_include(entry, 'hooks.slack.com')
+    end
+
     # ⚠ 不正なバイト列でもマスクごと素通りしないこと (#518 / #1469 の族)。
     # to_utf8 の後にマスクを通しているかを見る。
     def test_error_message_masks_broken_bytes

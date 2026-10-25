@@ -160,15 +160,21 @@ module TomatoShrieker
     # するまで読まれない**。全件実行では先に走る別のテストが読み直すので気付けないが、
     # `bin/test.rb mastodon_shrieker` のように単体で走らせると `disable?` が定義を
     # 見つけられず、**#1593 で走らせたかったテストが omit される**。
+    # ⚠ **読めなかったテストファイルを失敗として残す（#1668・ginseng-core#696）。**以前は `- case:` の
+    # 1 行で飛ばし、そのファイルのテストが 1 本も走らないまま緑になっていた。上書きしているので、
+    # 上流の `load` と同じく失敗を集めて `report_load_errors` へ渡す。
     def self.load(cases = nil)
       ENV['TEST'] = Package.full_name
       Config.instance.reload
+      errors = {}
       names(cases).each do |name|
         puts "+ case: #{name}" if Environment.test?
         require File.join(dir, "#{name}.rb")
       rescue => e
         puts "- case: #{name} (#{e.message})" if Environment.test?
+        errors[name] = e
       end
+      report_load_errors(errors)
     end
 
     def self.names(cases = nil)

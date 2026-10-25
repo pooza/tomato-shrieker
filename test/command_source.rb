@@ -135,6 +135,23 @@ module TomatoShrieker
       assert_equal('command killed by signal 9', build_source.exit_description(9))
     end
 
+    # 🔴 #1715: コマンドの実行中も、プロセスの `ENV` を差し替えない。`Bundler.with_unbundled_env` で
+    # 囲むと、走っている間だけ `BUNDLE_GEMFILE` などが消え、並列のスレッドがそれを控えて戻しうる。
+    def test_exec_does_not_touch_process_env
+      key = 'TOMATO_SHRIEKER_ENV_PROBE'
+      ENV[key] = 'kept'
+      ENV['BUNDLE_GEMFILE'] ||= File.join(Environment.dir, 'Gemfile')
+      before = ENV.to_h
+      source = CommandSource.new(secret_params('sleep 1'))
+      running = Thread.new {source.send(:run_command)}
+      sleep(0.5)
+
+      assert_equal(before, ENV.to_h)
+      running.join
+    ensure
+      ENV.delete(key)
+    end
+
     # 🔴 #1703: 締切。未指定なら `/command/timeout/seconds`、ソースごとに秒か duration で上書きできる。
     def test_command_timeout
       assert_equal(config['/command/timeout/seconds'], build_secret_source.command_timeout)
