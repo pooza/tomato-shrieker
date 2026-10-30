@@ -538,6 +538,18 @@ module TomatoShrieker
       ))
     end
 
+    # 4.0 で消したつもりで残っていた項目 (#1700)
+    def test_dest_category_is_removed
+      source = {'feed' => 'https://example.com/feed'}
+      dest = {'hooks' => ['https://example.com/x']}
+
+      assert_true(SourceValidator.valid?('source' => source, 'dest' => dest))
+      assert_false(SourceValidator.valid?(
+        'source' => source,
+        'dest' => dest.merge('category' => 'news'),
+      ))
+    end
+
     def test_incomplete_subobject
       # mastodon は url/token 両方必須
       assert_false(SourceValidator.valid?(

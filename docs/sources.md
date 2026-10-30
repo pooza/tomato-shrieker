@@ -90,9 +90,7 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 
 ## 実装に無いキー（FeedSource）
 
-⚠ 以前ここにあった `/dest/multi_entries` / `/dest/limit` / `/source/title/unique` は実装に無い（書くと `source validate` が NG にする）。
-
-⚠ **`/dest/category` は書けるが、絞り込みには使われていない。**読むのは `FeedSource#category` だけで、`bin/shrieker source fetch` のサマリーに値がそのまま出る。エントリを絞るなら `/source/keyword` / `/source/negative_keyword` を使う。
+⚠ 以前ここにあった `/dest/multi_entries` / `/dest/limit` / `/dest/category` / `/source/title/unique` は実装に無い（書くと `source validate` が NG にする）。エントリを絞るなら `/source/keyword` / `/source/negative_keyword` を使う。
 
 ## Shrieker 設定項目
 

@@ -26,12 +26,6 @@ module TomatoShrieker
       end
     end
 
-    def test_category
-      FeedSource.all.select(&:category).each do |source|
-        assert_kind_of(String, source.category)
-      end
-    end
-
     def test_keyword
       FeedSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)

@@ -49,10 +49,6 @@ module TomatoShrieker
       logger.error(source: id, error: e)
     end
 
-    def category
-      return self['/dest/category']
-    end
-
     def templates
       @templates ||= {
         default: Template.new(self['/dest/template'] || 'title'),
@@ -220,7 +216,7 @@ module TomatoShrieker
     end
 
     def summary
-      values = {id:, category:}
+      values = {id:}
       values[:entries] = entries.reject {|v| ignore_entry?(v)}.map do |entry|
         {
           date: entry.published.strftime('%Y/%m/%d %R'),
