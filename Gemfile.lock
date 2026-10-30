@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: e26796c12b91403bacc0791c03a19d595e22b4b1
+  revision: 4cd1d2d80ad0d9fa2ff97adff6854c988450840e
   branch: main
   specs:
-    ginseng-core (4.2.0)
+    ginseng-core (4.3.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -62,10 +62,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: a9f5e5186565c0be25a4f9b69e4e3eeb1453d915
+  revision: 07f38385d13f134568233849553e13801e52fc7c
   branch: main
   specs:
-    ginseng-youtube (3.0.2)
+    ginseng-youtube (3.0.3)
 
 GIT
   remote: https://github.com/pooza/icalendar-rrule.git
@@ -109,7 +109,7 @@ GEM
       bigdecimal
       rexml
     crass (1.0.8)
-    csv (3.3.6)
+    csv (3.3.7)
     date (3.5.1)
     drb (2.2.3)
     ecdsa (1.2.0)
