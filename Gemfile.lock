@@ -77,6 +77,19 @@ GIT
       icalendar (>= 2.4)
       ice_cube (>= 0.16)
 
+GIT
+  remote: https://github.com/pooza/nostr.git
+  revision: 16d4daa86f8a392e5c810968d3e176b484e8ff3b
+  tag: v0.7.1
+  specs:
+    nostr (0.7.1)
+      bech32 (~> 1.4)
+      bip-schnorr (~> 0.7)
+      ecdsa (~> 1.2)
+      event_emitter (~> 0.2)
+      faye-websocket (~> 0.11)
+      json (~> 2.7)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -200,13 +213,6 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.4-x86_64-linux-musl)
       racc (~> 1.4)
-    nostr (0.7.0)
-      bech32 (~> 1.4)
-      bip-schnorr (~> 0.7)
-      ecdsa (~> 1.2)
-      event_emitter (~> 0.2)
-      faye-websocket (~> 0.11)
-      json (~> 2.7)
     optparse (0.8.1)
     ostruct (0.6.3)
     parallel (2.1.0)
@@ -326,7 +332,7 @@ DEPENDENCIES
   icalendar
   icalendar-rrule!
   json-schema
-  nostr
+  nostr!
   optparse
   parallel
   puma
