@@ -160,39 +160,12 @@ module TomatoShrieker
     # するまで読まれない**。全件実行では先に走る別のテストが読み直すので気付けないが、
     # `bin/test.rb mastodon_shrieker` のように単体で走らせると `disable?` が定義を
     # 見つけられず、**#1593 で走らせたかったテストが omit される**。
-    # ⚠ **読めなかったテストファイルを失敗として残す（#1668・ginseng-core#696）。**以前は `- case:` の
-    # 1 行で飛ばし、そのファイルのテストが 1 本も走らないまま緑になっていた。上書きしているので、
-    # 上流の `load` と同じく失敗を集めて `report_load_errors` へ渡す。
+    # ⚠ 読み直しのあとは上流の `load` に任せる。読めなかったファイルを失敗にする検知（ginseng-core#696）を
+    # 届かせるため、写さない (#1753)。
     def self.load(cases = nil)
       ENV['TEST'] = Package.full_name
       Config.instance.reload
-      errors = {}
-      names(cases).each do |name|
-        puts "+ case: #{name}" if Environment.test?
-        require File.join(dir, "#{name}.rb")
-      rescue => e
-        puts "- case: #{name} (#{e.message})" if Environment.test?
-        errors[name] = e
-      end
-      report_load_errors(errors)
-    end
-
-    def self.names(cases = nil)
-      if cases
-        names = cases.split(',')
-          .map {|v| [v, "#{v}Test", v.underscore, "#{v.underscore}_test"]}.flatten
-          .select {|v| File.exist?(File.join(dir, "#{v}.rb"))}.compact
-      else
-        finder = Ginseng::FileFinder.new
-        finder.dir = dir
-        finder.patterns.push('*.rb')
-        names = finder.exec.map {|v| File.basename(v, '.rb')}
-      end
-      return names.to_set
-    end
-
-    def self.dir
-      return File.join(Environment.dir, 'test')
+      super
     end
   end
 end
