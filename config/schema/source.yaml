@@ -277,8 +277,6 @@ properties:
         type: string
       spoiler_text:
         type: string
-      category:
-        type: string
       account:
         type: object
         additionalProperties: false
