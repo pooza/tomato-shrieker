@@ -1,16 +1,27 @@
 [Unit]
 Description=tomato-shrieker
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
+# bin/scheduler_daemon.rb start は fork せず前面で回るので simple。
 Type=simple
 User=__username__
 WorkingDirectory=/home/__username__/path/to/tomato-shrieker
+# unit は login shell の環境を継がず、`bash -lc` が読む .bash_profile に rbenv の初期化しか
+# 無いことが多い。省くと LANG=C で動くので、ロケールはここで渡す。
+Environment="LANG=ja_JP.UTF-8"
+Environment="LC_ALL=ja_JP.UTF-8"
+# `bash -lc` は rbenv などの shims を PATH に載せるため。
 ExecStart=/bin/bash -lc 'bundle exec bin/scheduler_daemon.rb start'
-ExecStop=/bin/kill -TERM $MAINPID
+# 停止は既定の SIGTERM でよい（trap して pidfile を消し、スケジューラを止める）。
 TimeoutStopSec=15
 Restart=always
-Environment="LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so"
+RestartSec=5
+SyslogIdentifier=tomato-shrieker
+# Ruby を jemalloc 入り（--with-jemalloc）でビルドしていないときだけ、次の行を有効にする。
+# ビルド済みなら二重に差すことになるので入れない。
+#Environment="LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so"
 
 [Install]
 WantedBy=multi-user.target
