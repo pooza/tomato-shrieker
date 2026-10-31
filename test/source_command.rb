@@ -106,6 +106,31 @@ module TomatoShrieker
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
+    # 🔴 4.19.0 リリース前レビュー: 打ち直しで沈黙の起点と記録を動かさない。
+    def test_second_ack_changes_nothing
+      earlier = Time.at(Time.now.to_i - 3600)
+      SilenceAck.acknowledge(ACK_ID, at: earlier, silence: false, run_id: 42, reasons: [:undelivered])
+      said = ack_with(stub_source(86_400))
+      row = SilenceAck.where(source_id: ACK_ID).first
+
+      assert_include(said, '確認するものがありません')
+      assert_nil(row.silence_acknowledged_at)
+      assert_equal(42, row.acknowledged_run_id)
+      assert_equal(earlier.to_i, row.acknowledged_at.to_time.to_i)
+    ensure
+      SilenceAck.where(source_id: ACK_ID).delete
+    end
+
+    # ⚠ 判定不能（`silent?` が nil）は確認できる。確認すれば判定できるようになる。
+    def test_ack_when_silence_is_undetermined
+      ack_with(stub_source(86_400, silent: nil))
+      row = SilenceAck.where(source_id: ACK_ID).first
+
+      assert_not_nil(row.silence_acknowledged_at)
+    ensure
+      SilenceAck.where(source_id: ACK_ID).delete
+    end
+
     # 確認するものが無ければ記録しない
     def test_ack_refuses_when_nothing_to_acknowledge
       said = ack_with(stub_source(nil, undelivered: false))
