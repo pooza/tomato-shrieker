@@ -136,12 +136,13 @@ module TomatoShrieker
       lost = source.lost_entries?
       tolerance = source.monitor_silence_tolerance_seconds
       return say(nothing_to_ack_message(id)) unless undelivered || lost || tolerance
-      SilenceAck.acknowledge(id)
+      silence = source.silent? == true || !(undelivered || lost)
+      record_ack(source, undelivered:, lost:, silence:)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
       say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
       say '  エントリの取りこぼし (lost_entries) を解除しました。失われたエントリは再送されません。' if lost
-      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
+      say_silence_after_ack(source, moved: silence) if tolerance
       # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
       # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
       say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
@@ -212,6 +213,21 @@ module TomatoShrieker
       return [pid, daemon.alive_state_of(pid)] if pid
       # ⚠ 読めないファイルは :unknown のまま（:dead と混ぜない）。番号が無いのに :alive とは言わない。
       return [nil, daemon.alive_state == :unknown ? :unknown : :dead]
+    end
+
+    # #1680: どの run の何を了解したのかを残す。⚠ 沈黙の警告が出ていないのに未達や取りこぼしを
+    # 確認したときは、沈黙の起点を動かさない。
+    def record_ack(source, undelivered:, lost:, silence:)
+      reasons = {undelivered:, lost_entries: lost, silent: source.silent? == true}.select do |_, v|
+        v
+      end.keys
+      log = undelivered ? source.undelivered_log : (source.lost_entries_log if lost)
+      SilenceAck.acknowledge(source.id, silence:, run_id: log&.id, reasons:)
+    end
+
+    def say_silence_after_ack(source, moved:)
+      return say("  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。") if moved
+      say '  沈黙の起点は動かしていません（沈黙の警告は出ていないため）。'
     end
 
     def request_reload(pid, waiter)

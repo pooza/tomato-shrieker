@@ -154,6 +154,7 @@ module TomatoShrieker
       body << "silence_baseline: #{source.silence_baseline&.iso8601}\n"
       body << "silence_baseline_origin: #{source.silence_baseline_origin}\n"
       body << "acknowledged_at: #{source.acknowledged_at&.iso8601}\n"
+      body << "acknowledged_reasons: #{source.acknowledgement&.reasons&.join(',')}\n"
       return body
     end
 

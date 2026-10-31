@@ -436,8 +436,12 @@ module TomatoShrieker
     # 運用者が確認した時刻 (#1505 / #1506)。⚠ 未達・取りこぼし・沈黙の 3 つが読むので、
     # nil も含めて 1 回だけ引く (#1472)。
     def acknowledged_at
-      @acknowledged_at = SilenceAck.acknowledged_at(id) unless defined?(@acknowledged_at)
-      return @acknowledged_at
+      return acknowledgement&.acknowledged_at
+    end
+
+    def acknowledgement
+      @acknowledgement = SilenceAck.where(source_id: id).first unless defined?(@acknowledgement)
+      return @acknowledgement
     end
 
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
@@ -660,6 +664,7 @@ module TomatoShrieker
     # 沈黙を測る起点 (#1505)。配信・確認・観測開始のうち最も新しいもの。
     #
     # ⚠ 確認 (SilenceAck) で起点が前に進むので、運用者が確認すればそのまま緑に戻る。
+    # ⚠ 未達や取りこぼしだけの確認では動かない (#1680)。
     # 配信が再開すれば last_delivered_at が確認を追い越すので、確認記録は自然に
     # 無効化される。特別な失効処理は要らない。
     #
@@ -681,7 +686,7 @@ module TomatoShrieker
     def silence_baseline_entry
       @silence_baseline_entry ||= {
         BASELINE_DELIVERY => run_log_delivered_at,
-        BASELINE_ACKNOWLEDGEMENT => acknowledged_at,
+        BASELINE_ACKNOWLEDGEMENT => acknowledgement&.silence_acknowledged_at,
         BASELINE_OBSERVATION => observed_since,
       }.compact.max_by(&:last) || []
       return @silence_baseline_entry

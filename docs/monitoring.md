@@ -113,7 +113,7 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 **沈黙を測る起点は「配信・確認・観測開始のうち最も新しいもの」(#1505)。**
 
 ```
-silent? = now > max(last_delivered_at, acknowledged_at, observed_since) + silence_tolerance
+silent? = now > max(last_delivered_at, silence_acknowledged_at, observed_since) + silence_tolerance
           ただし配信実績も確認記録も無く、まだ超えていなければ nil (= 判定不能・#1502)
 ```
 
@@ -131,7 +131,7 @@ bin/shrieker source ack ID
 
 ⚠⚠ **「確定的な信号を運用者が消してよいのか」は判断した上でこうしている。**取りこぼしたエントリは**再送されないので、赤を放置しても失われたものは戻らない**。一方 **2026-09-05 の実測では 57 ソースのうち 17 件が 12 日間に配信試行ゼロ**で、逃げ道が無いと疎なソースは数週間 503 に貼り付く。**「いつも赤いモニター」は監視ごと信用されなくなる**ほうが害が大きい。
 
-⚠ **`ack` はソースごとに 1 つの記録**（`silence_ack` テーブル）なので、**サイレント不発と未達のどちらを確認しても両方に効く**。`bin/shrieker source ack` は**実際に効いた範囲だけを出力する**。
+⚠ **`ack` はソースごとに 1 つの記録**（`silence_ack` テーブル）なので、**未達・取りこぼしには確認の時刻で効く**。📌 **沈黙の起点が動くのは、沈黙の警告が出ていたときか、ほかに警告が無いときだけ（#1680）**＝未達だけの確認で沈黙の警告を遅らせない。⚠ しきい値の無いソースで未達を確認すると、次の配信試行まで再警告は無い（期限は持たせない・ユーザー判断）。`bin/shrieker source ack` は**実際に効いた範囲だけを出力する**。
 
 📌 **この仕組みがあるので `silence_tolerance` を保守的に丸める必要は無い。**偽陽性のコストが「設定を直す」から「1 回確認する」に下がる。
 
@@ -210,6 +210,8 @@ bin/shrieker source ack ID
       "silence_baseline": "2026-04-14T14:00:01+09:00",
       "silence_baseline_origin": "delivery",
       "acknowledged_at": null,
+      "acknowledged_run_id": null,
+      "acknowledged_reasons": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1},

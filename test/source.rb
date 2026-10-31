@@ -799,6 +799,19 @@ module TomatoShrieker
       SourceRunLog.where(source_id: SILENT_ID).delete
     end
 
+    # 🔴 #1680: 未達だけの確認（`silence: false`）は沈黙の起点にならない。
+    def test_silence_baseline_ignores_ack_without_silence
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60)
+      SilenceAck.acknowledge(SILENT_ID, silence: false, reasons: [:undelivered])
+
+      assert_not_nil(source.acknowledged_at)
+      assert_not_equal(Source::BASELINE_ACKNOWLEDGEMENT, source.silence_baseline_origin)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+      SilenceAck.where(source_id: SILENT_ID).delete
+    end
+
     # ⚠ 運用者が確認したら判定不能ではなくなる。起点も `acknowledgement` に変わるので、
     # 「なぜ緑なのか」が外から読める (#1505)。
     def test_silence_baseline_origin_after_acknowledge
