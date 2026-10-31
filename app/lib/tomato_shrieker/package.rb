@@ -49,6 +49,18 @@ module TomatoShrieker
       return "#{name}/#{version} (#{url})"
     end
 
+    # 配信は成功したが、欠けたものがある（添付・タグ）ことを Sentry へ残す (#1687)。毎回起きる形だと、
+    # warn のログにしか出ないまま緑が続く。⚠ メッセージは固定にする（Sentry のイシューを割らない・
+    # URL を載せない）。
+    def self.capture_warning(message, source:, shrieker:)
+      return unless Sentry.initialized?
+      Sentry.capture_message(message, level: :warning,
+        tags: {source: source&.id, shrieker: shrieker.to_s})
+    rescue => e
+      # ⚠ 投稿を作った後で呼ぶので、報告の失敗で配信を失敗にしない（再実行すると二重に出る）。
+      warn("capture_warning failed: #{e.class}")
+    end
+
     # 例外を人が読む 1 行にする。**例外メッセージを外へ出すときは必ずここを通す** (#1469)。
     #
     # ⚠ Sequel / SQLite の例外メッセージは ASCII-8BIT で上がる。日本語を含む SQL が

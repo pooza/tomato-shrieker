@@ -241,6 +241,16 @@ module TomatoShrieker
       assert_requested(edit, times: 1)
     end
 
+    # #1687: タグが付かなかったことは warn だけでなく Sentry へも残す。
+    def test_tags_not_attached_goes_to_sentry
+      stub_create
+      stub_edit(422)
+      captured = []
+      with_sentry_stub(captured) {exec_with(tagged_source)}
+
+      assert_equal('tags not attached', captured.first[:message])
+    end
+
     # 🔴 **#1679 の Codex P2: 投稿を作った後は、例外の種類を選ばずに握る。**
     # ⚠ 応答が JSON でない（`parsed_response` が文字列）と `dig` が `NoMethodError` を上げる。
     def test_exec_succeeds_when_response_is_not_json

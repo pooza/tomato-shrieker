@@ -141,14 +141,14 @@ module TomatoShrieker
       cutoff = retention_cutoff(retention_days)
       count = where(Sequel.lit('executed_at < ?', cutoff))
         .exclude(id: boundary_run_ids(:min)).exclude(id: boundary_run_ids(:max))
-        .exclude(id: last_delivered_ids).exclude(id: last_attempted_ids).delete
+        .exclude(id: last_delivered_ids).exclude(id: last_attempted_ids).exclude(id: last_entry_stage_ids).delete
       redact_expired(cutoff)
       return count
     end
 
     # 🔴 **retention を過ぎても残す保護行から error_message を落とす (#1511)。**
     #
-    # 保護行は 4 系統に増え、**ソースあたり最大 4 行が retention_days を超えて
+    # 保護行は 5 系統に増え、**ソースあたり最大 5 行が retention_days を超えて
     # 無期限に残る**ようになった。⚠ とくに `last_attempted_ids` が守る行は
     # 「直近の配信試行」＝ `partial` / `error` で `error_message` を持つ可能性が
     # 最も高い。`/monitor/retention_days` が担保していた「例外メッセージは
@@ -160,8 +160,7 @@ module TomatoShrieker
     # ⚠ 判定に使うのは `executed_at` / `attempted_count` / `delivered_count` だけ
     # なので、`error_message` を落としても保護の意味は失われない。
     def self.redact_expired(cutoff)
-      return where(Sequel.lit('executed_at < ?', cutoff))
-          .exclude(error_message: nil).update(error_message: nil)
+      return where(Sequel.lit('executed_at < ?', cutoff)).exclude(error_message: nil).update(error_message: nil)
     end
 
     # 「最後に配信できた時刻」の根拠行はソースごとに 1 行だけ prune から守る。
@@ -222,8 +221,9 @@ module TomatoShrieker
     # ため再送されず (`entry.tooted` 列も migration/004 で削除済み)、永久に失われている。
     # no-op で緑に戻すと、宛先が死んだまま監視だけが健全に見える。
     def self.last_attempted(source_id)
-      return where(source_id:).where(Sequel.lit('attempted_count > 0'))
-          .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+      row = where(source_id:).where(Sequel.lit('attempted_count > 0'))
+        .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+      return row
     end
 
     # このソースの run を観測し始めた時刻 (#1483)。

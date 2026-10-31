@@ -180,7 +180,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 - **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする
 - **`Sentry.initialized?` は Sentry 自身の singleton class に生えている。**`remove_method` で戻すと本物ごと消えるので、元の `Method` を保存して差し戻す
 - **`stub_request(...).to_return(body: <組み立て>)` は、本文の組み立てで例外が出ると、応答を定義していない stub だけが残って空の 200 を返す。**本文を先に組んでから登録する
-- **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（4 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
+- **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（5 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
 - **tomato に Timecop は無い。**時刻を差し替えるなら `Time.now` を stub する。⚠ `Time#utc` は破壊的なので、同じ `Time` を返すと途中で UTC に変わる（`{fake.dup}` で返す）
 
 ### Schema 設計の指針 (required の意味論)

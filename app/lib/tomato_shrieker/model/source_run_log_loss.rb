@@ -55,10 +55,17 @@ module TomatoShrieker
     module ClassMethods
       # 直近の「エントリ処理段に入った run」(#1574)。⚠ 新着の無い run は段に入らないので、
       # 取りこぼしは次に新着を処理する run が来るまで（または運用者が確認するまで）残る。
-      # ⚠ **prune の保護行にはしていない。**確認しないまま保持期間を過ぎると行ごと消える。
+      # ⚠ 根拠行は prune から守る（`last_entry_stage_ids`・#1687）。
       def last_entry_stage(source_id)
         logs = where(source_id:, entry_stage: true)
         return logs.order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+      end
+
+      # 上の根拠行もソースごとに 1 行だけ守る (#1687)。
+      # ⚠ これを刈ると、新着 1 件だけが落ちた run（配信の試行が 0 なので `last_attempted_ids` に
+      # 掛からない）の取りこぼしが、確認しないまま保持期間の経過だけで緑に戻る。
+      def last_entry_stage_ids
+        return boundary_run_ids(:max, where(entry_stage: true))
       end
     end
   end

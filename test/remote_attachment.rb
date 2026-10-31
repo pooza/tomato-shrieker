@@ -79,6 +79,31 @@ module TomatoShrieker
       end
     end
 
+    # #1687: 読めない URL（`Addressable`）も投稿ごと落とさない。URL はログに残さない。
+    def test_unparsable_url_is_dropped
+      shriekers.each do |shrieker|
+        logged = []
+        fake = Object.new
+        fake.define_singleton_method(:warn) {|values| logged.push(values)}
+        shrieker.define_singleton_method(:logger) {fake}
+
+        assert_empty(shrieker.upload_attachments([{image_url: 'http://exa mple.com/?token=SECRET'}]))
+        assert_nil(logged.first[:host])
+        assert_equal('Addressable::URI::InvalidURIError', logged.first[:error])
+        assert_not_include(logged.first.to_s, 'SECRET')
+      end
+    end
+
+    # #1687: 落ちた添付は warn だけでなく Sentry へも残す。
+    def test_dropped_attachment_goes_to_sentry
+      captured = []
+      shrieker = shriekers.first
+      with_sentry_stub(captured) {shrieker.upload_attachments([{image_url: 'http://127.0.0.1/a.png'}])}
+
+      assert_equal('attachment dropped', captured.first[:message])
+      assert_equal(:warning, captured.first[:level])
+    end
+
     # ⚠ ほかの失敗は `Package.error_message` を通す（クラス名つき）。
     def test_dropped_log_carries_error_class
       shrieker = shriekers.first

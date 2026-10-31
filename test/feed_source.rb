@@ -90,6 +90,16 @@ module TomatoShrieker
       end
     end
 
+    # #1687: 保存の後で落ちたエントリは、Sentry のタグでも拾い直せる失敗と分ける。
+    def test_lost_entry_is_tagged_as_entry_stage
+      captured = []
+      source = stub_entries(FeedSource.new('id' => FIXTURE_ID, 'source' => {'feed' => 'https://example.com/feed.rss'}), DeliveryStats.new)
+      source.define_singleton_method(:create_record) {|_entry| :record}
+      with_sentry_stub(captured) {source.fetch {|_record| raise 'boom'}}
+
+      assert_equal('entry', captured.first[:tags][:stage])
+    end
+
     # 🔴 **`shrieker_errors` のキーをクラス名に依存させない (#1485)。**
     # 以前は `"#{self.class}#fetch"` だったのでサブクラスごとにキーが増え、宛先別の
     # 分布（`MastodonShrieker` 等）と同じ Hash に足し込まれて `/status.json` が

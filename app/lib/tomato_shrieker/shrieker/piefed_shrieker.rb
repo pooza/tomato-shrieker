@@ -46,7 +46,7 @@ module TomatoShrieker
     #
     # 🔴 **タグが付かなくても、投稿は成功として返す。**⚠⚠ ここで例外を上げると
     # `Source#deliver` が「配信に失敗した」と数えるが、**投稿はもう出ている**。
-    # 再実行すれば同じ投稿が二重に出る。失敗は warn `tags not attached` で残す。
+    # 再実行すれば同じ投稿が二重に出る。失敗は warn `tags not attached` と Sentry の warning で残す。
     # ⚠⚠ **投稿を作った後なので、例外の種類を選ばずに握る（#1679 の Codex P2）。**
     # `GatewayError` だけだと、応答の形が違うときの `NoMethodError` などがすり抜ける。
     def attach_tags(response, tags, source)
@@ -65,6 +65,7 @@ module TomatoShrieker
         post_id: id,
         error: Package.error_message(e),
       )
+      Package.capture_warning('tags not attached', source:, shrieker: self.class)
     end
 
     # テンプレートが本文に並べるのと同じタグを、`#` なしで返す。
