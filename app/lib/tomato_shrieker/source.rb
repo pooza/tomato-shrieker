@@ -13,7 +13,9 @@ module TomatoShrieker
     BASELINE_OBSERVATION = 'observation'.freeze
 
     def initialize(params)
-      @params = params
+      @declared_params = params
+      @source_defaults = SourceDefaults.values_for(self.class, params)
+      @params = @source_defaults.empty? ? params : SourceDefaults.apply(params, @source_defaults)
       @shrieker_mutex = Mutex.new
       @run_mutex = Mutex.new
     end
@@ -23,12 +25,16 @@ module TomatoShrieker
       return @params[name]
     end
 
+    # 既定値から来たキーと値 (#1559)。
+    attr_reader :source_defaults
+
     def to_h
       return {'id' => id, 'class' => self.class.to_s}.merge(@params)
     end
 
     def id
-      @id ||= self['/id'] || Digest::SHA1.hexdigest(@params.to_json)
+      # ⚠ 既定値を変えても id が変わらないように、書かれたままの定義から求める (#1559)。
+      @id ||= self['/id'] || Digest::SHA1.hexdigest(@declared_params.to_json)
       return @id
     end
 

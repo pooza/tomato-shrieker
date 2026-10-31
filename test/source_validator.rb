@@ -248,6 +248,16 @@ module TomatoShrieker
       end
     end
 
+    # #1559: `null` は種別の既定を外す。
+    def test_null_opts_out_of_source_defaults
+      base = {'source' => {'text' => 'a'}, 'dest' => {'hooks' => ['https://example.com/x']}}
+
+      assert_empty(schema_errors(base.merge(
+        'monitor' => {'tolerance' => nil, 'silence_tolerance' => nil, 'error_streak_threshold' => nil},
+        'schedule' => {'cron' => '1 0 * * *', 'retry' => nil},
+      )))
+    end
+
     # #1703: 締切は秒（0 以上）か Rufus の duration。cron や負の数は NG。
     def test_command_timeout_schema
       dest = {'hooks' => ['https://example.com/x']}
