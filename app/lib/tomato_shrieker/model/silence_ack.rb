@@ -21,10 +21,21 @@ module TomatoShrieker
     end
 
     # 確認を記録する。source ごとに 1 行だけ持ち、確認のたびに前に進める。
-    def self.acknowledge(source_id, at: Time.now)
+    #
+    # 🔴 **沈黙の起点が動くのは `silence: true` のときだけ (#1680)。**未達や取りこぼしだけを
+    # 確認した ack で動かすと、沈黙の警告がそのぶん後ろ倒しになる。⚠ 動かさないときは前の値を
+    # 残す（消すと、前に確認した沈黙がまた赤くなる）。
+    def self.acknowledge(source_id, at: Time.now, silence: true, run_id: nil, reasons: [])
+      values = {acknowledged_at: at, acknowledged_run_id: run_id,
+                acknowledged_reasons: reasons.join(',')}
+      values[:silence_acknowledged_at] = at if silence
       row = where(source_id:).first
-      return row.update(acknowledged_at: at) if row
-      return create(source_id:, acknowledged_at: at)
+      return row.update(values) if row
+      return create(values.merge(source_id:))
+    end
+
+    def reasons
+      return acknowledged_reasons.to_s.split(',')
     end
   end
 end
