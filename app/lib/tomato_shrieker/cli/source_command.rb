@@ -135,8 +135,12 @@ module TomatoShrieker
       undelivered = source.undelivered?
       lost = source.lost_entries?
       tolerance = source.monitor_silence_tolerance_seconds
-      return say(nothing_to_ack_message(id)) unless undelivered || lost || tolerance
-      silence = source.silent? == true || !(undelivered || lost)
+      # ⚠ `silent?` の nil は判定不能（#1502）で、確認すれば判定できるようになるので警告と同じに扱う。
+      silence = source.silent? != false
+      # 🔴 **警告が無ければ何も記録しない（4.19.0 リリース前レビュー）。**記録すると、未達を確認した
+      # 後の打ち直しで沈黙の起点が動き（宛先が死んだまま警告が 1 周ぶん遅れる）、了解した run と
+      # 警告の記録も空で上書きされる。
+      return say(nothing_to_ack_message(id)) unless undelivered || lost || silence
       record_ack(source, undelivered:, lost:, silence:)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
@@ -218,9 +222,7 @@ module TomatoShrieker
     # #1680: どの run の何を了解したのかを残す。⚠ 沈黙の警告が出ていないのに未達や取りこぼしを
     # 確認したときは、沈黙の起点を動かさない。
     def record_ack(source, undelivered:, lost:, silence:)
-      reasons = {undelivered:, lost_entries: lost, silent: source.silent? == true}.select do |_, v|
-        v
-      end.keys
+      reasons = {undelivered:, lost_entries: lost, silent: silence}.select {|_, v| v}.keys
       log = undelivered ? source.undelivered_log : (source.lost_entries_log if lost)
       SilenceAck.acknowledge(source.id, silence:, run_id: log&.id, reasons:)
     end
@@ -340,7 +342,7 @@ module TomatoShrieker
     end
 
     def nothing_to_ack_message(id)
-      return "#{id} は silence_tolerance が未設定で、未達・取りこぼしの警告も出ていません。確認するものがありません。"
+      return "#{id} は未達・取りこぼし・沈黙の警告が出ていません。確認するものがありません。"
     end
 
     # silence_tolerance を人が読める長さで返す (#1513)。
