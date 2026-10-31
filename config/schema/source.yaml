@@ -112,10 +112,14 @@ properties:
             # やり直す回数の上限（既定 1）
             type: integer
             minimum: 1
+            maximum: 10
           interval:
-            # 失敗からやり直すまでの間（Rufus の duration 形式。既定 15m）
-            type: string
-            pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+            # 失敗からやり直すまでの間（秒、または Rufus の duration 形式。既定 15m）。0 は書けない
+            oneOf:
+              - type: integer
+                minimum: 1
+              - type: string
+                pattern: '^(?=.*[1-9])((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
   source:
     type: object
     additionalProperties: false

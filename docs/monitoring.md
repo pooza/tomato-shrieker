@@ -57,8 +57,8 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 
 - **期限 ＝ 起点から見た初回の発火予定 ＋ `grace_seconds`。**`every: 30m` なら起点の 30 分後、`cron` なら起点の次に来る発火時刻（日次なら最大 1 日）
 - 🔴 **起点は、daemon の中では scheduler がジョブを登録した時刻 (#1686)。**`source reload` で足した・変えたソースは reload の時刻、daemon を再起動すれば起動の時刻になる（定義が変わらなかったジョブは reload で張り直さないので、時刻も前のまま）
-  - 🔴 **ジョブが無いソースは期限が無い＝すぐ 503**（本文に `not scheduled`）。reload で登録に失敗した新しいソース（`CommandSource` の `bundle install` 失敗など）が、ジョブの無いまま期限まで緑に見えていた（4.15.0〜4.17 は日次 cron で最長約 26 時間）
-  - 定義を置いてから reload までに cron の時刻が挟まっても、実際の初回より前に期限が来ない（4.17 までは定義ファイルの更新時刻が起点で、`0 6 * * *` を 05:59 に置いて 06:01 に reload すると 22 時間赤かった）
+  - 🔴 **ジョブが無いソースは期限が無い＝すぐ 503**（本文に `not scheduled`）。reload で登録に失敗した新しいソース（`CommandSource` の `bundle install` 失敗など）が、ジョブの無いまま期限まで緑に見えていた（4.15.0〜4.17.x は日次 cron で最長約 26 時間）
+  - 定義を置いてから reload までに cron の時刻が挟まっても、実際の初回より前に期限が来ない（4.17.x までは定義ファイルの更新時刻が起点で、`0 6 * * *` を 05:59 に置いて 06:01 に reload すると 22 時間赤かった）
 - 🔴 **期限なしで緑にはしない。**登録しただけで一度も走っていないソースが緑のまま残ると、#1504 で塞いだ「壊れているのに緑」へ戻る
 - ⚠ **CLI（`source status`）は scheduler を持たないので、定義ファイルの更新時刻（いまのディスク）を起点に答える。**daemon の起動の途中（登録を終える前）も同じ。ジョブの有無も見ないので、登録に失敗したソースは CLI では期限まで `awaiting_first_run` のまま＝ **healthz と食い違う**。登録の失敗は reload の結果行（`--wait`）・ログ・Sentry の `failed` で見る
 - `/status.json` の `first_run_deadline` で期限が読める（1 度でも走ったら `null`）。CLI の `PROBLEMS` 列には目印 `awaiting_first_run` が出る（問題ではないので `--problems` には出ない）
@@ -223,7 +223,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 
 `reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
 
-`digest` は**いま scheduler に登録されている定義**のハッシュ (#1672)。`Scheduler.digest` で、reload が変更を見分けるのと同じもの。ディスク上の定義と比べれば、編集したまま reload していない定義（再起動で黙って有効になる）が分かる（deploy スキルの `pending_sources.sh`）。登録に失敗したソースと読めない定義の行は `null`。⚠ CLI の `source status` は scheduler の外で動くので出さない。
+`digest` は**いま scheduler に登録されている定義**のハッシュ (#1672)。`Scheduler.digest` で、reload が変更を見分けるのと同じもの。ディスク上の定義と比べれば、編集したまま reload していない定義（再起動で黙って有効になる）が分かる（deploy スキルの `pending_sources.sh`）。一度も登録できていない新しいソースは `null`、読めない定義の行はキーごと無い。⚠ 変更した定義の reload が失敗した場合は古い digest が残る。⚠ CLI の `source status` は scheduler の外で動くので出さない。
 
 `last_delivered_at_origin` は配信時刻の出どころ:
 

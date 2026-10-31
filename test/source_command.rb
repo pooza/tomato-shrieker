@@ -224,6 +224,30 @@ module TomatoShrieker
       assert_include(error.message, '/monitor/enabled')
     end
 
+    # #1745: 判定の後に終わったプロセスへの HUP は、例外ではなく「停止している」と答える。
+    def test_reload_when_process_ended_after_check
+      pid = spawn('true')
+      Process.wait(pid)
+      said = []
+      @command.define_singleton_method(:say) {|message| said.push(message)}
+      @command.define_singleton_method(:refuse_unless_startable!) {nil}
+      @command.define_singleton_method(:reload_target) {|_daemon| [pid, :alive]}
+      @command.options = {wait: false}
+      @command.reload
+
+      assert_include(said.join, '停止しています')
+    end
+
+    # #1745: PID ファイルを読めないときは、空の番号を出さない。
+    def test_reload_without_readable_pid
+      @command.define_singleton_method(:refuse_unless_startable!) {nil}
+      @command.define_singleton_method(:reload_target) {|_daemon| [nil, :unknown]}
+      @command.options = {wait: false}
+      error = assert_raise(Thor::Error) {@command.reload}
+
+      assert_include(error.message, 'PID ファイルを読めません')
+    end
+
     # #1529: 反映できなかった定義・失敗した reload は非 0 で終わる。
     def test_report_reload
       said = []

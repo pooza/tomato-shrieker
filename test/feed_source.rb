@@ -1,7 +1,6 @@
 module TomatoShrieker
   class FeedSourceTest < TestCase
     FIXTURE_ID = '__test_feed_source__'.freeze
-    SENTRY_STUBBED = [:initialized?, :capture_exception].freeze
 
     def test_all
       assert_kind_of(Enumerator, FeedSource.all)
@@ -226,22 +225,6 @@ module TomatoShrieker
       stub_entries(source, stats)
       source.define_singleton_method(:create_record) {|_entry| raise 'boom'}
       return source
-    end
-
-    # ⚠⚠ **`remove_method` で戻してはいけない。**`Sentry.initialized?` は Sentry 自身の
-    # singleton class に生えているので、`define_singleton_method` は**本物を上書き**する。
-    # `remove_method` すると本物ごと消えて、**以降のテストが軒並み
-    # `NoMethodError: undefined method 'initialized?'` で落ちる**（実際に踏んだ）。
-    # 元の Method を保存して差し戻す。
-    def with_sentry_stub(captured)
-      originals = SENTRY_STUBBED.to_h {|name| [name, Sentry.method(name)]}
-      Sentry.define_singleton_method(:initialized?) {true}
-      Sentry.define_singleton_method(:capture_exception) do |error, **options|
-        captured.push({error:}.merge(options))
-      end
-      yield
-    ensure
-      originals&.each {|name, method| Sentry.define_singleton_method(name, method)}
     end
   end
 end

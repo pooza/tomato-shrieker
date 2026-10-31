@@ -14,6 +14,34 @@ module TomatoShrieker
       'IcalendarSource' => 'calendar.ics',
     }.freeze
     DEFAULT_FEED_FIXTURE = 'feed.rss'.freeze
+    SENTRY_STUBBED = [:initialized?, :capture_exception].freeze
+
+    # daemon の中（scheduler が待ち受けに入った後）を装う (#1686)。⚠ Singleton の特異メソッドに
+    # 生やすので、必ず消して戻す（本物はクラスにあるので消えない）。
+    def serving(registered_at: nil)
+      scheduler = Scheduler.instance
+      scheduler.define_singleton_method(:serving?) {true}
+      scheduler.define_singleton_method(:registered_at) {|_id| registered_at}
+      yield
+    ensure
+      [:serving?, :registered_at].each {|name| scheduler.singleton_class.send(:remove_method, name)}
+    end
+
+    # ⚠⚠ **`remove_method` で戻してはいけない。**`Sentry.initialized?` は Sentry 自身の
+    # singleton class に生えているので、`define_singleton_method` は**本物を上書き**する。
+    # `remove_method` すると本物ごと消えて、**以降のテストが軒並み
+    # `NoMethodError: undefined method 'initialized?'` で落ちる**（実際に踏んだ）。
+    # 元の Method を保存して差し戻す。
+    def with_sentry_stub(captured)
+      originals = SENTRY_STUBBED.to_h {|name| [name, Sentry.method(name)]}
+      Sentry.define_singleton_method(:initialized?) {true}
+      Sentry.define_singleton_method(:capture_exception) do |error, **options|
+        captured.push({error:}.merge(options))
+      end
+      yield
+    ensure
+      originals&.each {|name, method| Sentry.define_singleton_method(name, method)}
+    end
 
     # 🔴 **`require` だけでは有効にならない (#1468)。**`WebMock.enable!` を呼ぶまで
     # `stub_request` も `disable_net_connect!` も**無言で素通りする**。⚠⚠ 書いたつもりで
