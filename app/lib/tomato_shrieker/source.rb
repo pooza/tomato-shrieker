@@ -197,7 +197,9 @@ module TomatoShrieker
     # 🔴 **宛先のオブジェクトは run ごとに作り直す（#1712 の Codex P1）。**スケジューラが持つ
     # ソースのインスタンスは run をまたいで生きるので、メモした宛先も生き続ける。⚠⚠ PieFed は
     # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
-    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
+    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。ログインの失敗も
+    # インスタンスの寿命の間覚えるので（ginseng-piefed 0.6.0・#1752）、一時的な 429 からの回復も
+    # ここに頼っている。
     # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
     def reset_shriekers
       @shrieker_mutex.synchronize do

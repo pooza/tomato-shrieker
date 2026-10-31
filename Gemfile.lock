@@ -43,10 +43,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 3e9ad942aac9a454465efbffc989535e196095fb
+  revision: 66e4acbc6f2c43c4f5920052914ec588e2c574d9
   branch: main
   specs:
-    ginseng-piefed (0.4.1)
+    ginseng-piefed (0.6.1)
       ginseng-core (>= 2.0.0)
 
 GIT
@@ -106,7 +106,7 @@ GEM
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
-    addressable (2.9.0)
+    addressable (2.9.1)
       public_suffix (>= 2.0.2, < 8.0)
     ast (2.4.3)
     base64 (0.3.0)
