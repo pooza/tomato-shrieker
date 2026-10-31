@@ -124,7 +124,7 @@ module TomatoShrieker
       set_disable(id, false)
     end
 
-    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達）'
+    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達 / 取りこぼし）'
     # 🔴 **出力は実際に効いた範囲だけを言う (#1506)。**
     #
     # ⚠ 以前は `SilenceAck` を書くだけで **`undelivered` には一切効かない**のに、
@@ -135,13 +135,18 @@ module TomatoShrieker
       undelivered = source.undelivered?
       lost = source.lost_entries?
       tolerance = source.monitor_silence_tolerance_seconds
-      return say(nothing_to_ack_message(id)) unless undelivered || lost || tolerance
-      SilenceAck.acknowledge(id)
+      # ⚠ `silent?` の nil は判定不能（#1502）で、確認すれば判定できるようになるので警告と同じに扱う。
+      silence = source.silent? != false
+      # 🔴 **警告が無ければ何も記録しない（4.19.0 リリース前レビュー）。**記録すると、未達を確認した
+      # 後の打ち直しで沈黙の起点が動き（宛先が死んだまま警告が 1 周ぶん遅れる）、了解した run と
+      # 警告の記録も空で上書きされる。
+      return say(nothing_to_ack_message(id)) unless undelivered || lost || silence
+      record_ack(source, undelivered:, lost:, silence:)
       say "#{id} を確認済みにしました。"
       # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
       say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
       say '  エントリの取りこぼし (lost_entries) を解除しました。失われたエントリは再送されません。' if lost
-      say "  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。" if tolerance
+      say_silence_after_ack(source, moved: silence) if tolerance
       # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
       # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
       say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
@@ -167,17 +172,13 @@ module TomatoShrieker
       pid, state = reload_target(daemon)
       case state
       when :alive
-        before = monitor_call {waiter&.count}
-        Process.kill('HUP', pid)
-        say "reload requested (pid #{pid})"
-        return report_reload(monitor_call {waiter.wait(before)}) if waiter
-        # ⚠ シグナルは非同期なので、`--wait` なしでは「要求した」までしか言えない (#1529)。
-        say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
+        request_reload(pid, waiter)
       when :unknown
         # ⚠ :unknown（EPERM）を :dead と混ぜない。プロセスは生きている可能性がある。
+        raise Thor::Error, 'PID ファイルを読めません。reload できません。' unless pid
         raise Thor::Error, "PID #{pid} exists but is not ours. reload できません。"
       else
-        say 'scheduler は停止しています。ソース定義は次回起動時に読み込まれます。'
+        say_stopped
       end
     end
 
@@ -216,6 +217,37 @@ module TomatoShrieker
       return [pid, daemon.alive_state_of(pid)] if pid
       # ⚠ 読めないファイルは :unknown のまま（:dead と混ぜない）。番号が無いのに :alive とは言わない。
       return [nil, daemon.alive_state == :unknown ? :unknown : :dead]
+    end
+
+    # #1680: どの run の何を了解したのかを残す。⚠ 沈黙の警告が出ていないのに未達や取りこぼしを
+    # 確認したときは、沈黙の起点を動かさない。
+    def record_ack(source, undelivered:, lost:, silence:)
+      reasons = {undelivered:, lost_entries: lost, silent: silence}.select {|_, v| v}.keys
+      log = undelivered ? source.undelivered_log : (source.lost_entries_log if lost)
+      SilenceAck.acknowledge(source.id, silence:, run_id: log&.id, reasons:)
+    end
+
+    def say_silence_after_ack(source, moved:)
+      return say("  次に silence_tolerance (#{tolerance_label(source)}) を超えたら、再び警告します。") if moved
+      say '  沈黙の起点は動かしていません（沈黙の警告は出ていないため）。'
+    end
+
+    def request_reload(pid, waiter)
+      before = monitor_call {waiter&.count}
+      begin
+        Process.kill('HUP', pid)
+      rescue Errno::ESRCH
+        # ⚠ 生きていると判定した後に終わった。
+        return say_stopped
+      end
+      say "reload requested (pid #{pid})"
+      return report_reload(monitor_call {waiter.wait(before)}) if waiter
+      # ⚠ シグナルは非同期なので、`--wait` なしでは「要求した」までしか言えない (#1529)。
+      say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
+    end
+
+    def say_stopped
+      say 'scheduler は停止しています。ソース定義は次回起動時に読み込まれます。'
     end
 
     # ⚠ **HUP を送る前に断る。**監視が無効なら読む先が無く、送った後では「待てない」と
@@ -310,7 +342,7 @@ module TomatoShrieker
     end
 
     def nothing_to_ack_message(id)
-      return "#{id} は silence_tolerance が未設定で、未達・取りこぼしの警告も出ていません。確認するものがありません。"
+      return "#{id} は未達・取りこぼし・沈黙の警告が出ていません。確認するものがありません。"
     end
 
     # silence_tolerance を人が読める長さで返す (#1513)。

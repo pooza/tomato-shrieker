@@ -1,7 +1,6 @@
 module TomatoShrieker
   class FeedSourceTest < TestCase
     FIXTURE_ID = '__test_feed_source__'.freeze
-    SENTRY_STUBBED = [:initialized?, :capture_exception].freeze
 
     def test_all
       assert_kind_of(Enumerator, FeedSource.all)
@@ -23,12 +22,6 @@ module TomatoShrieker
     def test_enclosure?
       FeedSource.all do |source|
         assert_boolean(source.enclosure?)
-      end
-    end
-
-    def test_category
-      FeedSource.all.select(&:category).each do |source|
-        assert_kind_of(String, source.category)
       end
     end
 
@@ -95,6 +88,16 @@ module TomatoShrieker
       FeedSource.all do |source|
         assert_kind_of(String, source.prefix)
       end
+    end
+
+    # #1687: 保存の後で落ちたエントリは、Sentry のタグでも拾い直せる失敗と分ける。
+    def test_lost_entry_is_tagged_as_entry_stage
+      captured = []
+      source = stub_entries(FeedSource.new('id' => FIXTURE_ID, 'source' => {'feed' => 'https://example.com/feed.rss'}), DeliveryStats.new)
+      source.define_singleton_method(:create_record) {|_entry| :record}
+      with_sentry_stub(captured) {source.fetch {|_record| raise 'boom'}}
+
+      assert_equal('entry', captured.first[:tags][:stage])
     end
 
     # 🔴 **`shrieker_errors` のキーをクラス名に依存させない (#1485)。**
@@ -232,22 +235,6 @@ module TomatoShrieker
       stub_entries(source, stats)
       source.define_singleton_method(:create_record) {|_entry| raise 'boom'}
       return source
-    end
-
-    # ⚠⚠ **`remove_method` で戻してはいけない。**`Sentry.initialized?` は Sentry 自身の
-    # singleton class に生えているので、`define_singleton_method` は**本物を上書き**する。
-    # `remove_method` すると本物ごと消えて、**以降のテストが軒並み
-    # `NoMethodError: undefined method 'initialized?'` で落ちる**（実際に踏んだ）。
-    # 元の Method を保存して差し戻す。
-    def with_sentry_stub(captured)
-      originals = SENTRY_STUBBED.to_h {|name| [name, Sentry.method(name)]}
-      Sentry.define_singleton_method(:initialized?) {true}
-      Sentry.define_singleton_method(:capture_exception) do |error, **options|
-        captured.push({error:}.merge(options))
-      end
-      yield
-    ensure
-      originals&.each {|name, method| Sentry.define_singleton_method(name, method)}
     end
   end
 end

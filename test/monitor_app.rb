@@ -19,7 +19,7 @@ module TomatoShrieker
     end
 
     def teardown
-      ids = [FIXTURE_ID, SILENT_ID, DISABLED_ID, THRESHOLD_ID]
+      ids = [FIXTURE_ID, SILENT_ID, DISABLED_ID, THRESHOLD_ID, UNMATCHED_ID]
       SourceRunLog.where(source_id: ids).delete
       SilenceAck.where(source_id: ids).delete
       ids.each {|id| FileUtils.rm_f(fixture_path(id))}
@@ -64,7 +64,11 @@ module TomatoShrieker
 
       assert_equal(registry[FIXTURE_ID], source_status(FIXTURE_ID)['digest'])
     ensure
-      original ? registry[FIXTURE_ID] = original : registry&.delete(FIXTURE_ID)
+      if original
+        registry[FIXTURE_ID] = original
+      else
+        registry&.delete(FIXTURE_ID)
+      end
     end
 
     def test_not_found
@@ -97,8 +101,6 @@ module TomatoShrieker
       assert_equal(503, status)
       assert_include(body.first, 'no source class matched')
       assert_include(body.first, UNMATCHED_ID)
-    ensure
-      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
 
     # 🔴 **#1682 の Codex P1: 同じ id の読める定義があっても、読めない定義があれば 503。**
@@ -117,8 +119,6 @@ module TomatoShrieker
       cli = JSON.parse(run_source_status(json: true)).select {|v| v['id'] == FIXTURE_ID}
 
       assert_equal([SourceStatus::UNMATCHED_ERROR], cli.map {|v| v['error']})
-    ensure
-      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
 
     # 🔴 **#1682 の Codex P2: 読めるソースと読めない定義を、同じ一覧から作れること。**
@@ -151,8 +151,6 @@ module TomatoShrieker
       end
 
       assert_equal(1, reads)
-    ensure
-      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
 
     # 🔴 **#1605: `/status.json` と CLI から行ごと消えない。**
@@ -164,8 +162,6 @@ module TomatoShrieker
       assert_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, UNMATCHED_ID)
       assert_include(JSON.parse(run_source_status(json: true, problems: true)).map {|v| v['id']}, UNMATCHED_ID)
       assert_match(/#{UNMATCHED_ID}.*unmatched/o, run_source_status_table)
-    ensure
-      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
 
     # ⚠ 止めた定義は逃げ道（`disable: true`）＝読めなくても問題にしない。
@@ -175,8 +171,6 @@ module TomatoShrieker
       assert_nil(source_status(UNMATCHED_ID))
       assert_equal(404, call("/healthz/source/#{UNMATCHED_ID}").first)
       assert_not_include(JSON.parse(run_source_status(json: true)).map {|v| v['id']}, UNMATCHED_ID)
-    ensure
-      FileUtils.rm_f(fixture_path(UNMATCHED_ID))
     end
 
     def test_healthz_unknown_source
@@ -184,17 +178,6 @@ module TomatoShrieker
 
       assert_equal(404, status)
       assert_include(body.first, '__no_such_source__')
-    end
-
-    # daemon の中（scheduler が待ち受けに入った後）を装う (#1686)。⚠ Singleton の特異メソッドに
-    # 生やすので、必ず消して戻す（本物はクラスにあるので消えない）。
-    def serving(registered_at:)
-      scheduler = Scheduler.instance
-      scheduler.define_singleton_method(:serving?) {true}
-      scheduler.define_singleton_method(:registered_at) {|_id| registered_at}
-      yield
-    ensure
-      [:serving?, :registered_at].each {|name| scheduler.singleton_class.send(:remove_method, name)}
     end
 
     # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
@@ -1230,7 +1213,7 @@ module TomatoShrieker
     end
 
     # ⚠ 取得段で落ちた run（段に入っていない）は、内訳が空でも取りこぼしではない。
-    def test_fetch_stage_abort_is_not_a_loss
+    def test_row_outside_entry_stage_is_not_a_loss
       log = record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, entry_stage: false,
         error_message: 'Bad response 404')
 

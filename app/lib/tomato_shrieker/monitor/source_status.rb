@@ -118,6 +118,8 @@ module TomatoShrieker
         class: @source.class.to_s,
         schedule: @source.schedule_spec,
         grace_seconds: @source.monitor_grace_seconds,
+        # #1559: 種別の既定（/source_defaults）から来たキーと値。ここに無いものは定義に書いてある。
+        source_defaults: @source.source_defaults,
         last_run_at: latest&.executed_at&.iso8601,
         # #1560: 一度も走っていないソースが、いつまで緑でいられるか。走ったら null。
         first_run_deadline: (@source.first_run_deadline&.iso8601 if @source.monitored? && !latest),
@@ -129,6 +131,22 @@ module TomatoShrieker
     end
 
     private
+
+    # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
+    # false だが、それは健全だからではなく運用者が確認したから
+    # ⚠ **キーは `acknowledged_at` (#1567)。**確認はサイレント不発にも未達にも効く (#1506)
+    # ので、`silence_` を付けると「未達がなぜ緑なのか」を探す人が行き当たらない。
+    # ⚠ 内部の名前（`SilenceAck` / `silence_ack` テーブル）は据え置き。
+    # #1680: `acknowledged_run_id` / `acknowledged_reasons` はその確認が了解した run と警告
+    # （`undelivered` / `lost_entries` / `silent`）。
+    def acknowledgement_status
+      ack = @source.acknowledgement
+      return {
+        acknowledged_at: ack&.acknowledged_at&.iso8601,
+        acknowledged_run_id: ack&.acknowledged_run_id,
+        acknowledged_reasons: ack&.reasons,
+      }
+    end
 
     # #1433 (統計) と #1470 (サイレント不発) の指標。
     def delivery_status
@@ -165,12 +183,7 @@ module TomatoShrieker
         # なぜその判定なのか。`observation` なら下限（観測開始からの経過）に頼っている
         silence_baseline: @source.silence_baseline&.iso8601,
         silence_baseline_origin: @source.silence_baseline_origin,
-        # #1505: 「なぜ緑なのか」を答えられるようにする。確認済みなら silent は
-        # false だが、それは健全だからではなく運用者が確認したから
-        # ⚠ **キーは `acknowledged_at` (#1567)。**確認はサイレント不発にも未達にも効く (#1506)
-        # ので、`silence_` を付けると「未達がなぜ緑なのか」を探す人が行き当たらない。
-        # ⚠ 内部の名前（`SilenceAck` / `silence_ack` テーブル）は据え置き。
-        acknowledged_at: @source.acknowledged_at&.iso8601,
+        **acknowledgement_status,
         error_rate_24h: SourceRunLog.error_rate(@source.id),
         **threshold_status(logs),
       )

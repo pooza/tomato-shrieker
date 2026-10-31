@@ -7,7 +7,7 @@ module TomatoShrieker
       body = body.clone
       body[:media_ids] ||= []
       if (attachments = body.delete(:attachments))
-        body[:media_ids] = upload_attachments(attachments, source: body[:template]&.source)
+        body[:media_ids] = upload_attachments(attachments, source: body[:template].source)
       end
       body[:template][:tag] = true
       body[:status] = body[:template].to_s.strip

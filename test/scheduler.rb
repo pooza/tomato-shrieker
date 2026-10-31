@@ -398,18 +398,5 @@ module TomatoShrieker
         'dest' => {'hooks' => ["https://example.com/#{ICAL_ID}/hook"]},
       }))
     end
-
-    # ⚠ 元の Method を保存して差し戻す（`Sentry.initialized?` は Sentry 自身の singleton class に
-    # 生えているので、`remove_method` で戻すと本物ごと消える）。
-    def with_sentry_stub(captured)
-      originals = [:initialized?, :capture_exception].to_h {|name| [name, Sentry.method(name)]}
-      Sentry.define_singleton_method(:initialized?) {true}
-      Sentry.define_singleton_method(:capture_exception) do |error, **options|
-        captured.push({error:}.merge(options))
-      end
-      yield
-    ensure
-      originals&.each {|name, method| Sentry.define_singleton_method(name, method)}
-    end
   end
 end

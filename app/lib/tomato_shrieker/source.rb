@@ -13,7 +13,9 @@ module TomatoShrieker
     BASELINE_OBSERVATION = 'observation'.freeze
 
     def initialize(params)
-      @params = params
+      @declared_params = params
+      @source_defaults = SourceDefaults.values_for(self.class, params)
+      @params = @source_defaults.empty? ? params : SourceDefaults.apply(params, @source_defaults)
       @shrieker_mutex = Mutex.new
       @run_mutex = Mutex.new
     end
@@ -23,12 +25,16 @@ module TomatoShrieker
       return @params[name]
     end
 
+    # 既定値から来たキーと値 (#1559)。
+    attr_reader :source_defaults
+
     def to_h
       return {'id' => id, 'class' => self.class.to_s}.merge(@params)
     end
 
     def id
-      @id ||= self['/id'] || Digest::SHA1.hexdigest(@params.to_json)
+      # ⚠ 既定値を変えても id が変わらないように、書かれたままの定義から求める (#1559)。
+      @id ||= self['/id'] || Digest::SHA1.hexdigest(@declared_params.to_json)
       return @id
     end
 
@@ -197,7 +203,9 @@ module TomatoShrieker
     # 🔴 **宛先のオブジェクトは run ごとに作り直す（#1712 の Codex P1）。**スケジューラが持つ
     # ソースのインスタンスは run をまたいで生きるので、メモした宛先も生き続ける。⚠⚠ PieFed は
     # ログインの JWT をメモし（上流の `login` は `return if @jwt`）、期限が切れても捨てないので、
-    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。
+    # **作り直さないと以後の配信がすべて失敗し続ける**（reload か再起動まで）。ログインの失敗も
+    # インスタンスの寿命の間覚えるので（ginseng-piefed 0.6.0・#1752）、一時的な 429 からの回復も
+    # ここに頼っている。
     # ⚠ run の中では共有する（`Parallel.each` のエントリごとにログインしない）。
     def reset_shriekers
       @shrieker_mutex.synchronize do
@@ -434,8 +442,12 @@ module TomatoShrieker
     # 運用者が確認した時刻 (#1505 / #1506)。⚠ 未達・取りこぼし・沈黙の 3 つが読むので、
     # nil も含めて 1 回だけ引く (#1472)。
     def acknowledged_at
-      @acknowledged_at = SilenceAck.acknowledged_at(id) unless defined?(@acknowledged_at)
-      return @acknowledged_at
+      return acknowledgement&.acknowledged_at
+    end
+
+    def acknowledgement
+      @acknowledgement = SilenceAck.where(source_id: id).first unless defined?(@acknowledgement)
+      return @acknowledgement
     end
 
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
@@ -658,6 +670,7 @@ module TomatoShrieker
     # 沈黙を測る起点 (#1505)。配信・確認・観測開始のうち最も新しいもの。
     #
     # ⚠ 確認 (SilenceAck) で起点が前に進むので、運用者が確認すればそのまま緑に戻る。
+    # ⚠ 未達や取りこぼしだけの確認では動かない (#1680)。
     # 配信が再開すれば last_delivered_at が確認を追い越すので、確認記録は自然に
     # 無効化される。特別な失効処理は要らない。
     #
@@ -679,7 +692,7 @@ module TomatoShrieker
     def silence_baseline_entry
       @silence_baseline_entry ||= {
         BASELINE_DELIVERY => run_log_delivered_at,
-        BASELINE_ACKNOWLEDGEMENT => acknowledged_at,
+        BASELINE_ACKNOWLEDGEMENT => acknowledgement&.silence_acknowledged_at,
         BASELINE_OBSERVATION => observed_since,
       }.compact.max_by(&:last) || []
       return @silence_baseline_entry
@@ -816,7 +829,10 @@ module TomatoShrieker
       end
       log_retry('retry scheduled', attempt: next_attempt, times: retry_times, in: retry_interval)
     rescue => e
+      # ⚠ 書き間違い（`times: '2'` など）は、やり直しが要る日に初めてここへ来る。`source reload` は
+      # 起動で倒れる定義だけを拒むので弾かない。ログだけだと気付けない（4.18.0 リリース前レビュー）。
       logger.error(source: id, action: 'retry', error: e)
+      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
     end
 
     def delivered_any?

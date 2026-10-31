@@ -221,22 +221,33 @@ module TomatoShrieker
       cleanup_retry
     end
 
+    # #1745: 書き間違いはやり直しが要る日に初めて分かるので、ログだけにしない。
+    def test_retry_reservation_failure_goes_to_sentry
+      captured = []
+      source = retry_source({'interval' => '*/5 * * * *'}) {raise 'upstream is down'}
+      with_sentry_stub(captured) {source.send(:exec_with_run_log, :cron, '1 0 * * *')}
+
+      # 1 件目は run の失敗そのもの、2 件目がやり直しの予約の失敗。
+      assert_equal(2, captured.size, captured.inspect)
+      assert_equal(0, retry_jobs.size)
+    ensure
+      cleanup_retry
+    end
+
     # 🔴 **#1741 の Codex P2: daemon の中では、定義が変わった・消えたソースのやり直しを捨てる。**
     def test_retry_dropped_when_definition_is_gone
       source = retry_source({}) {nil}
-      scheduler = Scheduler.instance
 
       assert_true(source.send(:current_definition?), 'daemon の外では見ない')
-      scheduler.define_singleton_method(:serving?) {true}
+      serving do
+        assert_false(source.send(:current_definition?))
+        ran = false
+        source.define_singleton_method(:run_with_log) {|*| ran = true}
+        source.send(:exec_retry, 1, Time.now)
 
-      assert_false(source.send(:current_definition?))
-      ran = false
-      source.define_singleton_method(:run_with_log) {|*| ran = true}
-      source.send(:exec_retry, 1, Time.now)
-
-      assert_false(ran)
+        assert_false(ran)
+      end
     ensure
-      scheduler.singleton_class.send(:remove_method, :serving?) if scheduler.singleton_methods.include?(:serving?)
       cleanup_retry
     end
 
@@ -786,6 +797,19 @@ module TomatoShrieker
       assert_false(source.silent?)
     ensure
       SourceRunLog.where(source_id: SILENT_ID).delete
+    end
+
+    # 🔴 #1680: 未達だけの確認（`silence: false`）は沈黙の起点にならない。
+    def test_silence_baseline_ignores_ack_without_silence
+      source = silent_source({'monitor' => {'silence_tolerance' => '1d'}})
+      record_run(at: Time.now - 60)
+      SilenceAck.acknowledge(SILENT_ID, silence: false, reasons: [:undelivered])
+
+      assert_not_nil(source.acknowledged_at)
+      assert_not_equal(Source::BASELINE_ACKNOWLEDGEMENT, source.silence_baseline_origin)
+    ensure
+      SourceRunLog.where(source_id: SILENT_ID).delete
+      SilenceAck.where(source_id: SILENT_ID).delete
     end
 
     # ⚠ 運用者が確認したら判定不能ではなくなる。起点も `acknowledgement` に変わるので、

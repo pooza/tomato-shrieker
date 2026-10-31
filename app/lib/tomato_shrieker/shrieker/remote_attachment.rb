@@ -13,7 +13,7 @@ module TomatoShrieker
   # ＝ #1574）。⚠ 名前解決の一時的な失敗も `Rejected host` で返り、再送されない。
   # ⚠ 投稿先へのアップロードの失敗もここで握る。宛先ごと落ちているなら続く投稿が同じ
   # 理由で落ちるが、**メディアの API だけが通らない形（権限・サイズ上限）は、画像なしの
-  # 投稿が成功として続く**＝監視には出ず、warn `attachment dropped` でしか分からない。
+  # 投稿が成功として続く**＝監視には出ないので、warn `attachment dropped` と Sentry の warning で残す。
   module RemoteAttachment
     def upload_attachments(attachments, source: nil)
       in_threads = Parallel.processor_count * 2
@@ -27,17 +27,24 @@ module TomatoShrieker
 
     # ⚠ **ログに出すのはホストまで。**署名付きの画像 URL はクエリに資格情報を持つ。
     # ⚠ `URI::InvalidURIError` は、リダイレクト先の `Location` が読めない形のとき
-    # （ginseng-core#695。`GatewayError` にならない）。
+    # （ginseng-core#695。`GatewayError` にならない）。`Addressable` のほうは URL そのものが読めないとき。
     def upload_attachment(url, source: nil)
       return upload_remote_resource(url, {response: :id})
-    rescue Ginseng::GatewayError, ::URI::InvalidURIError => e
+    rescue Ginseng::GatewayError, ::URI::InvalidURIError, Addressable::URI::InvalidURIError => e
       logger.warn(
         source: source&.id,
         shrieker: self.class.to_s,
         message: 'attachment dropped',
-        host: Ginseng::URI.parse(url.to_s)&.host,
+        host: attachment_host(url),
         error: dropped_reason(e),
       )
+      Package.capture_warning('attachment dropped', source:, shrieker: self.class)
+      return nil
+    end
+
+    def attachment_host(url)
+      return Ginseng::URI.parse(url.to_s)&.host
+    rescue Addressable::URI::InvalidURIError
       return nil
     end
 
@@ -46,7 +53,9 @@ module TomatoShrieker
     # する**ので、リダイレクト先の署名がそのまま残る（実測）。ほかは `Package.error_message`
     # を通す（docs/CLAUDE.md。クラス名が付き、文字コードとマスクも通る）。
     def dropped_reason(error)
-      return error.class.to_s if error.is_a?(::URI::InvalidURIError)
+      if [::URI::InvalidURIError, Addressable::URI::InvalidURIError].any? {|v| error.is_a?(v)}
+        return error.class.to_s
+      end
       return Package.error_message(error)
     end
   end

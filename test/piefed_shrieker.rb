@@ -72,6 +72,22 @@ module TomatoShrieker
       assert_requested(@stub, times: 1)
     end
 
+    # #1752: ginseng-piefed 0.6.0 はログインの失敗をインスタンスの寿命の間覚える。
+    # 回復は次の run の作り直しに任せている（`Source#reset_shriekers`）。
+    def test_login_failure_lasts_until_the_shrieker_is_recreated
+      stub = stub_request(:post, %r{/user/login}).to_return(
+        {status: 401, body: '{}', headers: {'Content-Type' => 'application/json'}},
+        {status: 200, body: '{"jwt":"dummy"}', headers: {'Content-Type' => 'application/json'}},
+      )
+      shrieker = PiefedShrieker.new(PARAMS)
+      assert_raise(Ginseng::AuthError) {shrieker.login}
+      assert_raise(Ginseng::AuthError) {shrieker.login}
+
+      assert_requested(stub, times: 1)
+      assert_nothing_raised {PiefedShrieker.new(PARAMS).login}
+      assert_requested(stub, times: 2)
+    end
+
     # #1631: `include Package` が無いと `http_class` が gem 既定の `Ginseng::HTTP` に
     # 倒れ、tomato の `/http/retry/limit`・User-Agent・マスクが PieFed 宛にだけ効かない。
     def test_uses_package_http
@@ -223,6 +239,16 @@ module TomatoShrieker
 
       assert_nothing_raised {exec_with(tagged_source)}
       assert_requested(edit, times: 1)
+    end
+
+    # #1687: タグが付かなかったことは warn だけでなく Sentry へも残す。
+    def test_tags_not_attached_goes_to_sentry
+      stub_create
+      stub_edit(422)
+      captured = []
+      with_sentry_stub(captured) {exec_with(tagged_source)}
+
+      assert_equal('tags not attached', captured.first[:message])
     end
 
     # 🔴 **#1679 の Codex P2: 投稿を作った後は、例外の種類を選ばずに握る。**

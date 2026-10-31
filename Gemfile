@@ -10,7 +10,8 @@ gem 'icalendar'
 gem 'icalendar-rrule', github: 'pooza/icalendar-rrule',
   ref: '396a2c3e6b5cf394c2416f39c05e948cccd4ea52'
 gem 'json-schema'
-gem 'nostr'
+# 上流はリレーの TLS 証明書を検証しない（verify_peer: false）ので、検証を戻したフォークを使う (#1740)
+gem 'nostr', github: 'pooza/nostr', tag: 'v0.7.1'
 gem 'optparse'
 gem 'parallel'
 gem 'puma'

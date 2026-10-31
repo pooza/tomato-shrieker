@@ -3,6 +3,7 @@ require 'sequel/model'
 module TomatoShrieker
   class SourceRunLog < Sequel::Model(:source_run_log)
     include SourceRunLogLoss
+    extend SourceRunLogPrune
     include Package
 
     STATUS_SUCCESS = 'success'.freeze
@@ -137,72 +138,6 @@ module TomatoShrieker
       }
     end
 
-    def self.prune(retention_days)
-      cutoff = retention_cutoff(retention_days)
-      count = where(Sequel.lit('executed_at < ?', cutoff))
-        .exclude(id: boundary_run_ids(:min)).exclude(id: boundary_run_ids(:max))
-        .exclude(id: last_delivered_ids).exclude(id: last_attempted_ids).delete
-      redact_expired(cutoff)
-      return count
-    end
-
-    # 🔴 **retention を過ぎても残す保護行から error_message を落とす (#1511)。**
-    #
-    # 保護行は 4 系統に増え、**ソースあたり最大 4 行が retention_days を超えて
-    # 無期限に残る**ようになった。⚠ とくに `last_attempted_ids` が守る行は
-    # 「直近の配信試行」＝ `partial` / `error` で `error_message` を持つ可能性が
-    # 最も高い。`/monitor/retention_days` が担保していた「例外メッセージは
-    # N 日で消える」という上限が、保護行だけ外れていた。
-    #
-    # ⚠ **削除の後に呼ぶこと。** 保護されていない期限切れ行は先に消えているので、
-    # ここで残っている期限切れ行は保護行だけになる。
-    #
-    # ⚠ 判定に使うのは `executed_at` / `attempted_count` / `delivered_count` だけ
-    # なので、`error_message` を落としても保護の意味は失われない。
-    def self.redact_expired(cutoff)
-      return where(Sequel.lit('executed_at < ?', cutoff))
-          .exclude(error_message: nil).update(error_message: nil)
-    end
-
-    # 「最後に配信できた時刻」の根拠行はソースごとに 1 行だけ prune から守る。
-    # 刈ってしまうと沈黙が retention_days を超えた瞬間に last_delivered_at が nil に化け、
-    # 長期の沈黙ほど検知できなくなる (#1470)。
-    def self.last_delivered_ids
-      return boundary_run_ids(:max, where(Sequel.lit('delivered_count > 0')))
-    end
-
-    # ソースごとの**最古行 (`:min`) と最新行 (`:max`)** を prune から守る。
-    #
-    # - `:min` ＝ 「いつから観測しているか」の根拠行 (#1483)。未配信のソースは
-    #   `last_delivered_ids` に引っかからないので、これが無いと `observed_since` が
-    #   常に `retention_days` 前に張り付き、それより長い `silence_tolerance` が
-    #   永久に成立しない。
-    # - 🔴🔴 `:max` ＝ 「直近の run」の根拠行 (#1621 の Codex P2)。⚠⚠ `streak_logs` は
-    #   **先頭行だけ cutoff を免除する**ので、**先頭行が本当に最新の run でなければ
-    #   ならない**。no-op success（新着が無く配信ゼロで完走した run）は他の系統の
-    #   どれにも掛からないため、これが無いと**疎なソースで「最新の成功 run だけ刈られ、
-    #   `:min` が守る古い error が先頭に来る」**＝ **一度直ったソースが永久に赤いまま**になる。
-    #
-    # 🔴 **ソースごとの端の行を、読む側と同じ `executed_at, id` の順で選ぶ (#1635 の Codex P2)。**
-    #
-    # ⚠⚠ **`min(id)` / `max(id)` で選んではいけない。**行は run の**終了時**に insert
-    # されるので、同じ source_id の run が重なると（reload で差し替えた直後・
-    # IcalendarSource の追加ジョブ）**`id` の順と `executed_at`（開始時刻）の順が逆になる**。
-    # 読む側（`recent_for` / `last_attempted` / `observed_since`）は `executed_at` 順なので、
-    # `id` で守ると**最新でない行を守り、本当の根拠行を刈る**。
-    def self.boundary_run_ids(func, dataset = self)
-      order = func == :min ? [:executed_at, :id] : [Sequel.desc(:executed_at), Sequel.desc(:id)]
-      rank = Sequel.function(:row_number).over(partition: :source_id, order:)
-      return dataset.select(:id, rank.as(:edge_rank)).from_self.where(edge_rank: 1).select(:id)
-    end
-
-    # 「直近の配信試行」の根拠行もソースごとに 1 行だけ守る (#1504)。
-    # ⚠ これを刈ると、取りこぼしを検知して赤くなったソースが retention_days の経過だけで
-    # 黙って緑に戻る。**次に配信できたときだけ解除する**という仕様が壊れる。
-    def self.last_attempted_ids
-      return boundary_run_ids(:max, where(Sequel.lit('attempted_count > 0')))
-    end
-
     def self.duration_ms(started_at)
       return ((Time.now - started_at) * 1000).to_i
     end
@@ -222,8 +157,9 @@ module TomatoShrieker
     # ため再送されず (`entry.tooted` 列も migration/004 で削除済み)、永久に失われている。
     # no-op で緑に戻すと、宛先が死んだまま監視だけが健全に見える。
     def self.last_attempted(source_id)
-      return where(source_id:).where(Sequel.lit('attempted_count > 0'))
-          .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+      row = where(source_id:).where(Sequel.lit('attempted_count > 0'))
+        .order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
+      return row
     end
 
     # このソースの run を観測し始めた時刻 (#1483)。
@@ -300,9 +236,9 @@ module TomatoShrieker
 
     # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**
     #
-    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 4 行
+    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 5 行
     # （`boundary_run_ids(:min)` / `boundary_run_ids(:max)` / `last_attempted_ids` /
-    # `last_delivered_ids`）を**無期限に守る**。
+    # `last_delivered_ids` / `last_entry_stage_ids`）を**無期限に守る**。
     # **疎なソース**では retention 内の行が `limit` より少ないので、**守られた古い行が
     # そのまま末尾に並ぶ**。間にあった成功行は prune で消えているので、
     # **「直近のエラー」と「何か月も前の最初の run のエラー」が連続して見え、streak が

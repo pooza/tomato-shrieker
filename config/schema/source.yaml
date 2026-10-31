@@ -56,9 +56,11 @@ properties:
     properties:
       tolerance:
         # 実行遅延の猶予。数値（秒）または Rufus::Scheduler 形式の文字列（例: "10m"）
+        # `null` は種別の既定（/source_defaults）を外す（#1559）
         type:
           - integer
           - string
+          - 'null'
       silence_tolerance:
         # 無配信の許容期間。未指定ならサイレント不発を検知しない（例: "90d"）
         # cron 形式の書き間違いを弾くため、文字列は Rufus の duration 形式に限る
@@ -67,12 +69,15 @@ properties:
             minimum: 1
           - type: string
             pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+          - type: 'null'
       error_streak_threshold:
         # /healthz/source/:id を 503 にする連続エラー回数。未指定なら
         # /monitor/error_streak_threshold へ倒す（#1558）
         # ⚠ 緩められるのはエントリを 1 件も読めていない失敗（取得失敗）だけ。
         # エントリを読んだ後に落ちた失敗は、この値に関わらず 1 回で 503 になる
-        type: integer
+        type:
+          - integer
+          - 'null'
         minimum: 1
   keep:
     type: object
@@ -104,18 +109,24 @@ properties:
             minimum: 1
       retry:
         # 1 件も配信できずに error で終わった run を、あとでやり直す (#1585)。日次のソース向けの opt-in。
-        # 未指定ならやり直さない
-        type: object
-        additionalProperties: false
-        properties:
-          times:
-            # やり直す回数の上限（既定 1）
-            type: integer
-            minimum: 1
-          interval:
-            # 失敗からやり直すまでの間（Rufus の duration 形式。既定 15m）
-            type: string
-            pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+        # 未指定ならやり直さない。`null` は種別の既定（/source_defaults）を外す（#1559）
+        oneOf:
+          - type: 'null'
+          - type: object
+            additionalProperties: false
+            properties:
+              times:
+                # やり直す回数の上限（既定 1）
+                type: integer
+                minimum: 1
+                maximum: 10
+              interval:
+                # 失敗からやり直すまでの間（秒、または Rufus の duration 形式。既定 15m）。0 は書けない
+                oneOf:
+                  - type: integer
+                    minimum: 1
+                  - type: string
+                    pattern: '^(?=.*[1-9])((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
   source:
     type: object
     additionalProperties: false
@@ -276,8 +287,6 @@ properties:
       prefix:
         type: string
       spoiler_text:
-        type: string
-      category:
         type: string
       account:
         type: object

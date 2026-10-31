@@ -60,7 +60,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.18.0
+  version: 4.19.0
 nostr:
   # リレーが `OK`（NIP-20）を返すまで待つ秒数。返らなければそのリレーは失敗 (#1479)。
   publish:

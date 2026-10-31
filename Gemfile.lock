@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: e26796c12b91403bacc0791c03a19d595e22b4b1
+  revision: 4cd1d2d80ad0d9fa2ff97adff6854c988450840e
   branch: main
   specs:
-    ginseng-core (4.2.0)
+    ginseng-core (4.3.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -43,10 +43,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 3e9ad942aac9a454465efbffc989535e196095fb
+  revision: 66e4acbc6f2c43c4f5920052914ec588e2c574d9
   branch: main
   specs:
-    ginseng-piefed (0.4.1)
+    ginseng-piefed (0.6.1)
       ginseng-core (>= 2.0.0)
 
 GIT
@@ -62,10 +62,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: a9f5e5186565c0be25a4f9b69e4e3eeb1453d915
+  revision: 07f38385d13f134568233849553e13801e52fc7c
   branch: main
   specs:
-    ginseng-youtube (3.0.2)
+    ginseng-youtube (3.0.3)
 
 GIT
   remote: https://github.com/pooza/icalendar-rrule.git
@@ -76,6 +76,19 @@ GIT
       activesupport (>= 5.1)
       icalendar (>= 2.4)
       ice_cube (>= 0.16)
+
+GIT
+  remote: https://github.com/pooza/nostr.git
+  revision: 16d4daa86f8a392e5c810968d3e176b484e8ff3b
+  tag: v0.7.1
+  specs:
+    nostr (0.7.1)
+      bech32 (~> 1.4)
+      bip-schnorr (~> 0.7)
+      ecdsa (~> 1.2)
+      event_emitter (~> 0.2)
+      faye-websocket (~> 0.11)
+      json (~> 2.7)
 
 GEM
   remote: https://rubygems.org/
@@ -93,7 +106,7 @@ GEM
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
-    addressable (2.9.0)
+    addressable (2.9.1)
       public_suffix (>= 2.0.2, < 8.0)
     ast (2.4.3)
     base64 (0.3.0)
@@ -109,7 +122,7 @@ GEM
       bigdecimal
       rexml
     crass (1.0.8)
-    csv (3.3.6)
+    csv (3.3.7)
     date (3.5.1)
     drb (2.2.3)
     ecdsa (1.2.0)
@@ -200,13 +213,6 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.4-x86_64-linux-musl)
       racc (~> 1.4)
-    nostr (0.7.0)
-      bech32 (~> 1.4)
-      bip-schnorr (~> 0.7)
-      ecdsa (~> 1.2)
-      event_emitter (~> 0.2)
-      faye-websocket (~> 0.11)
-      json (~> 2.7)
     optparse (0.8.1)
     ostruct (0.6.3)
     parallel (2.1.0)
@@ -326,7 +332,7 @@ DEPENDENCIES
   icalendar
   icalendar-rrule!
   json-schema
-  nostr
+  nostr!
   optparse
   parallel
   puma
@@ -344,4 +350,4 @@ RUBY VERSION
   ruby 4.0.6
 
 BUNDLED WITH
-  4.0.17
+  4.0.20

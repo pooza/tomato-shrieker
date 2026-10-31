@@ -71,6 +71,28 @@ dest:
 - ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る
 - ⚠ 終日の予定に `DTEND` を書くなら注意。iCalendar の規格では終了日は「翌日」だが、1 日戻すのは Google カレンダーのとき（`/source/google`）だけ。書かなければ開始日と同じ日になる
 
+## 種別ごとの既定値（`/source_defaults`・#1559）
+
+**同じ種別のソースに同じ方針を書くなら、`config/local.yaml` の 1 か所に置ける。**ファイルごとに複製すると、ファイルを消したときに方針も消えるため。
+
+```yaml
+source_defaults:
+  YouTubeChannelSource:
+    monitor:
+      error_streak_threshold: 28
+  GitHubRepositorySource:
+    monitor:
+      tolerance: 10m
+```
+
+- **規則は「個別の定義にキーがあれば定義、無ければ既定」だけ。**キーごとに決まる（`/schedule/retry/times` だけ定義に書けば、`/schedule/retry/interval` は既定から来る）
+- 書けるのは `/monitor/tolerance`・`/monitor/silence_tolerance`・`/monitor/error_streak_threshold`・`/schedule/retry/times`・`/schedule/retry/interval` だけ。⚠ `retry: {}` は既定にならない（`times` か `interval` を書く）。⚠ スケジュールや宛先は個別に書く
+- 効くのは**完全に同じクラス**だけ（`FeedSource` に書いても `YouTubeChannelSource` には効かない）
+- 定義に `null` を書くと、そのソースだけ既定を外せる（`monitor: {silence_tolerance: null}`・`schedule: {retry: null}`）
+- 📌 **どのキーが既定から来たかは `/status.json` の `source_defaults` に出る。**「なぜこのソースはこの間隔なのか」はここで答える
+- ⚠ `config/local.yaml` なので、変えたら再起動する（`source reload` は読み直さない）。⚠ 既定の変更は `digest` も変えるので、`pending_sources.sh` には該当の全ソースが `~` で出る
+- ⚠ `source validate` の WARN（しきい値への到達性など）は定義に書かれた値だけを見る
+
 ## URL の検証（`source validate`・#1461）
 
 スキーマの `format: uri`（`/source/feed`・`/source/url`・`/source/calendar`・`/source/ical`・`/source/news/url`・`/dest/hooks` など）は、**絶対 URI（スキーム必須）**を要求する。`example.com/feed` や空文字は NG。
@@ -90,9 +112,7 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 
 ## 実装に無いキー（FeedSource）
 
-⚠ 以前ここにあった `/dest/multi_entries` / `/dest/limit` / `/source/title/unique` は実装に無い（書くと `source validate` が NG にする）。
-
-⚠ **`/dest/category` は書けるが、絞り込みには使われていない。**読むのは `FeedSource#category` だけで、`bin/shrieker source fetch` のサマリーに値がそのまま出る。エントリを絞るなら `/source/keyword` / `/source/negative_keyword` を使う。
+⚠ 以前ここにあった `/dest/multi_entries` / `/dest/limit` / `/dest/category` / `/source/title/unique` は実装に無い（書くと `source validate` が NG にする）。エントリを絞るなら `/source/keyword` / `/source/negative_keyword` を使う。
 
 ## Shrieker 設定項目
 
@@ -191,7 +211,7 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 - ⚠ **v4.13.0 より前は既定値が無く、`local.yaml` に書いていない環境では CommandSource に触れた時点で `ConfigError` になっていた (#1614)**
 - 🔴 **コマンドには締切がある (#1703)。**`/source/timeout`（IcalendarSource は `/source/ical/timeout`）に秒か Rufus の duration（`10m` など）で書く。未指定なら `/command/timeout/seconds`（既定 600 秒。本番の最長は約 100 秒・2026-10-25 実測）。`0` は締切なし
   - 締切が来たら子のプロセスグループへ TERM → 2 秒の猶予 → KILL（ginseng-core#684）。その run は `Timeout::Error` の取得段の失敗になる
-  - ⚠ 4.17 までは締切が無く、戻らないコマンドはそのソースの以後の実行を塞いでいた（`overlap: false` なので発火はスキップされ続け、IcalendarSource のリマインドもコマンドの直列化で待たされる）
+  - ⚠ 4.17.x までは締切が無く、戻らないコマンドはそのソースの以後の実行を塞いでいた（`overlap: false` なので発火はスキップされ続け、IcalendarSource のリマインドもコマンドの直列化で待たされる）
   - ⚠ `sudo` で別のユーザーへ降りた子・`setsid` でグループを抜けた子孫は止められない。締切で戻りはするが、相手は動き続ける
 
 ## 暗号化
@@ -217,14 +237,15 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 schedule:
   cron: '1 0 * * *'
   retry:
-    times: 2        # やり直す回数の上限（既定 1）
-    interval: 15m   # 失敗からやり直すまでの間（既定 15m）
+    times: 2        # やり直す回数の上限（既定 1・10 まで）
+    interval: 15m   # 失敗からやり直すまでの間（秒か duration 形式・既定 15m）
 ```
 
 - `retry: {}` と書けば既定のまま有効になる。書かなければやり直さない
 - 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。やり直すのは「取得で落ちた」「宛先が全部落ちた」run だけ
 - ⚠ **FeedSource 系（GoogleNews・YouTube・GitHub を含む）は「取得で落ちた」run だけ。**投稿の前にエントリを記録するので、宛先が全部落ちた run をやり直しても、記録済みとして飛ばして何も投稿しない（#1741 の Codex P2）。CommandSource・IcalendarSource は毎回出力し直すので、宛先が全部落ちた run もやり直す
 - やり直しの run も `source_run_log` に 1 行ずつ残る。落ちた事実は消えず、成功すれば `error_streak` が切れる。⚠ やり直しを待つ間は、`error_streak_threshold` に達していれば healthz は 503
+- ⚠ やり直しの行も `error_streak`・`error_rate_24h` に数える。1 日ぶんが丸ごと落ちると streak は 1 + `times` 進むので、しきい値を緩めたソース（YouTube の 28）に足すと効き方が変わる
 - やり直しは一度きりのジョブ（同じ tag）。定義を変えた `source reload` や再起動で、本体のジョブと一緒に外れる（待っていたやり直しは走らない）
 - ⚠ HTTP の再送（`/http/retry/limit`）を使い切った後の話。間隔は取得先が立ち直るのを待つ長さにする
 - IcalendarSource のリマインド（`/schedule/remind`）はやり直さない
