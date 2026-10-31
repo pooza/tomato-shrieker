@@ -20,6 +20,8 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 - ステージングの dev25 / dev27 に ssh できること（`test-mastodon` / `test-misskey` / `test-webhook` の宛先を取ってくる・#1481）
 - PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82) に投稿可能なアカウント情報。疎通を確認したアカウントはメモリにある（`user_id` にメールアドレスをそのまま書ける）。⚠ **パスワードはリポジトリにも本番にも無い。**`config/sources/test-google-news-piefed.yaml` はローカルにしか存在せず（`config/sources/.gitignore` が `*`）、本番の `config/local.yaml` にも piefed の項目は無い
 
+- ⚠ **手元に `config/local.yaml` は無い**（`.gitignore`）。`bin/shrieker` と daemon は無くても動くが、`rake config:lint` は `crypt.password` で NG になる。🔴 **`config/local.yaml` に書く設定を足した版は、実物を置いて確かめる**（4.19.0 の `/source_defaults` は、テストは緑なのに実物では効いていなかった）。終わったら消す
+
 ## テスト用ソースの配置
 
 `config/sources/` は `.gitignore` で `*` 除外されているため、テスト用 YAML は commit されない。手元にだけ配置する。
@@ -72,6 +74,8 @@ bundle exec bin/shrieker source list
 ```sh
 .claude/skills/release-validation/scripts/fetch_all.sh
 ```
+
+⚠ YouTube の 2 本は毎日の 404 の窓（昼前後）に当たると `Invalid feed` で落ちる。`failed to load command` と出ても追随の不具合と読まず、時間を置いて取り直す。
 
 各ソースで `entries:` が取得できていればパス。`test-google-news-cleaner` / `test-google-news-piefed` の entry URL が Google News のリダイレクト URL ではなく実 publisher URL になっていれば cleaner 連携も動いている。
 
@@ -140,7 +144,7 @@ for id in test-mastodon test-misskey test-webhook; do bundle exec bin/shrieker s
 
 ⚠ **投稿先で実視認するなら FeedSource を使う。**`test-youtube-channel` の定義に PieFed の `dest` と `keyword` を足した一時ソースを作ると、ハッシュタグを含むエントリだけを 1 件投稿できる。⚠ **一時ソースには PieFed のパスワードが入るので、確認したら消すこと。**
 
-⚠ **PieFed のタグは投稿ページで見る (#1673)。**作成のあとに編集でタグを付けるので、投稿ページにタグのリンク（`/tag/<名前>`）が出ること、本文に `#tag` の文字が残っていないことを確かめる。`GET /api/alpha/post?id=<id>` の `post_view.post.tags` でも読める。⚠ ログに warn `tags not attached` が出ていたら付いていない。
+⚠ **PieFed のタグは投稿ページで見る (#1673)。**作成のあとに編集でタグを付けるので、投稿ページにタグのリンク（`/tag/<名前>`）が出ること、本文に `#tag` の文字が残っていないことを確かめる。`GET /api/alpha/post?id=<id>` の `post_view.post.tags` でも読める。⚠ **配列ではなくカンマ区切りの文字列**（`.tags[]` で読むと空に見える）。⚠ ログに warn `tags not attached` が出ていたら付いていない。
 
 ### 6. PieFed 認証単独テスト（Shriek 失敗時の切り分け用）
 

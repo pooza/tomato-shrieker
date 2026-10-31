@@ -50,7 +50,7 @@ source:
       - bin/anniv.rb
       - --ics
       - numbering_title
-    dir: /home/deploy/repos/dqdai-anniv
+    dir: /path/to/dqdai-anniv
     # env:              # 資格情報はここへ（値はログと例外メッセージから伏せる）
     # timeout: 10m      # 締切（既定 600 秒・下記）
   days: 3

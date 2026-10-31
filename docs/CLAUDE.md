@@ -9,6 +9,7 @@
 | [daemon.md](daemon.md) | 🔴 **daemon の起動・停止・`source reload` / `bin/shrieker` を叩くとき、本番を操作するとき** |
 | [sync スキル](../.claude/skills/sync/SKILL.md) | 🔴 **「進捗を同期してください」と言われたとき**（#1577 で `docs/sync.md` から移した。同梱スクリプトは `scripts/`） |
 | [release](../.claude/skills/release/SKILL.md) / [release-review](../.claude/skills/release-review/SKILL.md) / [release-validation](../.claude/skills/release-validation/SKILL.md) / [deploy](../.claude/skills/deploy/SKILL.md) スキル | 🔴 **リリースするとき・本番へデプロイするとき**（#1577 で移した。明示呼び出しのみ） |
+| [doc-maintenance スキル](../.claude/skills/doc-maintenance/SKILL.md) | **docs・スキル・メモリ・Wiki を棚卸しするとき**（不定期。明示呼び出しのみ） |
 
 ⚠ **迷ったら `grep -rn <語> docs/ .claude/skills/` でまとめて引く。**
 
@@ -140,7 +141,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 ## 設定構造
 
 - `config/application.yaml` — デフォルト設定
-- `config/local.yaml` — ローカル上書き（git 管理外）
+- `config/local.yaml` — ローカル上書き（git 管理外）。ソース種別ごとの既定値（`/source_defaults`）もここに書く（[sources.md](sources.md)）
 - `config/sources/*.yaml` — ソース定義（動的読み込み）。⚠ **git 管理外**（運用ホスト上の実物・資格情報が入る）
 - `test/sources/*.yaml` — **テスト専用のソース定義**。⚠ **`Environment.test?` の間だけ読む (#1593)**
 - `config/schema/base.yaml` — JSON Schema によるバリデーション
@@ -181,6 +182,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 - **`Sentry.initialized?` は Sentry 自身の singleton class に生えている。**`remove_method` で戻すと本物ごと消えるので、元の `Method` を保存して差し戻す
 - **`stub_request(...).to_return(body: <組み立て>)` は、本文の組み立てで例外が出ると、応答を定義していない stub だけが残って空の 200 を返す。**本文を先に組んでから登録する
 - **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（5 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
+- 🔴 **設定のテストはキーを手で書かず、`config/local.yaml` と同じ形から `key_flatten` を通す（4.19.0）。**`Config` はキーを小文字にして持つ。`config['/source_defaults/TextSource/...'] = v` と入れると、実物では 1 度も当たらないコードが緑になった
 - **tomato に Timecop は無い。**時刻を差し替えるなら `Time.now` を stub する。⚠ `Time#utc` は破壊的なので、同じ `Time` を返すと途中で UTC に変わる（`{fake.dup}` で返す）
 
 ### Schema 設計の指針 (required の意味論)
