@@ -60,13 +60,6 @@ module TomatoShrieker
         logs = where(source_id:, entry_stage: true)
         return logs.order(Sequel.desc(:executed_at), Sequel.desc(:id)).first
       end
-
-      # 上の根拠行もソースごとに 1 行だけ守る (#1687)。
-      # ⚠ これを刈ると、新着 1 件だけが落ちた run（配信の試行が 0 なので `last_attempted_ids` に
-      # 掛からない）の取りこぼしが、確認しないまま保持期間の経過だけで緑に戻る。
-      def last_entry_stage_ids
-        return boundary_run_ids(:max, where(entry_stage: true))
-      end
     end
   end
 end
