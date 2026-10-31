@@ -73,7 +73,7 @@ dest:
 
 ## 種別ごとの既定値（`/source_defaults`・#1559）
 
-**同じ種別のソースに同じ方針を書くなら、`local.yaml` の 1 か所に置ける。**ファイルごとに複製すると、ファイルを消したときに方針も消えるため。
+**同じ種別のソースに同じ方針を書くなら、`config/local.yaml` の 1 か所に置ける。**ファイルごとに複製すると、ファイルを消したときに方針も消えるため。
 
 ```yaml
 source_defaults:
@@ -85,12 +85,12 @@ source_defaults:
       tolerance: 10m
 ```
 
-- **規則は「個別の定義にキーがあれば定義、無ければ既定」だけ。**キーごとに決まる（`retry.times` だけ定義に書けば、`retry.interval` は既定から来る）
-- 書けるのは `monitor.tolerance`・`monitor.silence_tolerance`・`monitor.error_streak_threshold`・`schedule.retry.times`・`schedule.retry.interval` だけ。⚠ スケジュールや宛先は個別に書く
+- **規則は「個別の定義にキーがあれば定義、無ければ既定」だけ。**キーごとに決まる（`/schedule/retry/times` だけ定義に書けば、`/schedule/retry/interval` は既定から来る）
+- 書けるのは `/monitor/tolerance`・`/monitor/silence_tolerance`・`/monitor/error_streak_threshold`・`/schedule/retry/times`・`/schedule/retry/interval` だけ。⚠ `retry: {}` は既定にならない（`times` か `interval` を書く）。⚠ スケジュールや宛先は個別に書く
 - 効くのは**完全に同じクラス**だけ（`FeedSource` に書いても `YouTubeChannelSource` には効かない）
 - 定義に `null` を書くと、そのソースだけ既定を外せる（`monitor: {silence_tolerance: null}`・`schedule: {retry: null}`）
 - 📌 **どのキーが既定から来たかは `/status.json` の `source_defaults` に出る。**「なぜこのソースはこの間隔なのか」はここで答える
-- ⚠ `local.yaml` なので、変えたら再起動する（`source reload` は読み直さない）。⚠ 既定の変更は `digest` も変えるので、`pending_sources.sh` には該当の全ソースが `~` で出る
+- ⚠ `config/local.yaml` なので、変えたら再起動する（`source reload` は読み直さない）。⚠ 既定の変更は `digest` も変えるので、`pending_sources.sh` には該当の全ソースが `~` で出る
 - ⚠ `source validate` の WARN（しきい値への到達性など）は定義に書かれた値だけを見る
 
 ## URL の検証（`source validate`・#1461）

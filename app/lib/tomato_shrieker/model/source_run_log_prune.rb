@@ -22,7 +22,8 @@ module TomatoShrieker
     # ⚠ **削除の後に呼ぶこと。** 保護されていない期限切れ行は先に消えているので、
     # ここで残っている期限切れ行は保護行だけになる。
     #
-    # ⚠ 判定に使うのは `executed_at` / `attempted_count` / `delivered_count` だけ
+    # ⚠ 判定に使うのは `executed_at` / `attempted_count` / `delivered_count` / `entry_stage` /
+    # `shrieker_errors` だけ
     # なので、`error_message` を落としても保護の意味は失われない。
     def redact_expired(cutoff)
       expired = where(Sequel.lit('executed_at < ?', cutoff)).exclude(error_message: nil)

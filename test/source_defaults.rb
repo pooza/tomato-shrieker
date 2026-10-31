@@ -1,19 +1,32 @@
 module TomatoShrieker
   # #1559: ソース種別ごとの既定値。
   class SourceDefaultsTest < TestCase
-    PATHS = {
-      '/source_defaults/TextSource/monitor/error_streak_threshold' => 28,
-      '/source_defaults/TextSource/monitor/silence_tolerance' => '30d',
-      '/source_defaults/TextSource/schedule/retry/times' => 2,
-      '/source_defaults/TextSource/schedule/retry/interval' => '10m',
+    # ⚠ `config/local.yaml` と同じ形から `key_flatten` を通す（`Config` の読み込みと同じ）。キーを
+    # 手で書くと、小文字になることを素通りして、実物では効かないのに緑になる（4.19.0 リリース前レビュー）。
+    DEFAULTS = {
+      'source_defaults' => {
+        'TextSource' => {
+          'monitor' => {'error_streak_threshold' => 28, 'silence_tolerance' => '30d'},
+          'schedule' => {'retry' => {'times' => 2, 'interval' => '10m'}},
+        },
+      },
     }.freeze
 
     def setup
-      PATHS.each {|path, value| config[path] = value}
+      flat_defaults.each {|path, value| config[path] = value}
     end
 
     def teardown
-      PATHS.each_key {|path| config.delete(path)}
+      clear_defaults
+      super
+    end
+
+    def flat_defaults
+      return DEFAULTS.key_flatten
+    end
+
+    def clear_defaults
+      flat_defaults.each_key {|path| config.delete(path)}
     end
 
     def text_source(extra = {})
@@ -33,7 +46,7 @@ module TomatoShrieker
       assert_equal(30 * 86_400, source.monitor_silence_tolerance_seconds)
     end
 
-    # 🔴 定義にあるキーは定義が勝ち、無いキーだけが既定から来る。
+    # 定義にあるキーは定義が勝ち、無いキーだけが既定から来る。
     def test_declared_key_wins_per_key
       source = text_source('monitor' => {'error_streak_threshold' => 3}, 'schedule' => {'retry' => {'times' => 5}})
 
@@ -55,12 +68,27 @@ module TomatoShrieker
 
     # ⚠ 継承しない（規則を単純に保つ）。
     def test_applies_only_to_the_exact_class
-      config['/source_defaults/FeedSource/monitor/error_streak_threshold'] = 99
+      config['/source_defaults/feedsource/monitor/error_streak_threshold'] = 99
       source = YouTubeChannelSource.new({'id' => 'x', 'source' => {'youtube' => {'channel' => {'id' => 'y'}}}})
 
       assert_empty(source.source_defaults)
     ensure
-      config.delete('/source_defaults/FeedSource/monitor/error_streak_threshold')
+      config.delete('/source_defaults/feedsource/monitor/error_streak_threshold')
+    end
+
+    # ⚠ 空の値（`tolerance:`）で `Source.new` を倒さない。全ソースが止まる。
+    def test_empty_default_is_ignored
+      config['/source_defaults/textsource/monitor/tolerance'] = nil
+
+      assert_false(text_source.source_defaults.key?('monitor/tolerance'))
+    ensure
+      config.delete('/source_defaults/textsource/monitor/tolerance')
+    end
+
+    # ⚠ スキーマ違反の定義でも `Source.new` を倒さず、無効のつもりを有効に反転させない。
+    def test_non_hash_parent_is_left_alone
+      assert_nothing_raised {text_source('schedule' => '5m', 'monitor' => 'x')}
+      assert_equal(0, text_source('schedule' => {'retry' => false}).send(:retry_times))
     end
 
     # ⚠ 元の定義は `/sources` の実物なので書き換えない。
@@ -72,20 +100,20 @@ module TomatoShrieker
       assert_false(params.key?('monitor'))
     end
 
-    # 🔴 id の無い定義の id は定義の SHA1。既定値を変えても id（＝ Entry の feed）を変えない。
+    # id の無い定義の id は定義の SHA1。既定値を変えても id（＝ Entry の feed）を変えない。
     def test_id_ignores_defaults
       params = {'source' => {'text' => 'body'}}
       with_defaults = TextSource.new(params).id
-      teardown
+      clear_defaults
       without_defaults = TextSource.new(params).id
 
       assert_equal(without_defaults, with_defaults)
     end
 
-    # 🔴 既定値の変更は digest に出す（再起動で定義が変わることを `pending_sources.sh` で見られる）。
+    # 既定値の変更は digest に出す（再起動で定義が変わることを `pending_sources.sh` で見られる）。
     def test_digest_follows_defaults
       with_defaults = Scheduler.digest([text_source])
-      teardown
+      clear_defaults
       without_defaults = Scheduler.digest([text_source])
 
       assert_not_equal(without_defaults, with_defaults)
@@ -117,6 +145,7 @@ module TomatoShrieker
       assert_not_empty(schema_errors('TextSauce' => {}))
       assert_not_empty(schema_errors('TextSource' => {'schedule' => {'cron' => '1 0 * * *'}}))
       assert_not_empty(schema_errors('TextSource' => {'monitor' => {'silence_tolerance' => '*/5 * * * *'}}))
+      assert_not_empty(schema_errors('TextSource' => {'monitor' => {'tolerance' => 'abc'}}))
     end
 
     def base_schema

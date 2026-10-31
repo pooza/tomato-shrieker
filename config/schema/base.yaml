@@ -18,9 +18,11 @@ definitions:
         additionalProperties: false
         properties:
           tolerance:
-            type:
-              - integer
-              - string
+            oneOf:
+              - type: integer
+                minimum: 1
+              - type: string
+                pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
           silence_tolerance:
             oneOf:
               - type: integer
