@@ -14,7 +14,7 @@ module TomatoShrieker
       'IcalendarSource' => 'calendar.ics',
     }.freeze
     DEFAULT_FEED_FIXTURE = 'feed.rss'.freeze
-    SENTRY_STUBBED = [:initialized?, :capture_exception].freeze
+    SENTRY_STUBBED = [:initialized?, :capture_exception, :capture_message].freeze
 
     # daemon の中（scheduler が待ち受けに入った後）を装う (#1686)。⚠ Singleton の特異メソッドに
     # 生やすので、必ず消して戻す（本物はクラスにあるので消えない）。
@@ -37,6 +37,9 @@ module TomatoShrieker
       Sentry.define_singleton_method(:initialized?) {true}
       Sentry.define_singleton_method(:capture_exception) do |error, **options|
         captured.push({error:}.merge(options))
+      end
+      Sentry.define_singleton_method(:capture_message) do |message, **options|
+        captured.push({message:}.merge(options))
       end
       yield
     ensure

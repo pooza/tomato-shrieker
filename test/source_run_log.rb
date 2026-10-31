@@ -291,6 +291,24 @@ module TomatoShrieker
 
     # #1470: retention_days を超えて沈黙しても、根拠行が残って検知が続く。
     # 刈ってしまうと沈黙が長引くほど検知できなくなる。
+    # #1687: 新着 1 件だけが落ちた run（配信の試行が 0）の根拠行を、保持期間の経過で刈らない。
+    def test_prune_keeps_last_entry_stage_row
+      [
+        [30, nil], # 最古行
+        [20, true], # 直近のエントリ処理段（検証対象）
+        [18, nil], # 最新行
+      ].each do |days, entry_stage|
+        SourceRunLog.create(
+          source_id: SOURCE_ID, executed_at: Time.now - (days * 86_400),
+          status: SourceRunLog::STATUS_SUCCESS, duration_ms: 10,
+          attempted_count: 0, delivered_count: 0, entry_stage:
+        )
+      end
+      SourceRunLog.prune(14)
+
+      assert_not_nil(SourceRunLog.last_entry_stage(SOURCE_ID))
+    end
+
     def test_prune_keeps_last_delivered_row
       # ⚠ 根拠行を**他の保護と兼ねさせない**。兼ねると、この保護を外しても別の系統が
       # 守ってしまい、テストが空振りする。最古行 (`:min`)・直近の試行

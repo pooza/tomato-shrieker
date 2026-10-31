@@ -51,7 +51,6 @@ module TomatoShrieker
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
-    # 確認するものが無ければ記録しない
     # #1574: エントリの取りこぼしも `ack` で確認でき、どちらに効いたかを言う。
     def test_ack_reports_lost_entries
       said = ack_with(stub_source(nil, lost: true))
@@ -71,6 +70,7 @@ module TomatoShrieker
       SilenceAck.where(source_id: ACK_ID).delete
     end
 
+    # 確認するものが無ければ記録しない
     def test_ack_refuses_when_nothing_to_acknowledge
       said = ack_with(stub_source(nil, undelivered: false))
 
