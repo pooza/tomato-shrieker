@@ -186,6 +186,7 @@ bin/shrieker source ack ID
       "class": "TomatoShrieker::FeedSource",
       "schedule": {"type": "every", "value": "5m"},
       "grace_seconds": 7200,
+      "source_defaults": {},
       "last_run_at": "2026-04-14T14:00:00+09:00",
       "first_run_deadline": null,
       "next_run_at": "2026-04-14T14:05:00+09:00",

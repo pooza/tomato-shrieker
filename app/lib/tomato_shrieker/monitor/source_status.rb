@@ -118,6 +118,8 @@ module TomatoShrieker
         class: @source.class.to_s,
         schedule: @source.schedule_spec,
         grace_seconds: @source.monitor_grace_seconds,
+        # #1559: 種別の既定（/source_defaults）から来たキーと値。ここに無いものは定義に書いてある。
+        source_defaults: @source.source_defaults,
         last_run_at: latest&.executed_at&.iso8601,
         # #1560: 一度も走っていないソースが、いつまで緑でいられるか。走ったら null。
         first_run_deadline: (@source.first_run_deadline&.iso8601 if @source.monitored? && !latest),

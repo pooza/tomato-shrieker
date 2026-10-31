@@ -71,6 +71,28 @@ dest:
 - ⚠ コマンドは「今日のぶん」ではなく**先の予定まで**返すこと（`days` 日前から拾うため）。年をまたぐので、来年のぶんも要る
 - ⚠ 終日の予定に `DTEND` を書くなら注意。iCalendar の規格では終了日は「翌日」だが、1 日戻すのは Google カレンダーのとき（`/source/google`）だけ。書かなければ開始日と同じ日になる
 
+## 種別ごとの既定値（`/source_defaults`・#1559）
+
+**同じ種別のソースに同じ方針を書くなら、`local.yaml` の 1 か所に置ける。**ファイルごとに複製すると、ファイルを消したときに方針も消えるため。
+
+```yaml
+source_defaults:
+  YouTubeChannelSource:
+    monitor:
+      error_streak_threshold: 28
+  GitHubRepositorySource:
+    monitor:
+      tolerance: 10m
+```
+
+- **規則は「個別の定義にキーがあれば定義、無ければ既定」だけ。**キーごとに決まる（`retry.times` だけ定義に書けば、`retry.interval` は既定から来る）
+- 書けるのは `monitor.tolerance`・`monitor.silence_tolerance`・`monitor.error_streak_threshold`・`schedule.retry.times`・`schedule.retry.interval` だけ。⚠ スケジュールや宛先は個別に書く
+- 効くのは**完全に同じクラス**だけ（`FeedSource` に書いても `YouTubeChannelSource` には効かない）
+- 定義に `null` を書くと、そのソースだけ既定を外せる（`monitor: {silence_tolerance: null}`・`schedule: {retry: null}`）
+- 📌 **どのキーが既定から来たかは `/status.json` の `source_defaults` に出る。**「なぜこのソースはこの間隔なのか」はここで答える
+- ⚠ `local.yaml` なので、変えたら再起動する（`source reload` は読み直さない）。⚠ 既定の変更は `digest` も変えるので、`pending_sources.sh` には該当の全ソースが `~` で出る
+- ⚠ `source validate` の WARN（しきい値への到達性など）は定義に書かれた値だけを見る
+
 ## URL の検証（`source validate`・#1461）
 
 スキーマの `format: uri`（`/source/feed`・`/source/url`・`/source/calendar`・`/source/ical`・`/source/news/url`・`/dest/hooks` など）は、**絶対 URI（スキーム必須）**を要求する。`example.com/feed` や空文字は NG。
