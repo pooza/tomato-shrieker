@@ -76,7 +76,7 @@ module TomatoShrieker
     # 🔴 **#1608: prune が守る古い行をまたいで数えない。**
     #
     # ⚠⚠ `prune` はソースごとに `boundary_run_ids(:min)` / `boundary_run_ids(:max)` /
-    # `last_attempted_ids` / `last_delivered_ids` の 4 行を**無期限に守る**。**疎なソース**では retention 内の
+    # `last_attempted_ids` / `last_delivered_ids` / `last_entry_stage_ids` の 5 行を**無期限に守る**。**疎なソース**では retention 内の
     # 行が `limit` より少ないので、**守られた古い行がそのまま末尾に並ぶ**。間にあった
     # 成功行は消えているので、**何か月も前の最初の run のエラーが直近のエラーと
     # 地続きに見え、streak が水増しされる**＝ 実際には連続していない失敗で
@@ -289,8 +289,6 @@ module TomatoShrieker
       assert_equal(0, SourceRunLog.error_streak(SOURCE_ID))
     end
 
-    # #1470: retention_days を超えて沈黙しても、根拠行が残って検知が続く。
-    # 刈ってしまうと沈黙が長引くほど検知できなくなる。
     # #1687: 新着 1 件だけが落ちた run（配信の試行が 0）の根拠行を、保持期間の経過で刈らない。
     def test_prune_keeps_last_entry_stage_row
       [
@@ -309,6 +307,8 @@ module TomatoShrieker
       assert_not_nil(SourceRunLog.last_entry_stage(SOURCE_ID))
     end
 
+    # #1470: retention_days を超えて沈黙しても、根拠行が残って検知が続く。
+    # 刈ってしまうと沈黙が長引くほど検知できなくなる。
     def test_prune_keeps_last_delivered_row
       # ⚠ 根拠行を**他の保護と兼ねさせない**。兼ねると、この保護を外しても別の系統が
       # 守ってしまい、テストが空振りする。最古行 (`:min`)・直近の試行

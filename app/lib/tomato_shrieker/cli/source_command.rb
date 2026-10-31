@@ -124,7 +124,7 @@ module TomatoShrieker
       set_disable(id, false)
     end
 
-    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達）'
+    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達 / 取りこぼし）'
     # 🔴 **出力は実際に効いた範囲だけを言う (#1506)。**
     #
     # ⚠ 以前は `SilenceAck` を書くだけで **`undelivered` には一切効かない**のに、

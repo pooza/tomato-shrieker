@@ -26,8 +26,11 @@ module TomatoShrieker
     # 確認した ack で動かすと、沈黙の警告がそのぶん後ろ倒しになる。⚠ 動かさないときは前の値を
     # 残す（消すと、前に確認した沈黙がまた赤くなる）。
     def self.acknowledge(source_id, at: Time.now, silence: true, run_id: nil, reasons: [])
-      values = {acknowledged_at: at, acknowledged_run_id: run_id,
-                acknowledged_reasons: reasons.join(',')}
+      values = {
+        acknowledged_at: at,
+        acknowledged_run_id: run_id,
+        acknowledged_reasons: reasons.join(','),
+      }
       values[:silence_acknowledged_at] = at if silence
       row = where(source_id:).first
       return row.update(values) if row

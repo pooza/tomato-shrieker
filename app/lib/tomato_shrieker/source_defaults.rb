@@ -1,7 +1,7 @@
 module TomatoShrieker
-  # ソース種別ごとの既定値 (#1559)。`local.yaml` の `/source_defaults/<クラス名>/...` に書く。
+  # ソース種別ごとの既定値 (#1559)。`config/local.yaml` の `/source_defaults/<クラス名>/...` に書く。
   #
-  # 🔴 **解決の規則は「個別の定義にキーがあれば定義、無ければ既定」だけ。**⚠ 仕様を単純に保つ。
+  # **解決の規則は「個別の定義にキーがあれば定義、無ければ既定」だけ。**⚠ 仕様を単純に保つ。
   # - 効くのは完全に同じクラスだけ（継承しない）
   # - 書けるのは `KEYS` だけ。スケジュールや宛先は個別に書く
   # - 定義に `null` を書けば、そのソースだけ既定を外せる（`retry: null` なら `retry` の下のキーも）
@@ -19,10 +19,12 @@ module TomatoShrieker
     # このソースに効く既定値を `{'monitor/tolerance' => '10m'}` の形で返す。
     def self.values_for(source_class, params)
       config = Config.instance
-      name = source_class.to_s.split('::').last
+      # ⚠ `Config` はキーを小文字にして持つ（ginseng-core の `key_flatten`）。4.19.0 リリース前レビュー。
+      name = source_class.to_s.split('::').last.downcase
       return KEYS.each_with_object({}) do |key, values|
-        path = "/source_defaults/#{name}/#{key}"
-        values[key] = config[path] if config.key?(path) && !declared?(params, key)
+        # ⚠ `Config#[]` は無いキーと空の値で例外を上げる。`Source.new` で上げると全ソースが止まる。
+        value = config.fetch("/source_defaults/#{name}/#{key}", nil)
+        values[key] = value unless value.nil? || declared?(params, key)
       end
     end
 
@@ -37,13 +39,14 @@ module TomatoShrieker
       return merged
     end
 
-    # ⚠ 途中が `null` なら、その下も書いてあるものとして扱う（外した意図を尊重する）。
+    # ⚠ 途中が Hash でないなら、その下も書いてあるものとして扱う。`null` は外した意図を尊重する。
+    # 文字列などのスキーマ違反は `source validate` の領分で、ここで倒すと全ソースが止まる。
     def self.declared?(params, key)
       node = params
       key.split('/').each do |name|
-        return false unless node.is_a?(Hash) && node.key?(name)
+        return true unless node.is_a?(Hash)
+        return false unless node.key?(name)
         node = node[name]
-        return true if node.nil?
       end
       return true
     end

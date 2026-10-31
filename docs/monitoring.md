@@ -40,7 +40,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - ⚠ **保存の前（解析）で落ちたエントリは数えない。**行が無いので次の run が拾い直す。`shrieker_errors` の種別で分けている: `source#fetch`＝保存の前（数えない）・`source#entry`＝保存の後（数える）・`source#exec`＝エントリ処理の途中で run ごと落ちた（1 件と数える）
 - ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計
 - **根拠行は prune から守る（`last_entry_stage_ids`・#1687）。**確認しないまま保持期間（`/monitor/retention_days`）を過ぎても緑に戻らない
-- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` だけ（Sentry にも出ない）
+- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` と、同じ文言の Sentry の warning（#1687）
 - ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
 
 #### 定義は在るが読めないソース (#1605)
@@ -135,7 +135,7 @@ bin/shrieker source ack ID
 
 📌 **この仕組みがあるので `silence_tolerance` を保守的に丸める必要は無い。**偽陽性のコストが「設定を直す」から「1 回確認する」に下がる。
 
-⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。⚠ **4.14.0 までのキー名は `silence_acknowledged_at`（#1567 で改名）。**確認は未達（`undelivered`）にも効くので、`undelivered: false` の理由もこのキーで読む。503 本文の行も同じ名前。内部の名前（`SilenceAck` クラス・`silence_ack` テーブル）は据え置いている。
+⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。⚠ **4.14.0 までのキー名は `silence_acknowledged_at`（#1567 で改名）。**確認は未達（`undelivered`）にも効くので、`undelivered: false` の理由もこのキーで読む。何を確認したかは `acknowledged_reasons`、沈黙の判定が確認に基づくかは `silence_baseline_origin` で読む。503 本文の行も同じ名前。内部の名前（`SilenceAck` クラス・`silence_ack` テーブル）は据え置いている。
 
 ソースの状況ごとの使い分け:
 
@@ -388,7 +388,7 @@ monitor:
   - 🔴 **4.15.0 で種別が 3 つになった (#1574)。**`source#fetch`＝保存の**前**（解析）で落ちたエントリ（次の run が拾い直す）／`source#entry`＝保存の**後**で落ちたエントリ（二度と取得されない）／`source#exec`＝エントリ処理の途中で run ごと落ちた（件数は不明なので 1）。⚠⚠ **4.14.0 までの `source#fetch` は保存の前後を区別していない。**run ごと落ちた error 行は、4.14.0 までは内訳が空（`NULL`）だった
   - 🔴 **古い行には `TomatoShrieker::FeedSource#fetch` のような旧キーが残っている。**#1485 でクラス名依存をやめて `source#fetch` に固定したが、それ以前の行はそのまま
 - 古いレコードは Rufus ジョブで毎日 prune（`/monitor/retention_days`）
-  - ⚠ 保護行（上の「prune はソースごとに 4 行を守る」）は残るが、**retention を過ぎると `error_message` は消える (#1511)**。⚠ そのため**実行間隔が retention より長いソースが error のまま 503 を立て続けると、15 日目以降の 503 本文には `error:` 行が出ない (#1621)**。原文は Sentry かログに残る。⚠⚠ **ただし宛先を組み立てられなかった失敗（`UnavailableDest`）は Sentry へ送らず `logger.error` だけ**で、ログは 7 世代でローテーションされる＝**retention を過ぎると原文はどこにも残らない**
+  - ⚠ 保護行（上の「prune はソースごとに 5 行を守る」）は残るが、**retention を過ぎると `error_message` は消える (#1511)**。⚠ そのため**実行間隔が retention より長いソースが error のまま 503 を立て続けると、15 日目以降の 503 本文には `error:` 行が出ない (#1621)**。原文は Sentry かログに残る。⚠⚠ **ただし宛先を組み立てられなかった失敗（`UnavailableDest`）は Sentry へ送らず `logger.error` だけ**で、ログは 7 世代でローテーションされる＝**retention を過ぎると原文はどこにも残らない**
 
 計上は `Source#shriek` の各 shrieker 呼び出し単位で行い、`DeliveryStats` が Mutex 越しに集約する（`IcalendarSource#exec` は `Parallel.each` で並列配信するため）。
 

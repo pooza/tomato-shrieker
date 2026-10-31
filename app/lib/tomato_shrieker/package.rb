@@ -58,7 +58,8 @@ module TomatoShrieker
         tags: {source: source&.id, shrieker: shrieker.to_s})
     rescue => e
       # ⚠ 投稿を作った後で呼ぶので、報告の失敗で配信を失敗にしない（再実行すると二重に出る）。
-      warn("capture_warning failed: #{e.class}")
+      # ⚠ `warn` は使わない。daemon は stderr を捨てている。
+      Logger.new.error(sentry: 'capture_warning', error: e.class.to_s)
     end
 
     # 例外を人が読む 1 行にする。**例外メッセージを外へ出すときは必ずここを通す** (#1469)。

@@ -236,9 +236,9 @@ module TomatoShrieker
 
     # 🔴 **retention の cutoff より古い行で streak を止める (#1608)。**
     #
-    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 4 行
+    # ⚠⚠ `prune` は retention を過ぎた行を消すとき、ソースごとに 5 行
     # （`boundary_run_ids(:min)` / `boundary_run_ids(:max)` / `last_attempted_ids` /
-    # `last_delivered_ids`）を**無期限に守る**。
+    # `last_delivered_ids` / `last_entry_stage_ids`）を**無期限に守る**。
     # **疎なソース**では retention 内の行が `limit` より少ないので、**守られた古い行が
     # そのまま末尾に並ぶ**。間にあった成功行は prune で消えているので、
     # **「直近のエラー」と「何か月も前の最初の run のエラー」が連続して見え、streak が
