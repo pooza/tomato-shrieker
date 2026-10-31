@@ -240,10 +240,10 @@ module TomatoShrieker
     def test_schedule_retry_schema
       base = {'source' => {'text' => 'a'}, 'dest' => {'hooks' => ['https://example.com/x']}}
 
-      [{}, {'times' => 2}, {'interval' => '15m'}, {'times' => 1, 'interval' => '1h30m'}].each do |value|
+      [{}, {'times' => 2}, {'times' => 10}, {'interval' => '15m'}, {'interval' => '10s'}, {'interval' => 900}, {'times' => 1, 'interval' => '1h30m'}].each do |value|
         assert_empty(schema_errors(base.merge('schedule' => {'cron' => '1 0 * * *', 'retry' => value})), value.inspect)
       end
-      [{'times' => 0}, {'interval' => '*/5 * * * *'}, {'limit' => 2}, true].each do |value|
+      [{'times' => 0}, {'times' => 11}, {'interval' => '*/5 * * * *'}, {'interval' => '0s'}, {'interval' => 0}, {'limit' => 2}, true].each do |value|
         assert_not_empty(schema_errors(base.merge('schedule' => {'cron' => '1 0 * * *', 'retry' => value})), value.inspect)
       end
     end

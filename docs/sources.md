@@ -189,7 +189,7 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 - ⚠ **v4.13.0 より前は既定値が無く、`local.yaml` に書いていない環境では CommandSource に触れた時点で `ConfigError` になっていた (#1614)**
 - 🔴 **コマンドには締切がある (#1703)。**`/source/timeout`（IcalendarSource は `/source/ical/timeout`）に秒か Rufus の duration（`10m` など）で書く。未指定なら `/command/timeout/seconds`（既定 600 秒。本番の最長は約 100 秒・2026-10-25 実測）。`0` は締切なし
   - 締切が来たら子のプロセスグループへ TERM → 2 秒の猶予 → KILL（ginseng-core#684）。その run は `Timeout::Error` の取得段の失敗になる
-  - ⚠ 4.17 までは締切が無く、戻らないコマンドはそのソースの以後の実行を塞いでいた（`overlap: false` なので発火はスキップされ続け、IcalendarSource のリマインドもコマンドの直列化で待たされる）
+  - ⚠ 4.17.x までは締切が無く、戻らないコマンドはそのソースの以後の実行を塞いでいた（`overlap: false` なので発火はスキップされ続け、IcalendarSource のリマインドもコマンドの直列化で待たされる）
   - ⚠ `sudo` で別のユーザーへ降りた子・`setsid` でグループを抜けた子孫は止められない。締切で戻りはするが、相手は動き続ける
 
 ## 暗号化
@@ -215,14 +215,15 @@ WebhookShrieker → モロヘイヤの URL は `POST /mulukhiya/webhook/{digest}
 schedule:
   cron: '1 0 * * *'
   retry:
-    times: 2        # やり直す回数の上限（既定 1）
-    interval: 15m   # 失敗からやり直すまでの間（既定 15m）
+    times: 2        # やり直す回数の上限（既定 1・10 まで）
+    interval: 15m   # 失敗からやり直すまでの間（秒か duration 形式・既定 15m）
 ```
 
 - `retry: {}` と書けば既定のまま有効になる。書かなければやり直さない
 - 🔴 **1 件でも配信していたらやり直さない。**届いた宛先へもう一度投稿することになる。やり直すのは「取得で落ちた」「宛先が全部落ちた」run だけ
 - ⚠ **FeedSource 系（GoogleNews・YouTube・GitHub を含む）は「取得で落ちた」run だけ。**投稿の前にエントリを記録するので、宛先が全部落ちた run をやり直しても、記録済みとして飛ばして何も投稿しない（#1741 の Codex P2）。CommandSource・IcalendarSource は毎回出力し直すので、宛先が全部落ちた run もやり直す
 - やり直しの run も `source_run_log` に 1 行ずつ残る。落ちた事実は消えず、成功すれば `error_streak` が切れる。⚠ やり直しを待つ間は、`error_streak_threshold` に達していれば healthz は 503
+- ⚠ やり直しの行も `error_streak`・`error_rate_24h` に数える。1 日ぶんが丸ごと落ちると streak は 1 + `times` 進むので、しきい値を緩めたソース（YouTube の 28）に足すと効き方が変わる
 - やり直しは一度きりのジョブ（同じ tag）。定義を変えた `source reload` や再起動で、本体のジョブと一緒に外れる（待っていたやり直しは走らない）
 - ⚠ HTTP の再送（`/http/retry/limit`）を使い切った後の話。間隔は取得先が立ち直るのを待つ長さにする
 - IcalendarSource のリマインド（`/schedule/remind`）はやり直さない

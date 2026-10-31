@@ -818,7 +818,10 @@ module TomatoShrieker
       end
       log_retry('retry scheduled', attempt: next_attempt, times: retry_times, in: retry_interval)
     rescue => e
+      # ⚠ 書き間違い（`times: '2'` など）は、やり直しが要る日に初めてここへ来る。`source reload` は
+      # 起動で倒れる定義だけを拒むので弾かない。ログだけだと気付けない（4.18.0 リリース前レビュー）。
       logger.error(source: id, action: 'retry', error: e)
+      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
     end
 
     def delivered_any?

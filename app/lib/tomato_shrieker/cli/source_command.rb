@@ -167,17 +167,13 @@ module TomatoShrieker
       pid, state = reload_target(daemon)
       case state
       when :alive
-        before = monitor_call {waiter&.count}
-        Process.kill('HUP', pid)
-        say "reload requested (pid #{pid})"
-        return report_reload(monitor_call {waiter.wait(before)}) if waiter
-        # ⚠ シグナルは非同期なので、`--wait` なしでは「要求した」までしか言えない (#1529)。
-        say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
+        request_reload(pid, waiter)
       when :unknown
         # ⚠ :unknown（EPERM）を :dead と混ぜない。プロセスは生きている可能性がある。
+        raise Thor::Error, 'PID ファイルを読めません。reload できません。' unless pid
         raise Thor::Error, "PID #{pid} exists but is not ours. reload できません。"
       else
-        say 'scheduler は停止しています。ソース定義は次回起動時に読み込まれます。'
+        say_stopped
       end
     end
 
@@ -216,6 +212,24 @@ module TomatoShrieker
       return [pid, daemon.alive_state_of(pid)] if pid
       # ⚠ 読めないファイルは :unknown のまま（:dead と混ぜない）。番号が無いのに :alive とは言わない。
       return [nil, daemon.alive_state == :unknown ? :unknown : :dead]
+    end
+
+    def request_reload(pid, waiter)
+      before = monitor_call {waiter&.count}
+      begin
+        Process.kill('HUP', pid)
+      rescue Errno::ESRCH
+        # ⚠ 生きていると判定した後に終わった。
+        return say_stopped
+      end
+      say "reload requested (pid #{pid})"
+      return report_reload(monitor_call {waiter.wait(before)}) if waiter
+      # ⚠ シグナルは非同期なので、`--wait` なしでは「要求した」までしか言えない (#1529)。
+      say '  結果はログの {"scheduler":"reload",...} 行で確認できます（--wait で待てます）。'
+    end
+
+    def say_stopped
+      say 'scheduler は停止しています。ソース定義は次回起動時に読み込まれます。'
     end
 
     # ⚠ **HUP を送る前に断る。**監視が無効なら読む先が無く、送った後では「待てない」と

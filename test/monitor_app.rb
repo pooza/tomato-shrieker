@@ -64,7 +64,11 @@ module TomatoShrieker
 
       assert_equal(registry[FIXTURE_ID], source_status(FIXTURE_ID)['digest'])
     ensure
-      original ? registry[FIXTURE_ID] = original : registry&.delete(FIXTURE_ID)
+      if original
+        registry[FIXTURE_ID] = original
+      else
+        registry&.delete(FIXTURE_ID)
+      end
     end
 
     def test_not_found
@@ -184,17 +188,6 @@ module TomatoShrieker
 
       assert_equal(404, status)
       assert_include(body.first, '__no_such_source__')
-    end
-
-    # daemon の中（scheduler が待ち受けに入った後）を装う (#1686)。⚠ Singleton の特異メソッドに
-    # 生やすので、必ず消して戻す（本物はクラスにあるので消えない）。
-    def serving(registered_at:)
-      scheduler = Scheduler.instance
-      scheduler.define_singleton_method(:serving?) {true}
-      scheduler.define_singleton_method(:registered_at) {|_id| registered_at}
-      yield
-    ensure
-      [:serving?, :registered_at].each {|name| scheduler.singleton_class.send(:remove_method, name)}
     end
 
     # ⚠ 定義ファイルの更新時刻を過去へずらす＝「足してから時間が経った」を作る (#1560)。
