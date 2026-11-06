@@ -189,6 +189,15 @@ dest:
 - リモートのタグ付けが拒否されたら、ソースのタグだけで投稿する（ログに error）
 - ⚠ **添付の検証は gem（ginseng-fediverse 6.0.0 以降）の既定。**tomato 側に自前の検証は置いていない＝版を戻すと守りも消える（`RemoteAttachmentTest` が赤くなる）
 
+### フィードと iCalendar の取得（4.20.0・#1688）
+
+フィード（FeedSource とその子）と iCalendar（IcalendarSource の URL）の取得は、**初段のホストを検証しない**。運用者が書いた URL なので信頼でき、LAN 内の取得元（google-news-rss-cleaner の `scylla.b-shock.local:3000` など）を含むため。
+
+- 🔴 **別のホストへのリダイレクト先だけを `Ginseng::PublicHost` で検証する。**配信元が 3xx で内部ホストを指すと、そこへは GET しない（`Ginseng::GatewayError: Rejected host '…'`・run は error）。上の 2 経路と落ちる条件は同じ
+- ⚠ **同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで追う。**2026-11-07 の実測では、本番で初段が 3xx を返すのは 2 件で、どちらも同じホスト
+- ⚠ **LAN 内の取得元が別の LAN 内ホストへリダイレクトすると落ちる。**取得先を最終の URL で書き直す
+- 実装は `TomatoShrieker::HTTP#get_configured`
+
 ## モロヘイヤ連携
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（**既定は false**。`true` と書いたときだけ有効。`/dest/mulukhiya` を書くなら `enable` は必須）
