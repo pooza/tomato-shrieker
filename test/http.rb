@@ -77,5 +77,67 @@ module TomatoShrieker
 
       assert_not_equal(true, shrieker.instance_variable_get(:@http).retry_not_found)
     end
+
+    # #1688: 運用者の設定した取得元は、LAN 内のホストでも取れる（初段は検証しない）
+    def test_get_configured_allows_internal_origin
+      url = 'http://scylla.b-shock.local:3000/feed'
+      stub_request(:get, url).to_return(status: 200, body: 'ok')
+
+      assert_equal('ok', HTTP.new.get_configured(url).body)
+    end
+
+    # #1688: 同じホストへのリダイレクトは初段と同じ扱いで追う
+    def test_get_configured_follows_same_host_redirect
+      stub_request(:get, URL).to_return(status: 301, headers: {'Location' => 'https://example.com/moved.rss'})
+      stub_request(:get, 'https://example.com/moved.rss').to_return(status: 200, body: 'ok')
+
+      assert_equal('ok', HTTP.new.get_configured(URL).body)
+    end
+
+    # #1688: 別のホストへのリダイレクトで内部を指されたら、そこへは GET しない
+    def test_get_configured_rejects_redirect_to_internal_host
+      stub_request(:get, URL).to_return(status: 302, headers: {'Location' => 'http://127.0.0.1/admin'})
+      internal = stub_request(:get, 'http://127.0.0.1/admin').to_return(status: 200, body: 'secret')
+
+      assert_raise(Ginseng::GatewayError) {HTTP.new.get_configured(URL)}
+      assert_not_requested(internal)
+    end
+
+    # #1688: 初段以外のホストは PublicHost の判定に委ねる（大文字小文字は区別しない）
+    def test_configured_host_validator
+      public_host = ->(host) {host == 'public.example' ? '203.0.113.1' : nil}
+      validator = HTTP.configured_host_validator('Example.COM', public_host:)
+
+      assert_true(validator.call('example.com'))
+      assert_equal('203.0.113.1', validator.call('public.example'))
+      assert_nil(validator.call('internal.example'))
+    end
+
+    # #1688: FeedSource の取得がこの経路を通ること
+    def test_feed_source_rejects_redirect_to_internal_host
+      internal = stub_redirect_to_internal
+      source = FeedSource.new({'id' => '__test_http__', 'source' => {'feed' => URL}})
+
+      assert_raise(Ginseng::GatewayError) {source.feedjira}
+      assert_not_requested(internal)
+    end
+
+    # #1688: IcalendarSource の取得がこの経路を通ること
+    def test_icalendar_source_rejects_redirect_to_internal_host
+      internal = stub_redirect_to_internal
+      source = IcalendarSource.new({'id' => '__test_http__', 'source' => {'calendar' => URL}})
+
+      assert_raise(Ginseng::GatewayError) {source.ical}
+      assert_not_requested(internal)
+    end
+
+    private
+
+    # ⚠ IcalendarSource は URL に `t=` を足すので、クエリ付きでも当たる形で受ける。
+    def stub_redirect_to_internal
+      stub_request(:get, %r{\Ahttps://example\.com/feed\.rss})
+        .to_return(status: 302, headers: {'Location' => 'http://127.0.0.1/admin'})
+      return stub_request(:get, 'http://127.0.0.1/admin').to_return(status: 200, body: 'secret')
+    end
   end
 end

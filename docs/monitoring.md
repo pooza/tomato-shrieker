@@ -261,7 +261,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 - **転送先はログにだけ出る。**同じ時刻の `{"error":"redirect refused",…,"location":"…"}` の行を見る。⚠ この行に `source:` は無いので、直後の `{"source":…,"shrieker":…,"error":…}` の行と時刻で結ぶ
 - **直し方は、宛先の URL を `location` の示す最終オリジン（`https://`）へ書き換える**こと。`bin/shrieker source validate` は `http://` の宛先を WARN する
 - 監視は効く: `attempted > 0 / delivered = 0` の error になるので、`errored` と `undelivered` で `/healthz/source/:id` が 503 になる
-- ⚠ フィードの取得（FeedSource / IcalendarSource など）は従来どおりリダイレクトを追う
+- ⚠ フィードの取得（FeedSource / IcalendarSource など）はリダイレクトを追う。⚠ 4.20.0 から、別のホストへ飛ぶ先が内部ホストなら `Rejected host` で落ちる（[sources.md](sources.md) の「フィードと iCalendar の取得」）
 
 ## CLI で横断して問い合わせる (#1561)
 

@@ -28,7 +28,7 @@ module TomatoShrieker
 
     def ical
       return command_ical if command?
-      return Icalendar::Calendar.parse(@http.get(uri)).first
+      return Icalendar::Calendar.parse(@http.get_configured(uri)).first
     end
 
     # コマンドの標準出力を iCalendar として読む (#1691)。
