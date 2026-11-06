@@ -91,8 +91,15 @@ module TomatoShrieker
     #
     # 📌 `/status.json` の `digest` と、デプロイ前の確認（deploy スキルの `pending_sources.sh`）が
     # ディスク上の定義と比べるのにも使う (#1672)。
+    #
+    # 🔴 **素のハッシュにしない (#1761)。**定義には資格情報（PieFed のパスワードなど）が入るので、
+    # ほかの項目が分かっていれば、`/status.json` の値で推測の当否を試せる。`/crypt/password` を
+    # 鍵にした HMAC にしてある。⚠ 鍵を変えると全ソースの digest が変わる（デプロイ前の確認で
+    # 全部 `~` と出る）。⚠ 形式は 64 桁（SHA1 の頃は 40 桁）。`pending_sources.sh` は桁数の違いで
+    # 切り替えの回を見分ける。
     def self.digest(sources)
-      return Digest::SHA1.hexdigest(sources.map {|v| v.to_h.except('class')}.to_json)
+      return OpenSSL::HMAC.hexdigest('SHA256', config['/crypt/password'].to_s,
+        sources.map {|v| v.to_h.except('class')}.to_json)
     end
 
     private

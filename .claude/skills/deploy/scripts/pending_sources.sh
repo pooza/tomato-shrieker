@@ -63,10 +63,15 @@ running_digests=$(jq -r '.sources[] | select(.digest != null) | "\(.id)\t\(.dige
 disk_digests=$(awk -F'\t' '$1=="DIGEST"{print $2 "\t" $3}' <<< "$out" | LC_ALL=C sort)
 changed=$(LC_ALL=C join -t $'\t' <(printf '%s\n' "$running_digests") <(printf '%s\n' "$disk_digests") \
   | awk -F'\t' '$2 != $3 {print $1}')
+# ⚠ #1761: digest の形式が変わる回（SHA1 の 40 桁 → HMAC-SHA256 の 64 桁・4.20.0）は全部が違って見える。
+# 桁数で見分け、比べずにそう出す。
+digest_widths=$(printf '%s\n%s\n' "$running_digests" "$disk_digests" | awk -F'\t' 'NF>1{print length($2)}' | sort -u | wc -l)
 if [ -z "$running_digests" ]; then
   echo '⚠ 稼働中の版が digest を出していない＝定義の変更は比べていない'
 elif [ -z "$disk_digests" ]; then
   echo '⚠ ディスク上の定義の digest が取れていない＝定義の変更は比べていない'
+elif [ "$digest_widths" -gt 1 ]; then
+  echo '⚠ 稼働中と新しい版で digest の形式が違う（4.20.0 の HMAC への切り替え・#1761）＝定義の変更は比べていない'
 elif [ -n "$changed" ]; then
   printf '~ %s\n' $changed
   echo '⚠ 再起動で定義が変わるソースがある（reload していない編集）。意図したものかを確かめる'

@@ -178,7 +178,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 - 🔴 **`rake test` は同時に 2 本走らせない。**DB を共有しているので、並走すると偽のエラーが出る（#1573 の後も 2〜9 件）。レビューのエージェントを並列で回すときも、エージェントには走らせない
 - 🔴 **結果は本数も見る (#1668)。**テストの途中で `exit` が呼ばれると、残りが走らないまま「0 failures・100% passed」で終わっていた（410 → 137 本になったのを本数で気づいた。CI は本数を見ない）。📌 ginseng-core 4.2.0 からはそのテストの失敗になり、読めなかったテストファイルも失敗として残る（`TestCase.load` が `report_load_errors` を呼ぶ）。⚠ `exit!`・fork した子の `exit`・`assert_raise(SystemExit)` で受けるものには効かないので、本数は引き続き見る。CLI の終了コードは `exit` ではなく `Thor::Error` で返す
 - **omissions が増えていたら、書いたテストが走っていないことを疑う。**Shrieker のテストクラスは `disable?` でケースごと省略される（#1520）
-- **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする
+- **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする。🔴 **手元でも同じく写してから回す（4.20.0）。**`Scheduler.digest` が `/crypt/password` を鍵にするので（#1761）、`config/local.yaml` が無いと Scheduler まわりが `ConfigError` で 31 本落ちる
 - **`Sentry.initialized?` は Sentry 自身の singleton class に生えている。**`remove_method` で戻すと本物ごと消えるので、元の `Method` を保存して差し戻す
 - **`stub_request(...).to_return(body: <組み立て>)` は、本文の組み立てで例外が出ると、応答を定義していない stub だけが残って空の 200 を返す。**本文を先に組んでから登録する
 - **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（5 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
