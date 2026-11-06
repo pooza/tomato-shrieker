@@ -7,6 +7,9 @@ module TomatoShrieker
   # ⚠ ClassLength は外せていない（#1648 で `status_row` を `SourceStatusTable` へ寄せても 200 行を超える）。
   # Thor のサブコマンドを 1 クラスに並べる形なので、分けるならサブコマンド単位になる。
   class SourceCommand < Thor # rubocop:disable Metrics/ClassLength
+    # 確認の対象になる警告の名前（`acknowledged_reasons` に残す名前・#1680 / #1749）。
+    ACK_REASONS = [:undelivered, :lost_entries, :silent, :errored].freeze
+
     include Package
 
     desc 'list', 'ソース一覧 (id とクラス名) を表示'
@@ -124,32 +127,27 @@ module TomatoShrieker
       set_disable(id, false)
     end
 
-    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達 / 取りこぼし）'
+    desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達 / 取りこぼし / error）'
+    method_option :until, type: :string,
+      desc: 'error を期限まで確認済みにする（例: 2026-11-01 / 2026-11-01T12:00）。その間に成功したら解除'
     # 🔴 **出力は実際に効いた範囲だけを言う (#1506)。**
     #
     # ⚠ 以前は `SilenceAck` を書くだけで **`undelivered` には一切効かない**のに、
     # 出力は「確認済みにしました」とだけ返していた。**運用者は緑に戻ると期待して
     # Kuma の赤を放置する。**いまは ack が両方に効くが、**どちらに効いたかを言う**。
+    #
+    # 📌 #1749: error にも効く。期限なしなら確認した run まで（次の定期実行で再判定）、
+    # `--until` なら期限まで。⚠ 期限の無い「ずっと緑」は作らない。
     def ack(id)
       source = find_source!(id)
-      undelivered = source.undelivered?
-      lost = source.lost_entries?
-      tolerance = source.monitor_silence_tolerance_seconds
-      # ⚠ `silent?` の nil は判定不能（#1502）で、確認すれば判定できるようになるので警告と同じに扱う。
-      silence = source.silent? != false
+      warnings = ack_warnings(source, parse_ack_until(options[:until]))
       # 🔴 **警告が無ければ何も記録しない（4.19.0 リリース前レビュー）。**記録すると、未達を確認した
       # 後の打ち直しで沈黙の起点が動き（宛先が死んだまま警告が 1 周ぶん遅れる）、了解した run と
       # 警告の記録も空で上書きされる。
-      return say(nothing_to_ack_message(id)) unless undelivered || lost || silence
-      record_ack(source, undelivered:, lost:, silence:)
+      return say(nothing_to_ack_message(id)) unless warnings.values_at(*ACK_REASONS).any?
+      record_ack(source, warnings)
       say "#{id} を確認済みにしました。"
-      # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
-      say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if undelivered
-      say '  エントリの取りこぼし (lost_entries) を解除しました。失われたエントリは再送されません。' if lost
-      say_silence_after_ack(source, moved: silence) if tolerance
-      # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
-      # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
-      say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
+      say_after_ack(source, warnings)
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
@@ -221,10 +219,81 @@ module TomatoShrieker
 
     # #1680: どの run の何を了解したのかを残す。⚠ 沈黙の警告が出ていないのに未達や取りこぼしを
     # 確認したときは、沈黙の起点を動かさない。
-    def record_ack(source, undelivered:, lost:, silence:)
-      reasons = {undelivered:, lost_entries: lost, silent: silence}.select {|_, v| v}.keys
-      log = undelivered ? source.undelivered_log : (source.lost_entries_log if lost)
-      SilenceAck.acknowledge(source.id, silence:, run_id: log&.id, reasons:)
+    # いま出ている警告。⚠ `silent?` の nil は判定不能（#1502）で、確認すれば判定できるようになるので
+    # 警告と同じに扱う。
+    def ack_warnings(source, error_until)
+      latest_error = ack_target_error(source)
+      if error_until && !latest_error
+        raise Thor::Error, "#{source.id} は error の警告が出ていません。--until は error にだけ効きます。"
+      end
+      return {
+        undelivered: source.undelivered?,
+        lost_entries: source.lost_entries?,
+        silent: source.silent? != false,
+        errored: latest_error.present?,
+        latest_error:,
+        error_until:,
+      }
+    end
+
+    def record_ack(source, warnings)
+      reasons = ACK_REASONS.select {|key| warnings[key]}
+      log = source.undelivered_log if warnings[:undelivered]
+      log ||= source.lost_entries_log if warnings[:lost_entries]
+      log ||= warnings[:latest_error]
+      at = Time.now
+      SilenceAck.acknowledge(source.id, at:, silence: warnings[:silent], run_id: log&.id, reasons:)
+      return unless warnings[:errored]
+      SilenceAck.acknowledge_error(source.id, at:,
+        until_at: warnings[:error_until])
+    end
+
+    # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
+    def say_after_ack(source, warnings)
+      if warnings[:errored]
+        say_error_after_ack(source, warnings[:latest_error],
+          warnings[:error_until])
+      end
+      say '  未達 (undelivered) を解除しました。この後の試行で届かなければ、また警告します。' if warnings[:undelivered]
+      say '  エントリの取りこぼし (lost_entries) を解除しました。失われたエントリは再送されません。' if warnings[:lost_entries]
+      tolerance = source.monitor_silence_tolerance_seconds
+      say_silence_after_ack(source, moved: warnings[:silent]) if tolerance
+      # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
+      # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
+      say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
+    end
+
+    # 🔴 **error の警告が出ている（または確認済みで抑えている）ときの、直近の error の run (#1749)。**
+    # 判定は `/healthz/source/:id` と同じ `SourceStatus.checks` を通す（しきい値の実効値も同じ）。
+    # ⚠ 確認済みのものも返す（期限を延ばす・期限なしへ戻すための打ち直しを受ける）。
+    def ack_target_error(source)
+      return nil unless source.monitored?
+      return nil unless latest = SourceRunLog.latest_for(source.id)
+      checks = SourceStatus.checks(source, latest)
+      return nil unless checks[:errored] || checks[:error_acknowledged]
+      return latest
+    end
+
+    # `--until` の期限。⚠ 過去や今は受けない（確認した瞬間に切れる）。
+    def parse_ack_until(value)
+      return nil if value.nil?
+      until_at = Time.parse(value)
+      raise Thor::Error, "--until は未来の時刻を指定してください: #{value}" unless until_at > Time.now
+      return until_at
+    rescue ArgumentError
+      raise Thor::Error, "--until を時刻として読めません: #{value}"
+    end
+
+    def say_error_after_ack(source, latest_error, error_until)
+      run_at = latest_error.executed_at.strftime('%Y-%m-%d %H:%M')
+      if error_until
+        say "  error（#{run_at} の run）を #{error_until.strftime('%Y-%m-%d %H:%M')} まで確認済みにしました。" \
+          'それまでに成功すれば、その時点で解除します。期限を過ぎたら、その時点の結果で判定し直します。'
+        return
+      end
+      next_run = source.next_run_at(latest_error.executed_at)
+      say "  error（#{run_at} の run）を確認済みにしました。" \
+        "次の定期実行 #{next_run&.strftime('%Y-%m-%d %H:%M')} で再判定します（また error なら警告します）。"
     end
 
     def say_silence_after_ack(source, moved:)
@@ -342,7 +411,7 @@ module TomatoShrieker
     end
 
     def nothing_to_ack_message(id)
-      return "#{id} は未達・取りこぼし・沈黙の警告が出ていません。確認するものがありません。"
+      return "#{id} は未達・取りこぼし・沈黙・error の警告が出ていません。確認するものがありません。"
     end
 
     # silence_tolerance を人が読める長さで返す (#1513)。

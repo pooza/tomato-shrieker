@@ -51,7 +51,7 @@ module TomatoShrieker
         # 取得段の失敗が来ると `error_streak: 2 / 1` なのに `entry_stage: false` と
         # 出て、**しきい値が 1 に倒れた理由が読めなくなる**。
         entry_stage:,
-        errored: streak >= threshold,
+        **error_checks(source, logs, streak >= threshold),
         silent: source.silent?,
         # 試みたのに届かなかった宛先がある (#1504)。取りこぼしは再送されないので、
         # 次に全宛先へ届くか、運用者が確認するまで解除しない (#1506)。
@@ -65,6 +65,14 @@ module TomatoShrieker
         lost_entries: source.lost_entries?,
         lost_entries_log: source.lost_entries_log,
       }
+    end
+
+    # 🔴 #1749: 運用者が確認した error は、次の定期実行（期限つきなら期限）まで赤にしない。
+    # ⚠ `error_streak` の数字はそのまま出す（落ちた事実は消さない）。`logs.first` は連続している
+    # error のうち直近の run（しきい値に届いているなら先頭は error）。
+    def self.error_checks(source, logs, reached)
+      acknowledged = reached && source.error_acknowledged?(logs.first)
+      return {errored: reached && !acknowledged, error_acknowledged: acknowledged}
     end
 
     # ⚠ **しきい値はソース単位で上書きできる (#1558)。**読む行数もそれに従わせないと、
@@ -145,6 +153,9 @@ module TomatoShrieker
         acknowledged_at: ack&.acknowledged_at&.iso8601,
         acknowledged_run_id: ack&.acknowledged_run_id,
         acknowledged_reasons: ack&.reasons,
+        # #1749: error の確認。期限つきなら `error_acknowledged_until`（期限の無い確認は null）
+        error_acknowledged_at: ack&.error_acknowledged_at&.iso8601,
+        error_acknowledged_until: ack&.error_acknowledged_until&.iso8601,
       }
     end
 

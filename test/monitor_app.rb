@@ -358,6 +358,69 @@ module TomatoShrieker
       assert_include(body.first, 'RuntimeError: boom')
     end
 
+    # 🔴 **#1749: error を確認したら、次の定期実行までは緑。本文で確認済みと分かる。**
+    # ⚠ run_log には触らない（落ちた事実は残る）。次の定期実行がまた error なら赤に戻る。
+    def test_ack_error_until_next_run
+      record_error(FIXTURE_ID)
+      said = ack_cli(FIXTURE_ID)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(said, '再判定します')
+      assert_equal(200, status)
+      assert_include(body.first, 'error acknowledged, re-evaluated at')
+      assert_equal(1, SourceRunLog.where(source_id: FIXTURE_ID).count)
+      assert_equal(1, source_status(FIXTURE_ID)['error_streak'])
+
+      record_error(FIXTURE_ID, at: Time.now + 1)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+    end
+
+    # #1749: 期限つきなら、期限までは次の error でも緑。本文に期限を出す。
+    def test_ack_error_with_until_survives_next_error
+      record_error(FIXTURE_ID)
+      said = ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      record_error(FIXTURE_ID, at: Time.now + 1)
+      status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(said, 'まで確認済みにしました')
+      assert_equal(200, status)
+      assert_include(body.first, 'error acknowledged until')
+      assert_not_nil(source_status(FIXTURE_ID)['error_acknowledged_until'])
+    end
+
+    # #1749: 期限の前に成功したら、その時点で解除する（次の失敗はすぐ赤）。
+    def test_ack_error_with_until_is_cleared_by_success
+      record_error(FIXTURE_ID)
+      ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      record(FIXTURE_ID, at: Time.now + 1)
+      record_error(FIXTURE_ID, at: Time.now + 2)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+    end
+
+    # #1749: 期限を過ぎたら、その時点の結果で判定し直す（確認した run のままでも赤）。
+    def test_ack_error_with_expired_until
+      record_error(FIXTURE_ID)
+      SilenceAck.acknowledge(FIXTURE_ID, silence: false, reasons: [:errored])
+      SilenceAck.acknowledge_error(FIXTURE_ID, until_at: Time.now - 1)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+    end
+
+    # #1749: `--until` は error にだけ効く。過去の期限も受けない。
+    def test_ack_until_requires_error_and_future
+      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)}
+      record_error(FIXTURE_ID)
+
+      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: (Time.now - 60).iso8601)}
+      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: 'not a time')}
+      assert_nil(SilenceAck.where(source_id: FIXTURE_ID).first&.error_acknowledged_at)
+    end
+
     # #1558: しきい値をソース単位で上げたソースは、下回るあいだ緑のまま。
     # ⚠ **YouTube の /feeds/videos.xml は 24h で 7〜10% 失敗する**ので、グローバルの
     # 1 では正常時も Kuma が頻繁に赤くなり、監視ごと信用されなくなる。
@@ -1404,6 +1467,20 @@ module TomatoShrieker
       record(source_id, status: SourceRunLog::STATUS_ERROR, attempted_count: 1)
       SourceRunLog.latest_for(source_id).this
         .update(error_message: Sequel.blob("Sequel::DatabaseError: #{message}"))
+    end
+
+    # ⚠ 既定は 1 分前に始まった run。ack は終わった run を了解するので、いま始めた run
+    # （終了時刻が ack より後）にすると確認の対象にならない。
+    def record_error(source_id, at: Time.now - 60)
+      return record(source_id, at:, status: SourceRunLog::STATUS_ERROR, error_message: 'RuntimeError: boom')
+    end
+
+    def ack_cli(source_id, options = {})
+      said = []
+      command = SourceCommand.new([], options.transform_keys(&:to_s))
+      command.define_singleton_method(:say) {|message| said.push(message)}
+      command.ack(source_id)
+      return said.join("\n")
     end
 
     def record(source_id, at: Time.now, **values)

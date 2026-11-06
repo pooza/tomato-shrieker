@@ -500,6 +500,8 @@ module TomatoShrieker
       source.define_singleton_method(:monitor_silence_tolerance_seconds) {seconds}
       source.define_singleton_method(:undelivered?) {undelivered}
       source.define_singleton_method(:lost_entries?) {lost}
+      # #1749: error の判定は run_log を引くので、stub では監視対象外にして素通りさせる
+      source.define_singleton_method(:monitored?) {false}
       return source
     end
   end
