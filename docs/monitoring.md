@@ -180,7 +180,7 @@ bin/shrieker source ack ID
 - 📌 **使いどころ**: `schedule.retry`（#1585）のやり直しも使い切ったとき（期限なし）と、原因が分かっていて上流の復旧を何日も待つとき・週次や月次のソース（`--until`）
 - ⚠ **`--until` が抑えるのは error だけ。**その間の run が宛先で落ちれば未達（`undelivered`）で赤くなる（未達・取りこぼしは run ごとの確認のまま）
 - **緑でも本文で分かる。**`/healthz/source/:id` は `OK (error acknowledged until …)` / `OK (error acknowledged, re-evaluated at <次の定期実行>)` を返す。ほかの理由で赤いときは 503 の本文に同じ行が出る。`/status.json` は `error_acknowledged_at` / `error_acknowledged_until`、`acknowledged_reasons` に `errored`
-- ⚠ 期限つきの確認の「成功で解除」は、確認の後に**終わった** error でない run（`success` / `partial`）を run_log から探す（窓では足りない・確認の時点で走っていた run も数える）
+- ⚠ **「成功で解除」は記録で持つ。**error で終わらなかった run（`success` / `partial`）を記録した時点で、error の確認を消す（`SilenceAck.clear_error`）。⚠ 判定のたびに run_log から探す形にすると、保持期間の掃除で成功の行が消えたとき確認が復活する（#1779 の Codex P2）
 
 ### `/status.json` の中身
 
