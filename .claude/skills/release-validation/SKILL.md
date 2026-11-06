@@ -20,7 +20,7 @@ RC や正式版リリース前に、開発環境で各 Source / Shrieker が動�
 - ステージングの dev25 / dev27 に ssh できること（`test-mastodon` / `test-misskey` / `test-webhook` の宛先を取ってくる・#1481）
 - PieFed テストコミュニティ (`pf.korako.me/c/local_test`, community_id 82) に投稿可能なアカウント情報。疎通を確認したアカウントはメモリにある（`user_id` にメールアドレスをそのまま書ける）。⚠ **パスワードはリポジトリにも本番にも無い。**`config/sources/test-google-news-piefed.yaml` はローカルにしか存在せず（`config/sources/.gitignore` が `*`）、本番の `config/local.yaml` にも piefed の項目は無い
 
-- ⚠ **手元に `config/local.yaml` は無い**（`.gitignore`）。`bin/shrieker` と daemon は無くても動くが、`rake config:lint` は `crypt.password` で NG になる。🔴 **`config/local.yaml` に書く設定を足した版は、実物を置いて確かめる**（4.19.0 の `/source_defaults` は、テストは緑なのに実物では効いていなかった）。終わったら消す
+- ⚠ **手元に `config/local.yaml` は無い**（`.gitignore`）。`bin/shrieker` は無くても動くが、`rake config:lint` は `crypt.password` で NG になり、4.20.0 から Scheduler（daemon・`rake test`）も `crypt.password` が要る（digest の鍵・#1761）。少なくとも `config/local_sample.yaml` を写して置く。🔴 **`config/local.yaml` に書く設定を足した版は、実物を置いて確かめる**（4.19.0 の `/source_defaults` は、テストは緑なのに実物では効いていなかった）。終わったら消す
 
 ## テスト用ソースの配置
 

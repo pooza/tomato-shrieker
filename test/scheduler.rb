@@ -156,6 +156,27 @@ module TomatoShrieker
       assert_equal(1, jobs(FIXTURE_ID).size, '消したほうのジョブが残っている')
     end
 
+    # 🔴 **#1761: digest は `/crypt/password` を鍵にした HMAC。**素のハッシュだと、定義の
+    # ほかの項目が分かっていれば `/status.json` の値で資格情報の推測を試せる。
+    def test_digest_is_keyed
+      sources = [Source.create(FIXTURE_ID)]
+      body = sources.map {|v| v.to_h.except('class')}.to_json
+      digest = Scheduler.digest(sources)
+
+      assert_match(/\A\h{64}\z/, digest)
+      assert_not_equal(Digest::SHA256.hexdigest(body), digest)
+      assert_equal(OpenSSL::HMAC.hexdigest('SHA256', config['/crypt/password'], body), digest)
+    end
+
+    # 鍵が変われば digest も変わる（鍵を読んでいること）
+    def test_digest_depends_on_crypt_password
+      sources = [Source.create(FIXTURE_ID)]
+      before = Scheduler.digest(sources)
+      config['/crypt/password'] = "#{config['/crypt/password']}-changed"
+
+      assert_not_equal(before, Scheduler.digest(sources))
+    end
+
     # 🔴 **register が失敗したソースは、古いジョブを残す (#1545 Codex P1)。**
     # reload はスキーマ検証をしないので、不正な cron 式はここまで来る。先に
     # unschedule する実装だと、失敗したソースが次の reload までジョブ 1 本無い
