@@ -202,6 +202,7 @@ dest:
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（**既定は false**。`true` と書いたときだけ有効。`/dest/mulukhiya` を書くなら `enable` は必須）
 - `/dest/mulukhiya/url`, `/dest/mulukhiya/tagging/enable` — ハッシュタグ自動付与
+  - 🔴 **タグ付けの問い合わせが失敗したら、ソースのタグ（`/dest/tags`）だけで投稿する**（ログに error・4.20.0・#1754）。本文を持つソース（`common.erb`・PieFed）もエントリ（`Entry#tags`）も同じ。⚠ ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと失敗になる（追わない）。`/dest/mulukhiya/url` は最終の URL で書く
 - Webhook digest・カスタムフィード連携の詳細: [mulukhiya-toot-proxy 連携ドキュメント](https://github.com/pooza/mulukhiya-toot-proxy/blob/develop/docs/tomato-shrieker-integration.md)
 
 ### タグ処理の責務分担
