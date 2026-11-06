@@ -113,16 +113,31 @@ module TomatoShrieker
       assert_nil(validator.call('internal.example'))
     end
 
-    # #1688: FeedSource / IcalendarSource の取得がこの経路を通ること
-    def test_sources_reject_redirect_to_internal_host
-      stub_request(:get, %r{\Ahttps://example\.com/feed\.rss}).to_return(status: 302, headers: {'Location' => 'http://127.0.0.1/admin'})
-      internal = stub_request(:get, 'http://127.0.0.1/admin').to_return(status: 200, body: 'secret')
-      feed = FeedSource.new({'id' => '__test_http__', 'source' => {'feed' => URL}})
-      ical = IcalendarSource.new({'id' => '__test_http__', 'source' => {'calendar' => URL}})
+    # #1688: FeedSource の取得がこの経路を通ること
+    def test_feed_source_rejects_redirect_to_internal_host
+      internal = stub_redirect_to_internal
+      source = FeedSource.new({'id' => '__test_http__', 'source' => {'feed' => URL}})
 
-      assert_raise(Ginseng::GatewayError) {feed.feedjira}
-      assert_raise(Ginseng::GatewayError) {ical.ical}
+      assert_raise(Ginseng::GatewayError) {source.feedjira}
       assert_not_requested(internal)
+    end
+
+    # #1688: IcalendarSource の取得がこの経路を通ること
+    def test_icalendar_source_rejects_redirect_to_internal_host
+      internal = stub_redirect_to_internal
+      source = IcalendarSource.new({'id' => '__test_http__', 'source' => {'calendar' => URL}})
+
+      assert_raise(Ginseng::GatewayError) {source.ical}
+      assert_not_requested(internal)
+    end
+
+    private
+
+    # ⚠ IcalendarSource は URL に `t=` を足すので、クエリ付きでも当たる形で受ける。
+    def stub_redirect_to_internal
+      stub_request(:get, %r{\Ahttps://example\.com/feed\.rss})
+        .to_return(status: 302, headers: {'Location' => 'http://127.0.0.1/admin'})
+      return stub_request(:get, 'http://127.0.0.1/admin').to_return(status: 200, body: 'secret')
     end
   end
 end
