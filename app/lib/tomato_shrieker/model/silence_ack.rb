@@ -43,6 +43,13 @@ module TomatoShrieker
       return where(source_id:).update(error_acknowledged_at: at, error_acknowledged_until: until_at)
     end
 
+    # error の確認を解除する（error で終わらなかった run の後・#1749）。⚠ ほかの確認（沈黙・未達・
+    # 取りこぼし）の記録には触らない。
+    def self.clear_error(source_id)
+      return where(source_id:).exclude(error_acknowledged_at: nil)
+          .update(error_acknowledged_at: nil, error_acknowledged_until: nil)
+    end
+
     def reasons
       return acknowledged_reasons.to_s.split(',')
     end

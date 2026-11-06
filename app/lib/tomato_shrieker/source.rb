@@ -10,9 +10,6 @@ module TomatoShrieker
     # 沈黙の起点の根拠 (#1502)。
     BASELINE_DELIVERY = 'delivery'.freeze
     BASELINE_ACKNOWLEDGEMENT = 'acknowledgement'.freeze
-    # 期限つきの error の確認で、確認の時点で走っていた run を拾うための余白（秒・#1749）。
-    # ⚠ 本番の最長 run は 62.6 秒。
-    SUCCEEDED_SINCE_MARGIN = 3600
     BASELINE_OBSERVATION = 'observation'.freeze
 
     def initialize(params)
@@ -458,27 +455,18 @@ module TomatoShrieker
     # `latest_error` は連続している error のうち直近の run（呼び出し側が持っている窓から渡す）。
     # - 期限なし: その run が確認より前に終わっていれば確認済み。⚠ 次の定期実行がまた error なら
     #   赤に戻る（確認は 1 回の失敗にしか効かない）
-    # - 期限つき（`--until`）: 期限の前で、確認の後に成功した run が無ければ確認済み。⚠ 期限を
-    #   過ぎたら、その時点の結果で判定し直す（確認した run のままでも赤）
+    # - 期限つき（`--until`）: 期限の前なら確認済み。⚠ 期限を過ぎたら、その時点の結果で判定し直す
+    #   （確認した run のままでも赤）
+    # ⚠ **成功したら確認は消える。**error で終わらなかった run を記録したときに、記録ごと消す
+    # （`SourceRunLog.record` → `SilenceAck.clear_error`）。
     # ⚠ **run_log には触らない。**落ちた事実と定期実行の結果は残る。緑に戻すのは周期どおりの実行だけ。
     def error_acknowledged?(latest_error)
       return false unless latest_error
       return false unless at = acknowledgement&.error_acknowledged_at
-      unless until_at = acknowledgement.error_acknowledged_until
-        return latest_error.finished_at <= at
+      if acknowledgement.error_acknowledged_until
+        return Time.now < acknowledgement.error_acknowledged_until
       end
-      return false unless Time.now < until_at
-      return !run_succeeded_after?(at)
-    end
-
-    # 確認の後に終わった、error でない run があるか（期限つきの確認を解除する条件・#1749）。
-    # ⚠ 窓（`streak_window`）では足りない。月単位の期限だと日次のソースは窓を超えて error が続く。
-    # ⚠ 確認の時点で走っていた run も、確認の後に成功で終われば数える（終了時刻で比べる）。
-    def run_succeeded_after?(at)
-      return SourceRunLog.where(source_id: id)
-          .where {executed_at > at - SUCCEEDED_SINCE_MARGIN}
-          .exclude(status: SourceRunLog::STATUS_ERROR)
-          .any? {|log| log.finished_at > at}
+      return latest_error.finished_at <= at
     end
 
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**

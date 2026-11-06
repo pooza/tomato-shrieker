@@ -394,11 +394,33 @@ module TomatoShrieker
     def test_ack_error_with_until_is_cleared_by_success
       record_error(FIXTURE_ID)
       ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
-      record(FIXTURE_ID, at: Time.now + 1)
+      SourceRunLog.record_success(FIXTURE_ID, started_at: Time.now)
       record_error(FIXTURE_ID, at: Time.now + 2)
       status, = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_equal(503, status)
+    end
+
+    # 🔴 #1749（#1779 の Codex P2）: 解除は記録で持つ。成功の行が掃除で消えても、確認は戻らない。
+    def test_ack_error_cleared_by_success_survives_pruning
+      record_error(FIXTURE_ID)
+      ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      SourceRunLog.record_success(FIXTURE_ID, started_at: Time.now)
+      SourceRunLog.where(source_id: FIXTURE_ID, status: SourceRunLog::STATUS_SUCCESS).delete
+      record_error(FIXTURE_ID, at: Time.now + 2)
+      status, = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_equal(503, status)
+      assert_nil(SilenceAck.where(source_id: FIXTURE_ID).first.error_acknowledged_until)
+    end
+
+    # #1749: error の run は確認を消さない（期限つきの確認は次の error でも残る）
+    def test_ack_error_not_cleared_by_error_run
+      record_error(FIXTURE_ID)
+      ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      SourceRunLog.record_error(FIXTURE_ID, started_at: Time.now, error: RuntimeError.new('boom'))
+
+      assert_not_nil(SilenceAck.where(source_id: FIXTURE_ID).first.error_acknowledged_until)
     end
 
     # #1749: 期限を過ぎたら、その時点の結果で判定し直す（確認した run のままでも赤）。
