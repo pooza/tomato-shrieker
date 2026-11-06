@@ -23,7 +23,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - 配信先が 1 つ以上ある (`dest_count > 0`)
 - 1 度は走っている。**ただし足したばかりのソースは、初回の実行期限までは 200**（下の「まだ走っていないソース」）
 - 次回の発火予定 ＋ `grace_seconds` を過ぎていない (stale でない)
-- 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）
+- 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）。⚠ 届いていても、運用者が確認済みにしていれば 200（下の「error の確認」・#1749）
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
 - **配信へ進む前に失ったエントリが残っていない (lost_entries でない・#1574)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
@@ -142,6 +142,7 @@ bin/shrieker source ack ID
 | 状況 | 対処 |
 |------|------|
 | 一時的に静か（たまたま 1 か月新着が無かった） | `bin/shrieker source ack ID` |
+| 一時的な失敗で error（原因は分かっている） | `bin/shrieker source ack ID`（上流の復旧を待つなら `--until`・上の「error の確認」） |
 | 投稿が恒久的に終了した | `bin/shrieker source disable ID`（＋ `source reload`） |
 | 年単位で正常に静か（`chikanan` 等） | `silence_tolerance` を設定しない |
 
@@ -165,6 +166,21 @@ bin/shrieker source ack ID
 | `null` | run が 1 件も無い（まだ一度も走っていない）。`silent` は `false`（#1560 の初回の期限の領分） |
 
 ⚠ **初回 run でいきなり配信できたソースは `observed_since` と時刻が一致する**が、`delivery` が勝つ（同着は宣言順）。
+
+### error の確認（4.20.0・#1749）
+
+🔴 **`ack` は error（`error_streak` がしきい値に届いた状態）にも効く。**日次のソースが一時的な失敗で 1 回落ちると、次の定期実行まで丸 1 日赤いままになるため。⚠ **緑に戻すのは周期どおりの実行だけ、という判断は変えていない**: run_log には触らず（`error_streak` の数字もそのまま）、`/healthz/source/:id` の判定だけを抑える。
+
+| 書き方 | 効く範囲 |
+| --- | --- |
+| `bin/shrieker source ack ID` | **確認した run まで。**次の定期実行がまた error なら赤に戻る（確認より後に終わった error の run は了解していない） |
+| `bin/shrieker source ack ID --until 2026-11-14` | **期限まで。**その間の error でも緑。⚠ **期限の前に成功したら、その時点で解除する**（次の失敗はすぐ赤）。期限を過ぎたら、その時点の結果で判定し直す（確認した run のままでも赤） |
+
+- ⚠ **期限の無い「ずっと緑」は作らない（ユーザー判断）。**`--until` は未来の時刻だけを受け、error の警告が出ていないソースには使えない（先回りの確認はしない）。日付だけなら**その日の 0:00**（`Time.parse`）。出力に実際の時刻を出す
+- 📌 **使いどころ**: `schedule.retry`（#1585）のやり直しも使い切ったとき（期限なし）と、原因が分かっていて上流の復旧を何日も待つとき・週次や月次のソース（`--until`）
+- ⚠ **`--until` が抑えるのは error だけ。**その間の run が宛先で落ちれば未達（`undelivered`）で赤くなる（未達・取りこぼしは run ごとの確認のまま）
+- **緑でも本文で分かる。**`/healthz/source/:id` は `OK (error acknowledged until …)` / `OK (error acknowledged, re-evaluated at <次の定期実行>)` を返す。ほかの理由で赤いときは 503 の本文に同じ行が出る。`/status.json` は `error_acknowledged_at` / `error_acknowledged_until`、`acknowledged_reasons` に `errored`
+- ⚠ 期限つきの確認の「成功で解除」は、確認の後に**終わった** error でない run（`success` / `partial`）を run_log から探す（窓では足りない・確認の時点で走っていた run も数える）
 
 ### `/status.json` の中身
 
@@ -213,6 +229,8 @@ bin/shrieker source ack ID
       "acknowledged_at": null,
       "acknowledged_run_id": null,
       "acknowledged_reasons": null,
+      "error_acknowledged_at": null,
+      "error_acknowledged_until": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1},
