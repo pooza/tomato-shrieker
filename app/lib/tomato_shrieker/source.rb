@@ -355,8 +355,22 @@ module TomatoShrieker
     def create_tags(status)
       container = Ginseng::Fediverse::TagContainer.new
       container.concat(tags.clone)
-      container.concat(mulukhiya.search_hashtags(status)) if remote_tagging?
+      container.concat(remote_tags(status)) if remote_tagging?
       return container.create_tags
+    end
+
+    # モロヘイヤのリモートのタグ付け。
+    #
+    # 🔴 **失敗したら、ソースのタグだけで投稿する (#1754)。**`create_tags` は `common.erb` の
+    # 描画と PieFed の `tags_of` から呼ばれるので、ここで上げると**そのソースの全宛先が
+    # 投稿に失敗する**。ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと
+    # `GatewayError` になる（4xx / 5xx と同じ扱い）。⚠ エントリの側（`Entry#tags`）と
+    # 揃えてある（docs/sources.md の「リモートのタグ付けが拒否されたら」）。ログには error を残す。
+    def remote_tags(status)
+      return mulukhiya.search_hashtags(status)
+    rescue => e
+      logger.error(source: id, error: e)
+      return []
     end
 
     def remote_tagging?

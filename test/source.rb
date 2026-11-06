@@ -919,7 +919,37 @@ module TomatoShrieker
       end
     end
 
+    # #1754: リモートのタグ付けが効いていれば、モロヘイヤの答えを足す
+    def test_create_tags_with_remote_tagging
+      stub_tag_search.to_return(status: 200, headers: {'Content-Type' => 'application/json'},
+        body: {'キュアブラック' => {'words' => ['キュアブラック']}}.to_json)
+
+      assert_equal(Set['#precure_fun', '#キュアブラック'], remote_tagging_source.create_tags('キュアブラック'))
+    end
+
+    # 🔴 #1754: モロヘイヤが 3xx を返したら（ginseng-fediverse 7.0.0 から GatewayError）、
+    # ソースのタグだけで投稿する。上げると common.erb の描画ごと全宛先が落ちる。
+    def test_create_tags_falls_back_when_remote_tagging_redirects
+      stub_tag_search.to_return(status: 307, headers: {'Location' => 'https://other.example.test/x'})
+
+      assert_equal(Set['#precure_fun'], remote_tagging_source.create_tags('キュアブラック'))
+    end
+
     private
+
+    def remote_tagging_source
+      return TextSource.new(
+        'source' => {'text' => 'dummy'},
+        'dest' => {
+          'tags' => ['precure_fun'],
+          'mulukhiya' => {'enable' => true, 'url' => 'https://mulukhiya.example.test', 'tagging' => {'enable' => true}},
+        },
+      )
+    end
+
+    def stub_tag_search
+      return stub_request(:post, 'https://mulukhiya.example.test/mulukhiya/api/tagging/tag/search')
+    end
 
     def retry_source(retry_params, &)
       params = {
