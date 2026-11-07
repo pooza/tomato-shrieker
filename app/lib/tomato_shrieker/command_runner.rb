@@ -142,10 +142,17 @@ module TomatoShrieker
     # ⚠ **検査するだけ。**起動は止めず、直しもしない（デプロイ漏れをコードで隠さない）。
     # 見つけたらログと Sentry に出す。
     def check_command_bundle
-      return unless problem = command_bundle_problem
+      # ⚠ 結果を控える。`Scheduler#apply` が `reload.result` の `bundle` に出す（#1721）。
+      @command_bundle_problem = command_bundle_problem
+      return unless problem = @command_bundle_problem
       error = RuntimeError.new(problem)
       logger.error(source: id, class: self.class.to_s, error:)
       Sentry.capture_exception(error, tags: {source: id}) if Sentry.initialized?
+    end
+
+    # 直近の登録で、コマンドの依存が壊れていたか（#1721）。⚠ 登録しない限り偽。
+    def command_bundle_broken?
+      return @command_bundle_problem.present?
     end
 
     # 依存の問題の説明。無ければ nil。⚠ デプロイ前の確認（deploy スキルの `enabled_sources.rb`）

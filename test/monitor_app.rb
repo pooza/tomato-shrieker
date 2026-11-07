@@ -347,6 +347,17 @@ module TomatoShrieker
       assert_equal(200, status)
     end
 
+    # #1721: `source reload --wait` が読む軽い口。中身は `/status.json` の `reload` と同じ。
+    def test_reload_json
+      status, headers, body = call('/reload.json')
+      payload = JSON.parse(body.first)
+
+      assert_equal(200, status)
+      assert_include(headers['content-type'], 'application/json')
+      assert_equal(Scheduler.instance.load_state[:count], payload['reload']['count'])
+      assert_not_include(payload.keys, 'sources')
+    end
+
     def test_healthz_source_errored
       record(FIXTURE_ID, status: SourceRunLog::STATUS_ERROR, attempted_count: 1,
         error_message: 'RuntimeError: boom')
@@ -682,7 +693,8 @@ module TomatoShrieker
       _status, _headers, body = call('/status.json')
       reload = JSON.parse(body.first)['reload']
 
-      assert_equal(['action', 'at', 'count', 'error', 'result'], reload.keys.sort)
+      # #1721: `last_reload` は直近の reload（HUP）の回
+      assert_equal(['action', 'at', 'count', 'error', 'last_reload', 'result'], reload.keys.sort)
       assert_kind_of(Integer, reload['count'])
     end
 

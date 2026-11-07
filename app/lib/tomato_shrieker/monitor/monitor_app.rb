@@ -15,6 +15,8 @@ module TomatoShrieker
         healthz
       when '/status.json'
         status_json
+      when '/reload.json'
+        reload_json
       when SOURCE_HEALTHZ
         healthz_source(Regexp.last_match(:id))
       else
@@ -207,6 +209,13 @@ module TomatoShrieker
     rescue => e
       Sentry.capture_exception(e, tags: {stage: 'status_json'}) if Sentry.initialized?
       return [500, JSON_HEADERS, ["#{JSON.dump(error: Package.error_message(e))}\n"]]
+    end
+
+    # 🔴 **`source reload --wait` が待つあいだ読む軽い口 (#1721)。**`/status.json` は全ソースの行を
+    # 組み立てる（約 0.3 秒・行の組み立てが壊れていると Sentry へ 1 件ずつ送る）ので、毎秒は読まない。
+    # ⚠ 読むだけ。中身は `/status.json` の `reload` と同じ。
+    def reload_json
+      return [200, JSON_HEADERS, ["#{JSON.generate(reload: Scheduler.instance.load_state)}\n"]]
     end
 
     def status_rows(entries)
