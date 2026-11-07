@@ -185,8 +185,8 @@ module TomatoShrieker
       return removed
     end
 
-    # 失敗した id を返す。⚠ CommandSource#register は bundle install を走らせる
-    # ので、初回登録の速さのために並列のまま置く。
+    # 失敗した id を返す。⚠ コマンドを走らせるソースの `register` は `bundle install`（`bundle` で
+    # 始まるコマンドだけ）と `bundle check` を走らせるので、初回登録の速さのために並列のまま置く。
     def swap_all(stale, desired, action)
       in_threads = Parallel.processor_count * 2
       return Parallel.map(stale, in_threads:) do |id|
@@ -195,8 +195,9 @@ module TomatoShrieker
     end
 
     # 🔴 **新しいジョブを立ててから古いジョブを落とす (#1545 Codex P1)。**
-    # `register` は失敗しうる（`CommandSource` は bundle install を走らせるし、
-    # reload はスキーマ検証をしないので不正な cron 式もここへ来る）。先に消すと、
+    # `register` は失敗しうる（reload はスキーマ検証をしないので不正な cron 式もここへ来る）。
+    # ⚠ `bundle install` の失敗はここでは失敗にならない（`CommandLine#bundle_install` は `system` の
+    # 戻り値を返すだけ・#1704）。依存の欠けは `bundle check` の結果として `bundle` に出る（#1721）。先に消すと、
     # **失敗したソースが次の reload までジョブ 1 本無いまま放置される**。
     def swap(id, sources, action)
       # ⚠ 先に nil で置く (#1575)。`jobs` 自体が上げたら、何も立てていないので巻き戻さない。

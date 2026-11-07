@@ -665,6 +665,27 @@ module TomatoShrieker
       assert_false(SourceValidator.valid?(base.merge('monitor' => {'error_streak_threshold' => '4'})))
     end
 
+    # 🔴 #1704: 期間の pattern は文字列全体に当てる（`^…$` だと改行の後ろだけで通っていた）。
+    def test_duration_pattern_matches_whole_string
+      base = {'source' => {'feed' => 'https://example.com/feed'}, 'dest' => {'hooks' => ['https://example.com/x']}}
+
+      assert_true(SourceValidator.valid?(base.merge('monitor' => {'silence_tolerance' => '30d'})))
+      assert_false(SourceValidator.valid?(base.merge('monitor' => {'silence_tolerance' => "0 0 * * *\n30d"})))
+    end
+
+    # #1704: 1 つの定義が複数のソースクラスに当たったら WARN（二重に走る）。
+    def test_warnings_multiple_match
+      base = {'dest' => {'hooks' => ['https://example.com/x']}, 'monitor' => {'silence_tolerance' => '7d'}}
+      single = base.merge('source' => {'feed' => 'https://example.com/feed'})
+      double = base.merge('source' => {'calendar' => 'https://example.com/a.ics', 'ical' => {'command' => ['bin/x']}})
+
+      assert_empty(SourceValidator.warnings(single))
+      warnings = SourceValidator.warnings(double)
+
+      assert_equal(1, warnings.size)
+      assert_include(warnings.first, '2 本のソースとして立ちます')
+    end
+
     # #1625: 投稿はリダイレクトを追わない。`http://` の宛先が https へ転送する構成だと
     # 投稿が全部 error になるので、スキーマは通したまま WARN で知らせる。
     def test_warnings_insecure_dest
@@ -855,7 +876,11 @@ module TomatoShrieker
       }
 
       assert_equal(2, SourceValidator.send(:matched_sources, params).size, '前提: 2 インスタンス')
-      assert_empty(SourceValidator.warnings(params))
+      # ⚠ #1704 から、複数のクラスに当たること自体は WARN になる。しきい値の WARN は出ないこと。
+      warnings = SourceValidator.warnings(params)
+
+      assert_equal(1, warnings.size)
+      assert_include(warnings.first, '2 本のソースとして立ちます')
     end
 
     # 🔴 **#1587 (Codex P1): `schedule` を省いても実行時には既定で走る。**

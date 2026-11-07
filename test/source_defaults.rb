@@ -148,6 +148,17 @@ module TomatoShrieker
       assert_not_empty(schema_errors('TextSource' => {'monitor' => {'tolerance' => 'abc'}}))
     end
 
+    # 🔴 #1704: `/google/news` の綴りの誤りを `rake config:lint` で拾う（cleaner の未設定は黙って
+    # Google News の直読みへ倒れるので）。
+    def test_schema_rejects_google_news_typos
+      errors = ->(google) {JSON::Validator.fully_validate(base_schema, {'google' => google})}
+
+      assert_empty(errors.call('news' => {'cleaner' => {'url' => 'http://cleaner.local:3000/clean'}}))
+      assert_empty(errors.call('api' => {'key' => 'x'}, 'news' => {'cleaner' => {'url' => nil}}))
+      assert_not_empty(errors.call('news' => {'cleaner' => {'uri' => 'http://cleaner.local:3000/clean'}}))
+      assert_not_empty(errors.call('news' => {'cleanr' => {'url' => 'http://cleaner.local:3000/clean'}}))
+    end
+
     def base_schema
       return YAML.load_file(File.join(Environment.dir, 'config/schema/base.yaml'))
     end

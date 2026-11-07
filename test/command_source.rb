@@ -188,6 +188,14 @@ module TomatoShrieker
       assert_include(error.message, 'only on stdout')
     end
 
+    # #1704: 例外メッセージ（`last_error`）の末尾に改行を残さない。
+    def test_exec_error_has_no_trailing_newline
+      source = build_secret_source('echo "calendar name required" >&2; exit 1')
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_equal('calendar name required', error.message)
+    end
+
     # ⚠ 短い値まで伏せると、ログの同じ文字が全部 `[FILTERED]` になって読めなくなる。
     def test_command_secrets_skips_short_values
       assert_not_include(build_secret_source.command.secrets, '1')
