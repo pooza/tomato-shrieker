@@ -464,6 +464,25 @@ module TomatoShrieker
       return @acknowledgement
     end
 
+    # 🔴 **いま連続している error を、運用者が確認済みにしているか (#1749)。**
+    #
+    # `latest_error` は連続している error のうち直近の run（呼び出し側が持っている窓から渡す）。
+    # - 期限なし: その run が確認より前に終わっていれば確認済み。⚠ 次の定期実行がまた error なら
+    #   赤に戻る（確認は 1 回の失敗にしか効かない）
+    # - 期限つき（`--until`）: 期限の前なら確認済み。⚠ 期限を過ぎたら、その時点の結果で判定し直す
+    #   （確認した run のままでも赤）
+    # ⚠ **成功したら確認は消える。**error で終わらなかった run を記録したときに、記録ごと消す
+    # （`SourceRunLog.record` → `SilenceAck.clear_error`）。
+    # ⚠ **run_log には触らない。**落ちた事実と定期実行の結果は残る。緑に戻すのは周期どおりの実行だけ。
+    def error_acknowledged?(latest_error)
+      return false unless latest_error
+      return false unless at = acknowledgement&.error_acknowledged_at
+      if acknowledgement.error_acknowledged_until
+        return Time.now < acknowledgement.error_acknowledged_until
+      end
+      return latest_error.finished_at <= at
+    end
+
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**
     #
     # 未達（`undelivered?`）と同じ重さ・同じ消し方にする: 失われたものは戻らないので、
