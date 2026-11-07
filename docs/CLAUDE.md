@@ -297,7 +297,7 @@ Sentry イシューをクローズせず経過観察とする場合、その意�
 | PiefedShrieker | 0 件 | 不明 |
 | NostrShrieker | 0 件 | 別枠（下記） |
 
-⚠ **運用者の目線だけで優先度を決めると、直接経路が永久に検証されないまま残る。**Mastodon / Misskey に触れる変更は、本番で 0 件だからといって影響が小さいと判断しない。📌 4.18.0 から、リリース前検証でステージングへ直接投稿・モロヘイヤ経由の両方を実際に通す（[release-validation スキル](../.claude/skills/release-validation/SKILL.md) の 4a・#1481）。
+⚠ **運用者の目線だけで優先度を決めると、直接経路が永久に検証されないまま残る。**Mastodon / Misskey に触れる変更は、本番で 0 件だからといって影響が小さいと判断しない。📌 4.18.0 から、リリース前検証でステージングへ直接投稿・モロヘイヤ経由の両方を実際に通す（[release-validation スキル](../.claude/skills/release-validation/SKILL.md) の 4a・#1481）。📌 4.20.0 から、chubo2 の fedi-test-harness（バニラの Mastodon / Misskey）を手元で立てると、`test/fedi_harness.rb` が直接経路で実際に投稿して読み返す（#1451）。`set -a; source ~/repos/chubo2/fedi-test-harness/{mastodon,misskey}/.env.test; set +a` してから `rake test`。⚠ 環境変数が無ければ省略（CI も）。⚠ 使い終わったらハーネスは `scripts/stop.sh` で止める（3000 番はモロヘイヤも使う）。
 
 ⚠ **Nostr をこの非対称と同列に扱わない。**Nostr にも外部ユーザーはいるが、下記のとおりテスト責任の所在が違う。
 
