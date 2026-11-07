@@ -46,7 +46,7 @@ ssh oscura '
   pid=$(systemctl show tomato-shrieker -p MainPID --value)
   # ⚠ `attachment dropped` / `tags not attached`（4.15.0）は、投稿は成功として数えるので
   # 監視のどこにも出ない。ここでしか気づけない（直接経路・PieFed 宛が無ければ 0 のはず）
-  for word in "redirect refused" "process identity" "event dropped" "attachment dropped" "tags not attached"; do
+  for word in "redirect refused" "process identity" "event dropped" "attachment dropped" "tags not attached" "remote tags dropped" "Rejected host"; do
     printf "%s: %s\n" "$word" "$(grep -F "tomato-shrieker[$pid]:" "$log" | grep -cF "$word")"
   done
   printf "not started（今日のログ全体）: %s\n" "$(grep -cF "not started" "$log")"'
