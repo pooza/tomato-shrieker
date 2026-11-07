@@ -367,6 +367,29 @@ module TomatoShrieker
       assert_nil(state[:error])
     end
 
+    # 🔴 #1721: 起動の登録（`register`）が後から記録されても、直近の reload の回は `last_reload` に残る。
+    def test_load_state_keeps_last_reload
+      @scheduler.reload
+      reload_count = @scheduler.load_state[:count]
+      @scheduler.send(:register_all)
+      state = @scheduler.load_state
+
+      assert_equal('register', state[:action])
+      assert_equal(reload_count, state[:last_reload][:count])
+      assert_equal('reload', state[:last_reload][:action])
+    end
+
+    # 🔴 #1721: 依存の欠けたコマンドソースは登録は通るが、`bundle` に出る（`--wait` が非 0 で終える）。
+    def test_reload_reports_broken_command_bundle
+      write_fixture(OTHER_ID, {'source' => {'feed' => nil, 'command' => ['echo', 'x'],
+                                            'dir' => '/nonexistent/__test_1721__'}})
+      result = @scheduler.reload
+
+      assert_include(result[:bundle], OTHER_ID)
+      assert_not_empty(jobs(OTHER_ID))
+      assert_not_include(result[:bundle], FIXTURE_ID)
+    end
+
     # ⚠ **失敗しても `count` は進む**（進まないと `--wait` が締切まで待つ）。メッセージは載せない。
     def test_load_state_records_failure
       before = @scheduler.load_state[:count]

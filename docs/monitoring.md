@@ -11,6 +11,7 @@ scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サ
 | `/healthz` | 総合ヘルスチェック | 200 / 503 |
 | `/healthz/source/:id` | ソース別ヘルスチェック | 200 / 503 / 404 |
 | `/status.json` | 全体ステータス（人間/ダッシュボード向け） | 200 (JSON) |
+| `/reload.json` | ソース定義を読んだ結果だけ（`/status.json` の `reload` と同じ・`source reload --wait` が読む・4.20.0・#1721） | 200 (JSON) |
 
 ### `/healthz` の判定
 
@@ -242,7 +243,7 @@ bin/shrieker source ack ID
 
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
 
-`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
+`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)。4.20.0 から軽い `/reload.json` で）。`last_reload` は直近の reload（HUP）の回（まだ無ければ `null`・#1721）。`result.bundle` は登録は通ったがコマンドの依存が欠けている id（#1721）。
 
 `digest` は**いま scheduler に登録されている定義**のハッシュ (#1672)。`Scheduler.digest` で、reload が変更を見分けるのと同じもの。ディスク上の定義と比べれば、編集したまま reload していない定義（再起動で黙って有効になる）が分かる（deploy スキルの `pending_sources.sh`）。一度も登録できていない新しいソースは `null`、読めない定義の行はキーごと無い。⚠ 変更した定義の reload が失敗した場合は古い digest が残る。⚠ CLI の `source status` は scheduler の外で動くので出さない。
 

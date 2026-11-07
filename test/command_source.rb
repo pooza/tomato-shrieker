@@ -388,6 +388,20 @@ module TomatoShrieker
       source.register
 
       assert_true(registered)
+      # #1721: 登録の結果として控え、`Scheduler#apply` が `reload.result` の `bundle` に出す
+      assert_true(source.command_bundle_broken?)
+    end
+
+    # #1721: 依存が壊れていなければ偽。登録しない限りも偽。
+    def test_command_bundle_broken_is_false_when_healthy
+      source = build_secret_source
+      source.define_singleton_method(:command_bundle_problem) {nil}
+      source.define_singleton_method(:schedule) {|*| nil}
+
+      assert_false(source.command_bundle_broken?)
+      source.register
+
+      assert_false(source.command_bundle_broken?)
     end
 
     def build_secret_source(script = nil)

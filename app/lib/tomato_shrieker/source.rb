@@ -44,6 +44,12 @@ module TomatoShrieker
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 
+    # コマンドの依存が壊れていたか（#1721）。コマンドを走らせないソースは常に偽。
+    # ⚠ `CommandRunner` が上書きする。
+    def command_bundle_broken?
+      return false
+    end
+
     def register
       return if disable?
       return schedule(:at, post_at) if post_at

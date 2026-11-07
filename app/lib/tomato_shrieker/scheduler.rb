@@ -109,18 +109,24 @@ module TomatoShrieker
       # id => 設定の digest。無変更のソースを見分けるためだけに持つ。
       @registry = {}
       @reload_mutex = Mutex.new
-      @load_state = {count: 0, action: nil, at: nil, result: nil, error: nil}
+      @load_state = {count: 0, action: nil, at: nil, result: nil, error: nil, last_reload: nil}
     end
 
     # ⚠ Hash ごと差し替える（読む側のスレッドが書きかけを見ない）。`@reload_mutex` の中で呼ぶ。
+    #
+    # 🔴 **直近の reload（HUP）の回を `last_reload` に別に控える (#1721)。**起動の途中に HUP が届いて
+    # reload が登録より先に `@reload_mutex` を取ると、記録の順が `reload` → `register` になり、
+    # 最後の 1 件（`register`）しか見えない `--wait` が、成功した reload を締切切れと誤報する。
     def record_load(result, error = nil, action:)
-      @load_state = {
+      state = {
         count: @load_state[:count] + 1,
         action:,
         at: Time.now.iso8601,
         result:,
         error: error&.class&.to_s,
-      }.freeze
+      }
+      last_reload = action == 'reload' ? state.dup.freeze : @load_state[:last_reload]
+      @load_state = state.merge(last_reload:).freeze
       return result
     end
 
@@ -141,9 +147,16 @@ module TomatoShrieker
       # ⚠ **失敗した id は registry を更新しない。**次の reload で必ずやり直す。
       (stale - failed).each {|id| @registry[id] = digests[id]}
       result = {added: added - failed, removed:, changed: stale - added - failed,
-                failed:, unmatched:}
+                failed:, unmatched:, bundle: bundle_broken(stale - failed, desired)}
       logger.info({scheduler: action}.merge(result))
       return result
+    end
+
+    # 🔴 #1721: 登録は通ったが、コマンドの依存が壊れている（走るたびに落ちる）id。起動は止めない
+    # 約束（#1477）は残し、結果に出して `source reload --wait` が非 0 で終える。⚠ 張り直した id だけを
+    # 見る（無変更のソースは登録しないので、検査も走っていない）。
+    def bundle_broken(ids, desired)
+      return ids.select {|id| desired[id].any?(&:command_bundle_broken?)}
     end
 
     # 🔴 **unmatched を `failed` と同じ声量で出す（4.10.0 リリース前レビュー）。**

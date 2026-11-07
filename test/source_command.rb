@@ -323,6 +323,44 @@ module TomatoShrieker
       end
 
       assert_include(error.message, 'b, c')
+      # #1721: 依存の欠けた定義も非 0
+      error = assert_raise(Thor::Error) {@command.send(:report_reload, {'result' => {'bundle' => ['d']}})}
+
+      assert_include(error.message, 'd')
+    end
+
+    # 🔴 #1721: 最後の 1 件が起動の登録でも、直近の reload が前進していればその回を返す。
+    def test_reload_waiter_returns_last_reload
+      waiter = ReloadWaiter.new(timeout: 5)
+      state = {'count' => 5, 'action' => 'register', 'last_reload' => {'count' => 4, 'action' => 'reload'}}
+      waiter.define_singleton_method(:state) {|*| state}
+      waiter.define_singleton_method(:sleep) {|_| nil}
+
+      assert_equal(4, waiter.wait(3)['count'])
+    end
+
+    # #1721: 軽い口を読む。知らない daemon（404）なら /status.json へ倒す。
+    def test_reload_waiter_falls_back_to_status_json
+      waiter = ReloadWaiter.new(timeout: 1)
+      reload = stub_request(:get, waiter.uri.to_s).to_return(status: 404)
+      status = stub_request(:get, waiter.uri(path: '/status.json').to_s)
+        .to_return(status: 200, body: {reload: {count: 7}}.to_json)
+
+      assert_equal(7, waiter.state['count'])
+      assert_requested(reload)
+      assert_requested(status)
+    end
+
+    # 🔴 #1721（#1724 の Codex P2）: 同時に打った `--wait` は 1 本だけ通す。
+    def test_reload_waiter_lock
+      inner = nil
+
+      ReloadWaiter.lock do
+        inner = assert_raise(Ginseng::GatewayError) {ReloadWaiter.lock {nil}}
+      end
+
+      assert_include(inner.message, '実行中')
+      assert_equal(:ok, ReloadWaiter.lock {:ok})
     end
 
     # #1529: 前進するまで読み直し、前進した回の結果を返す。締切を過ぎたら例外。
@@ -380,7 +418,7 @@ module TomatoShrieker
       ['::1', '::'].each do |bind|
         config['/monitor/bind'] = bind
 
-        assert_equal("http://[::1]:#{config['/monitor/port']}/status.json", ReloadWaiter.new(timeout: 1).uri.to_s)
+        assert_equal("http://[::1]:#{config['/monitor/port']}/reload.json", ReloadWaiter.new(timeout: 1).uri.to_s)
       end
     end
 

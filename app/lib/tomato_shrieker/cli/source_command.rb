@@ -301,7 +301,14 @@ module TomatoShrieker
       say '  沈黙の起点は動かしていません（沈黙の警告は出ていないため）。'
     end
 
+    # #1721: `--wait` は 1 本ずつ（`ReloadWaiter.lock`）。⚠ `count` を控えるところから結果を読むまでを
+    # 囲む（控えた後に別の 1 本が HUP を送ると、その回の結果を自分のものとして読む）。
     def request_reload(pid, waiter)
+      return send_reload(pid, nil) unless waiter
+      return monitor_call {ReloadWaiter.lock {send_reload(pid, waiter)}}
+    end
+
+    def send_reload(pid, waiter)
       before = monitor_call {waiter&.count}
       begin
         Process.kill('HUP', pid)
@@ -344,11 +351,16 @@ module TomatoShrieker
     def report_reload(state)
       raise Thor::Error, "reload failed: #{state['error']}（ログを確認してください）" if state['error']
       result = state['result'] || {}
-      ['added', 'removed', 'changed', 'failed', 'unmatched'].each do |key|
+      ['added', 'removed', 'changed', 'failed', 'unmatched', 'bundle'].each do |key|
         say "  #{key}: #{Array(result[key]).join(', ')}" if Array(result[key]).any?
       end
       problems = Array(result['failed']) + Array(result['unmatched'])
       raise Thor::Error, "反映できなかった定義があります: #{problems.join(', ')}" if problems.any?
+      # 🔴 #1721: 登録は通ったが、走るたびに落ちる。起動は止めない（#1477）が、成功とは言わない。
+      if Array(result['bundle']).any?
+        raise Thor::Error,
+          "コマンドの依存が欠けています（そのディレクトリで bundle install）: #{result['bundle'].join(', ')}"
+      end
       say "reloaded at #{state['at']}"
     end
 
