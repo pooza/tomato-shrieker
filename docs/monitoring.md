@@ -143,7 +143,7 @@ bin/shrieker source ack ID
 | 状況 | 対処 |
 |------|------|
 | 一時的に静か（たまたま 1 か月新着が無かった） | `bin/shrieker source ack ID` |
-| 一時的な失敗で error（原因は分かっている） | `bin/shrieker source ack ID`（上流の復旧を待つなら `--until`・上の「error の確認」） |
+| 一時的な失敗で error（原因は分かっている） | `bin/shrieker source ack ID`（上流の復旧を待つなら `--until`・下の「error の確認」） |
 | 投稿が恒久的に終了した | `bin/shrieker source disable ID`（＋ `source reload`） |
 | 年単位で正常に静か（`chikanan` 等） | `silence_tolerance` を設定しない |
 
@@ -180,6 +180,7 @@ bin/shrieker source ack ID
 - ⚠ **期限の無い「ずっと緑」は作らない（ユーザー判断）。**`--until` は未来の時刻だけを受け、error の警告が出ていないソースには使えない（先回りの確認はしない）。日付だけなら**その日の 0:00**（`Time.parse`）。出力に実際の時刻を出す
 - 📌 **使いどころ**: `schedule.retry`（#1585）のやり直しも使い切ったとき（期限なし）と、原因が分かっていて上流の復旧を何日も待つとき・週次や月次のソース（`--until`）
 - ⚠ **`--until` が抑えるのは error だけ。**その間の run が宛先で落ちれば未達（`undelivered`）で赤くなる（未達・取りこぼしは run ごとの確認のまま）
+- ⚠ **`/status.json` の `error_acknowledged_at` / `_until` は記録で、いま効いているかではない。**次の error で赤に戻っても・期限が過ぎても値は残る（成功で消える）。いま抑えているかは `/healthz/source/:id` の本文で読む
 - **緑でも本文で分かる。**`/healthz/source/:id` は `OK (error acknowledged until …)` / `OK (error acknowledged, re-evaluated at <次の定期実行>)` を返す。ほかの理由で赤いときは 503 の本文に同じ行が出る。`/status.json` は `error_acknowledged_at` / `error_acknowledged_until`、`acknowledged_reasons` に `errored`
 - ⚠ **「成功で解除」は記録で持つ。**error で終わらなかった run（`success` / `partial`）を記録した時点で、error の確認を消す（`SilenceAck.clear_error`）。⚠ 判定のたびに run_log から探す形にすると、保持期間の掃除で成功の行が消えたとき確認が復活する（#1779 の Codex P2）
 
@@ -194,8 +195,9 @@ bin/shrieker source ack ID
     "count": 3,
     "action": "reload",
     "at": "2026-10-16T08:00:00+09:00",
-    "result": {"added": [], "removed": [], "changed": ["matrix-news"], "failed": [], "unmatched": []},
-    "error": null
+    "result": {"added": [], "removed": [], "changed": ["matrix-news"], "failed": [], "unmatched": [], "bundle": []},
+    "error": null,
+    "last_reload": {"count": 3, "action": "reload", "at": "2026-10-16T08:00:00+09:00", "result": {"...": "..."}, "error": null}
   },
   "sources": [
     {
