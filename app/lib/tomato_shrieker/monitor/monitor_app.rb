@@ -15,6 +15,8 @@ module TomatoShrieker
         healthz
       when '/status.json'
         status_json
+      when '/reload.json'
+        reload_json
       when SOURCE_HEALTHZ
         healthz_source(Regexp.last_match(:id))
       else
@@ -65,8 +67,22 @@ module TomatoShrieker
       latest = SourceRunLog.latest_for(source_id)
       return no_run_response(source) unless latest
       checks = source_checks(source, latest)
-      return [200, HEADERS, ["OK\n"]] unless unhealthy?(checks)
+      return [200, HEADERS, [healthy_body(source, checks)]] unless unhealthy?(checks)
       return [503, HEADERS, [unhealthy_body(source, latest, checks)]]
+    end
+
+    # 🔴 **error を確認済みにして緑なら、本文でそう言う (#1749)。**Kuma の赤は消えても、
+    # 「健全だから緑」と「確認したから緑」を本文で見分けられるようにする。
+    def healthy_body(source, checks)
+      return "OK\n" unless checks[:error_acknowledged]
+      return "OK (#{error_acknowledgement_label(source, checks)})\n"
+    end
+
+    def error_acknowledgement_label(source, checks)
+      if until_at = source.acknowledgement.error_acknowledged_until
+        return "error acknowledged until #{until_at.iso8601}"
+      end
+      return "error acknowledged, re-evaluated at #{checks[:next_run].iso8601}"
     end
 
     # 🔴 **「定義が無い」と「定義は在るが読めない」を分ける (#1605)。**判別キーを打ち
@@ -106,16 +122,23 @@ module TomatoShrieker
       body << "next_run_at: #{checks[:next_run].iso8601}\n"
       body << "grace_seconds: #{source.monitor_grace_seconds}\n"
       body << "stale: #{checks[:stale]}\n"
-      body << "error_streak: #{checks[:streak]} / #{checks[:threshold]}\n"
+      body << streak_body(source, checks)
+      body << failure_body(latest)
+      body << undelivered_body(checks[:undelivered_log], latest) if checks[:undelivered]
+      body << lost_entries_body(checks[:lost_entries_log], latest) if checks[:lost_entries]
+      body << silent_body(source) if checks[:silent]
+      return body
+    end
+
+    def streak_body(source, checks)
+      body = "error_streak: #{checks[:streak]} / #{checks[:threshold]}\n"
       # 🔴 **なぜそのしきい値なのかを読めるようにする (#1586)。**⚠ ソース側で 28 に
       # 緩めていても、エントリ処理段で落ちた run があれば 1 に戻る。理由が出ないと
       # 運用者は「設定が効いていない」と読む。
       # ⚠ **いま連続している失敗のどれかが該当すれば true**（#1615 の Codex P2）。
       body << "entry_stage: #{checks[:entry_stage]}\n"
-      body << failure_body(latest)
-      body << undelivered_body(checks[:undelivered_log], latest) if checks[:undelivered]
-      body << lost_entries_body(checks[:lost_entries_log], latest) if checks[:lost_entries]
-      body << silent_body(source) if checks[:silent]
+      # #1749: error は確認済みで、ほかの理由で赤い
+      body << "#{error_acknowledgement_label(source, checks)}\n" if checks[:error_acknowledged]
       return body
     end
 
@@ -207,6 +230,13 @@ module TomatoShrieker
     rescue => e
       Sentry.capture_exception(e, tags: {stage: 'status_json'}) if Sentry.initialized?
       return [500, JSON_HEADERS, ["#{JSON.dump(error: Package.error_message(e))}\n"]]
+    end
+
+    # 🔴 **`source reload --wait` が待つあいだ読む軽い口 (#1721)。**`/status.json` は全ソースの行を
+    # 組み立てる（約 0.3 秒・行の組み立てが壊れていると Sentry へ 1 件ずつ送る）ので、毎秒は読まない。
+    # ⚠ 読むだけ。中身は `/status.json` の `reload` と同じ。
+    def reload_json
+      return [200, JSON_HEADERS, ["#{JSON.generate(reload: Scheduler.instance.load_state)}\n"]]
     end
 
     def status_rows(entries)

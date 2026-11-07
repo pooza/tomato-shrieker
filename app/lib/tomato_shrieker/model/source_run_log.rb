@@ -123,6 +123,10 @@ module TomatoShrieker
         error_message: Package.error_message(error),
         duration_ms: duration_ms(started_at),
       }.merge(stats_columns(stats)))
+      # 🔴 #1749: error で終わらなかった run は、error の確認をその場で解除する（次の失敗はすぐ赤）。
+      # ⚠ **記録で持つ。**判定のたびに「確認の後の成功」を run_log から探すと、掃除（保持期間）で
+      # 成功の行が消えたとき、期限つきの確認が復活する（#1779 の Codex P2）。
+      SilenceAck.clear_error(source_id) unless status == STATUS_ERROR
     rescue => e
       Sentry.capture_exception(e) if Sentry.initialized?
     end

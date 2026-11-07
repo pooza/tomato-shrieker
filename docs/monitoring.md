@@ -11,6 +11,7 @@ scheduler_daemon と同一プロセス内に Puma 埋め込みの軽量 HTTP サ
 | `/healthz` | 総合ヘルスチェック | 200 / 503 |
 | `/healthz/source/:id` | ソース別ヘルスチェック | 200 / 503 / 404 |
 | `/status.json` | 全体ステータス（人間/ダッシュボード向け） | 200 (JSON) |
+| `/reload.json` | ソース定義を読んだ結果だけ（`/status.json` の `reload` と同じ・`source reload --wait` が読む・4.20.0・#1721） | 200 (JSON) |
 
 ### `/healthz` の判定
 
@@ -23,7 +24,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - 配信先が 1 つ以上ある (`dest_count > 0`)
 - 1 度は走っている。**ただし足したばかりのソースは、初回の実行期限までは 200**（下の「まだ走っていないソース」）
 - 次回の発火予定 ＋ `grace_seconds` を過ぎていない (stale でない)
-- 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）
+- 連続エラー回数が `error_streak_threshold` 未満である（ソース単位で上書き可・#1558）。⚠ 届いていても、運用者が確認済みにしていれば 200（下の「error の確認」・#1749）
 - **直近の配信試行に取りこぼしが無い (undelivered でない)**
 - **配信へ進む前に失ったエントリが残っていない (lost_entries でない・#1574)**
 - `silence_tolerance` を超えて無配信が続いていない (silent でない)
@@ -40,7 +41,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - ⚠ **保存の前（解析）で落ちたエントリは数えない。**行が無いので次の run が拾い直す。`shrieker_errors` の種別で分けている: `source#fetch`＝保存の前（数えない）・`source#entry`＝保存の後（数える）・`source#exec`＝エントリ処理の途中で run ごと落ちた（1 件と数える）
 - ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計
 - **根拠行は prune から守る（`last_entry_stage_ids`・#1687）。**確認しないまま保持期間（`/monitor/retention_days`）を過ぎても緑に戻らない
-- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` と、同じ文言の Sentry の warning（#1687）
+- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` と、同じ文言の Sentry の warning（#1687）。⚠ モロヘイヤのリモートのタグ付けの失敗も同じ扱い（4.20.0 から。warn `remote tags dropped`・ソースのタグだけで投稿する）
 - ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
 
 #### 定義は在るが読めないソース (#1605)
@@ -142,6 +143,7 @@ bin/shrieker source ack ID
 | 状況 | 対処 |
 |------|------|
 | 一時的に静か（たまたま 1 か月新着が無かった） | `bin/shrieker source ack ID` |
+| 一時的な失敗で error（原因は分かっている） | `bin/shrieker source ack ID`（上流の復旧を待つなら `--until`・下の「error の確認」） |
 | 投稿が恒久的に終了した | `bin/shrieker source disable ID`（＋ `source reload`） |
 | 年単位で正常に静か（`chikanan` 等） | `silence_tolerance` を設定しない |
 
@@ -166,6 +168,22 @@ bin/shrieker source ack ID
 
 ⚠ **初回 run でいきなり配信できたソースは `observed_since` と時刻が一致する**が、`delivery` が勝つ（同着は宣言順）。
 
+### error の確認（4.20.0・#1749）
+
+🔴 **`ack` は error（`error_streak` がしきい値に届いた状態）にも効く。**日次のソースが一時的な失敗で 1 回落ちると、次の定期実行まで丸 1 日赤いままになるため。⚠ **緑に戻すのは周期どおりの実行だけ、という判断は変えていない**: run_log には触らず（`error_streak` の数字もそのまま）、`/healthz/source/:id` の判定だけを抑える。
+
+| 書き方 | 効く範囲 |
+| --- | --- |
+| `bin/shrieker source ack ID` | **確認した run まで。**次の定期実行がまた error なら赤に戻る（確認より後に終わった error の run は了解していない） |
+| `bin/shrieker source ack ID --until 2026-11-14` | **期限まで。**その間の error でも緑。⚠ **期限の前に成功したら、その時点で解除する**（次の失敗はすぐ赤）。期限を過ぎたら、その時点の結果で判定し直す（確認した run のままでも赤） |
+
+- ⚠ **期限の無い「ずっと緑」は作らない（ユーザー判断）。**`--until` は未来の時刻だけを受け、error の警告が出ていないソースには使えない（先回りの確認はしない）。日付だけなら**その日の 0:00**（`Time.parse`）。出力に実際の時刻を出す
+- 📌 **使いどころ**: `schedule.retry`（#1585）のやり直しも使い切ったとき（期限なし）と、原因が分かっていて上流の復旧を何日も待つとき・週次や月次のソース（`--until`）
+- ⚠ **`--until` が抑えるのは error だけ。**その間の run が宛先で落ちれば未達（`undelivered`）で赤くなる（未達・取りこぼしは run ごとの確認のまま）
+- ⚠ **`/status.json` の `error_acknowledged_at` / `_until` は記録で、いま効いているかではない。**次の error で赤に戻っても・期限が過ぎても値は残る（成功で消える）。いま抑えているかは `/healthz/source/:id` の本文で読む
+- **緑でも本文で分かる。**`/healthz/source/:id` は `OK (error acknowledged until …)` / `OK (error acknowledged, re-evaluated at <次の定期実行>)` を返す。ほかの理由で赤いときは 503 の本文に同じ行が出る。`/status.json` は `error_acknowledged_at` / `error_acknowledged_until`、`acknowledged_reasons` に `errored`
+- ⚠ **「成功で解除」は記録で持つ。**error で終わらなかった run（`success` / `partial`）を記録した時点で、error の確認を消す（`SilenceAck.clear_error`）。⚠ 判定のたびに run_log から探す形にすると、保持期間の掃除で成功の行が消えたとき確認が復活する（#1779 の Codex P2）
+
 ### `/status.json` の中身
 
 ```json
@@ -177,8 +195,9 @@ bin/shrieker source ack ID
     "count": 3,
     "action": "reload",
     "at": "2026-10-16T08:00:00+09:00",
-    "result": {"added": [], "removed": [], "changed": ["matrix-news"], "failed": [], "unmatched": []},
-    "error": null
+    "result": {"added": [], "removed": [], "changed": ["matrix-news"], "failed": [], "unmatched": [], "bundle": []},
+    "error": null,
+    "last_reload": {"count": 3, "action": "reload", "at": "2026-10-16T08:00:00+09:00", "result": {"...": "..."}, "error": null}
   },
   "sources": [
     {
@@ -213,6 +232,8 @@ bin/shrieker source ack ID
       "acknowledged_at": null,
       "acknowledged_run_id": null,
       "acknowledged_reasons": null,
+      "error_acknowledged_at": null,
+      "error_acknowledged_until": null,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1},
@@ -224,7 +245,7 @@ bin/shrieker source ack ID
 
 Kuma からは見ない（人間が `curl | jq` する用、または外部ダッシュボードに食わせる用）。
 
-`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)）。
+`reload` は**ソース定義を読んだ結果** (#1529)。`count` は起動時の登録を含めて読んだ回数で、失敗しても進む。`action` はその回の種類（起動時の登録が `register`、HUP が `reload`。まだ一度も読んでいなければ `null`）。失敗なら `result` は `null`、`error` に例外のクラス名（メッセージは載せない）。`bin/shrieker source reload --wait` がこれを読む（[daemon.md](daemon.md)。4.20.0 から軽い `/reload.json` で）。`last_reload` は直近の reload（HUP）の回（まだ無ければ `null`・#1721）。`result.bundle` は登録は通ったがコマンドの依存が欠けている id（#1721）。
 
 `digest` は**いま scheduler に登録されている定義**のハッシュ (#1672)。`Scheduler.digest` で、reload が変更を見分けるのと同じもの。ディスク上の定義と比べれば、編集したまま reload していない定義（再起動で黙って有効になる）が分かる（deploy スキルの `pending_sources.sh`）。一度も登録できていない新しいソースは `null`、読めない定義の行はキーごと無い。⚠ 変更した定義の reload が失敗した場合は古い digest が残る。⚠ CLI の `source status` は scheduler の外で動くので出さない。
 
@@ -261,7 +282,7 @@ Kuma からは見ない（人間が `curl | jq` する用、または外部ダ�
 - **転送先はログにだけ出る。**同じ時刻の `{"error":"redirect refused",…,"location":"…"}` の行を見る。⚠ この行に `source:` は無いので、直後の `{"source":…,"shrieker":…,"error":…}` の行と時刻で結ぶ
 - **直し方は、宛先の URL を `location` の示す最終オリジン（`https://`）へ書き換える**こと。`bin/shrieker source validate` は `http://` の宛先を WARN する
 - 監視は効く: `attempted > 0 / delivered = 0` の error になるので、`errored` と `undelivered` で `/healthz/source/:id` が 503 になる
-- ⚠ フィードの取得（FeedSource / IcalendarSource など）は従来どおりリダイレクトを追う
+- ⚠ フィードの取得（FeedSource / IcalendarSource など）はリダイレクトを追う。⚠ 4.20.0 から、別のホストへ飛ぶ先が内部ホストなら `Rejected host` で落ちる（[sources.md](sources.md) の「フィードと iCalendar の取得」）
 
 ## CLI で横断して問い合わせる (#1561)
 

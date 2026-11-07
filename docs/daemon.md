@@ -62,7 +62,7 @@ bin/shrieker source reload --wait   # 反映を待つ（#1529）
 # reloaded at 2026-10-16T08:00:00+09:00
 ```
 
-⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/status.json` の `reload`（`count` / `action` / `at` / `result` / `error`）を読み、HUP の前から `count` が進み、かつ `action: reload` の回が来るまで待つ（既定 30 秒・`--timeout`）。⚠ 起動時の登録（`action: register`）の完了では返さない（#1716）。⚠ **daemon を再起動するまでは使えない。**pull した後・再起動する前の古い daemon は `reload` を持たないので、HUP を送る前にエラーで断る。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
+⚠ **`--wait` なしでは「要求した」までしか言えない**（シグナルは非同期）。`--wait` は稼働中の daemon の `/reload.json`（404 なら `/status.json`）の `reload`（`count` / `action` / `at` / `result` / `error` / `last_reload`）を読み、HUP の前から `count` が進み、かつ `action: reload` の回（または `last_reload`）が来るまで待つ（既定 30 秒・`--timeout`）。⚠ 起動時の登録（`action: register`）の完了では返さない（#1716）。⚠ **daemon を再起動するまでは使えない。**pull した後・再起動する前の古い daemon は `reload` を持たないので、HUP を送る前にエラーで断る。⚠ 失敗した reload でも `count` は進み、`error` に例外のクラス名が入る（メッセージは載せない）。`failed` / `unmatched` があるか失敗なら非 0 で終わる。📌 4.20.0 から（#1721）: 読むのは軽い `/reload.json`（404 なら `/status.json` へ倒す）／起動の途中に HUP が届いて記録の順が `reload` → `register` になっても、`last_reload` で自分の回を拾う／**依存の欠けたコマンドソース（`result.bundle`）でも非 0**（登録は通るが走るたびに落ちる。起動は止めない）／**同時に打った `--wait` は 1 本だけ通す**（`tmp/cache/reload-wait.lock` の `flock`。後から打った側は待たずにエラー）。⚠ **監視（`/monitor/enabled`）が無効なら使えない**（HUP を送る前に断る）。
 
 ⚠ **reload は設定ファイル（`local.yaml` / `application.yaml`）を読み直さない**（下の「reload するのは『ソース定義』だけ」）。漏洩対応でマスク設定やトークンを差し替えたときは、**再起動する**（#1575）。
 

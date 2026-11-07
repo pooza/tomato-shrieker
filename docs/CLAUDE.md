@@ -9,6 +9,7 @@
 | [daemon.md](daemon.md) | 🔴 **daemon の起動・停止・`source reload` / `bin/shrieker` を叩くとき、本番を操作するとき** |
 | [sync スキル](../.claude/skills/sync/SKILL.md) | 🔴 **「進捗を同期してください」と言われたとき**（#1577 で `docs/sync.md` から移した。同梱スクリプトは `scripts/`） |
 | [release](../.claude/skills/release/SKILL.md) / [release-review](../.claude/skills/release-review/SKILL.md) / [release-validation](../.claude/skills/release-validation/SKILL.md) / [deploy](../.claude/skills/deploy/SKILL.md) スキル | 🔴 **リリースするとき・本番へデプロイするとき**（#1577 で移した。明示呼び出しのみ） |
+| [doc-maintenance スキル](../.claude/skills/doc-maintenance/SKILL.md) | **docs・スキル・メモリ・Wiki を棚卸しするとき**（不定期。明示呼び出しのみ） |
 
 ⚠ **迷ったら `grep -rn <語> docs/ .claude/skills/` でまとめて引く。**
 
@@ -140,7 +141,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 ## 設定構造
 
 - `config/application.yaml` — デフォルト設定
-- `config/local.yaml` — ローカル上書き（git 管理外）
+- `config/local.yaml` — ローカル上書き（git 管理外）。ソース種別ごとの既定値（`/source_defaults`）もここに書く（[sources.md](sources.md)）
 - `config/sources/*.yaml` — ソース定義（動的読み込み）。⚠ **git 管理外**（運用ホスト上の実物・資格情報が入る）
 - `test/sources/*.yaml` — **テスト専用のソース定義**。⚠ **`Environment.test?` の間だけ読む (#1593)**
 - `config/schema/base.yaml` — JSON Schema によるバリデーション
@@ -177,10 +178,11 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 - 🔴 **`rake test` は同時に 2 本走らせない。**DB を共有しているので、並走すると偽のエラーが出る（#1573 の後も 2〜9 件）。レビューのエージェントを並列で回すときも、エージェントには走らせない
 - 🔴 **結果は本数も見る (#1668)。**テストの途中で `exit` が呼ばれると、残りが走らないまま「0 failures・100% passed」で終わっていた（410 → 137 本になったのを本数で気づいた。CI は本数を見ない）。📌 ginseng-core 4.2.0 からはそのテストの失敗になり、読めなかったテストファイルも失敗として残る（`TestCase.load` が `report_load_errors` を呼ぶ）。⚠ `exit!`・fork した子の `exit`・`assert_raise(SystemExit)` で受けるものには効かないので、本数は引き続き見る。CLI の終了コードは `exit` ではなく `Thor::Error` で返す
 - **omissions が増えていたら、書いたテストが走っていないことを疑う。**Shrieker のテストクラスは `disable?` でケースごと省略される（#1520）
-- **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする
+- **CI は `config/local_sample.yaml` を `config/local.yaml` へ写してから走る。**設定を壊すテストは、強い basename からキーを消すのではなく `nil` で上書きする。🔴 **手元でも同じく写してから回す（4.20.0）。**`Scheduler.digest` が `/crypt/password` を鍵にするので（#1761）、`config/local.yaml` が無いと Scheduler まわりが `ConfigError` で 31 本落ちる
 - **`Sentry.initialized?` は Sentry 自身の singleton class に生えている。**`remove_method` で戻すと本物ごと消えるので、元の `Method` を保存して差し戻す
 - **`stub_request(...).to_return(body: <組み立て>)` は、本文の組み立てで例外が出ると、応答を定義していない stub だけが残って空の 200 を返す。**本文を先に組んでから登録する
 - **保護を確かめるテストは「1 行に 1 系統」に分ける。**prune の保護（5 系統）を 1 行に兼ねさせると、どれかの保護を外しても緑のまま
+- 🔴 **設定のテストはキーを手で書かず、`config/local.yaml` と同じ形から `key_flatten` を通す（4.19.0）。**`Config` はキーを小文字にして持つ。`config['/source_defaults/TextSource/...'] = v` と入れると、実物では 1 度も当たらないコードが緑になった
 - **tomato に Timecop は無い。**時刻を差し替えるなら `Time.now` を stub する。⚠ `Time#utc` は破壊的なので、同じ `Time` を返すと途中で UTC に変わる（`{fake.dup}` で返す）
 
 ### Schema 設計の指針 (required の意味論)
@@ -295,7 +297,7 @@ Sentry イシューをクローズせず経過観察とする場合、その意�
 | PiefedShrieker | 0 件 | 不明 |
 | NostrShrieker | 0 件 | 別枠（下記） |
 
-⚠ **運用者の目線だけで優先度を決めると、直接経路が永久に検証されないまま残る。**Mastodon / Misskey に触れる変更は、本番で 0 件だからといって影響が小さいと判断しない。📌 4.18.0 から、リリース前検証でステージングへ直接投稿・モロヘイヤ経由の両方を実際に通す（[release-validation スキル](../.claude/skills/release-validation/SKILL.md) の 4a・#1481）。
+⚠ **運用者の目線だけで優先度を決めると、直接経路が永久に検証されないまま残る。**Mastodon / Misskey に触れる変更は、本番で 0 件だからといって影響が小さいと判断しない。📌 4.18.0 から、リリース前検証でステージングへ直接投稿・モロヘイヤ経由の両方を実際に通す（[release-validation スキル](../.claude/skills/release-validation/SKILL.md) の 4a・#1481）。📌 4.20.0 から、chubo2 の fedi-test-harness（バニラの Mastodon / Misskey）を手元で立てると、`test/fedi_harness.rb` が直接経路で実際に投稿して読み返す（#1451）。`set -a; source ~/repos/chubo2/fedi-test-harness/mastodon/.env.test; source ~/repos/chubo2/fedi-test-harness/misskey/.env.test; set +a` してから `rake test`（⚠ `source` は 1 回に 1 ファイル。`{mastodon,misskey}` で 2 つ渡すと 2 つ目は引数になり、Misskey のテストが黙って省略される）。⚠ 環境変数が無ければ省略（CI も）。⚠ 使い終わったらハーネスは `scripts/stop.sh` で止める（3000 番はモロヘイヤも使う）。
 
 ⚠ **Nostr をこの非対称と同列に扱わない。**Nostr にも外部ユーザーはいるが、下記のとおりテスト責任の所在が違う。
 

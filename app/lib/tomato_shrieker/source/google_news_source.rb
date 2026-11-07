@@ -39,6 +39,13 @@ module TomatoShrieker
       return cleaner_uri.present?
     end
 
+    # 🔴 **cleaner を使うかを登録のたびにログへ出す (#1704)。**`/google/news/cleaner/url` が無ければ
+    # 黙って Google News を直接読む（#1694）ので、設定の綴りを誤っても、どこにも出なかった。
+    def register
+      logger.info(source: id, class: self.class.to_s, cleaner: cleaner?) unless disable?
+      return super
+    end
+
     private
 
     def cleaner_uri

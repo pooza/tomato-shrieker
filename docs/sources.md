@@ -50,7 +50,7 @@ source:
       - bin/anniv.rb
       - --ics
       - numbering_title
-    dir: /home/deploy/repos/dqdai-anniv
+    dir: /path/to/dqdai-anniv
     # env:              # 資格情報はここへ（値はログと例外メッセージから伏せる）
     # timeout: 10m      # 締切（既定 600 秒・下記）
   days: 3
@@ -122,8 +122,8 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 | MisskeyShrieker | `/dest/misskey/url`, `/dest/misskey/token` | 権限: `write:notes`（画像は `write:drive`） |
 | WebhookShrieker | `/dest/hooks` | Slack Incoming Webhooks 互換の宛先の配列（Discord は末尾に `/slack`）。URL 文字列のほかオブジェクト形式も可 → [Webhook 宛先の指定形式](#webhook-宛先の指定形式) |
 | LineShrieker | `/dest/line/user_id`, `/dest/line/token` | チャンネルアクセストークン（長期） |
-| PieFedShrieker | `/dest/piefed/host`, `/dest/piefed/user_id`, `/dest/piefed/password`, `/dest/piefed/community_id` | `host` は**ホスト名だけ**（接続先は常に `https://<host>`。スキーム・ポート・パスを書くと `source validate` が NG にする）。`community_id` は整数。`/dest/piefed/template`。API の版は `config/local.yaml` の `/piefed/api/version`（デフォルト alpha）。宛先ごとに変えるなら `/dest/piefed/api_version` |
-| NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/nostr/relays`（application.yaml） |
+| PieFedShrieker | `/dest/piefed/host`, `/dest/piefed/user_id`, `/dest/piefed/password`, `/dest/piefed/community_id` | `host` は**ホスト名だけ**（接続先は常に `https://<host>`。スキーム・ポート・パスを書くと `source validate` が NG にする）。⚠ 国際化ドメインは **punycode（`xn--…`）で書く**（スキーマが ASCII だけを受ける・#1704）。`community_id` は整数。`/dest/piefed/template`。API の版は `config/local.yaml` の `/piefed/api/version`（デフォルト alpha）。宛先ごとに変えるなら `/dest/piefed/api_version` |
+| NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/dest/nostr/relays`（ソース単位）、無ければ `/nostr/relays`（application.yaml） |
 
 🔴 **宛先はリダイレクトを追わない（4.14.0・ginseng-core 2.0.0）。宛先の URL は `https://` の最終オリジンで書く。**宛先が 3xx を返すと、その配信は `Ginseng::GatewayError: Bad response 301`（など）で失敗する。これまでは 301 / 302 を追って GET に化け、本文が落ちたまま「成功」と数えていた。⚠ `bin/shrieker source validate` は `/dest/hooks`・`/dest/mastodon/url`・`/dest/misskey/url` が `http://` のとき WARN を出す（`disable: true` の定義には出さない）。読み方は [monitoring.md](monitoring.md#bad-response-3xx-の読み方)。
 
@@ -189,10 +189,20 @@ dest:
 - リモートのタグ付けが拒否されたら、ソースのタグだけで投稿する（ログに error）
 - ⚠ **添付の検証は gem（ginseng-fediverse 6.0.0 以降）の既定。**tomato 側に自前の検証は置いていない＝版を戻すと守りも消える（`RemoteAttachmentTest` が赤くなる）
 
+### フィードと iCalendar の取得（4.20.0・#1688）
+
+フィード（FeedSource とその子）と iCalendar（IcalendarSource の URL）の取得は、**初段のホストを検証しない**。運用者が書いた URL なので信頼でき、LAN 内の取得元（google-news-rss-cleaner の `scylla.b-shock.local:3000` など）を含むため。
+
+- 🔴 **別のホストへのリダイレクト先だけを `Ginseng::PublicHost` で検証する。**配信元が 3xx で内部ホストを指すと、そこへは GET しない（`Ginseng::GatewayError: Rejected host '…'`・run は error）。上の 2 経路と落ちる条件は同じ
+- ⚠ **同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで追う。**2026-11-07 の実測では、本番で初段が 3xx を返すのは 2 件で、どちらも同じホスト
+- ⚠ **LAN 内の取得元が別の LAN 内ホストへリダイレクトすると落ちる。**取得先を最終の URL で書き直す
+- 実装は `TomatoShrieker::HTTP#get_configured`
+
 ## モロヘイヤ連携
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（**既定は false**。`true` と書いたときだけ有効。`/dest/mulukhiya` を書くなら `enable` は必須）
 - `/dest/mulukhiya/url`, `/dest/mulukhiya/tagging/enable` — ハッシュタグ自動付与
+  - 🔴 **タグ付けの問い合わせが失敗したら、ソースのタグ（`/dest/tags`）だけで投稿する**（ログに warn `remote tags dropped` と同じ文言の Sentry の warning・4.20.0・#1754）。⚠ 監視（healthz）は緑のまま。本文を持つソース（`common.erb`・PieFed）もエントリ（`Entry#tags`）も同じ。⚠ ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと失敗になる（追わない）。`/dest/mulukhiya/url` は最終の URL で書く
 - Webhook digest・カスタムフィード連携の詳細: [mulukhiya-toot-proxy 連携ドキュメント](https://github.com/pooza/mulukhiya-toot-proxy/blob/develop/docs/tomato-shrieker-integration.md)
 
 ### タグ処理の責務分担

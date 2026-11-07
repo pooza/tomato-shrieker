@@ -68,7 +68,7 @@ properties:
           - type: integer
             minimum: 1
           - type: string
-            pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+            pattern: '\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
           - type: 'null'
       error_streak_threshold:
         # /healthz/source/:id を 503 にする連続エラー回数。未指定なら
@@ -126,7 +126,7 @@ properties:
                   - type: integer
                     minimum: 1
                   - type: string
-                    pattern: '^(?=.*[1-9])((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+                    pattern: '\A(?=.*[1-9])((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
   source:
     type: object
     additionalProperties: false
@@ -181,7 +181,7 @@ properties:
                   - type: integer
                     minimum: 0
                   - type: string
-                    pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+                    pattern: '\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
       google:
         type: boolean
       text:
@@ -221,7 +221,7 @@ properties:
           - type: integer
             minimum: 0
           - type: string
-            pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+            pattern: '\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
       github:
         type: object
         additionalProperties: false

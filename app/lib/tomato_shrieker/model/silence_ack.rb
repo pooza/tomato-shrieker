@@ -37,6 +37,19 @@ module TomatoShrieker
       return create(values.merge(source_id:))
     end
 
+    # error の確認を記録する (#1749)。⚠ `acknowledge` の後に呼ぶ（行はそちらが作る）。
+    # 🔴 **期限（`until_at`）は確認のたびに置き直す。**期限なしで確認し直したら、前の期限は消える。
+    def self.acknowledge_error(source_id, at: Time.now, until_at: nil)
+      return where(source_id:).update(error_acknowledged_at: at, error_acknowledged_until: until_at)
+    end
+
+    # error の確認を解除する（error で終わらなかった run の後・#1749）。⚠ ほかの確認（沈黙・未達・
+    # 取りこぼし）の記録には触らない。
+    def self.clear_error(source_id)
+      return where(source_id:).exclude(error_acknowledged_at: nil)
+          .update(error_acknowledged_at: nil, error_acknowledged_until: nil)
+    end
+
     def reasons
       return acknowledged_reasons.to_s.split(',')
     end

@@ -71,6 +71,7 @@ git grep -n -I -E 'b-shock\.local|b-shock\.co\.jp|deploy@|/home/deploy|192\.168\
 
 - **IP アドレス・VPN の構成・ホスティング業者・LAN のホスト名で作業に要らないもの**は、infra-note へ寄せて剥がす（infra-note に既にあれば剥がすだけ）
 - ⚠ **deploy / sync の同梱スクリプトが叩く本番のホスト名（`ssh oscura`）と `deploy` ユーザーは、手順が動くために要る。**📌 **残すとユーザーが決めた**（2026-10-18・LAN の外からは名前解決できない）。この判断は繰り返さない
+- ⚠ **検証の cleaner の宛先（`scylla.b-shock.local`）も手順が動くために要る。**📌 残すと決めた（2026-10-31）。この判断は繰り返さない
 - infra-note は別リポジトリなので、変更は chubo2 への PR にする
 
 ### 5. 役目を終えた記述のアーカイブ

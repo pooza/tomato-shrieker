@@ -44,6 +44,12 @@ module TomatoShrieker
       raise Ginseng::ImplementError, "'#{__method__}' not implemented"
     end
 
+    # コマンドの依存が壊れていたか（#1721）。コマンドを走らせないソースは常に偽。
+    # ⚠ `CommandRunner` が上書きする。
+    def command_bundle_broken?
+      return false
+    end
+
     def register
       return if disable?
       return schedule(:at, post_at) if post_at
@@ -355,8 +361,26 @@ module TomatoShrieker
     def create_tags(status)
       container = Ginseng::Fediverse::TagContainer.new
       container.concat(tags.clone)
-      container.concat(mulukhiya.search_hashtags(status)) if remote_tagging?
+      container.concat(remote_tags(status)) if remote_tagging?
       return container.create_tags
+    end
+
+    # モロヘイヤのリモートのタグ付け。
+    #
+    # 🔴 **失敗したら、ソースのタグだけで投稿する (#1754)。**`create_tags` は `common.erb` の
+    # 描画と PieFed の `tags_of` から呼ばれるので、ここで上げると**そのソースの全宛先が
+    # 投稿に失敗する**。ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと
+    # `GatewayError` になる（4xx / 5xx と同じ扱い）。⚠ エントリの側（`Entry#tags`）と
+    # 揃えてある（docs/sources.md の「リモートのタグ付けが拒否されたら」）。
+    # 🔴 **黙らせない（4.20.0 リリース前レビュー）。**4.19.0 までは例外が `Source#deliver` まで上がり、
+    # Sentry・未達・healthz の 503 に出ていた。握るとそれが全部消えて、タグの欠けた投稿が毎回出続けても
+    # 誰も気づけない。添付・PieFed のタグと同じく、決まった文言で warn と Sentry の warning に残す（#1687）。
+    def remote_tags(status)
+      return mulukhiya.search_hashtags(status)
+    rescue => e
+      logger.warn(source: id, message: 'remote tags dropped', error: e)
+      Package.capture_warning('remote tags dropped', source: self, shrieker: MulukhiyaService)
+      return []
     end
 
     def remote_tagging?
@@ -448,6 +472,25 @@ module TomatoShrieker
     def acknowledgement
       @acknowledgement = SilenceAck.where(source_id: id).first unless defined?(@acknowledgement)
       return @acknowledgement
+    end
+
+    # 🔴 **いま連続している error を、運用者が確認済みにしているか (#1749)。**
+    #
+    # `latest_error` は連続している error のうち直近の run（呼び出し側が持っている窓から渡す）。
+    # - 期限なし: その run が確認より前に終わっていれば確認済み。⚠ 次の定期実行がまた error なら
+    #   赤に戻る（確認は 1 回の失敗にしか効かない）
+    # - 期限つき（`--until`）: 期限の前なら確認済み。⚠ 期限を過ぎたら、その時点の結果で判定し直す
+    #   （確認した run のままでも赤）
+    # ⚠ **成功したら確認は消える。**error で終わらなかった run を記録したときに、記録ごと消す
+    # （`SourceRunLog.record` → `SilenceAck.clear_error`）。
+    # ⚠ **run_log には触らない。**落ちた事実と定期実行の結果は残る。緑に戻すのは周期どおりの実行だけ。
+    def error_acknowledged?(latest_error)
+      return false unless latest_error
+      return false unless at = acknowledgement&.error_acknowledged_at
+      if acknowledgement.error_acknowledged_until
+        return Time.now < acknowledgement.error_acknowledged_until
+      end
+      return latest_error.finished_at <= at
     end
 
     # 🔴 **配信へ進む前に失ったエントリが、未解決のまま残っているか (#1574)。**

@@ -19,6 +19,18 @@ module TomatoShrieker
       assert_equal('プリキュア', source.uri.query_values['q'])
     end
 
+    # 🔴 #1704: cleaner を使うかを登録のたびにログへ出す（黙って直読みへ倒れたことに気づけるように）。
+    def test_register_logs_cleaner
+      config['/google/news/cleaner/url'] = 'http://cleaner.example.test:3000/clean'
+      source = build_source
+      logged = []
+      source.logger.define_singleton_method(:info) {|message| logged.push(message)}
+      source.define_singleton_method(:schedule) {|*| nil}
+      source.register
+
+      assert_true(logged.any? {|v| v.is_a?(Hash) && v[:cleaner] == true})
+    end
+
     def test_uri_with_cleaner
       config['/google/news/cleaner/url'] = 'http://cleaner.example.test:3000/clean'
       source = build_source
