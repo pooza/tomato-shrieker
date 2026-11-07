@@ -41,7 +41,7 @@ scheduler プロセス生存 + DB 接続 + Rufus ジョブが 1 件以上、す�
 - ⚠ **保存の前（解析）で落ちたエントリは数えない。**行が無いので次の run が拾い直す。`shrieker_errors` の種別で分けている: `source#fetch`＝保存の前（数えない）・`source#entry`＝保存の後（数える）・`source#exec`＝エントリ処理の途中で run ごと落ちた（1 件と数える）
 - ⚠ **専用の列は無い。**件数は `shrieker_errors` のうち上の 2 種別（`source#entry` / `source#exec`）の合計
 - **根拠行は prune から守る（`last_entry_stage_ids`・#1687）。**確認しないまま保持期間（`/monitor/retention_days`）を過ぎても緑に戻らない
-- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` と、同じ文言の Sentry の warning（#1687）
+- ⚠ **添付が付かない・タグが付かないは、ここには出ない。**`RemoteAttachment`（Mastodon / Misskey の直接経路）と PieFed のタグ付けは、失敗しても投稿を成功として数える。分かるのはログの warn `attachment dropped` / `tags not attached` と、同じ文言の Sentry の warning（#1687）。⚠ モロヘイヤのリモートのタグ付けの失敗も同じ扱い（4.20.0 から。warn `remote tags dropped`・ソースのタグだけで投稿する）
 - ⚠ エラー率（`error_rate_24h`）は変えていない（`error` の run だけを数える）
 
 #### 定義は在るが読めないソース (#1605)

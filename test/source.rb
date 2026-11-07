@@ -935,6 +935,18 @@ module TomatoShrieker
       assert_equal(Set['#precure_fun'], remote_tagging_source.create_tags('キュアブラック'))
     end
 
+    # 🔴 4.20.0 リリース前レビュー: 握った失敗は Sentry の warning に残す（黙ると監視から消える・#1687）。
+    def test_remote_tagging_failure_goes_to_sentry
+      stub_tag_search.to_return(status: 500)
+      captured = []
+      source = remote_tagging_source
+      with_sentry_stub(captured) {source.create_tags('キュアブラック')}
+
+      assert_equal('remote tags dropped', captured.first[:message])
+      assert_equal(:warning, captured.first[:level])
+      assert_equal(source.id, captured.first[:tags][:source])
+    end
+
     private
 
     def remote_tagging_source

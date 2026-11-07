@@ -371,11 +371,15 @@ module TomatoShrieker
     # 描画と PieFed の `tags_of` から呼ばれるので、ここで上げると**そのソースの全宛先が
     # 投稿に失敗する**。ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと
     # `GatewayError` になる（4xx / 5xx と同じ扱い）。⚠ エントリの側（`Entry#tags`）と
-    # 揃えてある（docs/sources.md の「リモートのタグ付けが拒否されたら」）。ログには error を残す。
+    # 揃えてある（docs/sources.md の「リモートのタグ付けが拒否されたら」）。
+    # 🔴 **黙らせない（4.20.0 リリース前レビュー）。**4.19.0 までは例外が `Source#deliver` まで上がり、
+    # Sentry・未達・healthz の 503 に出ていた。握るとそれが全部消えて、タグの欠けた投稿が毎回出続けても
+    # 誰も気づけない。添付・PieFed のタグと同じく、決まった文言で warn と Sentry の warning に残す（#1687）。
     def remote_tags(status)
       return mulukhiya.search_hashtags(status)
     rescue => e
-      logger.error(source: id, error: e)
+      logger.warn(source: id, message: 'remote tags dropped', error: e)
+      Package.capture_warning('remote tags dropped', source: self, shrieker: MulukhiyaService)
       return []
     end
 
