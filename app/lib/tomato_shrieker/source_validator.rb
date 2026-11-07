@@ -142,7 +142,7 @@ module TomatoShrieker
       def warnings(params)
         params = params.deep_stringify_keys
         return [] if params['disable'] == true
-        messages = insecure_dest_warnings(params)
+        messages = insecure_dest_warnings(params).concat(multiple_match_warnings(params))
         return messages if params.dig('schedule', 'at')
         unless params.dig('monitor', 'silence_tolerance')
           messages.push('/monitor/silence_tolerance が未設定です。無配信が続いても検知されません')
@@ -176,6 +176,17 @@ module TomatoShrieker
           "#{key} が http:// です（#{host}）。投稿はリダイレクトを追わないので、" \
             'https へ転送される宛先では投稿がすべて error になります。https:// で書いてください'
         end
+      end
+
+      # 🔴 **1 つの定義が複数のソースクラスに当たる (#1704)。**`source.calendar` と `source.ical.command`
+      # を一緒に書くと IcalendarSource が 2 本立ち、2 本ともコマンドを読む（URL は黙って無視され、
+      # 同じ予定が二重に出る）。`ical.command` ＋ `feed` / `text` / `command`、`news.phrase` ＋
+      # `news.url` も同じ形。⚠ 設計上は許している（`Scheduler#desired_sources`）ので NG にはしない。
+      def multiple_match_warnings(params)
+        classes = matched_classes(params).map {|v| v.to_s.split('::').last}
+        return [] unless classes.size > 1
+        return ["#{classes.size} 本のソースとして立ちます（#{classes.join(', ')}）。" \
+          '同じ id で別々に走り、同じものが二重に出ることがあります。判別キーは 1 つにしてください']
       end
 
       # ⚠⚠ **`Source#register` の優先順（`at` > `cron` > `every`）に合わせて、

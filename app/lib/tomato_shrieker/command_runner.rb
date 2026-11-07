@@ -69,7 +69,8 @@ module TomatoShrieker
       # ⚠ stderr は空でも String なので `||` では stdout へ倒れない（理由を stdout にだけ書いて
       # 非 0 で終わるコマンドの例外メッセージが空になっていた）。
       # ⚠ 何も書かずに落ちるコマンドもある。そのときは終わり方だけでも残す。
-      raise command.masked(stderr.presence || stdout.presence || exit_description(status))
+      # ⚠ 末尾の改行は落とす (#1704)。`last_error` が `…required\n` のように改行で終わっていた。
+      raise command.masked((stderr.presence || stdout.presence || exit_description(status)).strip)
     end
 
     # 🔴 **出力は受け取った直後に `scrub` する（4.16.0 リリース前レビュー）。**子プロセスの

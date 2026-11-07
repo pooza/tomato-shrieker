@@ -22,13 +22,13 @@ definitions:
               - type: integer
                 minimum: 1
               - type: string
-                pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+                pattern: '\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
           silence_tolerance:
             oneOf:
               - type: integer
                 minimum: 1
               - type: string
-                pattern: '^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+                pattern: '\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
           error_streak_threshold:
             type: integer
             minimum: 1
@@ -49,7 +49,7 @@ definitions:
                   - type: integer
                     minimum: 1
                   - type: string
-                    pattern: '^(?=.*[1-9])((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$'
+                    pattern: '\A(?=.*[1-9])((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
 properties:
   crypt:
     type: object
@@ -60,6 +60,30 @@ properties:
       - password
   disable:
     type: boolean
+  google:
+    # 🔴 **綴りの誤りを `rake config:lint` で拾う (#1704)。**`/google/news/cleaner/url` が無いと
+    # GoogleNewsSource は黙って Google News を直接読む（#1694）ので、`cleaner/uri` のような誤りに
+    # 気づけない。⚠ `news` の下だけ閉じる（`api` はサテライトも読みうる）。
+    type: object
+    properties:
+      news:
+        type: object
+        additionalProperties: false
+        properties:
+          cleaner:
+            type: object
+            additionalProperties: false
+            properties:
+              url:
+                type:
+                  - string
+                  - 'null'
+          urls:
+            type: object
+            additionalProperties: false
+            properties:
+              root:
+                type: string
   environment:
     enum:
       - development

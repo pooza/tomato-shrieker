@@ -122,8 +122,8 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 | MisskeyShrieker | `/dest/misskey/url`, `/dest/misskey/token` | 権限: `write:notes`（画像は `write:drive`） |
 | WebhookShrieker | `/dest/hooks` | Slack Incoming Webhooks 互換の宛先の配列（Discord は末尾に `/slack`）。URL 文字列のほかオブジェクト形式も可 → [Webhook 宛先の指定形式](#webhook-宛先の指定形式) |
 | LineShrieker | `/dest/line/user_id`, `/dest/line/token` | チャンネルアクセストークン（長期） |
-| PieFedShrieker | `/dest/piefed/host`, `/dest/piefed/user_id`, `/dest/piefed/password`, `/dest/piefed/community_id` | `host` は**ホスト名だけ**（接続先は常に `https://<host>`。スキーム・ポート・パスを書くと `source validate` が NG にする）。`community_id` は整数。`/dest/piefed/template`。API の版は `config/local.yaml` の `/piefed/api/version`（デフォルト alpha）。宛先ごとに変えるなら `/dest/piefed/api_version` |
-| NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/nostr/relays`（application.yaml） |
+| PieFedShrieker | `/dest/piefed/host`, `/dest/piefed/user_id`, `/dest/piefed/password`, `/dest/piefed/community_id` | `host` は**ホスト名だけ**（接続先は常に `https://<host>`。スキーム・ポート・パスを書くと `source validate` が NG にする）。⚠ 国際化ドメインは **punycode（`xn--…`）で書く**（スキーマが ASCII だけを受ける・#1704）。`community_id` は整数。`/dest/piefed/template`。API の版は `config/local.yaml` の `/piefed/api/version`（デフォルト alpha）。宛先ごとに変えるなら `/dest/piefed/api_version` |
+| NostrShrieker | `/dest/nostr/private_key` | nsec 形式対応。リレーは `/dest/nostr/relays`（ソース単位）、無ければ `/nostr/relays`（application.yaml） |
 
 🔴 **宛先はリダイレクトを追わない（4.14.0・ginseng-core 2.0.0）。宛先の URL は `https://` の最終オリジンで書く。**宛先が 3xx を返すと、その配信は `Ginseng::GatewayError: Bad response 301`（など）で失敗する。これまでは 301 / 302 を追って GET に化け、本文が落ちたまま「成功」と数えていた。⚠ `bin/shrieker source validate` は `/dest/hooks`・`/dest/mastodon/url`・`/dest/misskey/url` が `http://` のとき WARN を出す（`disable: true` の定義には出さない）。読み方は [monitoring.md](monitoring.md#bad-response-3xx-の読み方)。
 
