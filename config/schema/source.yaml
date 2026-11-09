@@ -42,14 +42,6 @@ properties:
     type: boolean
   test:
     type: boolean
-  enclosure:
-    type: object
-    additionalProperties: false
-    properties:
-      enable:
-        type: boolean
-      negative_keyword:
-        type: string
   monitor:
     type: object
     additionalProperties: false

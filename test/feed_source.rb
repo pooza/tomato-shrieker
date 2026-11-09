@@ -19,12 +19,6 @@ module TomatoShrieker
       end
     end
 
-    def test_enclosure?
-      FeedSource.all do |source|
-        assert_boolean(source.enclosure?)
-      end
-    end
-
     def test_keyword
       FeedSource.all.select(&:keyword).each do |source|
         assert_kind_of(Regexp, source.keyword)
