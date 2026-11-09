@@ -788,6 +788,35 @@ module TomatoShrieker
       ))
     end
 
+    # #1769: WARN は種別ごとの既定値（`/source_defaults`）を足した値で判定する。
+    # ⚠ 既定は `config/local.yaml` と同じ形から `key_flatten` で入れる（キーが小文字になる）。
+    def test_warnings_with_source_defaults
+      retention = Config.instance['/monitor/retention_days']
+      daily = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '1 0 * * *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+      }
+      defaults = {'source_defaults' => {'FeedSource' => {'monitor' => {
+        'silence_tolerance' => '7d', 'error_streak_threshold' => retention + 1
+      }}}}.key_flatten
+      defaults.each {|path, value| config[path] = value}
+
+      warnings = SourceValidator.warnings(daily)
+
+      # 既定の silence_tolerance が効いているので「未設定」とは言わない
+      assert_false(warnings.any? {|v| v.include?('silence_tolerance が未設定')})
+      # 既定のしきい値が到達不能なら言う
+      assert_true(warnings.any? {|v| v.include?('error_streak_threshold')})
+      # 定義で `null` にして既定を外したら「未設定」
+      assert_true(SourceValidator.warnings(daily.merge('monitor' => {'silence_tolerance' => nil}))
+        .any? {|v| v.include?('silence_tolerance が未設定')})
+      # 定義の値が既定に勝つ
+      assert_empty(SourceValidator.warnings(daily.merge('monitor' => {'error_streak_threshold' => retention})))
+    ensure
+      defaults&.each_key {|path| config.delete(path)}
+    end
+
     # 🔴 **#1587 (Codex P2): 不均一な cron は「次の 2 回の間隔」で外挿できない。**
     #
     # `0 0 * * 1-5`（平日のみ）は retention 14 日の窓に **10 回**しか発火しないので、
