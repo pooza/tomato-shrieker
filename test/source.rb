@@ -20,6 +20,31 @@ module TomatoShrieker
       end
     end
 
+    # `/dest/sanitize` で無毒化の口が変わること (#1775)。
+    # `fedi` は Misskey の境界で広く区切り、`mastodon` は Mastodon がリンク化する位置だけを区切る。
+    def test_fedi_sanitize
+      title = '曲名#featuring'
+      url = '詳細 https://foo.example/-@alice'
+
+      fedi = sanitize_source('fedi')
+
+      assert_equal('曲名# featuring', fedi.fedi_sanitize(title))
+      assert_equal(url, fedi.fedi_sanitize(url))
+
+      mastodon = sanitize_source('mastodon')
+
+      assert_equal(title, mastodon.fedi_sanitize(title))
+      assert_equal('詳細 https://foo.example/-@ alice', mastodon.fedi_sanitize(url))
+      # Mastodon がリンク化する位置は、従来どおり区切る。
+      assert_equal('先頭 # タグ', mastodon.fedi_sanitize('先頭 #タグ'))
+      assert_equal('宛先 @ alice@example.com', mastodon.fedi_sanitize('宛先 @alice@example.com'))
+
+      html = sanitize_source('html')
+
+      assert_equal(title, html.fedi_sanitize(title))
+      assert_equal(url, html.fedi_sanitize(url))
+    end
+
     def test_mulukhiya?
       Source.all do |source|
         assert_boolean(source.mulukhiya?)
@@ -948,6 +973,14 @@ module TomatoShrieker
     end
 
     private
+
+    def sanitize_source(mode)
+      return TextSource.new(
+        'id' => "__test_sanitize_#{mode}__",
+        'source' => {'text' => 'dummy'},
+        'dest' => {'hooks' => ['https://hook.example.test/sanitize'], 'sanitize' => mode},
+      )
+    end
 
     def remote_tagging_source
       return TextSource.new(

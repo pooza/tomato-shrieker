@@ -802,8 +802,20 @@ module TomatoShrieker
       return Source.all(entries).grep(self).find {|v| v.id == id}
     end
 
+    # 本文の無毒化。`/dest/sanitize` で口を選ぶ。
+    # - `fedi`（既定）: Misskey（mfm-js）の境界で `#` / `@` を区切る。投稿先を決めない口なので広めに当たる
+    # - `mastodon`: Mastodon がリンク化する位置だけを区切る（ginseng-fediverse 7.1.0・#1775）。
+    #   `曲名#featuring` を崩さず、`https://foo/-@alice` の通知を止める
+    # - `html`: タグを剥がすだけ（本文のハッシュタグを生かす）
+    #
+    # ⚠ **`mastodon` は投稿先がすべて Mastodon のソースにだけ使う。**無毒化はソースの単位で
+    # 掛かり、宛先ごとには分かれない。Misskey の宛先が混ざると、Misskey がリンク化する位置
+    # （`#-tag` の手前の連なりなど）を区切れない。
     def fedi_sanitize(message)
-      return message.to_s.sanitize_status if fedi_sanitize?
+      case sanitize_mode
+      when :fedi then return message.to_s.sanitize_status
+      when :mastodon then return Ginseng::Fediverse::MastodonService.sanitize_status(message.to_s)
+      end
       return message.to_s.sanitize
     end
 

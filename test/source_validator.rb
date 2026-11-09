@@ -22,6 +22,21 @@ module TomatoShrieker
       ))
     end
 
+    # #1775: `/dest/sanitize` は fedi / mastodon / html。綴り違いは弾く。
+    def test_sanitize_modes
+      ['fedi', 'mastodon', 'html'].each do |mode|
+        assert_empty(SourceValidator.validate(
+          'source' => {'feed' => 'https://example.com/feed'},
+          'dest' => {'hooks' => ['https://example.com/x'], 'sanitize' => mode},
+        ))
+      end
+
+      assert_not_empty(SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x'], 'sanitize' => 'mstdn'},
+      ))
+    end
+
     # #1691: `source.ical` は URL のほか、コマンド（標準出力を iCalendar として読む）も書ける。
     def test_valid_ical_command
       ical = {'command' => ['bin/anniv.rb', '--ics', 'character'], 'dir' => '/tmp', 'env' => {'A' => 'b'}}
