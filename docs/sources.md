@@ -21,7 +21,7 @@ dest:
   template: default     # ERB テンプレート名（views/ 配下）
 ```
 
-⚠ トップレベルに書けるのは `source` / `dest` / `schedule` / `monitor` / `keep` / `enclosure` / `disable` / `test` だけ（`additionalProperties: false`）。旧形式の `sources:` 配列は `config/local.yaml` でだけ読める（そこでは `id` を書く）。
+⚠ トップレベルに書けるのは `source` / `dest` / `schedule` / `monitor` / `keep` / `disable` / `test` だけ（`additionalProperties: false`）。旧形式の `sources:` 配列は `config/local.yaml` でだけ読める（そこでは `id` を書く）。
 
 ## Source 設定項目
 
@@ -29,7 +29,7 @@ dest:
 |--------|----------|------|
 | TextSource | `/source/text` | 定型文 |
 | CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`）, `/source/timeout`（締切・下記） |
-| FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot`、`/enclosure/enable` / `/enclosure/negative_keyword` |
+| FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot` |
 | GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
 | IcalendarSource | `/source/ical`（`/source/calendar` でも可） | iCalendar (.ics) の URL、またはコマンド（`/source/ical/command`・下記）。`/source/days`（何日前から出すか・既定 3）、`/source/keyword` / `/source/negative_keyword`、`/source/google` |
 | YouTubeChannelSource | `/source/youtube/channel/id`（`/source/youtube/channel/url` でも可） | FeedSource の設定項目も利用可（`/source/keyword` など） |

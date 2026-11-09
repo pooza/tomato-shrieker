@@ -72,15 +72,6 @@ module TomatoShrieker
       return Regexp.new(keyword)
     end
 
-    def enclosure?
-      return self['/enclosure/enable'] == true
-    end
-
-    def enclosure_negative_keyword
-      return nil unless keyword = self['/enclosure/negative_keyword']
-      return Regexp.new(keyword)
-    end
-
     def time
       unless @time
         records = Entry.dataset

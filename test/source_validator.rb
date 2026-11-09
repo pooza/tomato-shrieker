@@ -37,6 +37,15 @@ module TomatoShrieker
       ))
     end
 
+    # #1766: `/enclosure/*`（本文の `<img>` から添付を拾う Nitter 前提の設定）は廃止した。残っていれば NG。
+    def test_enclosure_removed
+      assert_not_empty(SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'enclosure' => {'enable' => true},
+      ))
+    end
+
     # #1691: `source.ical` は URL のほか、コマンド（標準出力を iCalendar として読む）も書ける。
     def test_valid_ical_command
       ical = {'command' => ['bin/anniv.rb', '--ics', 'character'], 'dir' => '/tmp', 'env' => {'A' => 'b'}}
