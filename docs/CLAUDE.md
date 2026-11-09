@@ -299,6 +299,13 @@ Sentry イシューをクローズせず経過観察とする場合、その意�
 
 ⚠ **運用者の目線だけで優先度を決めると、直接経路が永久に検証されないまま残る。**Mastodon / Misskey に触れる変更は、本番で 0 件だからといって影響が小さいと判断しない。📌 4.18.0 から、リリース前検証でステージングへ直接投稿・モロヘイヤ経由の両方を実際に通す（[release-validation スキル](../.claude/skills/release-validation/SKILL.md) の 4a・#1481）。📌 4.20.0 から、chubo2 の fedi-test-harness（バニラの Mastodon / Misskey）を手元で立てると、`test/fedi_harness.rb` が直接経路で実際に投稿して読み返す（#1451）。`set -a; source ~/repos/chubo2/fedi-test-harness/mastodon/.env.test; source ~/repos/chubo2/fedi-test-harness/misskey/.env.test; set +a` してから `rake test`（⚠ `source` は 1 回に 1 ファイル。`{mastodon,misskey}` で 2 つ渡すと 2 つ目は引数になり、Misskey のテストが黙って省略される）。⚠ 環境変数が無ければ省略（CI も）。⚠ 使い終わったらハーネスは `scripts/stop.sh` で止める（3000 番はモロヘイヤも使う）。
 
+📌 4.21.0 から、**モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Mastodon）**も同じテストで実際に通す（#1452）。ハーネスの Mastodon を立てたあと `test/harness/mulukhiya.sh up` でモロヘイヤを前段に立て、書き出された `~/.cache/tomato-shrieker/mulukhiya-harness/.env.test` も `source` する。終わったら `test/harness/mulukhiya.sh down`。
+
+- モロヘイヤのリリースタグ（既定は最新・`MULUKHIYA_VERSION` で指定）を `~/.cache` の下へ取り出して puma を `127.0.0.1:3018` で動かす。⚠ **開発機の `~/repos/mulukhiya-toot-proxy`（モロヘイヤ側の作業ツリー）には触れない**。モロヘイヤにコンテナは無い
+- webhook の URL はモロヘイヤの `/mulukhiya/api/config` から取る。⚠ 返る URL は Mastodon のホスト名（本番は nginx が `/mulukhiya` を振る）なので、スクリプトがモロヘイヤの待ち受けへ差し替える
+- ⚠ sidekiq と streaming は立てないので `/mulukhiya/api/health` は 503 のまま。webhook の投稿は同期で済むので関係ない
+- ⚠ Misskey 経由はまだ（#1789）
+
 ⚠ **Nostr をこの非対称と同列に扱わない。**Nostr にも外部ユーザーはいるが、下記のとおりテスト責任の所在が違う。
 
 ### Nostr のテスト責任

@@ -82,7 +82,7 @@ module TomatoShrieker
   # 本番の Mastodon 宛ては全部この経路なのに、テストは `WebhookShrieker` の body を組むところまでで、
   # モロヘイヤが受け取れる形かは一度も確かめていなかった。ハーネスの Mastodon の前段に
   # `test/harness/mulukhiya.sh up` でモロヘイヤを立て、その `.env.test` も読み込んで走らせる。
-  # ⚠ 環境変数が無ければ省略する。
+  # ⚠ 環境変数が無ければ省略する。⚠ Misskey 経由は #1789。
   class FediHarnessWebhookTest < TestCase
     include FediHarness
 
