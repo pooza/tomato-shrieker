@@ -91,7 +91,7 @@ source_defaults:
 - 定義に `null` を書くと、そのソースだけ既定を外せる（`monitor: {silence_tolerance: null}`・`schedule: {retry: null}`）
 - 📌 **どのキーが既定から来たかは `/status.json` の `source_defaults` に出る。**「なぜこのソースはこの間隔なのか」はここで答える
 - ⚠ `config/local.yaml` なので、変えたら再起動する（`source reload` は読み直さない）。⚠ 既定の変更は `digest` も変えるので、`pending_sources.sh` には該当の全ソースが `~` で出る
-- ⚠ `source validate` の WARN（しきい値への到達性など）は定義に書かれた値だけを見る
+- `source validate` の WARN（`silence_tolerance` の未設定・しきい値への到達性）は、既定値を足した値で判定する（4.21.0・#1769。それまでは定義に書かれた値だけを見ていた）。⚠ `source validate` も `config/local.yaml` を読むので、既定を変えたら validate で確かめられる
 
 ## URL の検証（`source validate`・#1461）
 

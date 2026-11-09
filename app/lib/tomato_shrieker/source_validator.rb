@@ -144,13 +144,26 @@ module TomatoShrieker
         return [] if params['disable'] == true
         messages = insecure_dest_warnings(params).concat(multiple_match_warnings(params))
         return messages if params.dig('schedule', 'at')
-        unless params.dig('monitor', 'silence_tolerance')
+        effective = effective_params(params)
+        unless effective.all? {|v| v.dig('monitor', 'silence_tolerance')}
           messages.push('/monitor/silence_tolerance が未設定です。無配信が続いても検知されません')
         end
-        return messages.concat(unreachable_streak_warnings(params))
+        return messages.concat(effective.flat_map {|v| unreachable_streak_warnings(v)}.uniq)
       end
 
       private
+
+      # 🔴 **種別ごとの既定値（`/source_defaults`）を足した定義で判定する (#1769)。**
+      # ⚠ 定義に書かれた値だけを見ると、既定で `silence_tolerance` が効いているのに「未設定」と出し、
+      # 既定のしきい値が到達不能でも黙る（既定はまさにしきい値を置く場所）。
+      # ⚠ 既定はクラスごとに違うので、マッチしたクラスごとに返す（複数マッチは別の WARN が出る）。
+      def effective_params(params)
+        classes = matched_classes(params)
+        return [params] if classes.empty?
+        return classes.map do |klass|
+          SourceDefaults.apply(params, SourceDefaults.values_for(klass, params))
+        end.uniq
+      end
 
       # 🔴 **投稿はリダイレクトを追わない（ginseng-core 2.0.0 / ginseng-fediverse 3.0.0）。**
       # `http://` で書いた宛先が 307 / 308 で https へ飛ばす構成だと、3xx がそのまま
