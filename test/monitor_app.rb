@@ -797,6 +797,19 @@ module TomatoShrieker
       assert_not_nil(source_status(SILENT_ID)['acknowledged_at'])
     end
 
+    # 🔴 #1770: migration 015 より前の確認（理由の記録が無い）は null、理由なしで記録したものは []。
+    def test_status_json_tells_legacy_ack_from_empty_reasons
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
+      SilenceAck.acknowledge(SILENT_ID)
+
+      assert_equal([], source_status(SILENT_ID)['acknowledged_reasons'])
+
+      SilenceAck.where(source_id: SILENT_ID).update(acknowledged_reasons: nil)
+
+      assert_nil(source_status(SILENT_ID)['acknowledged_reasons'])
+      assert_not_nil(source_status(SILENT_ID)['acknowledged_at'])
+    end
+
     # しきい値未指定のソースは、同じ状態でも沈黙では倒さない (opt-in)
     def test_healthz_source_silence_is_opt_in
       record(FIXTURE_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
