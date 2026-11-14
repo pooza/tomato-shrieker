@@ -9,6 +9,8 @@ module TomatoShrieker
 
     alias to_h values
 
+    attr_writer :feed
+
     # 🔴 **`Entry.create` は作ったソースをそのまま渡す (#1489)。**以前はエントリごとに
     # `FeedSource.all` で全ソースを作り直し、テンプレート（`File.read` + ERB のコンパイル）も
     # エントリごとにやり直していた。⚠ ここで探すのは、ソースを渡されずに読み出した行だけ。
@@ -16,8 +18,6 @@ module TomatoShrieker
       @feed ||= FeedSource.all.find {|v| v.id == values[:feed]}
       return @feed
     end
-
-    attr_writer :feed
 
     def enclosures
       unless @enclosures

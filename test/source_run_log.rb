@@ -608,13 +608,13 @@ module TomatoShrieker
       assert_in_delta(0.5, SourceRunLog.error_rate(SOURCE_ID, hours: 48))
     end
 
-    def test_summary_for
+    def test_summary_of
       create_logs(
         {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 1, delivered_count: 1},
         {status: SourceRunLog::STATUS_ERROR, attempted_count: 1,
          shrieker_errors: JSON.dump('MastodonShrieker' => 1)},
       )
-      summary = SourceRunLog.summary_for(SOURCE_ID)
+      summary = SourceRunLog.summary_of(SourceRunLog.recent_for(SOURCE_ID, SourceRunLog.streak_window))
 
       assert_equal(1, summary[:error_streak])
       assert_equal(1, summary[:noop_streak])

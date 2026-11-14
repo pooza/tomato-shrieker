@@ -387,6 +387,45 @@ module TomatoShrieker
       assert_equal('/source/dir not found: /nonexistent/__test_1477__', CommandSource.new(params).command_bundle_problem)
     end
 
+    # #1723: 検査するだけなので、サテライトの Gemfile.lock を書きうる形で走らせない。
+    def test_command_bundle_problem_runs_dry
+      args = nil
+      original = Open3.method(:capture2e)
+      Open3.define_singleton_method(:capture2e) do |*given, **|
+        args = given
+        next ['', Struct.new(:success?).new(true)]
+      end
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, 'Gemfile'), "source 'https://rubygems.org'\n")
+        build_secret_source.tap {|v| v.command.dir = dir}.command_bundle_problem
+      end
+
+      assert_equal(['bundle', 'check', '--dry-run'], args.drop(1))
+    ensure
+      Open3.define_singleton_method(:capture2e, original)
+    end
+
+    # #1723: スタックトレースの無い例外なので、出力の文面で割れないよう 1 ソース 1 つにまとめる。
+    def test_check_command_bundle_fixes_sentry_fingerprint
+      source = build_secret_source
+      source.define_singleton_method(:command_bundle_problem) {'bundle check failed in /x: missing'}
+      captured = []
+      with_sentry_stub(captured) {source.check_command_bundle}
+
+      assert_equal(['bundle-check', source.id], captured.first[:fingerprint])
+    end
+
+    # 🔴 #1723: クエリの値だけが書き出されても伏せる（`?sig=SECRET` の `sig=SECRET`）。
+    def test_command_masks_query_parts_of_secret
+      params = secret_params
+      params['dest']['hooks'] = [{'url' => 'https://hook.example.test/notify?sig=QuErYsEcReT987'}]
+      command = CommandSource.new(params).command
+
+      ['sig=QuErYsEcReT987', 'signature QuErYsEcReT987 rejected'].each do |line|
+        assert_not_include(command.masked(line), 'QuErYsEcReT987', line)
+      end
+    end
+
     # ⚠ 検査は登録を止めない（ログに出して、そのまま登録する）。
     def test_register_continues_when_bundle_is_broken
       source = build_secret_source

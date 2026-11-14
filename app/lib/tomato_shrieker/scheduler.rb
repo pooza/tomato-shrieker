@@ -200,10 +200,9 @@ module TomatoShrieker
     # 戻り値を返すだけ・#1704）。依存の欠けは `bundle check` の結果として `bundle` に出る（#1721）。先に消すと、
     # **失敗したソースが次の reload までジョブ 1 本無いまま放置される**。
     def swap(id, sources, action)
-      # ⚠ 先に nil で置く (#1575)。`jobs` 自体が上げたら、何も立てていないので巻き戻さない。
-      # ⚠⚠ 空の配列で置くと、rescue の `unschedule(id, except: [])` が**既存のジョブを全部消す**
-      # （#1717 の Codex P2）。
-      old = nil
+      # ⚠ `jobs` 自体が上げたら、rescue の `old` は nil（代入前のローカル変数）＝何も立てていないので
+      # 巻き戻さない (#1575)。⚠⚠ 空の配列で初期化してはいけない。rescue の
+      # `unschedule(id, except: [])` が**既存のジョブを全部消す**（#1717 の Codex P2）。
       old = @scheduler.jobs(tag: id)
       sources.each(&:register)
       old.each(&:unschedule)

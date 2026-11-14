@@ -148,7 +148,11 @@ module TomatoShrieker
       return unless problem = @command_bundle_problem
       error = RuntimeError.new(problem)
       logger.error(source: id, class: self.class.to_s, error:)
-      Sentry.capture_exception(error, tags: {source: id}) if Sentry.initialized?
+      # ⚠ スタックトレースの無い `RuntimeError` なので、Sentry は文面でまとめる＝出力の違いで
+      # 割れる。ソースごとに 1 つへ固定する（#1723）。
+      return unless Sentry.initialized?
+      Sentry.capture_exception(error, tags: {source: id},
+        fingerprint: ['bundle-check', id])
     end
 
     # 直近の登録で、コマンドの依存が壊れていたか（#1721）。⚠ 登録しない限り偽。
@@ -175,7 +179,10 @@ module TomatoShrieker
       # `GEM_HOME` などは結果を変える。上流が子へ渡す環境（`spawn_env`・ginseng-core 4.2.0 で公開）を
       # そのまま使う（#1715）。
       env = command.spawn_env.merge('BUNDLE_GEMFILE' => gemfile)
-      output, status = Open3.capture2e(env, 'bundle', 'check', chdir: dir, unsetenv_others: true)
+      # ⚠ `--dry-run` を付ける（#1723）。無いと Bundler 4 の `bundle check` は、中身が違うときに
+      # サテライトの Gemfile.lock を書き換えうる（検査するだけの約束）。
+      output, status = Open3.capture2e(env, 'bundle', 'check', '--dry-run', chdir: dir,
+        unsetenv_others: true)
       return nil if status.success?
       detail = output.to_s.scrub.lines.map(&:strip).reject(&:empty?).join(' ').ellipsize(300)
       return command.masked("bundle check failed in #{dir}: #{detail}")
@@ -242,7 +249,8 @@ module TomatoShrieker
     # shellescape した形だけなので、ここで足す。
     #
     # - URL: パス＋クエリ・クエリ抜きの URL・パス・最後のパスセグメント（`curl` などのエラーや
-    #   HTTP のログ行は、URL を丸ごとではなくこの形で書く）
+    #   HTTP のログ行は、URL を丸ごとではなくこの形で書く）。クエリの値も
+    #   入れる（`?sig=SECRET` の `sig=SECRET` だけが書き出されても伏せる・#1723）
     # - JSON の `\/`・HTML の `&amp;`・URL エンコード
     #
     # ⚠ 切り出した部分は `SECRET_MIN_LENGTH` 未満なら入れない（`/` や `api` まで伏せない）。
@@ -262,10 +270,17 @@ module TomatoShrieker
       stripped = uri.dup
       stripped.query = nil
       stripped.fragment = nil
-      parts = [uri.request_uri, uri.path, uri.path.split('/').last, stripped.to_s]
+      parts = [uri.request_uri, uri.path, uri.path.split('/').last, stripped.to_s,
+        *query_secret_parts(uri.query)]
       return parts.compact.select {|v| v.length >= SECRET_MIN_LENGTH}
     rescue Addressable::URI::InvalidURIError
       return []
+    end
+
+    # ⚠ 値だけ入れる。`key=value` の形も値の置換で伏せられ、`status=up` のような短いものは
+    # 呼び出し側の `SECRET_MIN_LENGTH` で落ちる。
+    def query_secret_parts(query)
+      return query.to_s.split('&').filter_map {|pair| pair.split('=', 2)[1]}
     end
   end
 end
