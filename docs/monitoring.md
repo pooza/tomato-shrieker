@@ -136,7 +136,11 @@ bin/shrieker source ack ID
 
 📌 **この仕組みがあるので `silence_tolerance` を保守的に丸める必要は無い。**偽陽性のコストが「設定を直す」から「1 回確認する」に下がる。
 
-⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。⚠ **4.14.0 までのキー名は `silence_acknowledged_at`（#1567 で改名）。**確認は未達（`undelivered`）にも効くので、`undelivered: false` の理由もこのキーで読む。何を確認したかは `acknowledged_reasons`、沈黙の判定が確認に基づくかは `silence_baseline_origin` で読む。503 本文の行も同じ名前。内部の名前（`SilenceAck` クラス・`silence_ack` テーブル）は据え置いている。
+⚠ **確認済みのソースは `silent: false` になるが、それは健全だからではない。**`/status.json` の `acknowledged_at` で「なぜ緑なのか」を答えられるようにしてある。⚠ **4.14.0 までのキー名は `silence_acknowledged_at`（#1567 で改名）。**確認は未達（`undelivered`）にも効くので、`undelivered: false` の理由もこのキーで読む。何を確認したかは `acknowledged_reasons`、沈黙の判定が確認に基づくかは `silence_baseline_origin` で読む。
+
+⚠ **上の式の `silence_acknowledged_at` は `/status.json` に出ない (#1770)。**効いているときは `silence_baseline_origin: acknowledgement` で、その値が `silence_baseline` に出る（配信が追い越せば判定に関わらないので出さない）。⚠ `acknowledged_at` とは別物＝未達・取りこぼしだけの確認では動かない（#1680）。
+
+⚠ **`acknowledged_reasons` が `null` なのは、4.19.0（migration 015）より前の確認**＝何を確認したかの記録が無い。`[]` とは別 (#1770)。⚠ **`acknowledged_run_id` は 1 つだけ**で、未達と取りこぼしが別の run にあると未達の run を指す（取りこぼし → error の順に次点）。どちらの警告も確認の時刻で解けるので赤緑には影響しない (#1770・実測済み)。503 本文の行も同じ名前。内部の名前（`SilenceAck` クラス・`silence_ack` テーブル）は据え置いている。
 
 ソースの状況ごとの使い分け:
 
