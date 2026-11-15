@@ -2,6 +2,7 @@ module TomatoShrieker
   class PiefedShrieker < Ginseng::Piefed::Service
     include Package
 
+    # ginseng-upstream: no — `host` / `user_id` は tomato のソース定義のキー名（上流は `url` / `user`）。
     def initialize(params = {})
       params = params.deep_symbolize_keys
       params[:url] = "https://#{params[:host]}" if params[:host] && !params[:url]
@@ -9,6 +10,7 @@ module TomatoShrieker
       super
     end
 
+    # ginseng-upstream: pooza/ginseng-piefed#47
     def api_version
       return @params[:api_version] || super
     end

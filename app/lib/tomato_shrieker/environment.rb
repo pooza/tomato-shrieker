@@ -2,10 +2,6 @@ module TomatoShrieker
   class Environment < Ginseng::Environment
     include Package
 
-    def self.name
-      return File.basename(dir)
-    end
-
     def self.dir
       return TomatoShrieker.dir
     end
@@ -18,20 +14,11 @@ module TomatoShrieker
       return ENV['RAKE'].present? && !test? rescue false
     end
 
-    def self.test?
-      return ENV['TEST'].present? rescue false
-    end
-
+    # ginseng-upstream: no — 文字列で返し、`RACK_ENV` を見ない。tomato では子プロセスへ渡す `RACK_ENV` の
+    # 元（`CommandRunner#command`）なので、上流のように `RACK_ENV` を読むと循環し、Symbol は spawn の env に渡せない。
+    # ⚠ `name` / `test?` / `development?` / `production?` は上流と同じだったので消した（#1786）。
     def self.type
       return config['/environment'] || 'development'
-    end
-
-    def self.development?
-      return type == 'development'
-    end
-
-    def self.production?
-      return type == 'production'
     end
 
     # ランタイムの能力欠落を可視化する (#1471)。
