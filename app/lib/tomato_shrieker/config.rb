@@ -28,6 +28,8 @@ module TomatoShrieker
     # **完成するまでの間、読み手には空の一覧が見える**。⚠ 窓を短くしても消えない。
     # `update` を横流しして完成品を組み立て、**1 回の `replace`** で公開する
     # （MRI の `Hash#replace` は C で完結するので中間状態が見えない）。
+    # ginseng-upstream: no — `config/sources/*.yaml` を `/sources` に足すのは tomato の設定の形。
+    # ⚠ `reload` の写し（上流の `alias reload load` の回避）は ginseng-core#491 で上流が直していたので消した（#1786）。
     def load
       entries, defined_at = scan_sources
       @staging = {}
@@ -123,12 +125,6 @@ module TomatoShrieker
         end
       end
       return @scratch_sources_dir
-    end
-
-    # Ginseng::Config の `alias reload load` は親の load を束縛するため、
-    # そのままでは config/sources/*.yaml を読み直さず全ソースが消える。
-    def reload
-      return load
     end
 
     def secure_dump

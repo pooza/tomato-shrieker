@@ -39,6 +39,7 @@ module TomatoShrieker
     # YouTube の /feeds/videos.xml は、チャンネルが生きていても間欠的に 404 を返す
     # (#1500 で 5 チャンネルぶん実測)。404 を恒久的な失敗として即 raise すると、
     # 一過性の揺らぎがそのまま run の失敗になり、監視が赤に貼り付く。
+    # ginseng-upstream: no — 404 を再送するのは YouTube の /feeds/videos.xml の事情（一般には恒久的な失敗）。
     def retryable?(error)
       return true if retry_not_found && not_found?(error)
       return super

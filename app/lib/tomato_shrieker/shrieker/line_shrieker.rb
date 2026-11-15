@@ -2,6 +2,7 @@ module TomatoShrieker
   class LineShrieker < Ginseng::LineService
     include Package
 
+    # ginseng-upstream: no — 組み立ての失敗を持ち越すのは、宛先の数え方（#1504）を崩さないための tomato の事情。
     def initialize(params = {})
       # 親の初期化は config が無い環境でも落とさない。ただし黙って捨てると
       # 後段の say 失敗の原因が追えなくなるので記録は残す (#1473)。
