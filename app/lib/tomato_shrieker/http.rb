@@ -17,7 +17,8 @@ module TomatoShrieker
     # `Ginseng::PublicHost.validator` を挿すと、それらが落ちる。
     # 🔴 **別のホストへのリダイレクト先だけを `PublicHost` で検証する。**配信元（第三者）が
     # 3xx で内部ホストを指すと、検証なしでは内部への GET を踏まされる（blind SSRF・#1666 の同族）。
-    # ⚠ 同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで通す。
+    # ⚠ 同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで通す。⚠ 別のポート・
+    # https → http も同じホストとして通る（validator はホスト名しか受けない・#1785）。
     # 2026-11-07 の本番の実測では、初段で 3xx を返すのは 2 件で、どちらも同じホストだった。
     def get_configured(uri, options = {})
       uri = create_uri(uri)

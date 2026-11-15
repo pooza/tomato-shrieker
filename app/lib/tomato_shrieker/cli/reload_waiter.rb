@@ -23,7 +23,8 @@ module TomatoShrieker
     def self.lock
       path = File.join(Environment.dir, 'tmp/cache/reload-wait.lock')
       FileUtils.mkdir_p(File.dirname(path))
-      File.open(path, File::RDWR | File::CREAT, 0o644) do |file|
+      # ⚠ シンボリックリンクは辿らない（#1785・差し替えられていると別のファイルを開く）。
+      File.open(path, File::RDWR | File::CREAT | File::NOFOLLOW, 0o644) do |file|
         busy = !file.flock(File::LOCK_EX | File::LOCK_NB)
         raise Ginseng::GatewayError, '別の source reload --wait が実行中です' if busy
         return yield

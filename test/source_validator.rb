@@ -188,7 +188,7 @@ module TomatoShrieker
       dest = {'hooks' => ['https://example.com/x']}
 
       [
-        {'feed' => 'http://scylla.b-shock.local:3000/clean?q=%E3%83%97%E3%83%AA%E3%82%AD%E3%83%A5%E3%82%A2'},
+        {'feed' => 'http://cleaner.example.local:3000/clean?q=%E3%83%97%E3%83%AA%E3%82%AD%E3%83%A5%E3%82%A2'},
         {'feed' => 'https://example.com/feed.xml#fragment'},
         {'ical' => 'webcal://example.com/a.ics'},
         {'calendar' => 'https://calendar.google.com/calendar/ical/a%40group.calendar.google.com/public/basic.ics'},

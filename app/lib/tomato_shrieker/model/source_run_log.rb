@@ -116,19 +116,26 @@ module TomatoShrieker
     end
 
     def self.record(source_id, started_at:, status:, error: nil, stats: nil)
-      create({
+      values = {
         source_id:,
         executed_at: started_at,
         status:,
         error_message: Package.error_message(error),
         duration_ms: duration_ms(started_at),
-      }.merge(stats_columns(stats)))
+      }.merge(stats_columns(stats))
       # 🔴 #1749: error で終わらなかった run は、error の確認をその場で解除する（次の失敗はすぐ赤）。
       # ⚠ **記録で持つ。**判定のたびに「確認の後の成功」を run_log から探すと、掃除（保持期間）で
       # 成功の行が消えたとき、期限つきの確認が復活する（#1779 の Codex P2）。
-      SilenceAck.clear_error(source_id) unless status == STATUS_ERROR
+      # 🔴 **行の作成と解除を 1 つのトランザクションにする（#1785）。**`source ack` も警告を読んでから
+      # 書くまでを `immediate` で囲んでいるので、どちらかが先に終わる（交互にならない）。
+      return db.transaction(mode: :immediate) do
+        row = create(values)
+        SilenceAck.clear_error(source_id) unless status == STATUS_ERROR
+        next row
+      end
     rescue => e
-      Sentry.capture_exception(e) if Sentry.initialized?
+      Sentry.capture_exception(e, tags: {source: source_id}) if Sentry.initialized?
+      return nil
     end
 
     def self.stats_columns(stats)

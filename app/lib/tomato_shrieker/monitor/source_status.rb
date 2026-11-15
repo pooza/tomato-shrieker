@@ -219,10 +219,14 @@ module TomatoShrieker
     # ⚠ `logs` は `delivery_status` が取った窓をそのまま受ける＝ 503 本文と同じ値・追加クエリなし。
     def threshold_status(logs)
       entry_stage = SourceRunLog.entry_level_error?(logs, cutoff)
+      threshold = self.class.effective_error_streak_threshold(@source, logs, entry_stage:)
+      reached = SourceRunLog.error_streak_of(logs, cutoff) >= threshold
       return {
         # #1558: 「なぜこのソースはまだ緑なのか」を外から説明できるようにする
-        error_streak_threshold:
-          self.class.effective_error_streak_threshold(@source, logs, entry_stage:),
+        error_streak_threshold: threshold,
+        # 🔴 #1785: error の確認が**いま**抑えているか。`error_acknowledged_at` / `_until` は記録で、
+        # 次の error で赤に戻っても・期限が過ぎても残るので、そこからは読めない。判定は healthz と同じ。
+        error_acknowledged: self.class.error_checks(@source, logs, reached)[:error_acknowledged],
         # #1624: しきい値が 1 に倒されている理由。⚠ 503 本文にしか無いと、503 になる前
         # （`error_streak: 0`）には「28 と宣言したのに 1 と出ている」理由がどこからも読めない。
         entry_stage:,

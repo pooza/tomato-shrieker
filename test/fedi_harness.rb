@@ -1,5 +1,5 @@
 module TomatoShrieker
-  # 🔴 **直接経路（MastodonShrieker / MisskeyShrieker）を実インスタンス相手に動かす (#1451)。**
+  # 🔴 **直接経路（MastodonShrieker / MisskeyShrieker）をハーネスの Mastodon / Misskey 相手に動かす (#1451)。**
   #
   # 運用者は Webhook（モロヘイヤ経由）しか使っていないが、Mastodon / Misskey の API へ直接投稿している
   # 外部ユーザーがいる（docs/CLAUDE.md「投稿先ごとのテスト厚みの非対称」）。`test/sources/` の

@@ -155,6 +155,8 @@ module TomatoShrieker
 
       assert_empty(errors.call('news' => {'cleaner' => {'url' => 'http://cleaner.local:3000/clean'}}))
       assert_empty(errors.call('api' => {'key' => 'x'}, 'news' => {'cleaner' => {'url' => nil}}))
+      # #1785: 使わないなら `cleaner: null` とも書ける
+      assert_empty(errors.call('news' => {'cleaner' => nil}))
       assert_not_empty(errors.call('news' => {'cleaner' => {'uri' => 'http://cleaner.local:3000/clean'}}))
       assert_not_empty(errors.call('news' => {'cleanr' => {'url' => 'http://cleaner.local:3000/clean'}}))
     end

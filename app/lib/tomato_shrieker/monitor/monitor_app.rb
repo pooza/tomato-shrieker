@@ -82,7 +82,10 @@ module TomatoShrieker
       if until_at = source.acknowledgement.error_acknowledged_until
         return "error acknowledged until #{until_at.iso8601}"
       end
-      return "error acknowledged, re-evaluated at #{checks[:next_run].iso8601}"
+      label = "error acknowledged, re-evaluated at #{checks[:next_run].iso8601}"
+      # ⚠ やり直し（`schedule.retry`・#1585）があれば、それも次の run になる（#1785）。
+      label += ' or at the next retry' if source.retry_configured?
+      return label
     end
 
     # 🔴 **「定義が無い」と「定義は在るが読めない」を分ける (#1605)。**判別キーを打ち

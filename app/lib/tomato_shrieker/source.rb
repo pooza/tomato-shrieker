@@ -819,6 +819,11 @@ module TomatoShrieker
       return message.to_s.sanitize
     end
 
+    # やり直し（`schedule.retry`・#1585）を設定しているか。healthz の本文が使う（#1785）。
+    def retry_configured?
+      return retry_times.positive?
+    end
+
     private
 
     def schedule(method, spec)
@@ -851,9 +856,19 @@ module TomatoShrieker
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       record_exec_abort(e)
       SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
-      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
+      Sentry.capture_exception(e, **run_error_sentry_options(e)) if Sentry.initialized?
       logger.error(source: id, error: e)
       retry_failed_run(attempt)
+    end
+
+    # 🔴 **取得元のリダイレクト先を拒んだ失敗（`Rejected host`・#1688）は、Sentry で別のイシューにする
+    # （#1785）。**どちらも `FeedSource#feedjira` が包んだ `GatewayError` でスタックが同じなので、
+    # 放っておくと YouTube の毎日の 404（TOMATO-SHRIEKER-S）に紛れて気づけない。
+    # ⚠ 名前解決の失敗も `Rejected host` になる（上流 pooza/ginseng-core#695）。
+    def run_error_sentry_options(error)
+      return {tags: {source: id}} unless error.message.to_s.include?('Rejected host')
+      return {tags: {source: id, reason: 'rejected_host'},
+              fingerprint: ['{{ default }}', 'rejected-host']}
     end
 
     def log_exec_start(method, spec)

@@ -9,6 +9,11 @@ module TomatoShrieker
   class SourceCommand < Thor # rubocop:disable Metrics/ClassLength
     # 確認の対象になる警告の名前（`acknowledged_reasons` に残す名前・#1680 / #1749）。
     ACK_REASONS = [:undelivered, :lost_entries, :silent, :errored].freeze
+    # `--until` の書き方（#1785）。⚠ `Time.parse` は `12` を今月 12 日、`2026-02-30` を 3/2 と読むので使わない。
+    ACK_UNTIL_FORMATS = ['%Y-%m-%d', '%Y-%m-%dT%H:%M'].freeze
+    # `--until` の上限（#1785・ユーザー判断）。月次のソースでも次の実行まで確認できる長さ。
+    # ⚠ 上限が無いと `--until 9999-12-31` で「ずっと緑」になる。
+    ACK_UNTIL_MAX_DAYS = 35
 
     include Package
 
@@ -129,7 +134,7 @@ module TomatoShrieker
 
     desc 'ack ID', '出ている警告を確認済みにする（サイレント不発 / 未達 / 取りこぼし / error）'
     method_option :until, type: :string,
-      desc: 'error を期限まで確認済みにする（例: 2026-12-01 / 2026-12-01T12:00・未来の時刻だけ）。その間に成功したら解除'
+      desc: 'error を期限まで確認済みにする（例: 2026-12-01 / 2026-12-01T12:00・35 日先まで）。その間に成功したら解除'
     # 🔴 **出力は実際に効いた範囲だけを言う (#1506)。**
     #
     # ⚠ 以前は `SilenceAck` を書くだけで **`undelivered` には一切効かない**のに、
@@ -140,12 +145,19 @@ module TomatoShrieker
     # `--until` なら期限まで。⚠ 期限の無い「ずっと緑」は作らない。
     def ack(id)
       source = find_source!(id)
-      warnings = ack_warnings(source, parse_ack_until(options[:until]))
-      # 🔴 **警告が無ければ何も記録しない（4.19.0 リリース前レビュー）。**記録すると、未達を確認した
-      # 後の打ち直しで沈黙の起点が動き（宛先が死んだまま警告が 1 周ぶん遅れる）、了解した run と
-      # 警告の記録も空で上書きされる。
+      error_until = parse_ack_until(options[:until])
+      # 🔴 **警告を読んでから書くまでを 1 つのトランザクションにする（#1785）。**daemon の
+      # `SourceRunLog.record`（成功の記録と error の確認の解除）と交互になると、確認の直前に記録された
+      # 成功を見落とし、「成功で解除」が破れる。⚠ SQLite は `immediate` で書き込みの錠を先に取る。
+      warnings = SilenceAck.db.transaction(mode: :immediate) do
+        found = ack_warnings(source, error_until)
+        # 🔴 **警告が無ければ何も記録しない（4.19.0 リリース前レビュー）。**記録すると、未達を確認した
+        # 後の打ち直しで沈黙の起点が動き（宛先が死んだまま警告が 1 周ぶん遅れる）、了解した run と
+        # 警告の記録も空で上書きされる。
+        record_ack(source, found) if found.values_at(*ACK_REASONS).any?
+        next found
+      end
       return say(nothing_to_ack_message(id)) unless warnings.values_at(*ACK_REASONS).any?
-      record_ack(source, warnings)
       say "#{id} を確認済みにしました。"
       say_after_ack(source, warnings)
     end
@@ -243,9 +255,9 @@ module TomatoShrieker
       log ||= warnings[:latest_error]
       at = Time.now
       SilenceAck.acknowledge(source.id, at:, silence: warnings[:silent], run_id: log&.id, reasons:)
-      return unless warnings[:errored]
-      SilenceAck.acknowledge_error(source.id, at:,
-        until_at: warnings[:error_until])
+      return nil unless warnings[:errored]
+      SilenceAck.acknowledge_error(source.id, at:, until_at: warnings[:error_until])
+      return nil
     end
 
     # ⚠ 「今後も問題ない」の保証ではないことを操作のたびに示す。
@@ -260,7 +272,10 @@ module TomatoShrieker
       say_silence_after_ack(source, moved: warnings[:silent]) if tolerance
       # 🔴 **しきい値が無いソースは、配信を試みない限り二度と鳴らない (#1567)。**⚠ 宛先が
       # 死んだままでも、次の試行（新着）が来るまでは緑のまま。せめて言葉で残す。
-      say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。' unless tolerance
+      # ⚠ error だけの確認には当てはまらない（error は次の定期実行で判定し直す・#1785）。
+      return nil if tolerance || warnings.values_at(:undelivered, :lost_entries, :silent).none?
+      say '  注意: silence_tolerance が未設定なので、次にエントリを処理するまで再警告はありません。'
+      return nil
     end
 
     # 🔴 **error の警告が出ている（または確認済みで抑えている）ときの、直近の error の run (#1749)。**
@@ -274,14 +289,28 @@ module TomatoShrieker
       return latest
     end
 
-    # `--until` の期限。⚠ 過去や今は受けない（確認した瞬間に切れる）。
+    # `--until` の期限。⚠ 過去や今は受けない（確認した瞬間に切れる）。上限は `ACK_UNTIL_MAX_DAYS`。
     def parse_ack_until(value)
       return nil if value.nil?
-      until_at = Time.parse(value)
+      unless until_at = parse_ack_time(value)
+        raise Thor::Error, "--until は #{ACK_UNTIL_FORMATS.join(' か ')} の形で書いてください: #{value}"
+      end
       raise Thor::Error, "--until は未来の時刻を指定してください: #{value}" unless until_at > Time.now
+      if until_at > Time.now + (ACK_UNTIL_MAX_DAYS * 86_400)
+        raise Thor::Error, "--until は #{ACK_UNTIL_MAX_DAYS} 日先までです: #{value}"
+      end
       return until_at
-    rescue ArgumentError
-      raise Thor::Error, "--until を時刻として読めません: #{value}"
+    end
+
+    # ⚠ 書いたとおりに読み戻せるものだけ受ける（`2026-02-30` を 3/2 に読み替えない）。
+    def parse_ack_time(value)
+      ACK_UNTIL_FORMATS.each do |format|
+        time = Time.strptime(value.to_s, format)
+        return time if time.strftime(format) == value
+      rescue ArgumentError
+        next
+      end
+      return nil
     end
 
     def say_error_after_ack(source, latest_error, error_until)
@@ -429,7 +458,7 @@ module TomatoShrieker
     # silence_tolerance を人が読める長さで返す (#1513)。
     #
     # ⚠ **整数除算で「0日」と出してはいけない。** スキーマは `12h` / `30m` を許す
-    # ので（`^((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)$`）、日未満を設定した
+    # ので（`\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z`）、日未満を設定した
     # ソースでは「次に silence_tolerance (0日) を超えたら」と出ていた。
     # ⚠ #1496 の「9 月上旬に 7d → 3d へ締める」運用で日未満を入れたら踏む。
     def tolerance_label(source)
