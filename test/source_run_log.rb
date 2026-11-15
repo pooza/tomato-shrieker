@@ -695,5 +695,37 @@ module TomatoShrieker
       assert_equal(0, log.delivered_count)
       assert_true(log.noop?)
     end
+
+    # 🔴 4.21.0 リリース前レビューの赤: 並列の run の記録どうしが詰まらない（daemon は `Parallel.map` で
+    # 並べて走らせる）。`immediate` で囲んでいた版は、4 スレッド×10 回が終わらなかった。
+    def test_record_does_not_block_parallel_runs
+      ids = Array.new(4) {|i| "#{SOURCE_ID}#{i}"}
+      Timeout.timeout(30) do
+        ids.map do |id|
+          Thread.new do
+            10.times {|j| SourceRunLog.record(id, started_at: Time.now, status: j.even? ? 'success' : 'error')}
+          end
+        end.each(&:join)
+      end
+
+      assert_equal(40, SourceRunLog.where(source_id: ids).count)
+    ensure
+      SourceRunLog.where(source_id: ids).delete
+    end
+
+    # ⚠ 記録に失敗したら、Sentry だけでなくログにも残す（無い環境では行の欠けがどこにも残らない）。
+    def test_record_failure_is_logged
+      logged = []
+      fake = Object.new
+      fake.define_singleton_method(:error) {|**kw| logged.push(kw)}
+      originals = [:create, :logger].to_h {|name| [name, SourceRunLog.method(name)]}
+      SourceRunLog.define_singleton_method(:create) {|*| raise Sequel::DatabaseError, 'database is locked'}
+      SourceRunLog.define_singleton_method(:logger) {fake}
+
+      assert_nil(SourceRunLog.record_success(SOURCE_ID, started_at: Time.now))
+      assert_equal('run log record failed', logged.first[:message])
+    ensure
+      originals&.each {|name, method| SourceRunLog.define_singleton_method(name, method)}
+    end
   end
 end

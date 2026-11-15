@@ -487,6 +487,18 @@ module TomatoShrieker
       assert_include(ack_cli(FIXTURE_ID, until: (Time.now + (2 * day)).strftime('%Y-%m-%d')), 'まで確認済みにしました')
     end
 
+    # 4.21.0 リリース前レビュー: daemon が書き込み中で BUSY なら、素の例外ではなく打ち直しを促す。
+    def test_ack_reports_busy_database
+      record_error(FIXTURE_ID)
+      original = SilenceAck.db.method(:transaction)
+      SilenceAck.db.define_singleton_method(:transaction) {|*, **| raise Sequel::DatabaseError, 'database is locked'}
+      error = assert_raise(Thor::Error) {ack_cli(FIXTURE_ID)}
+
+      assert_include(error.message, '打ち直してください')
+    ensure
+      SilenceAck.db.define_singleton_method(:transaction, original)
+    end
+
     # #1785: 書いたとおりに読み戻せない日付（`strptime` は 2/30 を 3/2 と読む）は受けない。
     def test_ack_until_rejects_rolled_over_dates
       command = SourceCommand.new
