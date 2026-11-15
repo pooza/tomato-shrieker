@@ -149,6 +149,7 @@ module TomatoShrieker
       # 🔴 **警告を読んでから書くまでを 1 つのトランザクションにする（#1785）。**daemon の
       # `SourceRunLog.record`（成功の記録と error の確認の解除）と交互になると、確認の直前に記録された
       # 成功を見落とし、「成功で解除」が破れる。⚠ SQLite は `immediate` で書き込みの錠を先に取る。
+      # ⚠ 囲むのはこちらだけ（daemon の側を囲むと run どうしが詰まる・4.21.0 リリース前レビューの赤）。
       warnings = SilenceAck.db.transaction(mode: :immediate) do
         found = ack_warnings(source, error_until)
         # 🔴 **警告が無ければ何も記録しない（4.19.0 リリース前レビュー）。**記録すると、未達を確認した
@@ -160,6 +161,9 @@ module TomatoShrieker
       return say(nothing_to_ack_message(id)) unless warnings.values_at(*ACK_REASONS).any?
       say "#{id} を確認済みにしました。"
       say_after_ack(source, warnings)
+    rescue Sequel::DatabaseError => e
+      # ⚠ daemon が書き込み中だと、5 秒待って BUSY になる。記録は巻き戻っているので打ち直せばよい。
+      raise Thor::Error, "#{id} を確認済みにできませんでした（DB が混んでいます。打ち直してください）: #{e.class}"
     end
 
     desc 'reload', '稼働中の scheduler にソース定義を読み直させる (SIGHUP)'
