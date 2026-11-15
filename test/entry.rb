@@ -248,5 +248,19 @@ module TomatoShrieker
       assert_include(tags, '#test')
       assert_include(tags, '#fixture')
     end
+
+    # 🔴 #1785: モロヘイヤのタグ付けが落ちても、ソースのタグと `extra_tags` は残す。
+    def test_tags_survive_remote_tagging_failure
+      entry = @entries.first
+      feed = entry.feed
+      feed.define_singleton_method(:remote_tagging?) {true}
+      feed.define_singleton_method(:remote_tags) {|_status| []}
+      entry.define_singleton_method(:nokogiri) {Nokogiri::HTML('<h1>x</h1>')}
+      entry.instance_variable_set(:@tags, nil)
+      tags = entry.tags
+
+      assert_include(tags, '#test')
+      assert_include(tags, '#fixture')
+    end
   end
 end

@@ -158,6 +158,7 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
       "acknowledged_reasons": null,
       "error_acknowledged_at": null,
       "error_acknowledged_until": null,
+      "error_acknowledged": false,
       "error_rate_24h": 0.0,
       "duration_ms": {"min": 120, "avg": 380, "max": 1200, "p95": 900},
       "shrieker_errors": {"TomatoShrieker::MastodonShrieker": 1},

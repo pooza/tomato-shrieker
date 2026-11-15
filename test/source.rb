@@ -119,6 +119,17 @@ module TomatoShrieker
       assert_nil(source.instance_variable_get(:@piefed))
     end
 
+    # 🔴 #1785: 取得元のリダイレクト先を拒んだ失敗は、Sentry で YouTube の 404 と別のイシューにする。
+    def test_run_error_sentry_options_splits_rejected_host
+      source = TextSource.new({'id' => 'test-rejected-host', 'source' => {'text' => 'body'}})
+      rejected = Ginseng::GatewayError.new("Invalid feed x (https://example.com/feed) Rejected host 'internal'")
+      not_found = Ginseng::GatewayError.new('Invalid feed x (https://example.com/feed) Bad response 404')
+
+      assert_equal(['{{ default }}', 'rejected-host'], source.send(:run_error_sentry_options, rejected)[:fingerprint])
+      assert_equal('rejected_host', source.send(:run_error_sentry_options, rejected)[:tags][:reason])
+      assert_equal({tags: {source: 'test-rejected-host'}}, source.send(:run_error_sentry_options, not_found))
+    end
+
     # 🔴 **#1712 の Codex P1: 宛先のオブジェクトは run ごとに作り直す。**スケジューラのソースは
     # run をまたいで生きるので、作り直さないと PieFed の期限切れの JWT がずっと残る。
     def test_exec_with_run_log_resets_shriekers

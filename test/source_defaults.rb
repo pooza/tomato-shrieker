@@ -155,8 +155,18 @@ module TomatoShrieker
 
       assert_empty(errors.call('news' => {'cleaner' => {'url' => 'http://cleaner.local:3000/clean'}}))
       assert_empty(errors.call('api' => {'key' => 'x'}, 'news' => {'cleaner' => {'url' => nil}}))
+      # #1785: 使わないなら `cleaner: null` とも書ける
+      assert_empty(errors.call('news' => {'cleaner' => nil}))
       assert_not_empty(errors.call('news' => {'cleaner' => {'uri' => 'http://cleaner.local:3000/clean'}}))
       assert_not_empty(errors.call('news' => {'cleanr' => {'url' => 'http://cleaner.local:3000/clean'}}))
+    end
+
+    # #1785: 鍵（`crypt.password`）の空文字を通さない。
+    def test_schema_rejects_empty_crypt_password
+      errors = ->(password) {JSON::Validator.fully_validate(base_schema, {'crypt' => {'password' => password}})}
+
+      assert_empty(errors.call('x'))
+      assert_not_empty(errors.call(''))
     end
 
     def base_schema

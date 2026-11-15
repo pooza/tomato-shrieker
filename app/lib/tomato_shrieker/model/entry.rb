@@ -51,7 +51,10 @@ module TomatoShrieker
       ['h1', 'h2', 'h3', 'title', 'meta'].map do |v|
         contents.push(nokogiri.xpath("//#{v}").inner_text)
       end
-      return feed.mulukhiya.search_hashtags(contents.join(' '))
+      # ⚠ `Source#remote_tags` を通す（#1785）。モロヘイヤの失敗はそこで warn と Sentry に残して
+      # 空を返すので、`/feed/default_tags` と `extra_tags` まで落とさない（4.20.0 までは下の rescue で
+      # ソースのタグだけになり、Sentry にも出なかった）。
+      return feed.remote_tags(contents.join(' '))
     end
 
     def uri

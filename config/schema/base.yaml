@@ -55,7 +55,9 @@ properties:
     type: object
     properties:
       password:
+        # ⚠ 空文字を通さない（#1785）。暗号化と digest の HMAC（#1761）の鍵になる。
         type: string
+        minLength: 1
     required:
       - password
   disable:
@@ -71,13 +73,17 @@ properties:
         additionalProperties: false
         properties:
           cleaner:
-            type: object
-            additionalProperties: false
-            properties:
-              url:
-                type:
-                  - string
-                  - 'null'
+            # ⚠ `cleaner: null`（使わない）も書ける（#1785）。⚠ `type` に並べると json-schema gem が
+            # `additionalProperties` を効かせなくなる（綴りの誤りを拾えない）ので `anyOf` で分ける。
+            anyOf:
+              - type: 'null'
+              - type: object
+                additionalProperties: false
+                properties:
+                  url:
+                    type:
+                      - string
+                      - 'null'
           urls:
             type: object
             additionalProperties: false
