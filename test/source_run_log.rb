@@ -608,13 +608,13 @@ module TomatoShrieker
       assert_in_delta(0.5, SourceRunLog.error_rate(SOURCE_ID, hours: 48))
     end
 
-    def test_summary_for
+    def test_summary_of
       create_logs(
         {status: SourceRunLog::STATUS_SUCCESS, attempted_count: 1, delivered_count: 1},
         {status: SourceRunLog::STATUS_ERROR, attempted_count: 1,
          shrieker_errors: JSON.dump('MastodonShrieker' => 1)},
       )
-      summary = SourceRunLog.summary_for(SOURCE_ID)
+      summary = SourceRunLog.summary_of(SourceRunLog.recent_for(SOURCE_ID, SourceRunLog.streak_window))
 
       assert_equal(1, summary[:error_streak])
       assert_equal(1, summary[:noop_streak])
@@ -694,6 +694,38 @@ module TomatoShrieker
       assert_equal(0, log.attempted_count)
       assert_equal(0, log.delivered_count)
       assert_true(log.noop?)
+    end
+
+    # 🔴 4.21.0 リリース前レビューの赤: 記録をトランザクションで囲まない。`immediate` で囲むと、daemon の
+    # 並列の run（`Parallel.map`）どうしが書き込みの錠を取り合い、GVL を握った待ちで詰まって行が欠ける
+    # （本番と同じ WAL・接続数の手元の複製で、4 スレッド×10 回が終わらなかった）。⚠ テストの DB では
+    # 詰まり方を再現できないので、`immediate` のトランザクションを開かないことを直接見る（⚠ `create` 自身は
+    # 既定の deferred で囲む＝そちらは錠を書き込みの瞬間まで取らない）。
+    def test_record_does_not_open_immediate_transaction
+      original = SourceRunLog.db.method(:transaction)
+      SourceRunLog.db.define_singleton_method(:transaction) do |opts = {}, &block|
+        raise 'immediate transaction opened' if opts[:mode] == :immediate
+        next original.call(opts, &block)
+      end
+
+      assert_not_nil(SourceRunLog.record_success(SOURCE_ID, started_at: Time.now))
+    ensure
+      SourceRunLog.db.define_singleton_method(:transaction, original)
+    end
+
+    # ⚠ 記録に失敗したら、Sentry だけでなくログにも残す（無い環境では行の欠けがどこにも残らない）。
+    def test_record_failure_is_logged
+      logged = []
+      fake = Object.new
+      fake.define_singleton_method(:error) {|**kw| logged.push(kw)}
+      originals = [:create, :logger].to_h {|name| [name, SourceRunLog.method(name)]}
+      SourceRunLog.define_singleton_method(:create) {|*| raise Sequel::DatabaseError, 'database is locked'}
+      SourceRunLog.define_singleton_method(:logger) {fake}
+
+      assert_nil(SourceRunLog.record_success(SOURCE_ID, started_at: Time.now))
+      assert_equal('run log record failed', logged.first[:message])
+    ensure
+      originals&.each {|name, method| SourceRunLog.define_singleton_method(name, method)}
     end
   end
 end

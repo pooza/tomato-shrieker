@@ -46,12 +46,15 @@ module TomatoShrieker
     # error の確認を解除する（error で終わらなかった run の後・#1749）。⚠ ほかの確認（沈黙・未達・
     # 取りこぼし）の記録には触らない。
     def self.clear_error(source_id)
-      return where(source_id:).exclude(error_acknowledged_at: nil)
-          .update(error_acknowledged_at: nil, error_acknowledged_until: nil)
+      acknowledged = where(source_id:).exclude(error_acknowledged_at: nil)
+      return acknowledged.update(error_acknowledged_at: nil, error_acknowledged_until: nil)
     end
 
+    # 確認した警告の名前。⚠ **migration 015 より前の確認は nil**（何を確認したかの記録が無い・
+    # #1770）。空の配列に潰すと「警告なしで確認した」と区別できない。
     def reasons
-      return acknowledged_reasons.to_s.split(',')
+      return nil if acknowledged_reasons.nil?
+      return acknowledged_reasons.split(',')
     end
   end
 end

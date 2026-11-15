@@ -388,10 +388,27 @@ module TomatoShrieker
       assert_equal(503, status)
     end
 
+    # 🔴 #1785: `/status.json` と表で、error の確認が**いま**効いているかを読める（記録の時刻とは別）。
+    def test_status_tells_whether_error_ack_is_in_effect
+      record_error(FIXTURE_ID)
+
+      assert_false(source_status(FIXTURE_ID)['error_acknowledged'])
+
+      ack_cli(FIXTURE_ID)
+
+      assert_true(source_status(FIXTURE_ID)['error_acknowledged'])
+      assert_include(SourceStatusTable.marks(SourceStatusTable.row(Source.create(FIXTURE_ID))), 'error_acknowledged')
+
+      record_error(FIXTURE_ID, at: Time.now + 1)
+
+      assert_false(source_status(FIXTURE_ID)['error_acknowledged'])
+      assert_not_nil(source_status(FIXTURE_ID)['error_acknowledged_at'], '記録は残る')
+    end
+
     # #1749: 期限つきなら、期限までは次の error でも緑。本文に期限を出す。
     def test_ack_error_with_until_survives_next_error
       record_error(FIXTURE_ID)
-      said = ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      said = ack_cli(FIXTURE_ID, until: ack_until(86_400))
       record_error(FIXTURE_ID, at: Time.now + 1)
       status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
 
@@ -404,7 +421,7 @@ module TomatoShrieker
     # #1749: 期限の前に成功したら、その時点で解除する（次の失敗はすぐ赤）。
     def test_ack_error_with_until_is_cleared_by_success
       record_error(FIXTURE_ID)
-      ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      ack_cli(FIXTURE_ID, until: ack_until(86_400))
       SourceRunLog.record_success(FIXTURE_ID, started_at: Time.now)
       record_error(FIXTURE_ID, at: Time.now + 2)
       status, = call("/healthz/source/#{FIXTURE_ID}")
@@ -415,7 +432,7 @@ module TomatoShrieker
     # 🔴 #1749（#1779 の Codex P2）: 解除は記録で持つ。成功の行が掃除で消えても、確認は戻らない。
     def test_ack_error_cleared_by_success_survives_pruning
       record_error(FIXTURE_ID)
-      ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      ack_cli(FIXTURE_ID, until: ack_until(86_400))
       SourceRunLog.record_success(FIXTURE_ID, started_at: Time.now)
       SourceRunLog.where(source_id: FIXTURE_ID, status: SourceRunLog::STATUS_SUCCESS).delete
       record_error(FIXTURE_ID, at: Time.now + 2)
@@ -428,7 +445,7 @@ module TomatoShrieker
     # #1749: error の run は確認を消さない（期限つきの確認は次の error でも残る）
     def test_ack_error_not_cleared_by_error_run
       record_error(FIXTURE_ID)
-      ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)
+      ack_cli(FIXTURE_ID, until: ack_until(86_400))
       SourceRunLog.record_error(FIXTURE_ID, started_at: Time.now, error: RuntimeError.new('boom'))
 
       assert_not_nil(SilenceAck.where(source_id: FIXTURE_ID).first.error_acknowledged_until)
@@ -446,12 +463,56 @@ module TomatoShrieker
 
     # #1749: `--until` は error にだけ効く。過去の期限も受けない。
     def test_ack_until_requires_error_and_future
-      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: (Time.now + 86_400).iso8601)}
+      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: ack_until(86_400))}
       record_error(FIXTURE_ID)
 
-      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: (Time.now - 60).iso8601)}
+      assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: ack_until(-120))}
       assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: 'not a time')}
       assert_nil(SilenceAck.where(source_id: FIXTURE_ID).first&.error_acknowledged_at)
+    end
+
+    # 🔴 #1785: 上限（35 日）を超える期限と、読み替えの起きる書き方は受けない。
+    def test_ack_until_is_bounded_and_strict
+      record_error(FIXTURE_ID)
+      day = 86_400
+
+      [
+        ack_until(36 * day), '9999-12-31', '12', '2026-02-30', (Time.now + day).iso8601,
+        (Time.now + day).strftime('%Y/%m/%d')
+      ].each do |value|
+        assert_raise(Thor::Error, value) {ack_cli(FIXTURE_ID, until: value)}
+      end
+
+      assert_nil(SilenceAck.where(source_id: FIXTURE_ID).first&.error_acknowledged_at)
+      assert_include(ack_cli(FIXTURE_ID, until: (Time.now + (2 * day)).strftime('%Y-%m-%d')), 'まで確認済みにしました')
+    end
+
+    # 4.21.0 リリース前レビュー: daemon が書き込み中で BUSY なら、素の例外ではなく打ち直しを促す。
+    def test_ack_reports_busy_database
+      record_error(FIXTURE_ID)
+      original = SilenceAck.db.method(:transaction)
+      SilenceAck.db.define_singleton_method(:transaction) {|*, **| raise Sequel::DatabaseError, 'database is locked'}
+      error = assert_raise(Thor::Error) {ack_cli(FIXTURE_ID)}
+
+      assert_include(error.message, '打ち直してください')
+    ensure
+      SilenceAck.db.define_singleton_method(:transaction, original)
+    end
+
+    # #1785: 書いたとおりに読み戻せない日付（`strptime` は 2/30 を 3/2 と読む）は受けない。
+    def test_ack_until_rejects_rolled_over_dates
+      command = SourceCommand.new
+
+      assert_nil(command.send(:parse_ack_time, '2026-02-30'))
+      assert_nil(command.send(:parse_ack_time, '2026-11-31T10:00'))
+      assert_not_nil(command.send(:parse_ack_time, '2026-11-30T10:00'))
+    end
+
+    # 🟢 #1785: error だけの確認では、沈黙・未達の再警告の注意を出さない。
+    def test_error_only_ack_omits_silence_notice
+      record_error(FIXTURE_ID)
+
+      assert_not_include(ack_cli(FIXTURE_ID), '再警告はありません')
     end
 
     # #1558: しきい値をソース単位で上げたソースは、下回るあいだ緑のまま。
@@ -794,6 +855,19 @@ module TomatoShrieker
 
       assert_false(source_status(SILENT_ID)['silent'])
       # 「なぜ緑なのか」を答えられること
+      assert_not_nil(source_status(SILENT_ID)['acknowledged_at'])
+    end
+
+    # 🔴 #1770: migration 015 より前の確認（理由の記録が無い）は null、理由なしで記録したものは []。
+    def test_status_json_tells_legacy_ack_from_empty_reasons
+      record(SILENT_ID, attempted_count: 1, delivered_count: 1, at: Time.now - 172_800)
+      SilenceAck.acknowledge(SILENT_ID)
+
+      assert_equal([], source_status(SILENT_ID)['acknowledged_reasons'])
+
+      SilenceAck.where(source_id: SILENT_ID).update(acknowledged_reasons: nil)
+
+      assert_nil(source_status(SILENT_ID)['acknowledged_reasons'])
       assert_not_nil(source_status(SILENT_ID)['acknowledged_at'])
     end
 
@@ -1507,6 +1581,11 @@ module TomatoShrieker
     # （終了時刻が ack より後）にすると確認の対象にならない。
     def record_error(source_id, at: Time.now - 60)
       return record(source_id, at:, status: SourceRunLog::STATUS_ERROR, error_message: 'RuntimeError: boom')
+    end
+
+    # `--until` に渡す形（#1785 で `%Y-%m-%dT%H:%M` と `%Y-%m-%d` だけになった）。
+    def ack_until(seconds)
+      return (Time.now + seconds).strftime('%Y-%m-%dT%H:%M')
     end
 
     def ack_cli(source_id, options = {})

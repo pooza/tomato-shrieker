@@ -30,6 +30,7 @@ module TomatoShrieker
       ].compact.join("\n")
     end
 
+    # ginseng-upstream: no — 子を `exec` せず、同じプロセスでスケジューラと監視の HTTP を回すのは tomato の形。
     def start(args = [])
       logger.info(daemon: app_name, version: Package.version, message: 'start')
       db = Sequel.connect(Environment.dsn)
@@ -118,6 +119,7 @@ module TomatoShrieker
       return File.join(Environment.dir, 'app/migration')
     end
 
+    # ginseng-upstream: no — `start` と対（同じプロセスのスケジューラを止める）。
     def stop
       logger.info(daemon: app_name, version: Package.version, message: 'stop')
       @reload_queue&.close
@@ -137,6 +139,8 @@ module TomatoShrieker
     # TERM・INT の trap まで複製することになり、上流が #509 / #510 / #532 で
     # 個別に塞いだレースを写し取る羽目になる。pid を書く直前に通るのはここだけ
     # なので、1 行の `write_pid` を挟む。
+    # ginseng-upstream: hold — private の `PidFile#write_pid` を上書きしている。「pid を書く直前」の口は
+    # 一般に成り立ちうるので、2 つ目の利用側が要ったら上流に口を求める。
     def write_pid
       start_reload_worker
       super

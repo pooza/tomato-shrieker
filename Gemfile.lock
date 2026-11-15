@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: df46acf890b7d1cb83b033508377cbbae79b698f
+  revision: 6d51c4d7c1a9cdb5e582ad3ff7dfc9cf790e87be
   branch: main
   specs:
-    ginseng-core (5.1.0)
+    ginseng-core (7.0.1)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -34,10 +34,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 4ae6ba6c834371753de0d49fa2f52a454b231547
+  revision: 1fb69124a62cff6a57afaa088a34c1687330f927
   branch: main
   specs:
-    ginseng-fediverse (7.1.0)
+    ginseng-fediverse (9.0.0)
       ginseng-core (>= 2.1.0)
 
 GIT
@@ -61,10 +61,11 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: 07f38385d13f134568233849553e13801e52fc7c
+  revision: e166b3faded9412bd9776935fc02cb9dc8212d6b
   branch: main
   specs:
-    ginseng-youtube (3.0.3)
+    ginseng-youtube (4.0.0)
+      ginseng-core (>= 1.23.1)
 
 GIT
   remote: https://github.com/pooza/icalendar-rrule.git
@@ -166,9 +167,9 @@ GEM
     language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
     logger (1.7.0)
-    loofah (2.25.2)
+    loofah (2.25.3)
       crass (~> 1.0.2)
-      nokogiri (>= 1.12.0)
+      nokogiri (>= 1.19.5)
     mail (2.9.1)
       logger
       mini_mime (>= 0.1.1)
@@ -273,16 +274,16 @@ GEM
     sequel (5.106.0)
       bigdecimal
     set (1.1.3)
-    sqlite3 (2.9.6)
+    sqlite3 (2.10.2)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (2.9.6-aarch64-linux-gnu)
-    sqlite3 (2.9.6-aarch64-linux-musl)
-    sqlite3 (2.9.6-arm-linux-gnu)
-    sqlite3 (2.9.6-arm-linux-musl)
-    sqlite3 (2.9.6-arm64-darwin)
-    sqlite3 (2.9.6-x86_64-darwin)
-    sqlite3 (2.9.6-x86_64-linux-gnu)
-    sqlite3 (2.9.6-x86_64-linux-musl)
+    sqlite3 (2.10.2-aarch64-linux-gnu)
+    sqlite3 (2.10.2-aarch64-linux-musl)
+    sqlite3 (2.10.2-arm-linux-gnu)
+    sqlite3 (2.10.2-arm-linux-musl)
+    sqlite3 (2.10.2-arm64-darwin)
+    sqlite3 (2.10.2-x86_64-darwin)
+    sqlite3 (2.10.2-x86_64-linux-gnu)
+    sqlite3 (2.10.2-x86_64-linux-musl)
     syslog (0.4.0)
       logger
     test-unit (3.7.8)

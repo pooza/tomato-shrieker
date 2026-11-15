@@ -25,6 +25,7 @@ module TomatoShrieker
       return (name ? name.constantize : self).new(hook)
     end
 
+    # ginseng-upstream: no — `hooks` の要素を Hash（`url` と宛先固有のキー）でも書けるのは tomato の設定の形。
     def initialize(hook)
       case hook
       when Ginseng::URI
@@ -50,10 +51,12 @@ module TomatoShrieker
       return @params[:room_id] rescue nil # matrix-webhook で使用
     end
 
+    # ginseng-upstream: no — 本文は tomato のテンプレートから組む（上流の Slack の `text` とは別物）。
     def post(body, type = :hash)
       return @http.post(@uri, {body: create_body(body)})
     end
 
+    # ginseng-upstream: no — `post` と同じ（宛先ごとの差は `build_body` で出す）。
     def create_body(body, type = :hash)
       return build_body(body).to_json
     end

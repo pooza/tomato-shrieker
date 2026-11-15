@@ -130,8 +130,9 @@ module TomatoShrieker
       return fixture(name || DEFAULT_FEED_FIXTURE)
     end
 
-    def fixture(name)
-      return File.read(File.join(self.class.dir, 'fixtures', name))
+    # ⚠ `fixture` を写さず、置き場所だけ差し替える（上流は `test/fixture`・#1786）。
+    def self.fixture_dir
+      return File.join(dir, 'fixtures')
     end
 
     # 🔴 **`calendar.ics` の日付は実行時に埋める。**`test-ical-schedule.yaml` は
@@ -193,6 +194,7 @@ module TomatoShrieker
     # 見つけられず、**#1593 で走らせたかったテストが omit される**。
     # ⚠ 読み直しのあとは上流の `load` に任せる。読めなかったファイルを失敗にする検知（ginseng-core#696）を
     # 届かせるため、写さない (#1753)。
+    # ginseng-upstream: no — `test/sources/` を読ませるための `TEST` は tomato の仕掛け（#1593）。
     def self.load(cases = nil)
       ENV['TEST'] = Package.full_name
       Config.instance.reload

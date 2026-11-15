@@ -116,19 +116,29 @@ module TomatoShrieker
     end
 
     def self.record(source_id, started_at:, status:, error: nil, stats: nil)
-      create({
+      values = {
         source_id:,
         executed_at: started_at,
         status:,
         error_message: Package.error_message(error),
         duration_ms: duration_ms(started_at),
-      }.merge(stats_columns(stats)))
+      }.merge(stats_columns(stats))
       # 🔴 #1749: error で終わらなかった run は、error の確認をその場で解除する（次の失敗はすぐ赤）。
       # ⚠ **記録で持つ。**判定のたびに「確認の後の成功」を run_log から探すと、掃除（保持期間）で
       # 成功の行が消えたとき、期限つきの確認が復活する（#1779 の Codex P2）。
+      # 🔴🔴 **トランザクションで囲まない（4.21.0 リリース前レビューの赤）。**`immediate` で囲むと、daemon の
+      # 中の並列の run どうしが書き込みの錠を取り合う。sqlite3 の `busy_timeout` は GVL を握ったまま待つので、
+      # 錠を持つ側のスレッドが進めず、5 秒で BUSY になって**run_log の行が欠ける**（実測: 4 スレッド×10 回が
+      # 終わらない）。⚠ 「成功で解除」は `source ack` の側が警告の読みと書きを 1 つにしているので守れる
+      # （作成の後に ack が来れば成功を読んで error を確認しない・ack の後に来れば下の解除が効く）。
+      row = create(values)
       SilenceAck.clear_error(source_id) unless status == STATUS_ERROR
+      return row
     rescue => e
-      Sentry.capture_exception(e) if Sentry.initialized?
+      # ⚠ ログにも残す（Sentry だけだと、無い環境では行の欠けがどこにも残らない）。
+      logger.error(source: source_id, message: 'run log record failed', error: e)
+      Sentry.capture_exception(e, tags: {source: source_id}) if Sentry.initialized?
+      return nil
     end
 
     def self.stats_columns(stats)
@@ -184,12 +194,8 @@ module TomatoShrieker
     # 🔴 **503 本文（`sample_size` 固定）と `/status.json` が同名フィールドで違う数字**
     # を出す。4.8.0 で `last_attempted_count` で潰したのと同じ型の不具合。
     # ⚠ 追加のクエリは打たない（`logs` を切るだけ）。#1472 の約 900ms を増やさない。
-    def self.summary_for(source_id, limit: streak_window)
-      return summary_of(recent_for(source_id, limit))
-    end
-
-    # 取得済みの logs から出す版。⚠ **呼び出し側が logs を別の用途にも使うとき**
-    # （`entry_level_error?` の判定等）に、同じ行を 2 回引かないため (#1558)。
+    # ⚠ logs は呼び出し側が引く（`entry_level_error?` の判定等にも使うので、同じ行を 2 回引かない・
+    # #1558）。⚠ 自分で引く版（`summary_for`）は本体から呼ばれていなかったので消した（#1723）。
     def self.summary_of(logs, cutoff = retention_cutoff)
       sample = logs.first(sample_size)
       return {

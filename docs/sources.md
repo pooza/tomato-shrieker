@@ -21,7 +21,7 @@ dest:
   template: default     # ERB テンプレート名（views/ 配下）
 ```
 
-⚠ トップレベルに書けるのは `source` / `dest` / `schedule` / `monitor` / `keep` / `enclosure` / `disable` / `test` だけ（`additionalProperties: false`）。旧形式の `sources:` 配列は `config/local.yaml` でだけ読める（そこでは `id` を書く）。
+⚠ トップレベルに書けるのは `source` / `dest` / `schedule` / `monitor` / `keep` / `disable` / `test` だけ（`additionalProperties: false`）。旧形式の `sources:` 配列は `config/local.yaml` でだけ読める（そこでは `id` を書く）。
 
 ## Source 設定項目
 
@@ -29,7 +29,7 @@ dest:
 |--------|----------|------|
 | TextSource | `/source/text` | 定型文 |
 | CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`）, `/source/timeout`（締切・下記） |
-| FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot`、`/enclosure/enable` / `/enclosure/negative_keyword` |
+| FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot` |
 | GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
 | IcalendarSource | `/source/ical`（`/source/calendar` でも可） | iCalendar (.ics) の URL、またはコマンド（`/source/ical/command`・下記）。`/source/days`（何日前から出すか・既定 3）、`/source/keyword` / `/source/negative_keyword`、`/source/google` |
 | YouTubeChannelSource | `/source/youtube/channel/id`（`/source/youtube/channel/url` でも可） | FeedSource の設定項目も利用可（`/source/keyword` など） |
@@ -91,7 +91,7 @@ source_defaults:
 - 定義に `null` を書くと、そのソースだけ既定を外せる（`monitor: {silence_tolerance: null}`・`schedule: {retry: null}`）
 - 📌 **どのキーが既定から来たかは `/status.json` の `source_defaults` に出る。**「なぜこのソースはこの間隔なのか」はここで答える
 - ⚠ `config/local.yaml` なので、変えたら再起動する（`source reload` は読み直さない）。⚠ 既定の変更は `digest` も変えるので、`pending_sources.sh` には該当の全ソースが `~` で出る
-- ⚠ `source validate` の WARN（しきい値への到達性など）は定義に書かれた値だけを見る
+- `source validate` の WARN（`silence_tolerance` の未設定・しきい値への到達性）は、既定値を足した値で判定する（4.21.0・#1769。それまでは定義に書かれた値だけを見ていた）。⚠ `source validate` も `config/local.yaml` を読むので、既定を変えたら validate で確かめられる
 
 ## URL の検証（`source validate`・#1461）
 
@@ -136,6 +136,19 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 - ⚠ **投稿は出た直後から「編集済み」になる**（PieFed は編集で `edited_at` を必ず立てる）。作成と編集は別々に連合へ流れる
 - ⚠ **タグの出どころはテンプレートに合わせる**: フィードのエントリは自分のタグ、本文を持つもの（テキスト・コマンド）はソースのタグ＋リモートのタグ付け、予定はソースのタグだけ
 - 経緯: 4.13.0 までは同じソースの他の宛先しだい（単独ならタグなし・Mastodon / Misskey と併用なら本文とタイトルの両方・LINE と併用ならタグなし）。4.14.0（#1484）で「本文にだけ付ける」に揃えたが、PieFed 側でタグとして扱われなかった
+
+### 本文の無毒化（`/dest/sanitize`）
+
+投稿先に `#タグ` やメンションとして再解釈させないよう、本文（フィードのタイトル・予定の題名と本文と場所）の `#` / `@` の後ろへ空白を入れる。⚠ **ソースの単位で掛かり、宛先ごとには分かれない。**
+
+| 値 | 区切る位置 | 使いどころ |
+|----|-----------|-----------|
+| `fedi`（既定） | Misskey（mfm-js）がリンク化する位置。投稿先を決めない口なので広めに当たる（`曲名#featuring` も `曲名# featuring` になる） | 宛先に Misskey が混ざる・分からない |
+| `mastodon`（4.21.0・#1775） | Mastodon がリンク化する位置だけ（ginseng-fediverse 7.1.0）。`曲名#featuring` を崩さず、`https://foo/-@alice` の `@alice` への通知を止める | **宛先がすべて Mastodon**（モロヘイヤ経由を含む） |
+| `html` | 区切らない（HTML を剥がすだけ） | 本文のハッシュタグを生かしたい（予定のソースなど） |
+
+- ⚠ **`mastodon` を Misskey の宛先が混ざるソースに使わない。**Misskey がリンク化するのに Mastodon はしない位置（`曲名#featuring` など）が素通りし、Misskey でタグやメンションになる
+- ⚠ Webhook の先（モロヘイヤ）が Mastodon か Misskey かは定義からは分からない。書くときに宛先のインスタンスを確かめる
 
 ### Webhook 宛先の指定形式
 
@@ -196,6 +209,9 @@ dest:
 - 🔴 **別のホストへのリダイレクト先だけを `Ginseng::PublicHost` で検証する。**配信元が 3xx で内部ホストを指すと、そこへは GET しない（`Ginseng::GatewayError: Rejected host '…'`・run は error）。上の 2 経路と落ちる条件は同じ
 - ⚠ **同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで追う。**2026-11-07 の実測では、本番で初段が 3xx を返すのは 2 件で、どちらも同じホスト
 - ⚠ **LAN 内の取得元が別の LAN 内ホストへリダイレクトすると落ちる。**取得先を最終の URL で書き直す
+- ⚠ **転送先の名前解決の失敗・時間切れも `Rejected host` になり、やり直しも効かない**（`PublicHost` が拒否と区別しない・上流 pooza/ginseng-core#695）。一時的な DNS の揺れなら次の定期実行で戻る
+- 📌 Sentry では `reason: rejected_host` のタグが付き、YouTube の毎日の 404 などと別のイシューになる（#1785）
+- ⚠ **別のポート・https → http へのリダイレクトも「同じホスト」として通る**（validator はホスト名しか受けない・#1785）
 - 実装は `TomatoShrieker::HTTP#get_configured`
 
 ## モロヘイヤ連携

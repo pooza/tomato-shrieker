@@ -9,6 +9,8 @@ module TomatoShrieker
 
     alias to_h values
 
+    attr_writer :feed
+
     # 🔴 **`Entry.create` は作ったソースをそのまま渡す (#1489)。**以前はエントリごとに
     # `FeedSource.all` で全ソースを作り直し、テンプレート（`File.read` + ERB のコンパイル）も
     # エントリごとにやり直していた。⚠ ここで探すのは、ソースを渡されずに読み出した行だけ。
@@ -16,8 +18,6 @@ module TomatoShrieker
       @feed ||= FeedSource.all.find {|v| v.id == values[:feed]}
       return @feed
     end
-
-    attr_writer :feed
 
     def enclosures
       unless @enclosures
@@ -51,7 +51,10 @@ module TomatoShrieker
       ['h1', 'h2', 'h3', 'title', 'meta'].map do |v|
         contents.push(nokogiri.xpath("//#{v}").inner_text)
       end
-      return feed.mulukhiya.search_hashtags(contents.join(' '))
+      # ⚠ `Source#remote_tags` を通す（#1785）。モロヘイヤの失敗はそこで warn と Sentry に残して
+      # 空を返すので、`/feed/default_tags` と `extra_tags` まで落とさない（4.20.0 までは下の rescue で
+      # ソースのタグだけになり、Sentry にも出なかった）。
+      return feed.remote_tags(contents.join(' '))
     end
 
     def uri

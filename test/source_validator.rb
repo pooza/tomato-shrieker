@@ -22,6 +22,30 @@ module TomatoShrieker
       ))
     end
 
+    # #1775: `/dest/sanitize` は fedi / mastodon / html。綴り違いは弾く。
+    def test_sanitize_modes
+      ['fedi', 'mastodon', 'html'].each do |mode|
+        assert_empty(SourceValidator.validate(
+          'source' => {'feed' => 'https://example.com/feed'},
+          'dest' => {'hooks' => ['https://example.com/x'], 'sanitize' => mode},
+        ))
+      end
+
+      assert_not_empty(SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x'], 'sanitize' => 'mstdn'},
+      ))
+    end
+
+    # #1766: `/enclosure/*`（本文の `<img>` から添付を拾う Nitter 前提の設定）は廃止した。残っていれば NG。
+    def test_enclosure_removed
+      assert_not_empty(SourceValidator.validate(
+        'source' => {'feed' => 'https://example.com/feed'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+        'enclosure' => {'enable' => true},
+      ))
+    end
+
     # #1691: `source.ical` は URL のほか、コマンド（標準出力を iCalendar として読む）も書ける。
     def test_valid_ical_command
       ical = {'command' => ['bin/anniv.rb', '--ics', 'character'], 'dir' => '/tmp', 'env' => {'A' => 'b'}}
@@ -164,7 +188,7 @@ module TomatoShrieker
       dest = {'hooks' => ['https://example.com/x']}
 
       [
-        {'feed' => 'http://scylla.b-shock.local:3000/clean?q=%E3%83%97%E3%83%AA%E3%82%AD%E3%83%A5%E3%82%A2'},
+        {'feed' => 'http://cleaner.example.local:3000/clean?q=%E3%83%97%E3%83%AA%E3%82%AD%E3%83%A5%E3%82%A2'},
         {'feed' => 'https://example.com/feed.xml#fragment'},
         {'ical' => 'webcal://example.com/a.ics'},
         {'calendar' => 'https://calendar.google.com/calendar/ical/a%40group.calendar.google.com/public/basic.ics'},
@@ -762,6 +786,35 @@ module TomatoShrieker
       assert_empty(SourceValidator.warnings(
         daily.merge('monitor' => {'silence_tolerance' => '7d', 'error_streak_threshold' => 1}),
       ))
+    end
+
+    # #1769: WARN は種別ごとの既定値（`/source_defaults`）を足した値で判定する。
+    # ⚠ 既定は `config/local.yaml` と同じ形から `key_flatten` で入れる（キーが小文字になる）。
+    def test_warnings_with_source_defaults
+      retention = Config.instance['/monitor/retention_days']
+      daily = {
+        'source' => {'feed' => 'https://example.com/feed'},
+        'schedule' => {'cron' => '1 0 * * *'},
+        'dest' => {'hooks' => ['https://example.com/x']},
+      }
+      defaults = {'source_defaults' => {'FeedSource' => {'monitor' => {
+        'silence_tolerance' => '7d', 'error_streak_threshold' => retention + 1
+      }}}}.key_flatten
+      defaults.each {|path, value| config[path] = value}
+
+      warnings = SourceValidator.warnings(daily)
+
+      # 既定の silence_tolerance が効いているので「未設定」とは言わない
+      assert_false(warnings.any? {|v| v.include?('silence_tolerance が未設定')})
+      # 既定のしきい値が到達不能なら言う
+      assert_true(warnings.any? {|v| v.include?('error_streak_threshold')})
+      # 定義で `null` にして既定を外したら「未設定」
+      assert_true(SourceValidator.warnings(daily.merge('monitor' => {'silence_tolerance' => nil}))
+        .any? {|v| v.include?('silence_tolerance が未設定')})
+      # 定義の値が既定に勝つ
+      assert_empty(SourceValidator.warnings(daily.merge('monitor' => {'error_streak_threshold' => retention})))
+    ensure
+      defaults&.each_key {|path| config.delete(path)}
     end
 
     # 🔴 **#1587 (Codex P2): 不均一な cron は「次の 2 回の間隔」で外挿できない。**

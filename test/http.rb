@@ -80,7 +80,7 @@ module TomatoShrieker
 
     # #1688: 運用者の設定した取得元は、LAN 内のホストでも取れる（初段は検証しない）
     def test_get_configured_allows_internal_origin
-      url = 'http://scylla.b-shock.local:3000/feed'
+      url = 'http://cleaner.example.local:3000/feed'
       stub_request(:get, url).to_return(status: 200, body: 'ok')
 
       assert_equal('ok', HTTP.new.get_configured(url).body)

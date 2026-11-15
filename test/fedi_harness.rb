@@ -1,5 +1,5 @@
 module TomatoShrieker
-  # 🔴 **直接経路（MastodonShrieker / MisskeyShrieker）を実インスタンス相手に動かす (#1451)。**
+  # 🔴 **直接経路（MastodonShrieker / MisskeyShrieker）をハーネスの Mastodon / Misskey 相手に動かす (#1451)。**
   #
   # 運用者は Webhook（モロヘイヤ経由）しか使っていないが、Mastodon / Misskey の API へ直接投稿している
   # 外部ユーザーがいる（docs/CLAUDE.md「投稿先ごとのテスト厚みの非対称」）。`test/sources/` の
@@ -74,6 +74,63 @@ module TomatoShrieker
       source = harness_source('mastodon' => {'url' => ENV.fetch('MASTODON_URL'), 'token' => 'invalid-token'})
 
       assert_raise(Ginseng::GatewayError) {exec_shrieker(source, source.mastodon)}
+    end
+  end
+
+  # 🔴 **モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Mastodon）を実物で通す (#1452)。**
+  #
+  # 本番の Mastodon 宛ては全部この経路なのに、テストは `WebhookShrieker` の body を組むところまでで、
+  # モロヘイヤが受け取れる形かは一度も確かめていなかった。ハーネスの Mastodon の前段に
+  # `test/harness/mulukhiya.sh up` でモロヘイヤを立て、その `.env.test` も読み込んで走らせる。
+  # ⚠ 環境変数が無ければ省略する。⚠ Misskey 経由は #1789。
+  class FediHarnessWebhookTest < TestCase
+    include FediHarness
+
+    def disable?
+      return true unless ENV['MULUKHIYA_WEBHOOK_URL'].present?
+      return true unless ENV['MASTODON_URL'].present? && ENV['MASTODON_ACCESS_TOKEN'].present?
+      return super
+    end
+
+    # 読み返しと後片付けに使う（投稿はモロヘイヤが test アカウントとして行う）。
+    def mastodon
+      @mastodon ||= harness_source(
+        'mastodon' => {'url' => ENV.fetch('MASTODON_URL'), 'token' => ENV.fetch('MASTODON_ACCESS_TOKEN')},
+      ).mastodon
+    end
+
+    def exec_webhook(source, url = ENV.fetch('MULUKHIYA_WEBHOOK_URL'))
+      return WebhookShrieker.create(url).exec(template: source.create_template, visibility: 'unlisted')
+    end
+
+    # 本文とタグが届き、リクエストごとの公開範囲（`visibility`）がモロヘイヤの既定より優先されること。
+    def test_exec_posts_status
+      response = exec_webhook(harness_source('hooks' => [ENV.fetch('MULUKHIYA_WEBHOOK_URL')]))
+      status = mastodon.fetch_status(response['id'])
+
+      assert_include(status['content'], TEXT)
+      assert_include(status['content'], TAG)
+      assert_equal('unlisted', status['visibility'])
+      assert_match(/\Amulukhiya/, status.dig('application', 'name'))
+    ensure
+      mastodon&.delete_status(response['id']) if response&.dig('id')
+    end
+
+    # ソースの `spoiler_text` が CW として渡ること。
+    def test_exec_posts_spoiler_text
+      source = harness_source('hooks' => [ENV.fetch('MULUKHIYA_WEBHOOK_URL')], 'spoiler_text' => 'CW のテスト')
+      response = exec_webhook(source)
+
+      assert_equal('CW のテスト', mastodon.fetch_status(response['id'])['spoiler_text'])
+    ensure
+      mastodon&.delete_status(response['id']) if response&.dig('id')
+    end
+
+    # 誰のものでもない digest は 404（`Source#deliver` が宛先の失敗として数える形）。
+    def test_exec_with_unknown_digest
+      url = ENV.fetch('MULUKHIYA_WEBHOOK_URL').sub(%r{/webhook/\h+\z}, "/webhook/#{'0' * 64}")
+
+      assert_raise(Ginseng::GatewayError) {exec_webhook(harness_source('hooks' => [url]), url)}
     end
   end
 

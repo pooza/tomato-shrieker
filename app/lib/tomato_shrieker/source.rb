@@ -802,9 +802,26 @@ module TomatoShrieker
       return Source.all(entries).grep(self).find {|v| v.id == id}
     end
 
+    # 本文の無毒化。`/dest/sanitize` で口を選ぶ。
+    # - `fedi`（既定）: Misskey（mfm-js）の境界で `#` / `@` を区切る。投稿先を決めない口なので広めに当たる
+    # - `mastodon`: Mastodon がリンク化する位置だけを区切る（ginseng-fediverse 7.1.0・#1775）。
+    #   `曲名#featuring` を崩さず、`https://foo/-@alice` の通知を止める
+    # - `html`: タグを剥がすだけ（本文のハッシュタグを生かす）
+    #
+    # ⚠ **`mastodon` は投稿先がすべて Mastodon のソースにだけ使う。**無毒化はソースの単位で
+    # 掛かり、宛先ごとには分かれない。Misskey の宛先が混ざると、Misskey がリンク化する位置
+    # （`#-tag` の手前の連なりなど）を区切れない。
     def fedi_sanitize(message)
-      return message.to_s.sanitize_status if fedi_sanitize?
+      case sanitize_mode
+      when :fedi then return message.to_s.sanitize_status
+      when :mastodon then return Ginseng::Fediverse::MastodonService.sanitize_status(message.to_s)
+      end
       return message.to_s.sanitize
+    end
+
+    # やり直し（`schedule.retry`・#1585）を設定しているか。healthz の本文が使う（#1785）。
+    def retry_configured?
+      return retry_times.positive?
     end
 
     private
@@ -839,9 +856,19 @@ module TomatoShrieker
       raise if e.is_a?(SignalException) || e.is_a?(SystemExit)
       record_exec_abort(e)
       SourceRunLog.record_error(id, started_at:, error: e, stats: @delivery_stats)
-      Sentry.capture_exception(e, tags: {source: id}) if Sentry.initialized?
+      Sentry.capture_exception(e, **run_error_sentry_options(e)) if Sentry.initialized?
       logger.error(source: id, error: e)
       retry_failed_run(attempt)
+    end
+
+    # 🔴 **取得元のリダイレクト先を拒んだ失敗（`Rejected host`・#1688）は、Sentry で別のイシューにする
+    # （#1785）。**どちらも `FeedSource#feedjira` が包んだ `GatewayError` でスタックが同じなので、
+    # 放っておくと YouTube の毎日の 404（TOMATO-SHRIEKER-S）に紛れて気づけない。
+    # ⚠ 名前解決の失敗も `Rejected host` になる（上流 pooza/ginseng-core#695）。
+    def run_error_sentry_options(error)
+      return {tags: {source: id}} unless error.message.to_s.include?('Rejected host')
+      return {tags: {source: id, reason: 'rejected_host'},
+              fingerprint: ['{{ default }}', 'rejected-host']}
     end
 
     def log_exec_start(method, spec)

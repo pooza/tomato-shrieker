@@ -24,29 +24,12 @@ module TomatoShrieker
       return dest
     end
 
+    # フィードの enclosure（#1666）。⚠ 本文の `<img>` から添付を拾う `/enclosure/*` は 4.21.0 で
+    # 廃止した（Nitter 前提の残骸・#1766）。
     def enclosures
       enclosures = values[:enclosure_url]
       enclosures = [enclosures] unless enclosures.is_a?(Array)
-      if enclosure?
-        uris = values[:summary].nokogiri
-          .xpath('//img')
-          .map(&:to_h)
-          .map {|values| values['src']}
-          .map {|src| Ginseng::URI.parse(src)}
-          .map(&:normalize)
-          .select {|uri| uri.path.start_with?('/pic/media/')}
-        enclosures.concat(uris)
-      end
       return enclosures.compact
-    end
-
-    def enclosure?
-      return false unless feed.enclosure?
-      return false unless summary = values[:summary]
-      if (keyword = feed.enclosure_negative_keyword) && summary.match?(keyword)
-        return false
-      end
-      return true
     end
 
     private
