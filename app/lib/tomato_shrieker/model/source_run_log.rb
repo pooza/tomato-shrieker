@@ -184,12 +184,8 @@ module TomatoShrieker
     # 🔴 **503 本文（`sample_size` 固定）と `/status.json` が同名フィールドで違う数字**
     # を出す。4.8.0 で `last_attempted_count` で潰したのと同じ型の不具合。
     # ⚠ 追加のクエリは打たない（`logs` を切るだけ）。#1472 の約 900ms を増やさない。
-    def self.summary_for(source_id, limit: streak_window)
-      return summary_of(recent_for(source_id, limit))
-    end
-
-    # 取得済みの logs から出す版。⚠ **呼び出し側が logs を別の用途にも使うとき**
-    # （`entry_level_error?` の判定等）に、同じ行を 2 回引かないため (#1558)。
+    # ⚠ logs は呼び出し側が引く（`entry_level_error?` の判定等にも使うので、同じ行を 2 回引かない・
+    # #1558）。⚠ 自分で引く版（`summary_for`）は本体から呼ばれていなかったので消した（#1723）。
     def self.summary_of(logs, cutoff = retention_cutoff)
       sample = logs.first(sample_size)
       return {
