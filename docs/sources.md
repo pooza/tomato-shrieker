@@ -209,6 +209,9 @@ dest:
 - 🔴 **別のホストへのリダイレクト先だけを `Ginseng::PublicHost` で検証する。**配信元が 3xx で内部ホストを指すと、そこへは GET しない（`Ginseng::GatewayError: Rejected host '…'`・run は error）。上の 2 経路と落ちる条件は同じ
 - ⚠ **同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで追う。**2026-11-07 の実測では、本番で初段が 3xx を返すのは 2 件で、どちらも同じホスト
 - ⚠ **LAN 内の取得元が別の LAN 内ホストへリダイレクトすると落ちる。**取得先を最終の URL で書き直す
+- ⚠ **転送先の名前解決の失敗・時間切れも `Rejected host` になり、やり直しも効かない**（`PublicHost` が拒否と区別しない・上流 pooza/ginseng-core#695）。一時的な DNS の揺れなら次の定期実行で戻る
+- 📌 Sentry では `reason: rejected_host` のタグが付き、YouTube の毎日の 404 などと別のイシューになる（#1785）
+- ⚠ **別のポート・https → http へのリダイレクトも「同じホスト」として通る**（validator はホスト名しか受けない・#1785）
 - 実装は `TomatoShrieker::HTTP#get_configured`
 
 ## モロヘイヤ連携
