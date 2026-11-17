@@ -121,6 +121,9 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 ```
 
 - `feed-parse-error` は tomato へ 502 を返したもの。2026-10-24 の 5 件はどれも Google News の RSS 自体が返した一時的な 404 で、tomato の HTTP リトライで吸収されていた（Sentry に出ていない）。`via: timeout` は記事 1 件の解決の時間切れで、その記事を落とすだけ
+- `feed-rate-limited` は Google News が 429 / 503 を返したもの、`feed-stale` はその冷却中（既定 5 分・`Retry-After` があればその秒数・上限 1 時間）に**6 時間以内に取れた古いフィードを 200 で返した**もの（cleaner#23・2026-11-17 から）。⚠ tomato からは success に見え、Kuma も緑のまま。**古いものが 6 時間を超えるか、再起動直後でまだ一度も取れていないときだけ** 503 ＋ `Retry-After` になり、`feed-parse-error`（`status: 503`）に数えられる。⚠ ginseng-core の HTTP は `Retry-After` が 60 秒を超えると待たずに諦めるので、このときの tomato の run は error になる
+  - 📌 **2026-11-17 に 429 が約 13 時間（04:52〜17:12 JST・104 件）断続的に出た**（cleaner#24）。当時は毎回上流へ取りに行っていたので、断られた run がそのまま 502 になった。`feed-rate-limited` が日をまたいで続く・`feed-stale` の古さ（`ageSec`）が数時間に達するなら、利用側の間隔か上流の制限が変わったのを疑う。経過は #1809
+  - ⚠ 再起動するとキャッシュ（記事 URL・フィード本体・古いフィードの控え）がすべて消える。2026-11-17 の再起動直後の `/clean` は 5.2 秒 / 17.4 秒だった
 - クリーナーの応答待ちによるタイムアウト（Sentry TOMATO-SHRIEKER-B）は cleaner#19
 - ⚠ **Chromium が死んでも `/clean` は 200 ＋ 0 件を返す**（cleaner#13）。ここの数字が静かでも、Kuma の Google News 2 本の沈黙のほうも見る
 
