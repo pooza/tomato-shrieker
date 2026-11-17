@@ -8,9 +8,9 @@ gh issue list -R "$r" --state open
 gh api "repos/$r/dependabot/alerts" \
   --jq '[.[]|select(.state=="open")]|"Dependabot open \(length) \(map(.security_advisory.severity)|group_by(.)|map("\(.[0])=\(length)")|join(" "))"'
 echo "=== scylla ==="
-# ⚠ ログはファイルに出ない（syslog → journal）。直近 24 時間のエラーと時間切れを数える
+# ⚠ ログはファイルに出ない（syslog → journal）。直近 24 時間のエラー・時間切れ・上流の制限を数える
 ssh -o ConnectTimeout=5 scylla '
   systemctl show google-news-rss-cleaner -p ActiveState -p ActiveEnterTimestamp -p NRestarts
   journalctl -t google-news-rss-cleaner --since "-24h" -o cat --no-pager \
-    | grep -oE "\"(event|via)\":\"(resolve-error|feed-parse-error|timeout)\"" | sort | uniq -c
+    | grep -oE "\"(event|via)\":\"(resolve-error|feed-parse-error|feed-rate-limited|feed-stale|timeout)\"" | sort | uniq -c
 ' || echo "scylla に届かない（外出中なら VPN）"
