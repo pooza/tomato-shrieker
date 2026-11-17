@@ -246,15 +246,16 @@ module TomatoShrieker
       end
     end
 
-    # #1462: 実装（`PiefedShrieker#api_version`）が読む `api_version` を、スキーマが NG にしていた。
+    # #1462: 実装が読む `api_version` を、スキーマが NG にしていた。#1808 から gem（ginseng-piefed 0.7.0）が読む。
     def test_piefed_api_version_is_allowed
       assert_empty(SourceValidator.validate(piefed_params('api_version' => 'v3')))
       assert_equal('v3', PiefedShrieker.new(piefed_params('api_version' => 'v3').dig('dest', 'piefed')).api_version)
     end
 
     # ⚠ 空文字は既定へ倒れない（Ruby では真）。パスが `/api//post` になる。
+    # #1808: `.` / `..` で始まる値は gem（ginseng-piefed 0.7.0）が `ConfigError` にする。スキーマも同じ形で弾く。
     def test_piefed_api_version_must_be_token
-      ['', ' ', '../x', "v3\n"].each do |version|
+      ['', ' ', '../x', "v3\n", '.', '..', '.v3'].each do |version|
         assert_not_empty(SourceValidator.validate(piefed_params('api_version' => version)), version.inspect)
       end
       assert_empty(SourceValidator.validate(piefed_params('api_version' => 'alpha')))

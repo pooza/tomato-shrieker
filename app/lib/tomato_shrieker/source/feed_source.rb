@@ -169,10 +169,14 @@ module TomatoShrieker
       return uri.normalize if uri&.absolute?
     end
 
+    # ⚠ 包み直すときは、拒否の理由（`GatewayError#rejection`・ginseng-core 7.1.0）を持ち越す。
+    # 落とすと `Source#run_error_sentry_options` が拒否を見分けられない (#1807)。
     def feedjira
       return Feedjira.parse(@http.get_configured(uri).body)
     rescue => e
-      raise Ginseng::GatewayError, "Invalid feed #{id} (#{uri}) #{e.message}"
+      error = Ginseng::GatewayError.new("Invalid feed #{id} (#{uri}) #{e.message}")
+      error.rejection = e.rejection if e.respond_to?(:rejection)
+      raise error
     end
 
     def prefix

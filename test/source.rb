@@ -120,14 +120,49 @@ module TomatoShrieker
     end
 
     # 🔴 #1785: 取得元のリダイレクト先を拒んだ失敗は、Sentry で YouTube の 404 と別のイシューにする。
+    # #1807: 理由は `GatewayError#rejection`（ginseng-core 7.1.0）で見て、名前解決の失敗とも分ける。
     def test_run_error_sentry_options_splits_rejected_host
       source = TextSource.new({'id' => 'test-rejected-host', 'source' => {'text' => 'body'}})
-      rejected = Ginseng::GatewayError.new("Invalid feed x (https://example.com/feed) Rejected host 'internal'")
+      rejected = Ginseng::GatewayError.rejected_host("Invalid feed x (https://example.com/feed) Rejected host 'internal'")
       not_found = Ginseng::GatewayError.new('Invalid feed x (https://example.com/feed) Bad response 404')
 
       assert_equal(['{{ default }}', 'rejected-host'], source.send(:run_error_sentry_options, rejected)[:fingerprint])
       assert_equal('rejected_host', source.send(:run_error_sentry_options, rejected)[:tags][:reason])
       assert_equal({tags: {source: 'test-rejected-host'}}, source.send(:run_error_sentry_options, not_found))
+    end
+
+    # #1807: 名前が解決できなかったもの（一時的な DNS の揺れを含む）は、拒否とは別のイシューにする
+    def test_run_error_sentry_options_splits_unresolvable_host
+      source = TextSource.new({'id' => 'test-rejected-host', 'source' => {'text' => 'body'}})
+      error = Ginseng::GatewayError.rejected_host("Rejected host 'nx.example' (unresolvable)", :unresolvable_host)
+      options = source.send(:run_error_sentry_options, error)
+
+      assert_equal('unresolvable_host', options[:tags][:reason])
+      assert_equal(['{{ default }}', 'unresolvable-host'], options[:fingerprint])
+    end
+
+    # #1807: 見るのは属性で、メッセージではない。`Rejected host` を含むだけの例外は分けない
+    def test_run_error_sentry_options_ignores_message_only
+      source = TextSource.new({'id' => 'test-rejected-host', 'source' => {'text' => 'body'}})
+      error = Ginseng::GatewayError.new("Invalid feed x (https://example.com/feed) Rejected host 'internal'")
+
+      assert_equal({tags: {source: 'test-rejected-host'}}, source.send(:run_error_sentry_options, error))
+    end
+
+    # #1807: 包み直した例外でも、原因（`cause`）の拒否の理由をたどる
+    def test_run_error_sentry_options_follows_cause
+      source = TextSource.new({'id' => 'test-rejected-host', 'source' => {'text' => 'body'}})
+      error = begin
+        begin
+          raise Ginseng::GatewayError.rejected_host("Rejected host 'internal'")
+        rescue Ginseng::GatewayError
+          raise Ginseng::Error, 'wrapped'
+        end
+      rescue Ginseng::Error => e
+        e
+      end
+
+      assert_equal('rejected_host', source.send(:run_error_sentry_options, error)[:tags][:reason])
     end
 
     # 🔴 **#1712 の Codex P1: 宛先のオブジェクトは run ごとに作り直す。**スケジューラのソースは
