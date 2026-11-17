@@ -210,8 +210,9 @@ dest:
 - 🔴 **別のホストへのリダイレクト先だけを `Ginseng::PublicHost` で検証する。**配信元が 3xx で内部ホストを指すと、そこへは GET しない（`Ginseng::GatewayError: Rejected host '…'`・run は error）。上の 2 経路と落ちる条件は同じ
 - ⚠ **同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで追う。**2026-11-07 の実測では、本番で初段が 3xx を返すのは 2 件で、どちらも同じホスト
 - ⚠ **LAN 内の取得元が別の LAN 内ホストへリダイレクトすると落ちる。**取得先を最終の URL で書き直す
-- ⚠ **転送先の名前解決の失敗・時間切れも `Rejected host` になり、やり直しも効かない**（`PublicHost` が拒否と区別しない・上流 pooza/ginseng-core#695）。一時的な DNS の揺れなら次の定期実行で戻る
-- 📌 Sentry では `reason: rejected_host` のタグが付き、YouTube の毎日の 404 などと別のイシューになる（#1785）
+- ⚠ **転送先の名前解決の失敗・時間切れも `Rejected host` になり、やり直しも効かない**（メッセージに ` (unresolvable…)` が付く）。一時的な DNS の揺れなら次の定期実行で戻る
+- 📌 Sentry では理由ごとに別のイシューになる（#1785・#1807）: 内部ホストなどを拒んだものは `reason: rejected_host`、名前が解決できなかったものは `reason: unresolvable_host`。どちらも YouTube の毎日の 404 などとは別。理由は ginseng-core 7.1.0 の `GatewayError#rejection` で見ている（`FeedSource` が包み直すときに持ち越す）
+- ⚠ ginseng-core 7.1.0 から、拒否 1 件ごとに gem 自身も error 行（`gave_up: rejected_host` / `unresolvable_host`）を出す。run の error 行と合わせて 2 行になる
 - ⚠ **別のポート・https → http へのリダイレクトも「同じホスト」として通る**（validator はホスト名しか受けない・#1785）
 - 実装は `TomatoShrieker::HTTP#get_configured`
 

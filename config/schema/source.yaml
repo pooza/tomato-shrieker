@@ -372,11 +372,12 @@ properties:
           community_id:
             type: integer
           api_version:
-            # 宛先ごとの API の版。実装（PiefedShrieker#api_version）が読む (#1462)。
+            # 宛先ごとの API の版 (#1462)。ginseng-piefed 0.7.0 の `Service.new(api_version:)` が読む (#1808)。
             # ⚠ 全体の既定は `config/local.yaml` の `/piefed/api/version`。
-            # ⚠ 空文字は既定へ倒れず（Ruby では真）、パスが `/api//post` になる。
+            # ⚠ pattern は gem の検査（パスに埋め込むので `.` / `..` のセグメントを通さない）と同じ形にする。
+            # 違うと validate は通るのに、投稿の時点で `Ginseng::ConfigError` になる。
             type: string
-            pattern: '\A[A-Za-z0-9._-]+\z'
+            pattern: '\A[A-Za-z0-9_-][A-Za-z0-9_.-]*\z'
           template:
             type: string
       nostr:

@@ -118,8 +118,11 @@ module TomatoShrieker
       internal = stub_redirect_to_internal
       source = FeedSource.new({'id' => '__test_http__', 'source' => {'feed' => URL}})
 
-      assert_raise(Ginseng::GatewayError) {source.feedjira}
+      error = assert_raise(Ginseng::GatewayError) {source.feedjira}
       assert_not_requested(internal)
+      # #1807: `Invalid feed` で包み直しても、拒否の理由（ginseng-core 7.1.0）を落とさない
+      assert_equal(:rejected_host, error.rejection)
+      assert_equal('rejected_host', source.send(:run_error_sentry_options, error)[:tags][:reason])
     end
 
     # #1688: IcalendarSource の取得がこの経路を通ること
