@@ -34,10 +34,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 1fb69124a62cff6a57afaa088a34c1687330f927
+  revision: 0792e8097740749074c755606bd2d2521e5c1552
   branch: main
   specs:
-    ginseng-fediverse (9.0.0)
+    ginseng-fediverse (10.0.0)
       ginseng-core (>= 2.1.0)
 
 GIT
@@ -61,10 +61,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: e166b3faded9412bd9776935fc02cb9dc8212d6b
+  revision: 49f2bb19f376d131da95f921861ade78dc829b5f
   branch: main
   specs:
-    ginseng-youtube (4.0.0)
+    ginseng-youtube (4.0.1)
       ginseng-core (>= 1.23.1)
 
 GIT
