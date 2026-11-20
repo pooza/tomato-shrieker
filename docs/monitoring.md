@@ -114,7 +114,7 @@ run が 1 行も無いソースは、**初回の実行期限**までは 200（�
 {
   "scheduler": true,
   "database": true,
-  "ruby": {"version": "4.0.9", "yjit_available": true, "yjit_enabled": true},
+  "ruby": {"version": "4.0.10", "yjit_available": true, "yjit_enabled": true},
   "reload": {
     "count": 3,
     "action": "reload",
