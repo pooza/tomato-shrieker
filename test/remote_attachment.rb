@@ -116,6 +116,27 @@ module TomatoShrieker
       assert_match(/\AGinseng::GatewayError: Rejected host/, logged.first[:error])
     end
 
+    # #1814: ginseng-fediverse 10.0.0 から、受信が上限（既定 256 MiB）を超えると
+    # `Ginseng::TooLargeError`（`GatewayError` の子）が上がる。添付だけ落とし、投稿先へは上げない。
+    # ⚠ 上限を 16 バイトに縮め、検証は素通しにして（example.com を解決しに行かない）gem の本物の経路を通す。
+    def test_too_large_attachment_is_dropped
+      stub_request(:get, 'https://cdn.example.com/large.png')
+        .to_return(status: 200, body: 'x' * 1024, headers: {'Content-Type' => 'image/png'})
+      shriekers.each do |shrieker|
+        logged = []
+        fake = Object.new
+        fake.define_singleton_method(:warn) {|values| logged.push(values)}
+        shrieker.define_singleton_method(:logger) {fake}
+        shrieker.define_singleton_method(:remote_resource_max_bytes) {16}
+        shrieker.define_singleton_method(:remote_resource_host_validator) {->(_host) {true}}
+
+        assert_empty(shrieker.upload_attachments([{image_url: 'https://cdn.example.com/large.png'}]))
+        assert_equal('cdn.example.com', logged.first[:host], shrieker.class.to_s)
+        assert_match(/\AGinseng::TooLargeError/, logged.first[:error], shrieker.class.to_s)
+      end
+      assert_not_requested(:post, /mstdn\.example\.com|misskey\.example\.com/)
+    end
+
     # ⚠ 握るのは「取れない・上げられない」だけ。実装の誤りまで握らない。
     def test_does_not_swallow_unexpected_errors
       shriekers.each do |shrieker|
