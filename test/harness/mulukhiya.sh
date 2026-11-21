@@ -140,9 +140,10 @@ start() {
 # ⚠ モロヘイヤが返す URL は Mastodon / Misskey のホスト名（本番では nginx が /mulukhiya を振る）。
 #   ハーネスには前段の nginx が無いので、モロヘイヤの待ち受けへ差し替える。
 export_webhook() {
-  local controller="$1" env="$HARNESS_DIR/$1/.env.test" token url var
+  local controller="$1" env="$HARNESS_DIR/$1/.env.test" token url var other
   token=$(grep "^$(prefix_of "$controller")_ACCESS_TOKEN=" "$env" | cut -d= -f2-)
   var=$(webhook_var_of "$controller")
+  if [[ "$controller" == mastodon ]]; then other=$(webhook_var_of misskey); else other=$(webhook_var_of mastodon); fi
   curl -sf -o /dev/null -X POST -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' -d '{"command":"user_config"}' "$BASE/api/config/update"
   # shellcheck disable=SC2016 # Ruby の式なので展開しない
@@ -159,6 +160,8 @@ export_webhook() {
 # test/harness/mulukhiya.sh が書き出したモロヘイヤの接続情報 (#1452 / #1789・$controller)
 MULUKHIYA_URL=$BASE
 $var=$url
+# ⚠ もう一方の側は空にする（同じシェルで切り替えたとき、前の側のテストが今のモロヘイヤへ向かないように）
+$other=
 EOF
   )
   echo "==> 接続情報を $ROOT/.env.test に書き出しました"
