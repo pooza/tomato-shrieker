@@ -30,6 +30,25 @@ module TomatoShrieker
       return false
     end
 
+    # 🔴 **同じ run の候補どうしも比べる (#1820)。**`similar_entry?` は DB の行としか比べないので、
+    # 同じ取得に入っている（＝まだ DB に無い）類似記事はすべて通っていた。Google News は
+    # 同じニュースの各社配信をまとめて返すので、すり抜けの大半がこれだった（本番の 14 日分
+    # 278 件のうち、逐次なら 182 件が落ちる）。⚠ `entries` は `published` の昇順なので、
+    # 先に通したものが古い側＝ DB との比較（48 時間さかのぼる）と同じ窓になる。
+    def target_entries
+      return super unless dedupe?
+      accepted = []
+      return entries.reject do |entry|
+        next true if ignore_entry?(entry)
+        bigrams = to_bigrams(normalize_title(entry.title))
+        published = entry.published || Time.now
+        since = published - (DEDUPE_HOURS * 3600)
+        next true if accepted.any? {|time, other| time >= since && similar_bigrams?(bigrams, other)}
+        accepted.push([published, bigrams])
+        false
+      end
+    end
+
     def self.all(&block)
       return enum_for(__method__) unless block
       Source.all.grep(self).each(&block)
@@ -71,11 +90,14 @@ module TomatoShrieker
       title = normalize_title(entry.title)
       bigrams = to_bigrams(title)
       return false if bigrams.empty?
-      recent_entries(entry).any? do |existing|
-        other = to_bigrams(normalize_title(existing[:title]))
-        next false if other.empty?
-        jaccard(bigrams, other) >= SIMILARITY_THRESHOLD
+      return recent_entries(entry).any? do |existing|
+        similar_bigrams?(bigrams, to_bigrams(normalize_title(existing[:title])))
       end
+    end
+
+    def similar_bigrams?(bigrams, other)
+      return false if bigrams.empty? || other.empty?
+      return jaccard(bigrams, other) >= SIMILARITY_THRESHOLD
     end
 
     def recent_entries(entry)

@@ -61,9 +61,51 @@ module TomatoShrieker
       assert_equal('/rss/topics/x', source.uri.path)
     end
 
+    # 🔴 **#1820: 同じ run の候補どうしも類似判定にかける。**本番では同じ取得に入った
+    # 各社配信（ほぼ同じタイトル）が 9 件そのまま投稿されていた。
+    def test_target_entries_dedupe_within_run
+      source = build_source
+      stub_entries(source, [
+        '【きょうから第2弾】マクドナルド、ハッピーセットは「名探偵プリキュア！」 “こものいれ”など3種 - ORICON NEWS',
+        '【きょうから第2弾】マクドナルド、ハッピーセットは「名探偵プリキュア！」 “こものいれ”など3種 - Yahoo!ニュース',
+        '【きょうから第2弾】マクドナルド、ハッピーセットは「名探偵プリキュア！」　“こものいれ”など3種 - au Webポータル',
+        '名探偵プリキュア! × スイパラ 11月26日よりコラボカフェ開催! - コラボカフェ',
+      ])
+      titles = source.target_entries.map(&:title)
+
+      assert_equal(2, titles.size)
+      assert_match(/ORICON/, titles.first)
+      assert_match(/スイパラ/, titles.last)
+    end
+
+    # ⚠ `dedupe: false` なら同じ run でも畳まない。
+    def test_target_entries_without_dedupe
+      source = build_source('dedupe' => false)
+      stub_entries(source, ['同じタイトル - A', '同じタイトル - B'])
+
+      assert_equal(2, source.target_entries.count)
+    end
+
+    # ⚠ 48 時間より離れていれば、同じ run でも別の記事として扱う（DB との比較と同じ窓）。
+    def test_target_entries_window
+      source = build_source
+      now = Time.now
+      stub_entries(source, ['同じタイトルの記事 - A', '同じタイトルの記事 - B'], [now - (72 * 3600), now])
+
+      assert_equal(2, source.target_entries.count)
+    end
+
+    def stub_entries(source, titles, times = nil)
+      now = Time.now
+      items = titles.each_with_index.map do |title, i|
+        Struct.new(:title, :published, :url).new(title, times ? times[i] : now + i, "https://example.test/#{i}")
+      end
+      source.define_singleton_method(:entries) {items}
+    end
+
     def build_source(news = {})
       return GoogleNewsSource.new(
-        'id' => '__test_google_news__',
+        'id' => "__test_google_news_#{SecureRandom.hex(4)}__",
         'source' => {'news' => {'phrase' => 'プリキュア'}.merge(news)},
         'dest' => {'hooks' => ['https://hook.example.test/news']},
       )
