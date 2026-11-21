@@ -17,21 +17,37 @@ module TomatoShrieker
     # `Ginseng::PublicHost.validator` を挿すと、それらが落ちる。
     # 🔴 **別のホストへのリダイレクト先だけを `PublicHost` で検証する。**配信元（第三者）が
     # 3xx で内部ホストを指すと、検証なしでは内部への GET を踏まされる（blind SSRF・#1666 の同族）。
-    # ⚠ 同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで通す。⚠ 別のポート・
-    # https → http も同じホストとして通る（validator はホスト名しか受けない・#1785）。
+    # ⚠ 初段と同じ扱いで通すのは、**同じホスト・同じポートで、scheme が同じか http → https に
+    # 上がるもの**だけ（パスの移動・https 化）。別のポート・https → http は別のホストと同じく
+    # `PublicHost` に掛ける（#1800。ginseng-core 7.1.0 から validator がホップの URI を受け取れる）。
     # 2026-11-07 の本番の実測では、初段で 3xx を返すのは 2 件で、どちらも同じホストだった。
     def get_configured(uri, options = {})
       uri = create_uri(uri)
-      return get(uri, options.merge(host_validator: self.class.configured_host_validator(uri.host)))
+      return get(uri, options.merge(host_validator: self.class.configured_host_validator(uri)))
     end
 
-    # 初段のホストは通し、それ以外は `PublicHost` の判定（接続先の IP アドレスか nil）を返す。
-    def self.configured_host_validator(origin_host, public_host: Ginseng::PublicHost.validator)
-      origin_host = origin_host.to_s.downcase
-      return lambda do |host|
-        return true if host.to_s.downcase == origin_host
+    # 初段と同じ口は通し、それ以外は `PublicHost` の判定（接続先の IP アドレスか nil）を返す。
+    # ⚠ `uri:` を宣言しているので、ginseng-core はホップの URI を渡す。⚠ URI はクエリや
+    # userinfo を含みうるので、ここでログに出さない。
+    def self.configured_host_validator(origin, public_host: Ginseng::PublicHost.validator)
+      origin = Ginseng::URI.parse(origin.to_s)
+      return lambda do |host, uri:|
+        return true if same_origin?(origin, Ginseng::URI.parse(uri.to_s))
         return public_host.call(host)
       end
+    end
+
+    def self.same_origin?(origin, target)
+      return false unless target.normalized_host == origin.normalized_host
+      return true if upgrade?(origin, target)
+      return false unless target.normalized_scheme == origin.normalized_scheme
+      return target.inferred_port == origin.inferred_port
+    end
+
+    # http（既定のポート）→ https（既定のポート）への引き上げ。
+    def self.upgrade?(origin, target)
+      return false unless origin.normalized_scheme == 'http' && origin.inferred_port == 80
+      return target.normalized_scheme == 'https' && target.inferred_port == 443
     end
 
     private

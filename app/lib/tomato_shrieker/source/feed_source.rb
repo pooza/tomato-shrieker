@@ -113,7 +113,7 @@ module TomatoShrieker
       # 🔴 **`entries` を取り出してから段を立てる (#1586)。**⚠⚠ `entries` の評価自体が
       # 落ちる run（YouTube の 404 等）は**取得段**なので、ここへは到達しない
       # ＝ しきい値の緩和が効いてよい側。
-      targets = entries.reject {|v| ignore_entry?(v)}
+      targets = target_entries
       # ⚠ `templates` のメモ（`||=`）はスレッドセーフでないので、`Parallel.each` の前に暖める
       # (#1489)。暖めないと初回だけスレッドの数だけ ERB をコンパイルしうる（結果は壊れない）。
       templates
@@ -140,6 +140,12 @@ module TomatoShrieker
       rescue => e
         record_entry_failure(e, inserted)
       end
+    end
+
+    # 配信の候補（`ignore_entry?` で落とした残り）。⚠ `ignore_entry?` は 1 件ずつの判定なので、
+    # 同じ run の中の候補どうしを比べたいサブクラス（`GoogleNewsSource`・#1820）はここを上書きする。
+    def target_entries
+      return entries.reject {|v| ignore_entry?(v)}
     end
 
     def ignore_entry?(entry)
@@ -169,10 +175,14 @@ module TomatoShrieker
       return uri.normalize if uri&.absolute?
     end
 
+    # ⚠ 包み直すときは、拒否の理由（`GatewayError#rejection`・ginseng-core 7.1.0）を持ち越す。
+    # 落とすと `Source#run_error_sentry_options` が拒否を見分けられない (#1807)。
     def feedjira
       return Feedjira.parse(@http.get_configured(uri).body)
     rescue => e
-      raise Ginseng::GatewayError, "Invalid feed #{id} (#{uri}) #{e.message}"
+      error = Ginseng::GatewayError.new("Invalid feed #{id} (#{uri}) #{e.message}")
+      error.rejection = e.rejection if e.respond_to?(:rejection)
+      raise error
     end
 
     def prefix
@@ -187,7 +197,7 @@ module TomatoShrieker
 
     def summary
       values = {id:}
-      values[:entries] = entries.reject {|v| ignore_entry?(v)}.map do |entry|
+      values[:entries] = target_entries.map do |entry|
         {
           date: entry.published.strftime('%Y/%m/%d %R'),
           title: entry.title,

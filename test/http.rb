@@ -106,11 +106,51 @@ module TomatoShrieker
     # #1688: 初段以外のホストは PublicHost の判定に委ねる（大文字小文字は区別しない）
     def test_configured_host_validator
       public_host = ->(host) {host == 'public.example' ? '203.0.113.1' : nil}
-      validator = HTTP.configured_host_validator('Example.COM', public_host:)
+      validator = HTTP.configured_host_validator('http://Example.COM/feed', public_host:)
 
-      assert_true(validator.call('example.com'))
-      assert_equal('203.0.113.1', validator.call('public.example'))
-      assert_nil(validator.call('internal.example'))
+      assert_true(validator.call('example.com', uri: Ginseng::URI.parse('http://example.com/moved')))
+      assert_equal('203.0.113.1', validator.call('public.example', uri: Ginseng::URI.parse('https://public.example/')))
+      assert_nil(validator.call('internal.example', uri: Ginseng::URI.parse('https://internal.example/')))
+    end
+
+    # #1800: 同じホストでも、通すのは同じ口と http → https の引き上げだけ。
+    # 別のポート・https → http は PublicHost に掛ける（ここでは内部扱い＝ nil）。1 行に 1 系統。
+    def test_configured_host_validator_allows_https_upgrade
+      validator = HTTP.configured_host_validator('http://example.com/feed', public_host: ->(_host) {})
+
+      assert_true(validator.call('example.com', uri: Ginseng::URI.parse('https://example.com/feed')))
+    end
+
+    def test_configured_host_validator_rejects_other_port
+      validator = HTTP.configured_host_validator('https://example.com/feed', public_host: ->(_host) {})
+
+      assert_nil(validator.call('example.com', uri: Ginseng::URI.parse('https://example.com:8443/feed')))
+    end
+
+    def test_configured_host_validator_rejects_https_downgrade
+      validator = HTTP.configured_host_validator('https://example.com/feed', public_host: ->(_host) {})
+
+      assert_nil(validator.call('example.com', uri: Ginseng::URI.parse('http://example.com/feed')))
+    end
+
+    def test_configured_host_validator_keeps_lan_origin_port
+      validator = HTTP.configured_host_validator('http://scylla.example.local:3000/clean', public_host: ->(_host) {})
+
+      assert_true(validator.call('scylla.example.local', uri: Ginseng::URI.parse('http://scylla.example.local:3000/other')))
+      assert_nil(validator.call('scylla.example.local', uri: Ginseng::URI.parse('http://scylla.example.local:22/')))
+    end
+
+    # #1800: ginseng-core が実際に URI を渡してくること（`uri:` の宣言が効いている）。
+    # 同じホストの別ポートへのリダイレクトは、内部ホストなら要求を出さずに拒否する。
+    def test_feed_source_rejects_redirect_to_other_port_of_internal_origin
+      stub_request(:get, 'http://127.0.0.1:8080/feed.rss')
+        .to_return(status: 302, headers: {'Location' => 'http://127.0.0.1:9999/secret'})
+      internal = stub_request(:get, 'http://127.0.0.1:9999/secret')
+      source = FeedSource.new({'id' => '__test_http__', 'source' => {'feed' => 'http://127.0.0.1:8080/feed.rss'}})
+
+      error = assert_raise(Ginseng::GatewayError) {source.feedjira}
+      assert_not_requested(internal)
+      assert_equal(:rejected_host, error.rejection)
     end
 
     # #1688: FeedSource の取得がこの経路を通ること
@@ -118,8 +158,11 @@ module TomatoShrieker
       internal = stub_redirect_to_internal
       source = FeedSource.new({'id' => '__test_http__', 'source' => {'feed' => URL}})
 
-      assert_raise(Ginseng::GatewayError) {source.feedjira}
+      error = assert_raise(Ginseng::GatewayError) {source.feedjira}
       assert_not_requested(internal)
+      # #1807: `Invalid feed` で包み直しても、拒否の理由（ginseng-core 7.1.0）を落とさない
+      assert_equal(:rejected_host, error.rejection)
+      assert_equal('rejected_host', source.send(:run_error_sentry_options, error)[:tags][:reason])
     end
 
     # #1688: IcalendarSource の取得がこの経路を通ること

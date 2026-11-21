@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/pooza/ginseng-core.git
-  revision: 6d51c4d7c1a9cdb5e582ad3ff7dfc9cf790e87be
+  revision: 31af283534123caf0d9c88c16dd122748cfdd99c
   branch: main
   specs:
-    ginseng-core (7.0.1)
+    ginseng-core (7.1.0)
       activesupport (>= 8.1.2.1)
       addressable (>= 2.9.0)
       cgi (>= 0.4.2)
@@ -34,18 +34,18 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-fediverse.git
-  revision: 1fb69124a62cff6a57afaa088a34c1687330f927
+  revision: 0792e8097740749074c755606bd2d2521e5c1552
   branch: main
   specs:
-    ginseng-fediverse (9.0.0)
+    ginseng-fediverse (10.0.0)
       ginseng-core (>= 2.1.0)
 
 GIT
   remote: https://github.com/pooza/ginseng-piefed.git
-  revision: 66e4acbc6f2c43c4f5920052914ec588e2c574d9
+  revision: 041eda1bf8bb926b74d38b50ccb0234a6c27d327
   branch: main
   specs:
-    ginseng-piefed (0.6.1)
+    ginseng-piefed (0.7.0)
       ginseng-core (>= 2.0.0)
 
 GIT
@@ -61,10 +61,10 @@ GIT
 
 GIT
   remote: https://github.com/pooza/ginseng-youtube.git
-  revision: e166b3faded9412bd9776935fc02cb9dc8212d6b
+  revision: 49f2bb19f376d131da95f921861ade78dc829b5f
   branch: main
   specs:
-    ginseng-youtube (4.0.0)
+    ginseng-youtube (4.0.1)
       ginseng-core (>= 1.23.1)
 
 GIT
@@ -117,7 +117,7 @@ GEM
       ecdsa_ext (~> 0.5.0)
     cgi (0.5.2)
     concurrent-ruby (1.3.8)
-    connection_pool (3.0.2)
+    connection_pool (3.0.3)
     crack (1.0.1)
       bigdecimal
       rexml

@@ -30,7 +30,7 @@ dest:
 | TextSource | `/source/text` | 定型文 |
 | CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`）, `/source/timeout`（締切・下記） |
 | FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot` |
-| GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
+| GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true・タイトルの 2-gram の類似度 0.4 以上を 48 時間以内の投稿済み**と同じ run の先の候補**の両方と比べて落とす。同じ run どうしを比べるのは 4.22.0 から＝ #1820）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
 | IcalendarSource | `/source/ical`（`/source/calendar` でも可） | iCalendar (.ics) の URL、またはコマンド（`/source/ical/command`・下記）。`/source/days`（何日前から出すか・既定 3）、`/source/keyword` / `/source/negative_keyword`、`/source/google` |
 | YouTubeChannelSource | `/source/youtube/channel/id`（`/source/youtube/channel/url` でも可） | FeedSource の設定項目も利用可（`/source/keyword` など） |
 | GitHubRepositorySource | `/source/github/repository`（`/source/github/repos` でも可） | `owner/name` の形。`/source/github/timeline`（`releases` / `commits`） |
@@ -149,6 +149,9 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 
 - ⚠ **`mastodon` を Misskey の宛先が混ざるソースに使わない。**Misskey がリンク化するのに Mastodon はしない位置（`曲名#featuring` など）が素通りし、Misskey でタグやメンションになる
 - ⚠ Webhook の先（モロヘイヤ）が Mastodon か Misskey かは定義からは分からない。書くときに宛先のインスタンスを確かめる
+- 🔴 **区切りは必ず最後の段に置く（4.22.0・#1805）。**区切った後で HTML を剥がし直すと、二重にエンコードした実体参照（`&amp;amp;#64;`）が区切りの後で `@` に戻る。4.21.0 までは `EntryParser#parse` がタイトルをもう一度 `.sanitize` していて、配信元がボットに任意のメンション・タグを付けさせられた。切り替えの時点で本番のフィードに載っていたタイトル 887 件は、新旧で差が 0 件（＝再投稿は起きない）
+- ⚠ **フィードの本文（summary）は区切らない。**HTML を剥がすだけなので、`template: summary` / `summary_with_title` のソースでは、本文に書かれた `@user@host` / `#tag` がそのまま投稿先でメンション・タグになる。信用できない配信元の本文を流すなら `template: title` にする（2026-11 時点で本番の直近 60 日の本文にメンションの形は 0 件）
+- 📌 **本番は 2026-11-15（4.21.0 のデプロイ後）に、Mastodon 宛ての 50 本を `mastodon` へ切り替えた（#1792）。**除外したのは Misskey 宛ての `lovelink` と `html` の 10 本。切り替え前の定義の控えは本番の `tmp/sources.bak-202611151440`。⚠ **切り替えの後で `#` / `@` まわりの見た目や重複投稿がおかしくなったら、まず #1792 を読む**（タイトルが変わると一意索引をすり抜けて再投稿される条件・Misskey 混在の見分け方を書いてある）
 
 ### Webhook 宛先の指定形式
 
@@ -209,8 +212,9 @@ dest:
 - 🔴 **別のホストへのリダイレクト先だけを `Ginseng::PublicHost` で検証する。**配信元が 3xx で内部ホストを指すと、そこへは GET しない（`Ginseng::GatewayError: Rejected host '…'`・run は error）。上の 2 経路と落ちる条件は同じ
 - ⚠ **同じホストへのリダイレクト（http → https・パスの移動）は初段と同じ扱いで追う。**2026-11-07 の実測では、本番で初段が 3xx を返すのは 2 件で、どちらも同じホスト
 - ⚠ **LAN 内の取得元が別の LAN 内ホストへリダイレクトすると落ちる。**取得先を最終の URL で書き直す
-- ⚠ **転送先の名前解決の失敗・時間切れも `Rejected host` になり、やり直しも効かない**（`PublicHost` が拒否と区別しない・上流 pooza/ginseng-core#695）。一時的な DNS の揺れなら次の定期実行で戻る
-- 📌 Sentry では `reason: rejected_host` のタグが付き、YouTube の毎日の 404 などと別のイシューになる（#1785）
+- ⚠ **転送先の名前解決の失敗・時間切れも `Rejected host` になり、やり直しも効かない**（メッセージに ` (unresolvable…)` が付く）。一時的な DNS の揺れなら次の定期実行で戻る
+- 📌 Sentry では理由ごとに別のイシューになる（#1785・#1807）: 内部ホストなどを拒んだものは `reason: rejected_host`、名前が解決できなかったものは `reason: unresolvable_host`。どちらも YouTube の毎日の 404 などとは別。理由は ginseng-core 7.1.0 の `GatewayError#rejection` で見ている（`FeedSource` が包み直すときに持ち越す）
+- ⚠ ginseng-core 7.1.0 から、拒否 1 件ごとに gem 自身も error 行（`gave_up: rejected_host` / `unresolvable_host`）を出す。run の error 行と合わせて 2 行になる
 - ⚠ **別のポート・https → http へのリダイレクトも「同じホスト」として通る**（validator はホスト名しか受けない・#1785）
 - 実装は `TomatoShrieker::HTTP#get_configured`
 

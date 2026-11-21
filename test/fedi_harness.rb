@@ -82,7 +82,7 @@ module TomatoShrieker
   # 本番の Mastodon 宛ては全部この経路なのに、テストは `WebhookShrieker` の body を組むところまでで、
   # モロヘイヤが受け取れる形かは一度も確かめていなかった。ハーネスの Mastodon の前段に
   # `test/harness/mulukhiya.sh up` でモロヘイヤを立て、その `.env.test` も読み込んで走らせる。
-  # ⚠ 環境変数が無ければ省略する。⚠ Misskey 経由は #1789。
+  # ⚠ 環境変数が無ければ省略する。⚠ Misskey 経由は下の `FediHarnessMisskeyWebhookTest`（#1789）。
   class FediHarnessWebhookTest < TestCase
     include FediHarness
 
@@ -129,6 +129,63 @@ module TomatoShrieker
     # 誰のものでもない digest は 404（`Source#deliver` が宛先の失敗として数える形）。
     def test_exec_with_unknown_digest
       url = ENV.fetch('MULUKHIYA_WEBHOOK_URL').sub(%r{/webhook/\h+\z}, "/webhook/#{'0' * 64}")
+
+      assert_raise(Ginseng::GatewayError) {exec_webhook(harness_source('hooks' => [url]), url)}
+    end
+  end
+
+  # 🔴 **モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Misskey）を実物で通す (#1789)。**
+  #
+  # `test/harness/mulukhiya.sh up misskey` でハーネスの Misskey の前段にモロヘイヤを立て、
+  # Misskey 側とモロヘイヤ側の `.env.test` を読み込んで走らせる。⚠ 本番のモロヘイヤ経由はほぼ
+  # Mastodon 宛てで、Misskey 宛ては少ない。⚠ 環境変数が無ければ省略する。
+  class FediHarnessMisskeyWebhookTest < TestCase
+    include FediHarness
+
+    def disable?
+      return true unless ENV['MULUKHIYA_MISSKEY_WEBHOOK_URL'].present?
+      return true unless ENV['MISSKEY_URL'].present? && ENV['MISSKEY_ACCESS_TOKEN'].present?
+      return super
+    end
+
+    # 読み返しと後片付けに使う（投稿はモロヘイヤが test アカウントとして行う）。
+    def misskey
+      @misskey ||= harness_source(
+        'misskey' => {'url' => ENV.fetch('MISSKEY_URL'), 'token' => ENV.fetch('MISSKEY_ACCESS_TOKEN')},
+      ).misskey
+    end
+
+    def exec_webhook(source, url = ENV.fetch('MULUKHIYA_MISSKEY_WEBHOOK_URL'))
+      return WebhookShrieker.create(url).exec(template: source.create_template, visibility: 'unlisted')
+    end
+
+    # 本文とタグが届き、リクエストごとの公開範囲がモロヘイヤで Misskey の語（`unlisted` → `home`）に
+    # 直されること。⚠ 応答は Misskey の `notes/create` の形（`createdNote`）で返る。
+    def test_exec_posts_note
+      response = exec_webhook(harness_source('hooks' => [ENV.fetch('MULUKHIYA_MISSKEY_WEBHOOK_URL')]))
+      id = response.dig('createdNote', 'id')
+      note = misskey.fetch_note(id)
+
+      assert_include(note['text'], TEXT)
+      assert_include(note['text'], TAG)
+      assert_equal('home', note['visibility'])
+    ensure
+      misskey&.delete_note(id) if id
+    end
+
+    # ソースの `spoiler_text` が CW（Misskey の `cw`）として渡ること。
+    def test_exec_posts_spoiler_text
+      source = harness_source('hooks' => [ENV.fetch('MULUKHIYA_MISSKEY_WEBHOOK_URL')], 'spoiler_text' => 'CW のテスト')
+      id = exec_webhook(source).dig('createdNote', 'id')
+
+      assert_equal('CW のテスト', misskey.fetch_note(id)['cw'])
+    ensure
+      misskey&.delete_note(id) if id
+    end
+
+    # 誰のものでもない digest は 404（`Source#deliver` が宛先の失敗として数える形）。
+    def test_exec_with_unknown_digest
+      url = ENV.fetch('MULUKHIYA_MISSKEY_WEBHOOK_URL').sub(%r{/webhook/\h+\z}, "/webhook/#{'0' * 64}")
 
       assert_raise(Ginseng::GatewayError) {exec_webhook(harness_source('hooks' => [url]), url)}
     end
