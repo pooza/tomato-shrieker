@@ -65,6 +65,7 @@ module TomatoShrieker
     # 各社配信（ほぼ同じタイトル）が 9 件そのまま投稿されていた。
     def test_target_entries_dedupe_within_run
       source = build_source
+      deliverable!(source)
       stub_entries(source, [
         '【きょうから第2弾】マクドナルド、ハッピーセットは「名探偵プリキュア！」 “こものいれ”など3種 - ORICON NEWS',
         '【きょうから第2弾】マクドナルド、ハッピーセットは「名探偵プリキュア！」 “こものいれ”など3種 - Yahoo!ニュース',
@@ -89,10 +90,29 @@ module TomatoShrieker
     # ⚠ 48 時間より離れていれば、同じ run でも別の記事として扱う（DB との比較と同じ窓）。
     def test_target_entries_window
       source = build_source
+      deliverable!(source)
       now = Time.now
       stub_entries(source, ['同じタイトルの記事 - A', '同じタイトルの記事 - B'], [now - (72 * 3600), now])
 
       assert_equal(2, source.target_entries.count)
+    end
+
+    # ⚠ 流れない候補（`feed.time` より古い）は、同じ run の類似記事を落とさない（#1822 の Codex P2）。
+    # 落とすと、古い方は `Entry.deliverable` で捨てられ、新しい方は類似で捨てられ、どちらも流れない。
+    def test_target_entries_ignores_undeliverable
+      source = build_source
+      now = Time.now
+      source.define_singleton_method(:touched?) {true}
+      source.define_singleton_method(:time) {now - 3600}
+      stub_entries(source, ['同じタイトルの記事 - A', '同じタイトルの記事 - B'], [now - 7200, now])
+
+      assert_equal(2, source.target_entries.count)
+    end
+
+    # 候補がすべて流れる状態にする（touch 済み・`feed.time` は候補より前）。
+    def deliverable!(source)
+      source.define_singleton_method(:touched?) {true}
+      source.define_singleton_method(:time) {Time.now - (30 * 24 * 3600)}
     end
 
     def stub_entries(source, titles, times = nil)

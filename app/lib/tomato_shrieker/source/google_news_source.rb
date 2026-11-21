@@ -44,7 +44,10 @@ module TomatoShrieker
         published = entry.published || Time.now
         since = published - (DEDUPE_HOURS * 3600)
         next true if accepted.any? {|time, other| time >= since && similar_bigrams?(bigrams, other)}
-        accepted.push([published, bigrams])
+        # ⚠ **比べる相手に加えるのは、実際に流れる候補だけ（#1822 の Codex P2）。**`feed.time` より古い
+        # 候補は insert されても `Entry.deliverable` で落ちる＝流れない。それに新しい類似記事を
+        # 落とさせると、どちらも投稿されないまま行だけ残る。
+        accepted.push([published, bigrams]) if entry.published && Entry.deliverable(entry, self)
         false
       end
     end
