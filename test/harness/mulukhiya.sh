@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Mastodon）のテスト用に、
-# chubo2 の fedi-test-harness（Mastodon）の前段へモロヘイヤを立てる (#1452)。
+# モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Mastodon / Misskey）のテスト用に、
+# chubo2 の fedi-test-harness の前段へモロヘイヤを立てる (#1452 / #1789)。
 #
-#   test/harness/mulukhiya.sh up     # 取り出し → 設定 → 起動 → webhook の URL を .env.test へ（冪等）
-#   test/harness/mulukhiya.sh down   # 止める（取り出したものと .env.test は残す）
+#   test/harness/mulukhiya.sh up [mastodon|misskey]   # 取り出し → 設定 → 起動 → webhook の URL を .env.test へ（冪等・既定は mastodon）
+#   test/harness/mulukhiya.sh down                    # 止める（取り出したものと .env.test は残す）
+#
+# ⚠ モロヘイヤは 1 つだけ立てる（controller は起動時に決まる）。別の側へ向けるときは down してから up する。
+#   .env.test の変数名は側ごとに違う（Mastodon は MULUKHIYA_WEBHOOK_URL・Misskey は MULUKHIYA_MISSKEY_WEBHOOK_URL）。
 #
 #   ~/repos/chubo2/fedi-test-harness/mastodon/scripts/setup.sh   # 先に Mastodon を立てておく
 #   test/harness/mulukhiya.sh up
@@ -11,6 +14,12 @@
 #   set -a; source ~/.cache/tomato-shrieker/mulukhiya-harness/.env.test; set +a
 #   bundle exec rake test
 #   test/harness/mulukhiya.sh down
+#
+#   # Misskey へ向けるとき
+#   ~/repos/chubo2/fedi-test-harness/misskey/scripts/setup.sh
+#   test/harness/mulukhiya.sh up misskey
+#   set -a; source ~/repos/chubo2/fedi-test-harness/misskey/.env.test; set +a
+#   set -a; source ~/.cache/tomato-shrieker/mulukhiya-harness/.env.test; set +a
 #
 # ⚠ モロヘイヤのリリースタグを**作業ツリーとは別の場所**へ取り出して動かす。開発機の
 #   ~/repos/mulukhiya-toot-proxy（モロヘイヤ側の作業ツリー）には触れない。
@@ -26,6 +35,27 @@ REPO='https://github.com/pooza/mulukhiya-toot-proxy.git'
 APP="$ROOT/mulukhiya"
 BASE="http://127.0.0.1:$PORT/mulukhiya"
 PIDFILE="$APP/tmp/pids/puma.pid"
+CONTROLLER_FILE="$ROOT/controller"
+
+# 側ごとの .env.test の接頭辞（ハーネスの出力に合わせる）
+prefix_of() {
+  case "$1" in
+    mastodon) echo MASTODON ;;
+    misskey) echo MISSKEY ;;
+    *)
+      echo "==> ⚠ controller は mastodon か misskey です: $1" >&2
+      exit 2
+      ;;
+  esac
+}
+
+# 書き出す webhook の URL の変数名。⚠ Mastodon は #1452 からの名前のまま（既存の手順を崩さない）。
+webhook_var_of() {
+  case "$1" in
+    mastodon) echo MULUKHIYA_WEBHOOK_URL ;;
+    misskey) echo MULUKHIYA_MISSKEY_WEBHOOK_URL ;;
+  esac
+}
 
 latest_tag() {
   git ls-remote --tags --refs "$REPO" 'v*' | awk -F/ '{print $3}' | sort -V | tail -1
@@ -50,9 +80,10 @@ checkout() {
 
 # ハーネスの接続情報からモロヘイヤの local.yaml を組む。⚠ 毎回書き直す（ハーネスを作り直すとトークンが変わる）。
 configure() {
-  local env="$HARNESS_DIR/mastodon/.env.test"
+  local controller="$1" env="$HARNESS_DIR/$1/.env.test" prefix
+  prefix=$(prefix_of "$controller")
   [[ -f "$env" ]] || {
-    echo "==> ⚠ $env がありません。先に mastodon/scripts/setup.sh を実行してください。" >&2
+    echo "==> ⚠ $env がありません。先に $controller/scripts/setup.sh を実行してください。" >&2
     exit 1
   }
   (
@@ -62,16 +93,18 @@ configure() {
     set +a
     umask 077
     cd "$APP"
-    PORT="$PORT" ruby -ryaml -rsecurerandom -e '
+    PORT="$PORT" CONTROLLER="$controller" PREFIX="$prefix" ruby -ryaml -rsecurerandom -e '
+      controller = ENV.fetch("CONTROLLER")
+      env = ->(name) {ENV.fetch("#{ENV.fetch("PREFIX")}_#{name}")}
       File.write("config/local.yaml", {
-        "controller" => "mastodon",
+        "controller" => controller,
         "environment" => "development",
         "crypt" => {"password" => SecureRandom.hex(16)},
-        "mastodon" => {"url" => ENV.fetch("MASTODON_URL")},
-        "postgres" => {"dsn" => ENV.fetch("MASTODON_DB_DSN")},
+        controller => {"url" => env.call("URL")},
+        "postgres" => {"dsn" => env.call("DB_DSN")},
         "agent" => {
-          "info" => {"token" => ENV.fetch("MASTODON_INFO_ACCESS_TOKEN")},
-          "test" => {"token" => ENV.fetch("MASTODON_ACCESS_TOKEN")},
+          "info" => {"token" => env.call("INFO_ACCESS_TOKEN")},
+          "test" => {"token" => env.call("ACCESS_TOKEN")},
         },
         "puma" => {"port" => Integer(ENV.fetch("PORT"))},
         "sidekiq" => {"auth" => {"password" => SecureRandom.hex(8)}},
@@ -104,11 +137,12 @@ start() {
 }
 
 # test アカウントに webhook のトークンを持たせ、URL を .env.test へ書き出す。
-# ⚠ モロヘイヤが返す URL は Mastodon のホスト名（本番では nginx が /mulukhiya を振る）。
+# ⚠ モロヘイヤが返す URL は Mastodon / Misskey のホスト名（本番では nginx が /mulukhiya を振る）。
 #   ハーネスには前段の nginx が無いので、モロヘイヤの待ち受けへ差し替える。
 export_webhook() {
-  local env="$HARNESS_DIR/mastodon/.env.test" token url
-  token=$(grep '^MASTODON_ACCESS_TOKEN=' "$env" | cut -d= -f2-)
+  local controller="$1" env="$HARNESS_DIR/$1/.env.test" token url var
+  token=$(grep "^$(prefix_of "$controller")_ACCESS_TOKEN=" "$env" | cut -d= -f2-)
+  var=$(webhook_var_of "$controller")
   curl -sf -o /dev/null -X POST -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' -d '{"command":"user_config"}' "$BASE/api/config/update"
   # shellcheck disable=SC2016 # Ruby の式なので展開しない
@@ -122,9 +156,9 @@ export_webhook() {
   (
     umask 077
     cat >"$ROOT/.env.test" <<EOF
-# test/harness/mulukhiya.sh が書き出したモロヘイヤの接続情報 (#1452)
+# test/harness/mulukhiya.sh が書き出したモロヘイヤの接続情報 (#1452 / #1789・$controller)
 MULUKHIYA_URL=$BASE
-MULUKHIYA_WEBHOOK_URL=$url
+$var=$url
 EOF
   )
   echo "==> 接続情報を $ROOT/.env.test に書き出しました"
@@ -141,24 +175,34 @@ stop() {
   else
     echo '==> モロヘイヤは動いていません'
   fi
+  rm -f "$CONTROLLER_FILE"
   "$HARNESS_DIR/mulukhiya-redis/ctl.sh" down
 }
 
 case "${1:-}" in
   up)
+    controller="${2:-mastodon}"
+    prefix_of "$controller" >/dev/null
     # ⚠ 起動中は設定を書き換えない（crypt の鍵が変わると、動いているものと食い違う）。
-    if ! running; then
+    if running; then
+      current=$(cat "$CONTROLLER_FILE" 2>/dev/null || echo mastodon)
+      if [[ "$current" != "$controller" ]]; then
+        echo "==> ⚠ モロヘイヤは $current 向けで起動中です。先に down してください。" >&2
+        exit 1
+      fi
+    else
       checkout
-      configure
+      configure "$controller"
     fi
     start
-    export_webhook
+    echo "$controller" >"$CONTROLLER_FILE"
+    export_webhook "$controller"
     ;;
   down)
     stop
     ;;
   *)
-    echo "usage: $0 up|down" >&2
+    echo "usage: $0 up [mastodon|misskey] | down" >&2
     exit 2
     ;;
 esac
