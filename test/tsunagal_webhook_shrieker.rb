@@ -59,6 +59,39 @@ module TomatoShrieker
       assert_true(tmpl[:tag])
     end
 
+    # 🔴 #1825: エントリーのある投稿は `[prefix] 題` をスレッドのタイトルとして送る。
+    def test_build_body_sends_entry_title
+      body = tsunagal.build_body(template: template(nil, entry_title: 'v1.165.0', prefix: 'Release notes from synapse'))
+
+      assert_equal('[Release notes from synapse] v1.165.0', body[:title])
+      assert_equal(TEXT, body[:text], '本文は変えない')
+    end
+
+    def test_build_body_entry_title_without_prefix
+      assert_equal('v1.165.0', tsunagal.build_body(template: template(nil, entry_title: 'v1.165.0'))[:title])
+    end
+
+    # ⚠ エントリーの無いソース（定型文・コマンド）は title を送らない＝本文の 1 行目がタイトル。
+    def test_build_body_without_entry_sends_no_title
+      assert_false(tsunagal.build_body(template: template(nil, prefix: 'x')).key?(:title))
+      assert_false(tsunagal.build_body(template: template(nil, entry_title: ' ', prefix: 'x')).key?(:title))
+    end
+
+    # CW と title は独立に効く。
+    def test_build_body_title_with_spoiler_text
+      body = tsunagal.build_body(template: template(SPOILER, entry_title: '題', prefix: 'p'))
+
+      assert_equal('[p] 題', body[:title])
+      assert_equal("#{SPOILER}\n\n#{TEXT}", body[:text])
+    end
+
+    # 素の WebhookShrieker（モロヘイヤ宛て）には title を積まない。
+    def test_plain_webhook_sends_no_title
+      body = WebhookShrieker.new(HOOK_URL).build_body(template: template(nil, entry_title: '題', prefix: 'p'))
+
+      assert_false(body.key?(:title))
+    end
+
     # channel / room_id はそのまま載せる（matrix-webhook 側の解釈）。
     def test_build_body_carries_room
       shrieker = WebhookShrieker.create(
@@ -96,12 +129,19 @@ module TomatoShrieker
 
     # Template のふりをする最小の stub。⚠ 実 Template は ERB を評価するので、
     # ここでは「to_s が本文を返し、source.spoiler_text を持つ」ことだけ満たす。
-    def template(spoiler_text)
+    def template(spoiler_text, entry_title: nil, prefix: nil)
       source = Object.new
       source.define_singleton_method(:spoiler_text) {spoiler_text}
+      source.define_singleton_method(:prefix) {prefix}
+      entry = nil
+      if entry_title
+        entry = Object.new
+        entry.define_singleton_method(:title) {entry_title}
+      end
       stub = Object.new
       stub.define_singleton_method(:to_s) {TEXT}
       stub.define_singleton_method(:source) {source}
+      stub.define_singleton_method(:entry) {entry}
       stub.define_singleton_method(:[]=) {|key, value| (@slots ||= {})[key] = value}
       stub.define_singleton_method(:[]) {|key| (@slots ||= {})[key]}
       return stub

@@ -13,15 +13,33 @@ module TomatoShrieker
   #
   # ⚠ **Matrix に CW の標準は無い。** 独自の見せ方を決めることになるので、
   # 「本文の先頭に畳んで送る」という最小の解釈にしてある。
+  #
+  # 🔴 **エントリーのある投稿は `title` を送る (#1825)。**matrix-webhook は POST ごとに
+  # スレッドを起こし、`title` が無ければ `text` の最初の行をルートにする。
+  # `summary_with_title` などのテンプレートは 1 行目が `[prefix]` だけなので、
+  # **同じソースのスレッドが同じタイトルで並んで見分けが付かなかった**。
+  # ⚠ エントリーの無いソース（定型文・コマンド）は従来どおり本文の 1 行目に任せる。
   class TsunagalWebhookShrieker < WebhookShrieker
     # CW と本文を区切る空行。⚠ 1 行にすると CW が本文の一部に見える。
     SEPARATOR = "\n\n".freeze
 
     def build_body(body)
+      template = body[:template]
       result = super
-      return result unless (spoiler_text = result.delete(:spoiler_text)).present?
-      result[:text] = [spoiler_text, result[:text]].reject(&:blank?).join(SEPARATOR)
+      if (spoiler_text = result.delete(:spoiler_text)).present?
+        result[:text] = [spoiler_text, result[:text]].reject(&:blank?).join(SEPARATOR)
+      end
+      if title = thread_title(template)
+        result[:title] = title
+      end
       return result
+    end
+
+    # `[prefix] エントリーの題`。⚠ 長さは matrix-webhook が 60 文字で切るので、ここでは切らない。
+    def thread_title(template)
+      return nil unless title = template.entry&.title.presence
+      prefix = template.source&.prefix.presence
+      return [prefix && "[#{prefix}]", title].compact.join(' ')
     end
   end
 end
