@@ -26,9 +26,12 @@
 - [Mastodon](https://github.com/tootsuite/mastodon)
   - [Pleroma](https://git.pleroma.social/pleroma)等、互換APIをもつサービスを含む。
 - [Misskey](https://github.com/syuilo/misskey)
+- [Matrix](https://matrix.org)
+  - [Tsunagal](https://tsunagal.net)プロジェクトの[matrix-webhook](https://github.com/tsunagal/matrix-webhook)を経由します。暗号化されたルームにも投稿できます。
+  - 投稿ごとにスレッドが立ちます。CW（注意書き）は本文の先頭に畳んで送ります。
+  - Tsunagalの「Matrix ニュース」ルームでは、Matrix関連のニュースやリリース情報をtomato-shriekerで届けています。
 - Slack Incoming Webhooks
   - 拙作[モロヘイヤ](https://github.com/pooza/mulukhiya-toot-proxy)
-  - [matrix-webhook](https://github.com/tsunagal/matrix-webhook)
   - Discord等、webhookに互換性をもつサービス
 - [PieFed](https://join.piefed.social)
 - [Nostr](https://nostr.com) 実験的機能
