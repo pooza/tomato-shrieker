@@ -37,9 +37,19 @@ module TomatoShrieker
 
     # `[prefix] エントリーの題`。⚠ 長さは matrix-webhook が 60 文字で切るので、ここでは切らない。
     def thread_title(template)
-      return nil unless title = template.entry&.title.presence
+      return nil unless title = entry_title(template.entry).presence
       prefix = template.source&.prefix.presence
       return [prefix && "[#{prefix}]", title].compact.join(' ')
+    end
+
+    private
+
+    # 🔴 **エントリーの形はソースで違う（#1826 の Codex P2）。**フィードは `Entry` のオブジェクトだが、
+    # `IcalendarSource` は `create_entry` の Hash（`Template#[]=` が鍵をシンボルにする）を入れる。
+    # ⚠ `entry&.title` だけだと、予定のソースを Tsunagal へ向けた途端に NoMethodError で投稿が落ちる。
+    def entry_title(entry)
+      return entry[:title] if entry.is_a?(Hash)
+      return entry&.title
     end
   end
 end

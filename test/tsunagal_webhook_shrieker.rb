@@ -77,6 +77,25 @@ module TomatoShrieker
       assert_false(tsunagal.build_body(template: template(nil, entry_title: ' ', prefix: 'x')).key?(:title))
     end
 
+    # 🔴 #1826 の Codex P2: IcalendarSource のエントリーは Hash。`.title` を呼ぶと落ちる。
+    def test_build_body_sends_calendar_entry_title
+      body = tsunagal.build_body(template: template(nil, entry: {title: '定例会', body: '説明'}, prefix: 'p'))
+
+      assert_equal('[p] 定例会', body[:title])
+      assert_false(
+        tsunagal.build_body(template: template(nil, entry: {title: nil}, prefix: 'p')).key?(:title),
+      )
+    end
+
+    # ⚠ 実物の Template を通す。`Template#[]=` が Hash の鍵をシンボルにする前提に乗っているので、
+    # 文字列の鍵で入れても題が取れること（stub だけでは鍵の型の前提が崩れても気づけない）。
+    def test_thread_title_with_calendar_entry_through_template
+      tmpl = Template.new('calendar')
+      tmpl[:entry] = {'title' => '定例会'}
+
+      assert_equal('定例会', tsunagal.thread_title(tmpl))
+    end
+
     # CW と title は独立に効く。
     def test_build_body_title_with_spoiler_text
       body = tsunagal.build_body(template: template(SPOILER, entry_title: '題', prefix: 'p'))
@@ -129,11 +148,10 @@ module TomatoShrieker
 
     # Template のふりをする最小の stub。⚠ 実 Template は ERB を評価するので、
     # ここでは「to_s が本文を返し、source.spoiler_text を持つ」ことだけ満たす。
-    def template(spoiler_text, entry_title: nil, prefix: nil)
+    def template(spoiler_text, entry_title: nil, prefix: nil, entry: nil)
       source = Object.new
       source.define_singleton_method(:spoiler_text) {spoiler_text}
       source.define_singleton_method(:prefix) {prefix}
-      entry = nil
       if entry_title
         entry = Object.new
         entry.define_singleton_method(:title) {entry_title}
