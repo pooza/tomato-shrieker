@@ -89,7 +89,9 @@ module TomatoShrieker
 
         assert_empty(shrieker.upload_attachments([{image_url: 'http://exa mple.com/?token=SECRET'}]))
         assert_nil(logged.first[:host])
-        assert_equal('Addressable::URI::InvalidURIError', logged.first[:error])
+        # ⚠ ginseng-core 7.1.2 から、読めない URL も `GatewayError` に包まれる（pooza/ginseng-core#770）。
+        #   CI は ginseng-* を main の先頭へ上げてから走るので、タグの前後どちらでも通す。
+        assert_match(/\A(Addressable::URI::InvalidURIError|Ginseng::GatewayError)\b/, logged.first[:error])
         assert_not_include(logged.first.to_s, 'SECRET')
       end
     end
