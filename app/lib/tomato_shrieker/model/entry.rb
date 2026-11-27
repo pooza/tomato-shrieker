@@ -62,11 +62,13 @@ module TomatoShrieker
     # 下の `tags` の rescue に落ちてソースのタグだけになり、ログの error だけで Sentry にも出なかった。
     # モロヘイヤの失敗（`Source#remote_tags`）と同じ文言の warn と Sentry の warning に残す
     # （`verify.sh` と docs/monitoring.md の `remote tags dropped` がそのまま拾う）。
+    # ⚠ ログの URL は列の値（`url`）のまま出す。`uri` は読めない URL で例外を上げ、rescue の中で
+    # もう一度落ちると `tags` の rescue へ抜けて既定のタグまで落ちる（4.22.0 リリース前レビュー）。
     def fetch_page_for_tagging
       return nokogiri
     rescue => e
-      logger.warn(source: feed.id, message: 'remote tags dropped', reason: 'entry page',
-        url: uri.to_s, error: e)
+      logger.warn(source: feed.id, message: 'remote tags dropped', reason: 'entry page', url:,
+        error: e)
       Package.capture_warning('remote tags dropped', source: feed, shrieker: self.class)
       return nil
     end

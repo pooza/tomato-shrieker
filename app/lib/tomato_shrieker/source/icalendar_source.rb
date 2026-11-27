@@ -96,11 +96,16 @@ module TomatoShrieker
         template[:remind] = true
         shriek(template:, visibility:, stats: nil)
       end
+      @remind_failing = false
     rescue => e
       # 🔴 **Sentry にも出す（#1781）。**ログだけだと、リマインドが毎回落ちていても誰も気づけない。
       # ⚠ run_log には書かない（本体の run の判定（error_streak・沈黙）にリマインドを混ぜない）。
+      # ⚠ **続けて落ちている間は最初の 1 回だけ送る（4.22.0 リリース前レビュー）。**既定では 5 分ごとに
+      # 走るので、取得元が 1 時間落ちると 1 ソースで 12 件になる。ログには毎回残す。成功したら解く。
       logger.error(source: id, job: 'remind', error: e)
-      Sentry.capture_exception(e, tags: {source: id, job: 'remind'}) if Sentry.initialized?
+      tags = {source: id, job: 'remind'}
+      Sentry.capture_exception(e, tags:) if Sentry.initialized? && !@remind_failing
+      @remind_failing = true
     end
 
     def summary
@@ -139,9 +144,7 @@ module TomatoShrieker
     end
 
     def negative_entry?(entry)
-      return true if entry[:title].match?(negative_keyword)
-      return true if entry[:body].match?(negative_keyword)
-      return false
+      return entry[:title].match?(negative_keyword) || entry[:body].match?(negative_keyword)
     end
 
     def create_entry(event)
