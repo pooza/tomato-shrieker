@@ -15,7 +15,7 @@ daemon-spawn gem は廃止済み（#1388）。`Ginseng::Daemon` はスタンド�
 systemd/rc.d → bin/scheduler_daemon.rb start
   → SchedulerDaemon.spawn! (Ginseng::Daemon)
     → SchedulerDaemon#start
-      → Sequel.connect (SQLite3)
+      → Environment.connect_database (SQLite3・待ちは busy_handler_timeout)
       → SchedulerDaemon#migrate (未適用ならマイグレーション)
       → MonitorServer#start (Puma embedded / 監視用 HTTP)
       → SchedulerDaemon#start_reload_worker (SIGHUP → Queue → Scheduler#reload)

@@ -377,8 +377,10 @@ module TomatoShrieker
       status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
 
       assert_include(said, '再判定します')
+      assert_not_include(said, 'やり直し')
       assert_equal(200, status)
       assert_include(body.first, 'error acknowledged, re-evaluated at')
+      assert_not_include(body.first, 'next retry')
       assert_equal(1, SourceRunLog.where(source_id: FIXTURE_ID).count)
       assert_equal(1, source_status(FIXTURE_ID)['error_streak'])
 
@@ -471,6 +473,29 @@ module TomatoShrieker
       assert_nil(SilenceAck.where(source_id: FIXTURE_ID).first&.error_acknowledged_at)
     end
 
+    # #1806: やり直しのあるソースは、healthz も CLI も「やり直しでも再判定する」と言う。
+    def test_ack_error_mentions_retry
+      record_error(FIXTURE_ID)
+      original = Source.instance_method(:retry_configured?)
+      Source.define_method(:retry_configured?) {true}
+      said = ack_cli(FIXTURE_ID)
+      _status, _headers, body = call("/healthz/source/#{FIXTURE_ID}")
+
+      assert_include(said, 'やり直しが残っていれば')
+      assert_include(body.first, 'or at the next retry')
+    ensure
+      Source.define_method(:retry_configured?, original)
+    end
+
+    # #1806: 書式の誤りは、strftime の書式ではなく例で見せる。
+    def test_ack_until_format_error_shows_examples
+      record_error(FIXTURE_ID)
+      error = assert_raise(Thor::Error) {ack_cli(FIXTURE_ID, until: 'not a time')}
+
+      assert_not_include(error.message, '%Y')
+      assert_match(/\d{4}-\d{2}-\d{2} か \d{4}-\d{2}-\d{2}T12:00/, error.message)
+    end
+
     # 🔴 #1785: 上限（35 日）を超える期限と、読み替えの起きる書き方は受けない。
     def test_ack_until_is_bounded_and_strict
       record_error(FIXTURE_ID)
@@ -508,7 +533,7 @@ module TomatoShrieker
       assert_not_nil(command.send(:parse_ack_time, '2026-11-30T10:00'))
     end
 
-    # 🟢 #1785: error だけの確認では、沈黙・未達の再警告の注意を出さない。
+    # #1785: error だけの確認では、沈黙・未達の再警告の注意を出さない。
     def test_error_only_ack_omits_silence_notice
       record_error(FIXTURE_ID)
 

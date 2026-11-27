@@ -83,7 +83,7 @@ module TomatoShrieker
         return "error acknowledged until #{until_at.iso8601}"
       end
       label = "error acknowledged, re-evaluated at #{checks[:next_run].iso8601}"
-      # ⚠ やり直し（`schedule.retry`・#1585）があれば、それも次の run になる（#1785）。
+      # ⚠ やり直し（`/schedule/retry`・#1585）があれば、それも次の run になる（#1785）。
       label += ' or at the next retry' if source.retry_configured?
       return label
     end

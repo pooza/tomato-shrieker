@@ -4,6 +4,6 @@ $LOAD_PATH.unshift(File.join(File.expand_path('..', __dir__), 'app/lib'))
 
 require 'tomato_shrieker'
 module TomatoShrieker
-  Sequel.connect(Environment.dsn)
+  Environment.connect_database
   MainCommand.start(ARGV)
 end

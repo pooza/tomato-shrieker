@@ -426,6 +426,15 @@ module TomatoShrieker
       end
     end
 
+    # #1806: クエリの値をデコードした形（子が読んで書き出す形）も伏せる。
+    def test_command_masks_decoded_query_parts_of_secret
+      params = secret_params
+      params['dest']['hooks'] = [{'url' => 'https://hook.example.test/notify?sig=QuErY%2BsEcReT%2F987'}]
+      command = CommandSource.new(params).command
+
+      assert_not_include(command.masked('signature QuErY+sEcReT/987 rejected'), 'QuErY+sEcReT/987')
+    end
+
     # ⚠ 検査は登録を止めない（ログに出して、そのまま登録する）。
     def test_register_continues_when_bundle_is_broken
       source = build_secret_source

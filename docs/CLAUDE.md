@@ -196,7 +196,7 @@ ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (applica
 2. `schema` で該当キーを `required` + 必要なら `type: string` / `minLength` 等を指定
 3. `Hash.deep_merge` の `compact` が null をドロップするので、local.yaml で上書きされない限り merged config に該当キーが存在せず、required 違反になる
 
-逆に **既定値が application.yaml に埋まるキーを top-level required に置いても無意味** (常に通る)。実例: `crypt.password` は application.yaml で `null`、schema で `crypt.required: [password]`。
+逆に **既定値が application.yaml に埋まるキーを top-level required に置いても無意味** (常に通る)。実例: `/crypt/password` は application.yaml で `null`、schema で `/crypt` の `required: [password]`。
 
 ## CI
 

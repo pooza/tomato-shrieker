@@ -22,14 +22,14 @@ module TomatoShrieker
     # raise するので、呼び出し側は前の内容のまま走り続ける。
     #
     # ⚠ `+` で新しい配列を作る。`super` が返す配列は `@raw` の実体そのものなので、
-    # そこへ push すると load のたびに積み増さる（ginseng-core#491）。
+    # そこへ push すると load のたびに積み増さる（pooza/ginseng-core#491）。
     # ⚠ **公開は 1 手にする (#1548)。**`super` は self を直接 `update` するので、
     # そのままだと `/sources` が `application.yaml` の値（＝ `[]`）へ戻り、
     # **完成するまでの間、読み手には空の一覧が見える**。⚠ 窓を短くしても消えない。
     # `update` を横流しして完成品を組み立て、**1 回の `replace`** で公開する
     # （MRI の `Hash#replace` は C で完結するので中間状態が見えない）。
     # ginseng-upstream: no — `config/sources/*.yaml` を `/sources` に足すのは tomato の設定の形。
-    # ⚠ `reload` の写し（上流の `alias reload load` の回避）は ginseng-core#491 で上流が直していたので消した（#1786）。
+    # 📌 `reload` の写し（上流の `alias reload load` の回避）は pooza/ginseng-core#491 で上流が直していたので消した（#1786）。
     def load
       entries, defined_at = scan_sources
       @staging = {}

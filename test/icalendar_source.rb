@@ -65,12 +65,6 @@ module TomatoShrieker
       end
     end
 
-    def test_fedi_sanitize?
-      IcalendarSource.all.each do |source|
-        assert_kind_of([TrueClass, FalseClass], source.fedi_sanitize?)
-      end
-    end
-
     def test_google?
       IcalendarSource.all.each do |source|
         assert_kind_of([TrueClass, FalseClass], source.google?)

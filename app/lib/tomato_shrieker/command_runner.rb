@@ -279,8 +279,10 @@ module TomatoShrieker
 
     # ⚠ 値だけ入れる。`key=value` の形も値の置換で伏せられ、`status=up` のような短いものは
     # 呼び出し側の `SECRET_MIN_LENGTH` で落ちる。
+    # ⚠ デコードした形も入れる（#1806）。`?sig=ab%2Bcd` の値は、子が読んで書き出すと `ab+cd` になる。
     def query_secret_parts(query)
-      return query.to_s.split('&').filter_map {|pair| pair.split('=', 2)[1]}
+      values = query.to_s.split('&').filter_map {|pair| pair.split('=', 2)[1]}
+      return values.flat_map {|v| [v, CGI.unescape(v)]}.uniq
     end
   end
 end

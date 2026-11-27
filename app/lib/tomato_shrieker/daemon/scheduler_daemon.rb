@@ -33,9 +33,8 @@ module TomatoShrieker
     # ginseng-upstream: no — 子を `exec` せず、同じプロセスでスケジューラと監視の HTTP を回すのは tomato の形。
     def start(args = [])
       logger.info(daemon: app_name, version: Package.version, message: 'start')
-      db = Sequel.connect(Environment.dsn)
+      db = Environment.connect_database
       db.run('PRAGMA journal_mode=WAL')
-      db.run('PRAGMA busy_timeout=5000')
       migrate(db)
       @monitor_server = MonitorServer.new
       @monitor_server.start
@@ -119,7 +118,8 @@ module TomatoShrieker
       return File.join(Environment.dir, 'app/migration')
     end
 
-    # ginseng-upstream: no — `start` と対（同じプロセスのスケジューラを止める）。
+    # ginseng-upstream: no — 上流は `Process.kill('TERM', 0)` でプロセスグループごと落とす（`exec` した子を止める形）。
+    # tomato は子を持たず同じプロセスでスケジューラと監視の HTTP を回すので、それらを順に止める。
     def stop
       logger.info(daemon: app_name, version: Package.version, message: 'stop')
       @reload_queue&.close
