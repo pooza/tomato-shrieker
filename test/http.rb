@@ -104,6 +104,26 @@ module TomatoShrieker
     end
 
     # #1688: 初段以外のホストは PublicHost の判定に委ねる（大文字小文字は区別しない）
+    # #1781: 上限を超える本文はパーサに渡す前に止める。上限の内側は本文を返す（7.1.1 の `to_s`）。
+    def test_get_configured_stops_at_max_bytes
+      original = HTTP.method(:max_bytes)
+      HTTP.define_singleton_method(:max_bytes) {16}
+      stub_request(:get, URL).to_return(status: 200, body: 'x' * 17)
+
+      assert_raise(Ginseng::TooLargeError) {HTTP.new.get_configured(URL)}
+
+      stub_request(:get, URL).to_return(status: 200, body: 'x' * 16)
+
+      assert_equal('x' * 16, HTTP.new.get_configured(URL).to_s)
+    ensure
+      HTTP.define_singleton_method(:max_bytes, original)
+    end
+
+    def test_max_bytes_is_configured
+      assert_kind_of(Integer, HTTP.max_bytes)
+      assert_predicate(HTTP.max_bytes, :positive?)
+    end
+
     def test_configured_host_validator
       public_host = ->(host) {host == 'public.example' ? '203.0.113.1' : nil}
       validator = HTTP.configured_host_validator('http://Example.COM/feed', public_host:)

@@ -12,7 +12,7 @@ ssh oscura 'sudo -H -u deploy bash -lc "
   bundle install
   bundle check"'
 
-# サテライト 3 本（CommandSource の実行対象。それぞれ独立した Gemfile を持つ）
+# サテライト 3 本（コマンドを走らせるソース＝ CommandSource と `/source/ical/command` の IcalendarSource の実行対象。それぞれ独立した Gemfile を持つ）
 ssh oscura 'sudo -H -u deploy bash -lc "
   set -e
   RV=\$(cat ~/repos/tomato-shrieker/.ruby-version)

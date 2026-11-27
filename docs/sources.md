@@ -279,3 +279,24 @@ schedule:
 - やり直しは一度きりのジョブ（同じ tag）。定義を変えた `source reload` や再起動で、本体のジョブと一緒に外れる（待っていたやり直しは走らない）
 - ⚠ HTTP の再送（`/http/retry/limit`）を使い切った後の話。間隔は取得先が立ち直るのを待つ長さにする
 - IcalendarSource のリマインド（`/schedule/remind`）はやり直さない
+
+### 開始直前のリマインド（`/schedule/remind`・IcalendarSource）
+
+**時刻のある予定を、始まる少し前にもう一度流す。**本体の事前告知（`/source/days` 日前から毎日）とは別のジョブで、`minutes` 分ごとに走り、その間に始まる予定を拾う。
+
+```yaml
+schedule:
+  cron: '0 0 * * *'
+  remind:
+    enable: true   # true のときだけ立てる（既定は立てない）
+    minutes: 5     # 何分ごとに見るか＝何分前までに始まる予定を流すか（既定 5・1 以上）
+```
+
+| キー | 意味 |
+|------|------|
+| `/schedule/remind/enable` | `true` でリマインドのジョブを立てる。IcalendarSource だけが使う（ほかのソースに書いても無視） |
+| `/schedule/remind/minutes` | 間隔（分）。`0` や負の値は起動が倒れるので、スキーマと `source reload` の両方で弾く（#1570） |
+
+- 終日の予定は流さない。テンプレートには `remind: true` が渡る（`views/calendar.erb` が見出しを変える）
+- ⚠ コマンドのソースは、リマインドのたびにコマンドも走る（5 分なら 1 日 288 回・上の「コマンドの出力を iCalendar として読む」）
+- ⚠ リマインドは run_log に書かない（本体の run の判定に混ぜない）。失敗はログの error と Sentry（`job: remind`・#1781）に出る。やり直し（`/schedule/retry`）もしない

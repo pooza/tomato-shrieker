@@ -2,6 +2,8 @@ require 'feedjira'
 
 module TomatoShrieker
   class FeedSource < Source
+    include KeywordFilterable
+
     # 配信まで到達せずに落ちたエントリを `shrieker_errors` に積むときのキー (#1485)。
     #
     # ⚠⚠ **`self.class` を使わない。**以前は `"#{self.class}#fetch"` だったので
@@ -60,16 +62,6 @@ module TomatoShrieker
       template = super
       template[:feed] = self
       return template
-    end
-
-    def keyword
-      return nil unless keyword = self['/source/keyword']
-      return Regexp.new(keyword)
-    end
-
-    def negative_keyword
-      return nil unless keyword = self['/source/negative_keyword']
-      return Regexp.new(keyword)
     end
 
     def time

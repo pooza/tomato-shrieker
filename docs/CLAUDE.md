@@ -124,7 +124,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 
 ### コマンドを走らせるソース（CommandRunner）の子プロセス実行
 
-📌 **コマンドの組み立てと実行は `CommandRunner`（`app/lib/tomato_shrieker/command_runner.rb`）にあり、`CommandSource`（出力をそのまま投稿）と `IcalendarSource`（`/source/ical/command`・出力を iCalendar として読む・#1691）が共有する。**下の注意は両方に当てはまる。違うのは設定の置き場所（`/source` と `/source/ical`）だけ。
+📌 **コマンドの組み立てと実行は `CommandRunner`（`app/lib/tomato_shrieker/source/command_runner.rb`）にあり、`CommandSource`（出力をそのまま投稿）と `IcalendarSource`（`/source/ical/command`・出力を iCalendar として読む・#1691）が共有する。**下の注意は両方に当てはまる。違うのは設定の置き場所（`/source` と `/source/ical`）だけ。
 
 子プロセスへ渡す環境は ginseng-core の `CommandLine#spawn_env`（`Bundler.unbundled_env` に `child_env` を重ねたもの）で、親の RUBYOPT, GEM_HOME 等は漏れない。🔴 **`Bundler.with_unbundled_env` で囲まない（#1715）。**プロセス全体の `ENV` を差し替えて戻すので、並列のスレッド（`register` は `Parallel.map`）が差し替え後の `ENV` を控えて戻しうる。ginseng-core 4.2.0 から `CommandLine` 自身も `ENV` に触らない。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（子プロセスに正しい Gemfile 位置を教える役割）。
@@ -170,7 +170,9 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
   プロセスごとの一時ディレクトリ（リポジトリの外）で、テスト時だけ読み、終了時に消える。
   ⚠⚠ **実 `config/sources/` へ書かない。**途中で落ちると残り、次の起動か `source reload` で
   本番のスケジューラに登録される。⚠ テストファイルの `at_exit` は掃除に使えない
-  （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）
+  （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）。
+  📌 読み込ませない書き込み先（CLI の `sources_dir` を差し替える `test/source_command_file.rb`）は
+  `Dir.mktmpdir` でよい（`Config` が読まないので登録されない・#1781）
 
 ### テストの罠
 

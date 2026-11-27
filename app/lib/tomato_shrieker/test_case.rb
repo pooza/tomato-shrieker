@@ -5,6 +5,10 @@ module TomatoShrieker
     include Package
     include WebMock::API
 
+    # コマンドを走らせるソースのテストで、子へ渡す env に入れる資格情報（伏せ字の確かめ用）。
+    # ⚠ `test/command_source.rb` と `test/icalendar_source.rb` で値が少し違っていたのを 1 つにした（#1781）。
+    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
+
     # ソースの種類ごとに返すフィクスチャ。⚠ 判定はクラス名の文字列ではなく実体の `is_a?`
     # （サブクラスも拾う）。
     FEED_FIXTURES = {
@@ -32,6 +36,19 @@ module TomatoShrieker
     # `remove_method` すると本物ごと消えて、**以降のテストが軒並み
     # `NoMethodError: undefined method 'initialized?'` で落ちる**（実際に踏んだ）。
     # 元の Method を保存して差し戻す。
+    # 日付をまたがずに終わった結果を返す（#1781）。⚠ 日付を決めてから評価するまでに 0 時をまたぐと、
+    # 「今日」「2 日後」の判定がずれて落ちる（窓は数十ミリ秒）。またいだら 1 度だけやり直す。
+    # ⚠ assert はブロックの外で行う（中で落ちると、やり直す前に失敗になる）。
+    def on_same_day
+      result = nil
+      2.times do
+        day = Date.today
+        result = yield
+        break if Date.today == day
+      end
+      return result
+    end
+
     def with_sentry_stub(captured)
       originals = SENTRY_STUBBED.to_h {|name| [name, Sentry.method(name)]}
       Sentry.define_singleton_method(:initialized?) {true}

@@ -5,6 +5,7 @@ module TomatoShrieker
     using Icalendar::Scannable
     include CommandRunner
     include GoogleCalendarFixable
+    include KeywordFilterable
 
     def initialize(params)
       super
@@ -42,11 +43,16 @@ module TomatoShrieker
     # 🔴 **例外の型で絞らない（4.16.0 リリース前レビュー）。**`ParseError` が上がるのは strict
     # モードだけで、実際に上がるのは `Icalendar::Values::Date::FormatError`（`ArgumentError`
     # の子・`Failed to parse "<値>"`）など。`ParseError` だけ受けていたときは素通しだった。
+    #
+    # 🔴 **終わりの `END:VCALENDAR` が無ければ例外にする（#1781）。**exit 0 のまま出力が途中で切れると、
+    # パーサは読めたところまでの予定を返す（途中の VEVENT は題が nil のまま入る）＝欠けた予定が
+    # success として流れ、残りは黙って消える。⚠ URL の取得は Net::HTTP が長さの食い違いを例外にするので、
+    # ここではコマンドの出力だけを見る。
     def command_ical
       output = run_command
       return Icalendar::Calendar.new if output.blank?
       begin
-        ical = Icalendar::Calendar.parse(output).first
+        ical = Icalendar::Calendar.parse(output).first if output.match?(/^END:VCALENDAR\s*\z/i)
       rescue StandardError
         ical = nil
       end
@@ -91,21 +97,14 @@ module TomatoShrieker
         shriek(template:, visibility:, stats: nil)
       end
     rescue => e
-      logger.error(source: id, error: e)
+      # 🔴 **Sentry にも出す（#1781）。**ログだけだと、リマインドが毎回落ちていても誰も気づけない。
+      # ⚠ run_log には書かない（本体の run の判定（error_streak・沈黙）にリマインドを混ぜない）。
+      logger.error(source: id, job: 'remind', error: e)
+      Sentry.capture_exception(e, tags: {source: id, job: 'remind'}) if Sentry.initialized?
     end
 
     def summary
       return {id:, entries: entries.reject {|v| ignore_entry?(v)}.to_a}
-    end
-
-    def keyword
-      return nil unless keyword = self['/source/keyword']
-      return Regexp.new(keyword)
-    end
-
-    def negative_keyword
-      return nil unless keyword = self['/source/negative_keyword']
-      return Regexp.new(keyword)
     end
 
     def days
@@ -150,8 +149,8 @@ module TomatoShrieker
       # `DTSTART` の `to_i` で終了を作るが、終日（`Icalendar::Values::Date`）は `to_i` を持たず落ちる。
       event.dtend ||= event.dtstart
       event = scan_rrule(event) if event.rrule.present?
-      start_date = Time.parse(event.dtstart.to_s).getlocal
-      end_date = Time.parse(event.dtend.to_s).getlocal
+      start_date = event_time(event.dtstart, 'DTSTART')
+      end_date = event_time(event.dtend, 'DTEND')
       data = {
         start_date:,
         end_date:,
@@ -205,6 +204,15 @@ module TomatoShrieker
     end
 
     private
+
+    # ⚠ **値を例外メッセージに入れない（#1781）。**`Time.parse` は `no time information in "…"` と
+    # 値を載せ、例外は run_log・`/status.json`・Sentry へ流れる。DTSTART の無い VEVENT もここで落ちる。
+    # ⚠ `rescue` の外で投げる（中で投げると元の例外が `cause` に付き、Sentry へ値ごと届く）。
+    def event_time(value, name)
+      time = Time.parse(value.to_s) rescue nil
+      raise ArgumentError, "VEVENT has no readable #{name}" unless time
+      return time.getlocal
+    end
 
     def start_time_today
       return Time.parse(Time.now.strftime('%Y/%m/%d 00:00:00'))

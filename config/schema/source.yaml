@@ -49,10 +49,13 @@ properties:
       tolerance:
         # 実行遅延の猶予。数値（秒）または Rufus::Scheduler 形式の文字列（例: "10m"）
         # `null` は種別の既定（/source_defaults）を外す（#1559）
-        type:
-          - integer
-          - string
-          - 'null'
+        # 文字列は silence_tolerance と同じく Rufus の duration 形式に限る（#1781・/source_defaults と揃える）
+        oneOf:
+          - type: integer
+            minimum: 1
+          - type: string
+            pattern: '\A((\d+(\.\d+)?[smhdwMy])+|\d+(\.\d+)?)\z'
+          - type: 'null'
       silence_tolerance:
         # 無配信の許容期間。未指定ならサイレント不発を検知しない（例: "90d"）
         # cron 形式の書き間違いを弾くため、文字列は Rufus の duration 形式に限る
@@ -183,7 +186,9 @@ properties:
       negative_keyword:
         type: string
       days:
+        # 何日前から出すか。0 は当日だけ。⚠ 負の値は何も出さなくなる（#1781）
         type: integer
+        minimum: 0
       delimiter:
         type: string
       dir:

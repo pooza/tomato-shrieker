@@ -1,0 +1,12 @@
+# Google News のテスト専用ソース (#1781)。⚠ 無いと `GoogleNewsSource.all` を回すテストが CI で 1 度も回らない。
+test: true
+source:
+  news:
+    phrase: プリキュア
+schedule:
+  every: 1d
+dest:
+  hooks:
+    - https://hook.example.test/news
+  tags:
+    - test

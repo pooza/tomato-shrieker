@@ -80,7 +80,9 @@ module TomatoShrieker
     # （第三者）が決めるので、内部ホストやそこへのリダイレクトを踏ませられる。
     # ⚠ 拒否は `GatewayError` で、`fetch_page_for_tagging` が握ってリモートのタグだけを落とす。
     def nokogiri
-      @nokogiri ||= HTTP.new.get(uri, {host_validator: Ginseng::PublicHost.validator}).body.nokogiri
+      @nokogiri ||= HTTP.new.get(uri,
+        {host_validator: Ginseng::PublicHost.validator, max_bytes: HTTP.max_bytes})
+        .body.nokogiri
       return @nokogiri
     end
 
