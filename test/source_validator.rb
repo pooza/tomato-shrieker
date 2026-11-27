@@ -21,7 +21,7 @@ module TomatoShrieker
       assert_not_empty(ical.call(-1))
     end
 
-    # #1781: `monitor.tolerance` の文字列は duration 形式に限る（silence_tolerance と同じ）。
+    # #1781: `/monitor/tolerance` の文字列は duration 形式に限る（silence_tolerance と同じ）。
     def test_tolerance
       feed = ->(value) {SourceValidator.validate('source' => {'feed' => 'https://example.com/f'}, 'dest' => HOOKS, 'monitor' => {'tolerance' => value})}
 

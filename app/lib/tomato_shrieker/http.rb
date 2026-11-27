@@ -23,8 +23,8 @@ module TomatoShrieker
     # 2026-11-07 の本番の実測では、初段で 3xx を返すのは 2 件で、どちらも同じホストだった。
     def get_configured(uri, options = {})
       uri = create_uri(uri)
-      return get(uri, {max_bytes: self.class.max_bytes}.merge(options)
-        .merge(host_validator: self.class.configured_host_validator(uri)))
+      options = {max_bytes: self.class.max_bytes}.merge(options)
+      return get(uri, options.merge(host_validator: self.class.configured_host_validator(uri)))
     end
 
     # 取りにいく本文の上限（`/http/max_bytes`・#1781）。超えたら読むのをやめて `Ginseng::TooLargeError`

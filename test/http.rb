@@ -103,7 +103,6 @@ module TomatoShrieker
       assert_not_requested(internal)
     end
 
-    # #1688: 初段以外のホストは PublicHost の判定に委ねる（大文字小文字は区別しない）
     # #1781: 上限を超える本文はパーサに渡す前に止める。上限の内側は本文を返す（7.1.1 の `to_s`）。
     def test_get_configured_stops_at_max_bytes
       original = HTTP.method(:max_bytes)
@@ -124,6 +123,7 @@ module TomatoShrieker
       assert_predicate(HTTP.max_bytes, :positive?)
     end
 
+    # #1688: 初段以外のホストは PublicHost の判定に委ねる（大文字小文字は区別しない）
     def test_configured_host_validator
       public_host = ->(host) {host == 'public.example' ? '203.0.113.1' : nil}
       validator = HTTP.configured_host_validator('http://Example.COM/feed', public_host:)

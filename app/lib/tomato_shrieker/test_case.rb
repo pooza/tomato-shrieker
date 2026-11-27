@@ -31,11 +31,6 @@ module TomatoShrieker
       [:serving?, :registered_at].each {|name| scheduler.singleton_class.send(:remove_method, name)}
     end
 
-    # ⚠⚠ **`remove_method` で戻してはいけない。**`Sentry.initialized?` は Sentry 自身の
-    # singleton class に生えているので、`define_singleton_method` は**本物を上書き**する。
-    # `remove_method` すると本物ごと消えて、**以降のテストが軒並み
-    # `NoMethodError: undefined method 'initialized?'` で落ちる**（実際に踏んだ）。
-    # 元の Method を保存して差し戻す。
     # 日付をまたがずに終わった結果を返す（#1781）。⚠ 日付を決めてから評価するまでに 0 時をまたぐと、
     # 「今日」「2 日後」の判定がずれて落ちる（窓は数十ミリ秒）。またいだら 1 度だけやり直す。
     # ⚠ assert はブロックの外で行う（中で落ちると、やり直す前に失敗になる）。
@@ -49,6 +44,11 @@ module TomatoShrieker
       return result
     end
 
+    # ⚠⚠ **`remove_method` で戻してはいけない。**`Sentry.initialized?` は Sentry 自身の
+    # singleton class に生えているので、`define_singleton_method` は**本物を上書き**する。
+    # `remove_method` すると本物ごと消えて、**以降のテストが軒並み
+    # `NoMethodError: undefined method 'initialized?'` で落ちる**（実際に踏んだ）。
+    # 元の Method を保存して差し戻す。
     def with_sentry_stub(captured)
       originals = SENTRY_STUBBED.to_h {|name| [name, Sentry.method(name)]}
       Sentry.define_singleton_method(:initialized?) {true}

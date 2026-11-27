@@ -427,6 +427,24 @@ module TomatoShrieker
       assert_equal(0, SourceRunLog.where(source_id: source.id).count)
     end
 
+    # 4.22.0 リリース前レビュー: 続けて落ちている間は最初の 1 回だけ送り、成功したら解く。
+    def test_remind_failure_is_sent_once_per_streak
+      params = command_params
+      params['schedule'] = {'remind' => {'enable' => true}}
+      source = IcalendarSource.new(params)
+      captured = []
+      with_sentry_stub(captured) do
+        source.define_singleton_method(:entries) {raise 'boom'}
+        3.times {source.remind}
+        source.define_singleton_method(:entries) {[]}
+        source.remind
+        source.define_singleton_method(:entries) {raise 'boom'}
+        source.remind
+      end
+
+      assert_equal(2, captured.count)
+    end
+
     def stub_output(source, output)
       source.define_singleton_method(:run_command) {output}
     end

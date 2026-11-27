@@ -282,5 +282,18 @@ module TomatoShrieker
       assert_equal('remote tags dropped', captured.first[:message])
       assert_equal(feed.id, captured.first[:tags][:source])
     end
+
+    # 4.22.0 リリース前レビュー: URL として読めないエントリでも、既定のタグと `extra_tags` は残す。
+    def test_tags_survive_unparsable_entry_url
+      entry = @entries.first
+      entry.feed.define_singleton_method(:remote_tagging?) {true}
+      entry.define_singleton_method(:url) {'http://exa mple.com/a b'}
+      entry.instance_variable_set(:@uri, nil)
+      entry.instance_variable_set(:@tags, nil)
+      tags = with_sentry_stub([]) {entry.tags}
+
+      assert_include(tags, '#test')
+      assert_include(tags, '#fixture')
+    end
   end
 end
