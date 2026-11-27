@@ -43,6 +43,7 @@ module TomatoShrieker
       def validate(params)
         params = params.deep_stringify_keys
         errors = JSON::Validator.fully_validate(schema, params).map {|message| readable(message)}
+        errors.concat(KeywordFilterable.errors(params))
         return errors.concat(startup_errors(params))
       end
 
@@ -55,8 +56,12 @@ module TomatoShrieker
       #
       # - トップレベルの `anyOf`（配信先必須）は、意味が 1 つしか無いので定型文にする
       # - それ以外（`/dest/hooks` の要素・`/source/ical`）は、1 行目に各分岐の理由を並べる
+      #
+      # ⚠ **pattern 違反の行から値を落とす（#1781）。**json-schema は `value "<設定値>"` をそのまま
+      # 載せるので、資格情報の入りうるキー（URL など）の書き損じが端末に平文で出る。
       def readable(message)
         message = message.gsub(/ in schema [0-9a-f-]+$/, '')
+        message = message.gsub(/ value ".*" did not match the regex /, ' did not match the regex ')
         return NO_DEST_MESSAGE if message.match?(NO_DEST_PATTERN)
         head, *rest = message.split("\n")
         return message unless head.end_with?(BRANCH_HEADER)

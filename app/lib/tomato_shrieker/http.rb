@@ -23,7 +23,17 @@ module TomatoShrieker
     # 2026-11-07 の本番の実測では、初段で 3xx を返すのは 2 件で、どちらも同じホストだった。
     def get_configured(uri, options = {})
       uri = create_uri(uri)
-      return get(uri, options.merge(host_validator: self.class.configured_host_validator(uri)))
+      return get(uri, {max_bytes: self.class.max_bytes}.merge(options)
+        .merge(host_validator: self.class.configured_host_validator(uri)))
+    end
+
+    # 取りにいく本文の上限（`/http/max_bytes`・#1781）。超えたら読むのをやめて `Ginseng::TooLargeError`
+    # （`GatewayError` の下位）を上げる＝その run は取得段の失敗になる。
+    # 🔴 **パーサに渡す前に止める。**改行の無い 50MB を読ませると、パーサが RSS 4GB・9 秒を使った
+    # （4.16.0 リリース前レビューの実測）。⚠ ginseng-core 7.1.1 より前は、`max_bytes:` を付けた応答の
+    # `to_s` が本文を返さなかった（`Icalendar::Calendar.parse` は応答をそのまま渡す）。
+    def self.max_bytes
+      return config['/http/max_bytes']
     end
 
     # 初段と同じ口は通し、それ以外は `PublicHost` の判定（接続先の IP アドレスか nil）を返す。

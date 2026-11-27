@@ -1,5 +1,43 @@
 module TomatoShrieker
   class SourceValidatorTest < TestCase
+    HOOKS = {'hooks' => ['https://mastodon.example.com/webhook/x']}.freeze
+
+    # #1781: 正規表現として読めない keyword を弾く。メッセージに値を入れない。
+    def test_unreadable_keyword
+      ['keyword', 'negative_keyword'].each do |key|
+        errors = SourceValidator.validate('source' => {'feed' => 'https://example.com/f', key => '(secretish'}, 'dest' => HOOKS)
+
+        assert_equal(["/source/#{key}: 正規表現として読めません"], errors)
+      end
+
+      assert_empty(SourceValidator.validate('source' => {'feed' => 'https://example.com/f', 'keyword' => '(a|b)'}, 'dest' => HOOKS))
+    end
+
+    # #1781: 負の days（永久に何も出さない）を弾く。0（当日だけ）は通す。
+    def test_days
+      ical = ->(days) {SourceValidator.validate('source' => {'ical' => 'https://example.com/a.ics', 'days' => days}, 'dest' => HOOKS)}
+
+      assert_empty(ical.call(0))
+      assert_not_empty(ical.call(-1))
+    end
+
+    # #1781: `monitor.tolerance` の文字列は duration 形式に限る（silence_tolerance と同じ）。
+    def test_tolerance
+      feed = ->(value) {SourceValidator.validate('source' => {'feed' => 'https://example.com/f'}, 'dest' => HOOKS, 'monitor' => {'tolerance' => value})}
+
+      ['10m', 600, nil].each {|value| assert_empty(feed.call(value), value.inspect)}
+      ['*/10 * * * *', '10 minutes', 0].each {|value| assert_not_empty(feed.call(value), value.inspect)}
+    end
+
+    # #1781: pattern 違反の指摘に設定値を載せない（json-schema は値をそのまま入れる）。
+    def test_pattern_error_hides_value
+      errors = SourceValidator.validate('source' => {'feed' => 'https://example.com/f'}, 'dest' => HOOKS,
+        'monitor' => {'silence_tolerance' => 'token=AbCdEf123456'})
+
+      assert_not_empty(errors)
+      errors.each {|error| assert_not_include(error, 'AbCdEf123456')}
+    end
+
     def test_valid_feed
       assert_empty(SourceValidator.validate(
         'source' => {'feed' => 'https://example.com/feed'},

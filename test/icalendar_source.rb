@@ -131,7 +131,7 @@ module TomatoShrieker
       assert_predicate(source, :command?)
       assert_false(source.google?)
       assert_equal(2, source.ical.events.count)
-      entry = source.entries.first
+      entry = on_same_day {source.entries.first}
 
       assert_equal('コマンド由来の予定（今日）', entry[:title])
       assert_true(entry[:is_today])
@@ -142,11 +142,14 @@ module TomatoShrieker
     # #1691: コマンドの出力を、URL から取ったものと同じ規則で予定にする。
     def test_command_entries
       source = build_command_source
-      date = Date.today + 2
-      stub_output(source, command_ics(date))
-      entry = source.entries.to_a.first
+      date, entries = on_same_day do
+        date = Date.today + 2
+        stub_output(source, command_ics(date))
+        [date, source.entries.to_a]
+      end
+      entry = entries.first
 
-      assert_equal(1, source.entries.count)
+      assert_equal(1, entries.count)
       assert_equal(date, entry[:start_date].to_date)
       assert_equal(date, entry[:end_date].to_date, '終了日を書かない終日の予定は、開始日と同じ日')
       assert_equal(2, entry[:countdown])
@@ -225,6 +228,19 @@ module TomatoShrieker
         assert_include(error.message, 'invalid iCalendar output')
         assert_false(stats.entry_stage?)
       end
+    end
+
+    # 🔴 #1781: exit 0 のまま途中で切れた出力は、読めたぶんだけの予定にせず取得段の失敗にする。
+    def test_command_truncated_output
+      full = command_ics(Date.today + 1)
+      source = build_command_source
+      # ⚠ VEVENT の途中で切る（`END:VCALENDAR` だけを落とすと、パーサは全部の予定を読めてしまい区別できない）。
+      stub_output(source, full[0, full.rindex('END:VEVENT')])
+      stats = attach_stats(source)
+      error = assert_raise(RuntimeError) {source.exec}
+
+      assert_include(error.message, 'invalid iCalendar output')
+      assert_false(stats.entry_stage?)
     end
 
     # ⚠ コマンドが非 0 で終わった run も取得段。理由（stderr）を例外メッセージに載せる。
@@ -368,8 +384,6 @@ module TomatoShrieker
       assert_true(IcalendarSource.new(params).google?)
     end
 
-    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456'.freeze
-
     def build_command_source(script = nil)
       return IcalendarSource.new(command_params(script))
     end
@@ -386,6 +400,31 @@ module TomatoShrieker
         },
         'dest' => {'hooks' => ['https://hook.example.test/ical-command'], 'sanitize' => 'html'},
       }
+    end
+
+    # 🔴 #1781: DTSTART の無い VEVENT は取得段で落ちる。例外メッセージに値を入れず、`cause` も付けない。
+    def test_event_without_dtstart
+      ics = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:x\nSUMMARY:SeCrEtSuMmArY\nEND:VEVENT\nEND:VCALENDAR\n"
+      source = build_command_source
+      stub_output(source, ics)
+      error = assert_raise(ArgumentError) {source.entries.to_a}
+
+      assert_equal('VEVENT has no readable DTSTART', error.message)
+      assert_nil(error.cause)
+    end
+
+    # 🔴 #1781: リマインドの失敗はログだけでなく Sentry にも出す（run_log には書かない）。
+    def test_remind_failure_goes_to_sentry
+      params = command_params
+      params['schedule'] = {'remind' => {'enable' => true}}
+      source = IcalendarSource.new(params)
+      source.define_singleton_method(:entries) {raise 'boom'}
+      captured = []
+      with_sentry_stub(captured) {source.remind}
+
+      assert_equal('boom', captured.first[:error].message)
+      assert_equal({source: source.id, job: 'remind'}, captured.first[:tags])
+      assert_equal(0, SourceRunLog.where(source_id: source.id).count)
     end
 
     def stub_output(source, output)

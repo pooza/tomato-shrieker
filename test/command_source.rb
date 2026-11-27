@@ -1,6 +1,5 @@
 module TomatoShrieker
   class CommandSourceTest < TestCase
-    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
 
