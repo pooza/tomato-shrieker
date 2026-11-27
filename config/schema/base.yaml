@@ -55,9 +55,10 @@ properties:
     type: object
     properties:
       password:
-        # ⚠ 空文字を通さない（#1785）。暗号化と digest の HMAC（#1761）の鍵になる。
+        # ⚠ 空文字も空白だけも通さない（#1785・#1806）。暗号化と digest の HMAC（#1761）の鍵になる。
         type: string
         minLength: 1
+        pattern: \S
     required:
       - password
   disable:

@@ -56,7 +56,8 @@ module TomatoShrieker
       return @http.post(@uri, {body: create_body(body)})
     end
 
-    # ginseng-upstream: no — `post` と同じ（宛先ごとの差は `build_body` で出す）。
+    # ginseng-upstream: no — 上流（`Ginseng::Slack#create_body`）は渡された値を YAML / JSON の `text` に包む。
+    # tomato はテンプレートから組んだ本文を宛先ごとの形（`build_body`）にして JSON にする。
     def create_body(body, type = :hash)
       return build_body(body).to_json
     end

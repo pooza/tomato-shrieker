@@ -47,14 +47,28 @@ module TomatoShrieker
     end
 
     def fetch_remote_tags
+      return [] unless page = fetch_page_for_tagging
       contents = []
       ['h1', 'h2', 'h3', 'title', 'meta'].map do |v|
-        contents.push(nokogiri.xpath("//#{v}").inner_text)
+        contents.push(page.xpath("//#{v}").inner_text)
       end
       # ⚠ `Source#remote_tags` を通す（#1785）。モロヘイヤの失敗はそこで warn と Sentry に残して
       # 空を返すので、`/feed/default_tags` と `extra_tags` まで落とさない（4.20.0 までは下の rescue で
       # ソースのタグだけになり、Sentry にも出なかった）。
       return feed.remote_tags(contents.join(' '))
+    end
+
+    # 🔴 **ページを取れなくても、`/feed/default_tags` と `extra_tags` は落とさない（#1806）。**4.20.0 から
+    # 下の `tags` の rescue に落ちてソースのタグだけになり、ログの error だけで Sentry にも出なかった。
+    # モロヘイヤの失敗（`Source#remote_tags`）と同じ文言の warn と Sentry の warning に残す
+    # （`verify.sh` と docs/monitoring.md の `remote tags dropped` がそのまま拾う）。
+    def fetch_page_for_tagging
+      return nokogiri
+    rescue => e
+      logger.warn(source: feed.id, message: 'remote tags dropped', reason: 'entry page',
+        url: uri.to_s, error: e)
+      Package.capture_warning('remote tags dropped', source: feed, shrieker: self.class)
+      return nil
     end
 
     def uri
@@ -64,7 +78,7 @@ module TomatoShrieker
 
     # 🔴 **取りにいく先のホストを検証する (#1666)。**エントリの URL はフィードの書き手
     # （第三者）が決めるので、内部ホストやそこへのリダイレクトを踏ませられる。
-    # ⚠ 拒否は `GatewayError` で、`tags` が握ってソースのタグだけに倒す。
+    # ⚠ 拒否は `GatewayError` で、`fetch_page_for_tagging` が握ってリモートのタグだけを落とす。
     def nokogiri
       @nokogiri ||= HTTP.new.get(uri, {host_validator: Ginseng::PublicHost.validator}).body.nokogiri
       return @nokogiri
@@ -104,7 +118,7 @@ module TomatoShrieker
     # 以前は `rescue SQLite3::BusyException` で 5 回まで `retry` する形だったが、**一度も
     # 到達しない死んだコードだった**。Sequel は SQLite の例外を包み直すので、BUSY は素の
     # `Sequel::DatabaseError`（`wrapped_exception` が `SQLite3::BusyException`）で上がり、
-    # 下の `rescue => e` に落ちる。ロック待ちは接続の側（Sequel 既定の 5000ms）が持つ。
+    # 下の `rescue => e` に落ちる。ロック待ちは接続の側（`Environment.connect_database` の 5000ms・#1806）が持つ。
     # ⚠⚠ **`retry` を「効くように」直してはいけない。**`begin` の先頭へ戻ると insert を
     # もう一度打つので、insert の後（`Entry[id]`）で混んだ run は**自分が入れた行に当たって
     # `UniqueConstraintViolation` → `nil`**＝行は残るのに失敗がどこにも計上されない。

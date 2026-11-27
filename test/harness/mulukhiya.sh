@@ -61,8 +61,13 @@ latest_tag() {
   git ls-remote --tags --refs "$REPO" 'v*' | awk -F/ '{print $3}' | sort -V | tail -1
 }
 
+# ⚠ pid ファイルの pid が puma のものかを確かめる（#1806）。モロヘイヤが落ちたあと pid が
+#   別のプロセスに再利用されていると、`kill -0` だけでは「動いている」と読み、stop がそれを撃つ。
 running() {
-  [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+  local pid
+  [[ -f "$PIDFILE" ]] || return 1
+  pid=$(cat "$PIDFILE")
+  ps -o command= -p "$pid" 2>/dev/null | grep -q puma
 }
 
 checkout() {
@@ -120,11 +125,13 @@ start() {
   "$HARNESS_DIR/mulukhiya-redis/ctl.sh" up
   echo "==> モロヘイヤを起動 (127.0.0.1:$PORT)"
   mkdir -p "$APP/tmp/pids"
+  # ⚠ `-b` で 127.0.0.1 に絞る（#1806）。モロヘイヤの app/initializer/puma.rb は 0.0.0.0 で待ち受けるが、
+  #   コマンドラインの `-b` は設定ファイルの `bind` を置き換える（足すのではない・puma 8.1 で確認）。
   # ⚠ `&` は puma だけに掛ける。`cd && puma &` と書くと、待つ側のサブシェルが呼び出し元の
   #   標準出力を握ったまま残り、`up | tail` のようなパイプが閉じない。
   (
     cd "$APP" || exit 1
-    nohup bundle exec puma --config app/initializer/puma.rb >"$ROOT/puma.log" 2>&1 </dev/null &
+    nohup bundle exec puma --config app/initializer/puma.rb -b "tcp://127.0.0.1:$PORT" >"$ROOT/puma.log" 2>&1 </dev/null &
   )
   for _ in $(seq 1 60); do
     if curl -s -o /dev/null "$BASE/api/health"; then
@@ -150,7 +157,7 @@ export_webhook() {
   url=$(curl -sf -H "Authorization: Bearer $token" "$BASE/api/config" |
     ruby -rjson -e 'print JSON.parse($stdin.read).dig("webhook", "url").to_s')
   [[ -n "$url" ]] || {
-    echo '==> ⚠ webhook の URL を取れません（chubo2#232 の provisioning を確かめてください）。' >&2
+    echo '==> ⚠ webhook の URL を取れません（pooza/chubo2#232 の provisioning を確かめてください）。' >&2
     exit 1
   }
   url="$BASE/webhook/${url##*/mulukhiya/webhook/}"

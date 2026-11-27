@@ -30,7 +30,7 @@ dest:
 | TextSource | `/source/text` | 定型文 |
 | CommandSource | `/source/command` | 文字列（sh経由）または配列（shellescape）。`/source/dir`, `/source/env`, `/source/delimiter`（デフォルト `=====`）, `/source/timeout`（締切・下記） |
 | FeedSource | `/source/feed`（`/source/url` でも可） | `/keep/years`（エントリを覚えておく年数・既定 3）、`/dest/prefix`、`/dest/account/bot` |
-| GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true・タイトルの 2-gram の類似度 0.4 以上を 48 時間以内の投稿済み**と同じ run の先の候補**の両方と比べて落とす。同じ run どうしを比べるのは 4.22.0 から＝ #1820）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する |
+| GoogleNewsSource | `/source/news/phrase` | FeedSource の設定項目も利用可。`/source/news/dedupe`（デフォルト true・タイトルの 2-gram の類似度 0.4 以上を 48 時間以内の投稿済み**と同じ run の先の候補**の両方と比べて落とす。同じ run どうしを比べるのは 4.22.0 から＝ #1820）。`/google/news/cleaner/url` を application.yaml に設定すると [google-news-rss-cleaner](https://github.com/pooza/google-news-rss-cleaner) 経由で実記事 URL に解決し、Google News が古記事に付ける fresh pubDate 問題も併せて回避する。ソースごとの `/source/news/cleaner/url` で別の cleaner を指せるが、⚠ **ソース単位で cleaner を外す手段は無い**（`null` を書いても application.yaml の値に倒れる・#1806） |
 | IcalendarSource | `/source/ical`（`/source/calendar` でも可） | iCalendar (.ics) の URL、またはコマンド（`/source/ical/command`・下記）。`/source/days`（何日前から出すか・既定 3）、`/source/keyword` / `/source/negative_keyword`、`/source/google` |
 | YouTubeChannelSource | `/source/youtube/channel/id`（`/source/youtube/channel/url` でも可） | FeedSource の設定項目も利用可（`/source/keyword` など） |
 | GitHubRepositorySource | `/source/github/repository`（`/source/github/repos` でも可） | `owner/name` の形。`/source/github/timeline`（`releases` / `commits`） |
@@ -144,11 +144,11 @@ FeedSource 系は、取得元の **404 も再送する**（`HTTP#retry_not_found
 | 値 | 区切る位置 | 使いどころ |
 |----|-----------|-----------|
 | `fedi`（既定） | Misskey（mfm-js）がリンク化する位置。投稿先を決めない口なので広めに当たる（`曲名#featuring` も `曲名# featuring` になる） | 宛先に Misskey が混ざる・分からない |
-| `mastodon`（4.21.0・#1775） | Mastodon がリンク化する位置だけ（ginseng-fediverse 7.1.0）。`曲名#featuring` を崩さず、`https://foo/-@alice` の `@alice` への通知を止める | **宛先がすべて Mastodon**（モロヘイヤ経由を含む） |
+| `mastodon`（4.21.0・#1775） | Mastodon がリンク化する位置だけ（ginseng-fediverse 7.1.0）。`曲名#featuring` を崩さず、`https://foo/-@alice` の `@alice` への通知を止める | **宛先に Misskey が混ざらない**（Mastodon だけ・モロヘイヤ経由の Mastodon を含む。PieFed・LINE などリンク化しない宛先が混ざるのは構わない） |
 | `html` | 区切らない（HTML を剥がすだけ） | 本文のハッシュタグを生かしたい（予定のソースなど） |
 
 - ⚠ **`mastodon` を Misskey の宛先が混ざるソースに使わない。**Misskey がリンク化するのに Mastodon はしない位置（`曲名#featuring` など）が素通りし、Misskey でタグやメンションになる
-- ⚠ Webhook の先（モロヘイヤ）が Mastodon か Misskey かは定義からは分からない。書くときに宛先のインスタンスを確かめる
+- ⚠ Webhook の先（モロヘイヤ）が Mastodon か Misskey かは定義からは分からない。書くときに宛先のサーバーを確かめる
 - 🔴 **区切りは必ず最後の段に置く（4.22.0・#1805）。**区切った後で HTML を剥がし直すと、二重にエンコードした実体参照（`&amp;amp;#64;`）が区切りの後で `@` に戻る。4.21.0 までは `EntryParser#parse` がタイトルをもう一度 `.sanitize` していて、配信元がボットに任意のメンション・タグを付けさせられた。切り替えの時点で本番のフィードに載っていたタイトル 887 件は、新旧で差が 0 件（＝再投稿は起きない）
 - ⚠ **フィードの本文（summary）は区切らない。**HTML を剥がすだけなので、`template: summary` / `summary_with_title` のソースでは、本文に書かれた `@user@host` / `#tag` がそのまま投稿先でメンション・タグになる。信用できない配信元の本文を流すなら `template: title` にする（2026-11 時点で本番の直近 60 日の本文にメンションの形は 0 件）
 - 📌 **本番は 2026-11-15（4.21.0 のデプロイ後）に、Mastodon 宛ての 50 本を `mastodon` へ切り替えた（#1792）。**除外したのは Misskey 宛ての `lovelink` と `html` の 10 本。切り替え前の定義の控えは本番の `tmp/sources.bak-202611151440`。⚠ **切り替えの後で `#` / `@` まわりの見た目や重複投稿がおかしくなったら、まず #1792 を読む**（タイトルが変わると一意索引をすり抜けて再投稿される条件・Misskey 混在の見分け方を書いてある）
@@ -222,7 +222,7 @@ dest:
 
 - `/dest/mulukhiya/enable` — モロヘイヤ経由の投稿（**既定は false**。`true` と書いたときだけ有効。`/dest/mulukhiya` を書くなら `enable` は必須）
 - `/dest/mulukhiya/url`, `/dest/mulukhiya/tagging/enable` — ハッシュタグ自動付与
-  - 🔴 **タグ付けの問い合わせが失敗したら、ソースのタグ（`/dest/tags`）だけで投稿する**（ログに warn `remote tags dropped` と同じ文言の Sentry の warning・4.20.0・#1754）。⚠ 監視（healthz）は緑のまま。本文を持つソース（`common.erb`・PieFed）もエントリ（`Entry#tags`）も同じ。⚠ ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと失敗になる（追わない）。`/dest/mulukhiya/url` は最終の URL で書く
+  - 🔴 **タグ付けの問い合わせが失敗したら、ソースのタグ（`/dest/tags`）だけで投稿する**（ログに warn `remote tags dropped` と同じ文言の Sentry の warning・4.20.0・#1754）。⚠ 監視（healthz）は緑のまま。本文を持つソース（`common.erb`・PieFed）もエントリ（`Entry#tags`）も同じ（エントリの warn と Sentry は 4.21.0 から・#1785）。エントリのページを取れなかったときも同じ文言で、ソースのタグと `extra_tags` は残す（ログは `reason: entry page`・4.22.0・#1806）。⚠ ginseng-fediverse 7.0.0 から、モロヘイヤが 3xx を返すと失敗になる（追わない）。`/dest/mulukhiya/url` は最終の URL で書く
 - Webhook digest・カスタムフィード連携の詳細: [mulukhiya-toot-proxy 連携ドキュメント](https://github.com/pooza/mulukhiya-toot-proxy/blob/develop/docs/tomato-shrieker-integration.md)
 
 ### タグ処理の責務分担
