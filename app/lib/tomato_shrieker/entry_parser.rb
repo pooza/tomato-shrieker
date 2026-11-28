@@ -17,7 +17,11 @@ module TomatoShrieker
       dest = values.slice(:feed, :title, :summary, :url, :enclosure_url, :published)
       dest[:feed] ||= feed.id
       dest[:enclosure_url] ||= enclosures.map(&:to_s).to_json
-      dest[:title] = dest[:title].sanitize if dest[:title]
+      # 🔴 **タイトルはここで `.sanitize` を掛けない (#1805)。**`FeedSource#entries` が
+      # `fedi_sanitize`（HTML を剥がし実体参照を戻してから `#` / `@` を区切る）を済ませている。
+      # ⚠⚠ ここでもう一段戻すと、二重にエンコードした `&amp;amp;#64;` が**区切った後で `@` に
+      # 戻り**、配信元がボットに任意のメンション・タグを付けさせられる。区切りは必ず最後の段。
+      # ⚠ 呼び出し元は `Entry.create` だけで、渡るのは `entries` を通ったものだけ（`fetch` / `touch`）。
       dest[:summary] = dest[:summary].sanitize if dest[:summary]
       dest[:published] = dest[:published].getlocal
       dest[:extra_tags] ||= tags.to_a.to_json

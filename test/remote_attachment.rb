@@ -89,7 +89,9 @@ module TomatoShrieker
 
         assert_empty(shrieker.upload_attachments([{image_url: 'http://exa mple.com/?token=SECRET'}]))
         assert_nil(logged.first[:host])
-        assert_equal('Addressable::URI::InvalidURIError', logged.first[:error])
+        # ⚠ ginseng-core 7.1.2 から、読めない URL も `GatewayError` に包まれる（pooza/ginseng-core#770）。
+        #   CI は ginseng-* を main の先頭へ上げてから走るので、タグの前後どちらでも通す。
+        assert_match(/\A(Addressable::URI::InvalidURIError|Ginseng::GatewayError)\b/, logged.first[:error])
         assert_not_include(logged.first.to_s, 'SECRET')
       end
     end
@@ -114,6 +116,27 @@ module TomatoShrieker
       shrieker.upload_attachments([{image_url: 'http://127.0.0.1/a.png'}])
 
       assert_match(/\AGinseng::GatewayError: Rejected host/, logged.first[:error])
+    end
+
+    # #1814: ginseng-fediverse 10.0.0 から、受信が上限（既定 256 MiB）を超えると
+    # `Ginseng::TooLargeError`（`GatewayError` の子）が上がる。添付だけ落とし、投稿先へは上げない。
+    # ⚠ 上限を 16 バイトに縮め、検証は素通しにして（example.com を解決しに行かない）gem の本物の経路を通す。
+    def test_too_large_attachment_is_dropped
+      stub_request(:get, 'https://cdn.example.com/large.png')
+        .to_return(status: 200, body: 'x' * 1024, headers: {'Content-Type' => 'image/png'})
+      shriekers.each do |shrieker|
+        logged = []
+        fake = Object.new
+        fake.define_singleton_method(:warn) {|values| logged.push(values)}
+        shrieker.define_singleton_method(:logger) {fake}
+        shrieker.define_singleton_method(:remote_resource_max_bytes) {16}
+        shrieker.define_singleton_method(:remote_resource_host_validator) {->(_host) {true}}
+
+        assert_empty(shrieker.upload_attachments([{image_url: 'https://cdn.example.com/large.png'}]))
+        assert_equal('cdn.example.com', logged.first[:host], shrieker.class.to_s)
+        assert_match(/\AGinseng::TooLargeError/, logged.first[:error], shrieker.class.to_s)
+      end
+      assert_not_requested(:post, /mstdn\.example\.com|misskey\.example\.com/)
     end
 
     # ⚠ 握るのは「取れない・上げられない」だけ。実装の誤りまで握らない。

@@ -127,9 +127,10 @@ module TomatoShrieker
       # ⚠ **記録で持つ。**判定のたびに「確認の後の成功」を run_log から探すと、掃除（保持期間）で
       # 成功の行が消えたとき、期限つきの確認が復活する（#1779 の Codex P2）。
       # 🔴🔴 **トランザクションで囲まない（4.21.0 リリース前レビューの赤）。**`immediate` で囲むと、daemon の
-      # 中の並列の run どうしが書き込みの錠を取り合う。sqlite3 の `busy_timeout` は GVL を握ったまま待つので、
+      # 中の並列の run どうしが書き込みの錠を取り合う。当時の待ち（`busy_timeout`）は GVL を握ったまま待つので、
       # 錠を持つ側のスレッドが進めず、5 秒で BUSY になって**run_log の行が欠ける**（実測: 4 スレッド×10 回が
-      # 終わらない）。⚠ 「成功で解除」は `source ack` の側が警告の読みと書きを 1 つにしているので守れる
+      # 終わらない）。📌 待ちは #1806 で `busy_handler_timeout` に替えた（`Environment.connect_database`）。
+      # ⚠ 「成功で解除」は `source ack` の側が警告の読みと書きを 1 つにしているので守れる
       # （作成の後に ack が来れば成功を読んで error を確認しない・ack の後に来れば下の解除が効く）。
       row = create(values)
       SilenceAck.clear_error(source_id) unless status == STATUS_ERROR

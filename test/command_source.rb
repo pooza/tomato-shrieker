@@ -1,6 +1,5 @@
 module TomatoShrieker
   class CommandSourceTest < TestCase
-    SECRET_ENV = 'https://kuma.example.test/api/push/AbCdEf123456?status=up&msg=OK'.freeze
     SECRET_HOOK = 'https://hook.example.test/services/T000/B000/XXXXXXXX'.freeze
     SECRET_TOKEN = 'mastodon-token-0123456789'.freeze
 
@@ -424,6 +423,15 @@ module TomatoShrieker
       ['sig=QuErYsEcReT987', 'signature QuErYsEcReT987 rejected'].each do |line|
         assert_not_include(command.masked(line), 'QuErYsEcReT987', line)
       end
+    end
+
+    # #1806: クエリの値をデコードした形（子が読んで書き出す形）も伏せる。
+    def test_command_masks_decoded_query_parts_of_secret
+      params = secret_params
+      params['dest']['hooks'] = [{'url' => 'https://hook.example.test/notify?sig=QuErY%2BsEcReT%2F987'}]
+      command = CommandSource.new(params).command
+
+      assert_not_include(command.masked('signature QuErY+sEcReT/987 rejected'), 'QuErY+sEcReT/987')
     end
 
     # ⚠ 検査は登録を止めない（ログに出して、そのまま登録する）。

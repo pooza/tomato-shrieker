@@ -205,6 +205,35 @@ module TomatoShrieker
       assert_true(stats.entry_stage?)
     end
 
+    # 🔴 **#1805: 区切った後で実体参照をもう一段戻さない。**以前は `entries` で区切った後に
+    # `EntryParser#parse` がもう一度 `.sanitize` を掛け、二重にエンコードした `&amp;amp;#64;` が
+    # 区切りの後で `@` に戻っていた＝配信元がボットに任意のメンション・タグを付けさせられた。
+    # ⚠ `fedi` / `mastodon` のどちらの口でも、保存するタイトルにメンションとタグの形が残らないこと。
+    DOUBLE_ENCODED_RSS = <<~RSS.freeze
+      <?xml version="1.0" encoding="UTF-8"?>
+      <rss version="2.0"><channel><title>t</title><link>https://example.com/</link><description>d</description>
+      <item><title>&amp;amp;#64;alice@mastodon.example 見て</title><link>https://example.com/1</link><pubDate>Fri, 20 Nov 2026 00:00:00 +0000</pubDate></item>
+      <item><title><![CDATA[&amp;#64;bob@mastodon.example と &amp;#35;spamtag]]></title><link>https://example.com/2</link><pubDate>Fri, 20 Nov 2026 00:01:00 +0000</pubDate></item>
+      </channel></rss>
+    RSS
+
+    def test_stored_title_does_not_revive_sigils
+      ['fedi', 'mastodon'].each do |mode|
+        source = FeedSource.new(fixture_params.merge('dest' => {'sanitize' => mode}))
+        source.define_singleton_method(:feedjira) {Feedjira.parse(DOUBLE_ENCODED_RSS)}
+        titles = source.entries.map do |entry|
+          parser = EntryParser.new(entry)
+          parser.feed = source
+          parser.parse[:title]
+        end
+
+        assert_equal(2, titles.size, mode)
+        titles.each do |title|
+          assert_no_match(/@alice@|@bob@|#spamtag/, title, "#{mode}: #{title}")
+        end
+      end
+    end
+
     private
 
     def fixture_params

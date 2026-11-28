@@ -10,13 +10,25 @@ module TomatoShrieker
       return "sqlite://#{db}"
     end
 
+    # DB への接続はここを通す（#1806）。
+    #
+    # 🔴 **待ちは `busy_handler_timeout` で持つ。**Sequel が既定で掛ける `busy_timeout`（と
+    # `PRAGMA busy_timeout`）は SQLite の C 側で眠るので、**GVL を握ったまま待つ**。daemon の中で
+    # 錠を持つ側のスレッドが進めず、待つ側が 5 秒で BUSY になる（4.21.0 リリース前レビュー・
+    # 手元の混在負荷で心拍の最大間隔 5.02 秒 → 0.21 秒）。`busy_handler_timeout=` は Ruby 側で
+    # 眠るので GVL を手放す。⚠ handler を置き換えるので、`PRAGMA busy_timeout` を後から掛けない。
+    # ⚠ `after_connect` は接続ごとに走る（プールが増やした接続にも効く）。
+    def self.connect_database(url = dsn)
+      return Sequel.connect(url, after_connect: ->(conn) {conn.busy_handler_timeout = 5000})
+    end
+
     def self.rake?
       return ENV['RAKE'].present? && !test? rescue false
     end
 
     # ginseng-upstream: no — 文字列で返し、`RACK_ENV` を見ない。tomato では子プロセスへ渡す `RACK_ENV` の
     # 元（`CommandRunner#command`）なので、上流のように `RACK_ENV` を読むと循環し、Symbol は spawn の env に渡せない。
-    # ⚠ `name` / `test?` / `development?` / `production?` は上流と同じだったので消した（#1786）。
+    # 📌 `name` / `test?` / `development?` / `production?` は上流と同じだったので消した（#1786）。
     def self.type
       return config['/environment'] || 'development'
     end

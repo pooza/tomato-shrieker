@@ -10,10 +10,13 @@ module TomatoShrieker
   # 🔴 **取れなかった添付は落とし、本文は投稿する。**⚠⚠ 添付の失敗を投稿ごとの失敗に
   # すると、**フィードの書き手が enclosure に 1 本おかしな URL を混ぜるだけで、その
   # エントリが宛先に届かなくなる**（Entry は作成済みなので次の run でも拾われない
-  # ＝ #1574）。⚠ 名前解決の一時的な失敗も `Rejected host` で返り、再送されない。
+  # ＝ #1574）。⚠ 名前解決の一時的な失敗も `Rejected host` で返り、再送されない（ginseng-core 7.1.0 から
+  # `GatewayError#rejection` が `:unresolvable_host` になる＝見分けは付くが、扱いは同じ）。
   # ⚠ 投稿先へのアップロードの失敗もここで握る。宛先ごと落ちているなら続く投稿が同じ
   # 理由で落ちるが、**メディアの API だけが通らない形（権限・サイズ上限）は、画像なしの
   # 投稿が成功として続く**＝監視には出ないので、warn `attachment dropped` と Sentry の warning で残す。
+  # ⚠ 受信の上限（ginseng-fediverse 10.0.0 から既定 256 MiB）を超えたものも `Ginseng::TooLargeError`
+  # （`GatewayError` の子）で同じく落ちる（#1814）。上限は上書きしない＝投稿先の既定の上限より上にある。
   module RemoteAttachment
     def upload_attachments(attachments, source: nil)
       in_threads = Parallel.processor_count * 2

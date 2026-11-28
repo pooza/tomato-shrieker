@@ -124,7 +124,7 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
 
 ### コマンドを走らせるソース（CommandRunner）の子プロセス実行
 
-📌 **コマンドの組み立てと実行は `CommandRunner`（`app/lib/tomato_shrieker/command_runner.rb`）にあり、`CommandSource`（出力をそのまま投稿）と `IcalendarSource`（`/source/ical/command`・出力を iCalendar として読む・#1691）が共有する。**下の注意は両方に当てはまる。違うのは設定の置き場所（`/source` と `/source/ical`）だけ。
+📌 **コマンドの組み立てと実行は `CommandRunner`（`app/lib/tomato_shrieker/source/command_runner.rb`）にあり、`CommandSource`（出力をそのまま投稿）と `IcalendarSource`（`/source/ical/command`・出力を iCalendar として読む・#1691）が共有する。**下の注意は両方に当てはまる。違うのは設定の置き場所（`/source` と `/source/ical`）だけ。
 
 子プロセスへ渡す環境は ginseng-core の `CommandLine#spawn_env`（`Bundler.unbundled_env` に `child_env` を重ねたもの）で、親の RUBYOPT, GEM_HOME 等は漏れない。🔴 **`Bundler.with_unbundled_env` で囲まない（#1715）。**プロセス全体の `ENV` を差し替えて戻すので、並列のスレッド（`register` は `Parallel.map`）が差し替え後の `ENV` を控えて戻しうる。ginseng-core 4.2.0 から `CommandLine` 自身も `ENV` に触らない。
 ただし `command.env['BUNDLE_GEMFILE']` は引き続き必要（子プロセスに正しい Gemfile 位置を教える役割）。
@@ -170,7 +170,9 @@ Source (データソース) → Shrieker (投稿先) → Schedule (スケジュ�
   プロセスごとの一時ディレクトリ（リポジトリの外）で、テスト時だけ読み、終了時に消える。
   ⚠⚠ **実 `config/sources/` へ書かない。**途中で落ちると残り、次の起動か `source reload` で
   本番のスケジューラに登録される。⚠ テストファイルの `at_exit` は掃除に使えない
-  （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）
+  （テストの実行自体が test-unit の `at_exit` なので、後から登録したものが**先に**走る）。
+  📌 読み込ませない書き込み先（CLI の `sources_dir` を差し替える `test/source_command_file.rb`）は
+  `Dir.mktmpdir` でよい（`Config` が読まないので登録されない・#1781）
 
 ### テストの罠
 
@@ -196,7 +198,7 @@ ginseng-core v1.15.23 (#477) 以降、`Config#errors` は merged config (applica
 2. `schema` で該当キーを `required` + 必要なら `type: string` / `minLength` 等を指定
 3. `Hash.deep_merge` の `compact` が null をドロップするので、local.yaml で上書きされない限り merged config に該当キーが存在せず、required 違反になる
 
-逆に **既定値が application.yaml に埋まるキーを top-level required に置いても無意味** (常に通る)。実例: `crypt.password` は application.yaml で `null`、schema で `crypt.required: [password]`。
+逆に **既定値が application.yaml に埋まるキーを top-level required に置いても無意味** (常に通る)。実例: `/crypt/password` は application.yaml で `null`、schema で `/crypt` の `required: [password]`。
 
 ## CI
 
@@ -300,7 +302,7 @@ Sentry イシューをクローズせず経過観察とする場合、その意�
 
 ⚠ **運用者の目線だけで優先度を決めると、直接経路が永久に検証されないまま残る。**Mastodon / Misskey に触れる変更は、本番で 0 件だからといって影響が小さいと判断しない。📌 4.18.0 から、リリース前検証でステージングへ直接投稿・モロヘイヤ経由の両方を実際に通す（[release-validation スキル](../.claude/skills/release-validation/SKILL.md) の 4a・#1481）。📌 4.20.0 から、chubo2 の fedi-test-harness（バニラの Mastodon / Misskey）を手元で立てると、`test/fedi_harness.rb` が直接経路で実際に投稿して読み返す（#1451）。`set -a; source ~/repos/chubo2/fedi-test-harness/mastodon/.env.test; source ~/repos/chubo2/fedi-test-harness/misskey/.env.test; set +a` してから `rake test`（⚠ `source` は 1 回に 1 ファイル。`{mastodon,misskey}` で 2 つ渡すと 2 つ目は引数になり、Misskey のテストが黙って省略される）。⚠ 環境変数が無ければ省略（CI も）。⚠ 使い終わったらハーネスは `scripts/stop.sh` で止める（3000 番はモロヘイヤも使う）。
 
-📌 4.21.0 から、**モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Mastodon）**も同じテストで実際に通す（#1452）。ハーネスの Mastodon を立てたあと `test/harness/mulukhiya.sh up` でモロヘイヤを前段に立て、書き出された `~/.cache/tomato-shrieker/mulukhiya-harness/.env.test` も `source` する。終わったら `test/harness/mulukhiya.sh down`。
+📌 4.21.0 から、**モロヘイヤ経由（WebhookShrieker → モロヘイヤ → Mastodon）**も同じテストで実際に通す（#1452）。ハーネスの Mastodon を立てたあと `test/harness/mulukhiya.sh up` でモロヘイヤを前段に立て、書き出された `~/.cache/tomato-shrieker/mulukhiya-harness/.env.test` も `source` する。終わったら `test/harness/mulukhiya.sh down`。📌 4.22.0 から **Misskey 経由**も通す（#1789）。ハーネスの Misskey を立てて `test/harness/mulukhiya.sh up misskey`（書き出す変数は `MULUKHIYA_MISSKEY_WEBHOOK_URL`）。⚠ モロヘイヤは 1 つだけ立てる＝向け先を変えるときは `down` してから `up`。⚠ 応答は Misskey の `createdNote` の形で、公開範囲はモロヘイヤが Misskey の語に直す（`unlisted` → `home`）。
 
 - モロヘイヤのリリースタグ（既定は最新・`MULUKHIYA_VERSION` で指定）を `~/.cache` の下へ取り出して puma を `127.0.0.1:3018` で動かす。⚠ **開発機の `~/repos/mulukhiya-toot-proxy`（モロヘイヤ側の作業ツリー）には触れない**。モロヘイヤにコンテナは無い
 - webhook の URL はモロヘイヤの `/mulukhiya/api/config` から取る。⚠ 返る URL は Mastodon のホスト名（本番は nginx が `/mulukhiya` を振る）なので、スクリプトがモロヘイヤの待ち受けへ差し替える

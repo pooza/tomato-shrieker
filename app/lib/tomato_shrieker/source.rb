@@ -139,10 +139,6 @@ module TomatoShrieker
       return self['/dest/sanitize'].to_sym
     end
 
-    def fedi_sanitize?
-      return sanitize_mode == :fedi
-    end
-
     def mulukhiya?
       return self['/dest/mulukhiya/enable'] == true
     end
@@ -819,7 +815,7 @@ module TomatoShrieker
       return message.to_s.sanitize
     end
 
-    # やり直し（`schedule.retry`・#1585）を設定しているか。healthz の本文が使う（#1785）。
+    # やり直し（`/schedule/retry`・#1585）を設定しているか。healthz の本文が使う（#1785）。
     def retry_configured?
       return retry_times.positive?
     end
@@ -862,13 +858,28 @@ module TomatoShrieker
     end
 
     # 🔴 **取得元のリダイレクト先を拒んだ失敗（`Rejected host`・#1688）は、Sentry で別のイシューにする
-    # （#1785）。**どちらも `FeedSource#feedjira` が包んだ `GatewayError` でスタックが同じなので、
-    # 放っておくと YouTube の毎日の 404（TOMATO-SHRIEKER-S）に紛れて気づけない。
-    # ⚠ 名前解決の失敗も `Rejected host` になる（上流 pooza/ginseng-core#695）。
+    # （#1785）。**どちらも `FeedSource#feedjira` が包んだ `GatewayError` で、型とスタックが同じになりうる
+    # ので、放っておくと YouTube の毎日の 404（TOMATO-SHRIEKER-S）に紛れうる。**⚠ sentry-ruby は `cause`
+    # の連鎖も送るので、原因の型が違う失敗（ReadTimeout の T / B）は初めから S と別になる。紛れるのは
+    # 原因まで同じ形のもので、それを `reason` タグと fingerprint で分ける。
+    # 📌 **理由は `GatewayError#rejection` で見る（ginseng-core 7.1.0・#1807）。**内部ホストなどを
+    # 拒んだもの（`rejected_host`）と、名前が解決できなかったもの（`unresolvable_host`・一時的な
+    # DNS の揺れを含む）を別のイシューにする。⚠ 文字列（`Rejected host`）では両者を分けられない。
     def run_error_sentry_options(error)
-      return {tags: {source: id}} unless error.message.to_s.include?('Rejected host')
-      return {tags: {source: id, reason: 'rejected_host'},
-              fingerprint: ['{{ default }}', 'rejected-host']}
+      return {tags: {source: id}} unless (rejection = rejection_of(error))
+      return {
+        tags: {source: id, reason: rejection.to_s},
+        fingerprint: ['{{ default }}', rejection.to_s.tr('_', '-')],
+      }
+    end
+
+    # 例外とその原因（`cause`）をたどり、最初に見つかった拒否の理由を返す。
+    def rejection_of(error)
+      while error
+        return error.rejection if error.respond_to?(:rejection) && error.rejection
+        error = error.cause
+      end
+      return nil
     end
 
     def log_exec_start(method, spec)

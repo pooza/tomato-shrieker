@@ -1,6 +1,6 @@
 ---
 name: sync
-description: セッション開始時の進捗同期。「進捗を同期してください」「同期して」などで起動する。リモート・Dependabot・Codex レビュー・Sentry・ginseng-* のピン・サテライト 3 本・Kuma との突き合わせ・マイルストーンを確認して報告する。
+description: セッション開始時の進捗同期。「進捗を同期してください」「同期して」などで起動する。リモート・Dependabot・Codex レビュー・Sentry・ginseng-* と gobou のピン・サテライト 3 本・Kuma との突き合わせ・マイルストーンを確認して報告する。
 ---
 
 # セッション開始時の同期手順
@@ -114,14 +114,23 @@ git diff Gemfile.lock | grep -A2 'ginseng-' | grep -E '^[-+] +ginseng-'
 
 ### google-news-rss-cleaner
 
-🔴 **毎回実行する。**`precure-google-news` / `dqdai-google-news` の取得先だが、**ほかに面倒を見る人がいない**（2026-10-25 のユーザー依頼）。機能的にやることは残っていないので、見るのは依存の脆弱性と稼働状況。⚠ 2026-10-25 に初めて見たときは、Dependabot のアラートが 7 件（critical 1）・PR が 4 本、9 月から止まっていた。
+🔴 **毎回実行する。**`precure-google-news` / `dqdai-google-news` の取得先だが、**ほかに面倒を見る人がいない**（2026-10-25 のユーザー依頼）。機能的にやることは残っていないので、見るのは依存の脆弱性・gobou のピン・稼働状況。⚠ 2026-10-25 に初めて見たときは、Dependabot のアラートが 7 件（critical 1）・PR が 4 本、9 月から止まっていた。
 
 ```sh
 .claude/skills/sync/scripts/cleaner.sh
 ```
 
 - `feed-parse-error` は tomato へ 502 を返したもの。2026-10-24 の 5 件はどれも Google News の RSS 自体が返した一時的な 404 で、tomato の HTTP リトライで吸収されていた（Sentry に出ていない）。`via: timeout` は記事 1 件の解決の時間切れで、その記事を落とすだけ
+- `feed-rate-limited` は Google News が 429 / 503 を返したもの、`feed-stale` はその冷却中（既定 5 分・`Retry-After` があればその秒数・上限 1 時間）に**6 時間以内に取れた古いフィードを 200 で返した**もの（cleaner#23・2026-11-17 から）。⚠ tomato からは success に見え、Kuma も緑のまま。**古いものが 6 時間を超えるか、再起動直後でまだ一度も取れていないときだけ** 503 ＋ `Retry-After` になり、`feed-parse-error`（`status: 503`）に数えられる。⚠ ginseng-core の HTTP は `Retry-After` が 60 秒を超えると待たずに諦めるので、このときの tomato の run は error になる
+  - 📌 **2026-11-17 に 429 が約 13 時間（04:52〜17:12 JST・104 件）断続的に出た**（cleaner#24）。当時は毎回上流へ取りに行っていたので、断られた run がそのまま 502 になった。`feed-rate-limited` が日をまたいで続く・`feed-stale` の古さ（`ageSec`）が数時間に達するなら、利用側の間隔か上流の制限が変わったのを疑う。経過は #1809
+  - ⚠ 再起動するとキャッシュ（記事 URL・フィード本体・古いフィードの控え）がすべて消える。2026-11-17 の再起動直後の `/clean` は 5.2 秒 / 17.4 秒だった
 - クリーナーの応答待ちによるタイムアウト（Sentry TOMATO-SHRIEKER-B）は cleaner#19
+- 📌 **`=== gobou ===` は共有の Biome 設定（[gobou](https://github.com/pooza/gobou)・ginseng-style の Node.js 向けの配布物）のピン**（2026-11-26 のユーザー依頼・cleaner#22）。ginseng-style と同じくタグで固定するので、default ブランチの `package.json` の `#vX` を最新タグと比べる。遅れていたら:
+  - **跨いだリリースノートを全部読む**（`.claude/skills/sync/scripts/release_notes.sh gobou <いま> <最新>`）。⚠ Node と PHP の両方を配っていて、「Node の設定は変わっていない＝上げなくてよい」と書かれた版がある
+  - `package.json` の `gobou` のタグを書き換え、**`@biomejs/biome` を gobou と同じ版に揃える**（`^` を付けない・出力の「gobou の版」）。`yarn install` → `yarn lint`（終了コード 0）→ `yarn verify`（all green）
+  - ⚠ **`yarn format`（`biome check --write .`）は追跡していないファイルまで書き換える。**クリーナーの作業ツリーには、ほかのセッションが置いた確かめ用のスクリプト（`check*.mjs` など）が残っていることがある。先に `git status` で見て、あればファイルを指定して流す
+  - ⚠ warn は終了コードに効かない。版を上げて増えた warning は `npx biome check . --max-diagnostics=none` で数え、cleaner#21 に足す
+  - CI は無いので、確かめは手元だけ。上げるのは PR で（クリーナーの更新は tomato の Issue 扱い）
 - ⚠ **Chromium が死んでも `/clean` は 200 ＋ 0 件を返す**（cleaner#13）。ここの数字が静かでも、Kuma の Google News 2 本の沈黙のほうも見る
 
 ### Kuma のモニターと有効ソースの突き合わせ

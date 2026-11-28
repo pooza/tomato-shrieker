@@ -250,14 +250,47 @@ module TomatoShrieker
     end
 
     # 🔴 #1785: モロヘイヤのタグ付けが落ちても、ソースのタグと `extra_tags` は残す。
+    # ⚠ `remote_tags` を丸ごとスタブすると `Source#remote_tags` の rescue を通らない（#1806）。
+    #   モロヘイヤの呼び出しのほうを落とす。
     def test_tags_survive_remote_tagging_failure
       entry = @entries.first
       feed = entry.feed
+      broken = Object.new
+      broken.define_singleton_method(:search_hashtags) {|_status| raise Ginseng::GatewayError, 'Bad response 502'}
       feed.define_singleton_method(:remote_tagging?) {true}
-      feed.define_singleton_method(:remote_tags) {|_status| []}
+      feed.define_singleton_method(:mulukhiya) {broken}
       entry.define_singleton_method(:nokogiri) {Nokogiri::HTML('<h1>x</h1>')}
       entry.instance_variable_set(:@tags, nil)
       tags = entry.tags
+
+      assert_include(tags, '#test')
+      assert_include(tags, '#fixture')
+    end
+
+    # 🔴 #1806: エントリのページを取れなくても、ソースのタグと `extra_tags` は残し、Sentry の warning に残す。
+    def test_tags_survive_entry_page_failure
+      entry = @entries.first
+      feed = entry.feed
+      feed.define_singleton_method(:remote_tagging?) {true}
+      entry.define_singleton_method(:nokogiri) {raise Ginseng::GatewayError, 'Bad response 404'}
+      entry.instance_variable_set(:@tags, nil)
+      captured = []
+      tags = with_sentry_stub(captured) {entry.tags}
+
+      assert_include(tags, '#test')
+      assert_include(tags, '#fixture')
+      assert_equal('remote tags dropped', captured.first[:message])
+      assert_equal(feed.id, captured.first[:tags][:source])
+    end
+
+    # 4.22.0 リリース前レビュー: URL として読めないエントリでも、既定のタグと `extra_tags` は残す。
+    def test_tags_survive_unparsable_entry_url
+      entry = @entries.first
+      entry.feed.define_singleton_method(:remote_tagging?) {true}
+      entry.define_singleton_method(:url) {'http://exa mple.com/a b'}
+      entry.instance_variable_set(:@uri, nil)
+      entry.instance_variable_set(:@tags, nil)
+      tags = with_sentry_stub([]) {entry.tags}
 
       assert_include(tags, '#test')
       assert_include(tags, '#fixture')

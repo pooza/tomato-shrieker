@@ -10,11 +10,6 @@ module TomatoShrieker
       super
     end
 
-    # ginseng-upstream: pooza/ginseng-piefed#47
-    def api_version
-      return @params[:api_version] || super
-    end
-
     def exec(body)
       # ⚠ **構築時ではなくここで login する (#1514)。**上流の `Service#login` は
       # `return if @jwt` を持つので、二重に叩くことはない。構築時に無条件で叩くと、

@@ -297,13 +297,19 @@ module TomatoShrieker
     def parse_ack_until(value)
       return nil if value.nil?
       unless until_at = parse_ack_time(value)
-        raise Thor::Error, "--until は #{ACK_UNTIL_FORMATS.join(' か ')} の形で書いてください: #{value}"
+        raise Thor::Error, "--until は #{ack_until_examples.join(' か ')} の形で書いてください: #{value}"
       end
       raise Thor::Error, "--until は未来の時刻を指定してください: #{value}" unless until_at > Time.now
       if until_at > Time.now + (ACK_UNTIL_MAX_DAYS * 86_400)
         raise Thor::Error, "--until は #{ACK_UNTIL_MAX_DAYS} 日先までです: #{value}"
       end
       return until_at
+    end
+
+    # 書式の誤りのメッセージに出す例（#1806）。strftime の書式（`%Y-%m-%d`）をそのまま見せない。
+    def ack_until_examples
+      tomorrow = Time.now + 86_400
+      return ACK_UNTIL_FORMATS.map {|format| tomorrow.strftime(format.sub('%H:%M', '12:00'))}
     end
 
     # ⚠ 書いたとおりに読み戻せるものだけ受ける（`2026-02-30` を 3/2 に読み替えない）。
@@ -325,8 +331,11 @@ module TomatoShrieker
         return
       end
       next_run = source.next_run_at(latest_error.executed_at)
+      # ⚠ やり直し（`/schedule/retry`）があれば、それも次の run になる（healthz の ` or at the next retry` と揃える・#1806）。
+      # daemon の外からは、やり直しを使い切ったかは分からないので「あれば」と言う。
+      retry_note = source.retry_configured? ? '（やり直しが残っていれば、その結果でも）' : ''
       say "  error（#{run_at} の run）を確認済みにしました。" \
-        "次の定期実行 #{next_run&.strftime('%Y-%m-%d %H:%M')} で再判定します（また error なら警告します）。"
+        "次の定期実行 #{next_run&.strftime('%Y-%m-%d %H:%M')}#{retry_note} で再判定します（また error なら警告します）。"
     end
 
     def say_silence_after_ack(source, moved:)

@@ -40,7 +40,7 @@ bin/shrieker source ack ID
 
 ⚠ **上の式の `silence_acknowledged_at` は `/status.json` に出ない (#1770)。**効いているときは `silence_baseline_origin: acknowledgement` で、その値が `silence_baseline` に出る（配信が追い越せば判定に関わらないので出さない）。⚠ `acknowledged_at` とは別物＝未達・取りこぼしだけの確認では動かない（#1680）。
 
-⚠ **`acknowledged_reasons` が `null` なのは、4.19.0（migration 015）より前の確認**＝何を確認したかの記録が無い。`[]` とは別 (#1770)。⚠ **`acknowledged_run_id` は 1 つだけ**で、未達と取りこぼしが別の run にあると未達の run を指す（取りこぼし → error の順に次点）。どちらの警告も確認の時刻で解けるので赤緑には影響しない (#1770・実測済み)。
+⚠ **`acknowledged_reasons` が `null` なのは、4.19.0（migration 015）より前の確認**＝何を確認したかの記録が無い。`[]` とは別 (#1770)。⚠ **確認をしたことが無いソースも `null`**（`acknowledged_at` も `null`）。前者は `acknowledged_at` が入っているので、両方を組み合わせて読む (#1806)。⚠ **`acknowledged_run_id` は 1 つだけ**で、未達と取りこぼしが別の run にあると未達の run を指す（取りこぼし → error の順に次点）。どちらの警告も確認の時刻で解けるので赤緑には影響しない (#1770・実測済み)。
 
 ソースの状況ごとの使い分け:
 
@@ -81,10 +81,10 @@ bin/shrieker source ack ID
 | `bin/shrieker source ack ID` | **確認した run まで。**次の定期実行がまた error なら赤に戻る（確認より後に終わった error の run は了解していない） |
 | `bin/shrieker source ack ID --until 2026-11-14` | **期限まで。**その間の error でも緑。⚠ **期限の前に成功したら、その時点で解除する**（次の失敗はすぐ赤）。期限を過ぎたら、その時点の結果で判定し直す（確認した run のままでも赤） |
 
-- ⚠ **期限の無い「ずっと緑」は作らない（ユーザー判断）。**`--until` は未来の時刻だけを受け、error の警告が出ていないソースには使えない（先回りの確認はしない）。🔴 **35 日先まで**（月次のソースでも次の実行まで届く長さ・#1785・ユーザー判断）。⚠ **書き方は `2026-12-01`（その日の 0:00）と `2026-12-01T12:00` だけ**（#1785）。`Time.parse` は `12` を今月 12 日、`2026-02-30` を 3/2 と読むので使わない。読み戻して一致しないもの（2/30 など）も弾く。出力に実際の時刻を出す
-- 📌 **使いどころ**: `schedule.retry`（#1585）のやり直しも使い切ったとき（期限なし）と、原因が分かっていて上流の復旧を何日も待つとき・週次や月次のソース（`--until`）
+- ⚠ **期限の無い「ずっと緑」は作らない（ユーザー判断）。**`--until` は未来の時刻だけを受け、error の警告が出ていないソースには使えない（先回りの確認はしない）。⚠ **35 日先まで**（月次のソースでも次の実行まで届く長さ・#1785・ユーザー判断）。⚠ **書き方は `2026-12-01`（その日の 0:00）と `2026-12-01T12:00` だけ**（#1785）。`Time.parse` は `12` を今月 12 日、`2026-02-30` を 3/2 と読むので使わない。読み戻して一致しないもの（2/30 など）も弾く。出力に実際の時刻を出す
+- 📌 **使いどころ**: `/schedule/retry`（#1585）のやり直しも使い切ったとき（期限なし）と、原因が分かっていて上流の復旧を何日も待つとき・週次や月次のソース（`--until`）
 - ⚠ **`--until` が抑えるのは error だけ。**その間の run が宛先で落ちれば未達（`undelivered`）で赤くなる（未達・取りこぼしは run ごとの確認のまま）
 - ⚠ **`/status.json` の `error_acknowledged_at` / `_until` は記録で、いま効いているかではない。**次の error で赤に戻っても・期限が過ぎても値は残る（成功で消える）。📌 **いま抑えているかは `error_acknowledged`（真偽値）で読む**（4.21.0・#1785・判定は healthz と同じ）。`source status` の `PROBLEMS` 列には目印 `error_acknowledged` が出る（問題ではないので `--problems` には出ない）
 - ⚠ **`acknowledged_reasons` の `errored` は「成功で解除」の後も残る**（何を確認したかの履歴・ほかの理由と同じ扱い・#1785 のユーザー判断）
-- **緑でも本文で分かる。**`/healthz/source/:id` は `OK (error acknowledged until …)` / `OK (error acknowledged, re-evaluated at <次の定期実行>)` を返す（`schedule.retry` のあるソースは ` or at the next retry` が続く＝やり直しも次の run になる）。ほかの理由で赤いときは 503 の本文に同じ行が出る。`/status.json` は `error_acknowledged_at` / `error_acknowledged_until`、`acknowledged_reasons` に `errored`
+- **緑でも本文で分かる。**`/healthz/source/:id` は `OK (error acknowledged until …)` / `OK (error acknowledged, re-evaluated at <次の定期実行>)` を返す（`/schedule/retry` のあるソースは ` or at the next retry` が続く＝やり直しも次の run になる）。ほかの理由で赤いときは 503 の本文に同じ行が出る。`/status.json` は `error_acknowledged_at` / `error_acknowledged_until`、`acknowledged_reasons` に `errored`
 - ⚠ **「成功で解除」は記録で持つ。**error で終わらなかった run（`success` / `partial`）を記録した時点で、error の確認を消す（`SilenceAck.clear_error`）。⚠ 判定のたびに run_log から探す形にすると、保持期間の掃除で成功の行が消えたとき確認が復活する（#1779 の Codex P2）。📌 **`source ack` は警告の読みと記録の書きを 1 つのトランザクションにする**（SQLite の `immediate`・#1785）＝確認の直前に記録された成功を見落とさない。🔴 **run の記録（`SourceRunLog.record`）の側は囲まない**（4.21.0 リリース前レビューの赤）。daemon の並列の run どうしが書き込みの錠を取り合い、GVL を握った待ちで詰まって run_log の行が欠ける。ack の側だけで「成功で解除」は守れる（作成の後に ack が来れば成功を読む・ack の後なら解除が効く）

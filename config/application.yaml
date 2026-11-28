@@ -28,6 +28,9 @@ http:
   # 既定へ倒れないので、無いと HTTP を作った時点で ConfigError になる。
   timeout:
     seconds: 30
+  # 取りにいく本文（フィード・iCalendar・エントリのページ）の上限（#1781）。本番のフィードは
+  # 大きいもので数百 KB。⚠ 添付（`RemoteAttachment`）は ginseng-fediverse の上限（256 MiB）で別。
+  max_bytes: 10485760
 line:
   urls:
     api: https://api.line.me
@@ -60,7 +63,7 @@ package:
     - tkoishi@b-shock.co.jp
   license: MIT
   url: https://github.com/pooza/tomato-shrieker
-  version: 4.21.0
+  version: 4.22.0
 nostr:
   # リレーが `OK`（NIP-20）を返すまで待つ秒数。返らなければそのリレーは失敗 (#1479)。
   publish:
